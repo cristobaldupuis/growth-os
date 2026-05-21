@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 
-const KEY_ITEMS    = "gos_items_v3";
+const KEY_ITEMS    = "gos_items_v4";
 
 // Storage helper — works in Claude artifacts (window.storage), StackBlitz (localStorage), or memory
 const store = (() => {
@@ -24,14 +24,18 @@ const KEY_SETTINGS = "gos_settings_v2";
 const KEY_THEME    = "gos_theme_v1";
 
 const DEFAULT_SETTINGS = {
-  companyName:      "Company Name",
-  businessModel:    "DTC ecommerce",
-  northStarMetric:  "Revenue",
+  companyName:      "Growth OS",
+  businessModel:    "Multi-retailer growth portfolio",
+  northStarMetric:  "Portfolio Revenue",
   northStarCurrent: "$1.1M/mo",
   northStarTarget:  "$1.4M/mo",
-  categories:       ["Paid Media","Organic","Conversion","Merchandising","Retention","Retailer","Data / Analytics"],
+  categories:       ["Paid Media","Organic","Conversion","Merchandising","Retention","Brand","Data / Analytics"],
   dataSources:      [],
-  brands:           [{id:"default",name:"Northcove Home"}],
+  brands:           [
+    {id:"default", name:"Northcove Home"},
+    {id:"r1",      name:"Retailer 1"},
+    {id:"r2",      name:"Retailer 2"},
+  ],
 };
 
 const STATUSES  = ["Draft","Running","Completed","Killed"];
@@ -100,17 +104,32 @@ const TEMPLATES = [
 ];
 
 const SEED = [
-  { id:"e01", title:"Widget A/B — Pause Personalization on Mobile Collection Pages", initType:"A/B Test", hypothesis:"Removing personalization widgets from paid-social mobile entry traffic to lighting and living room collections will recover CVR toward prior 4W baseline (1.85%) by eliminating load-time and rendering friction introduced in late March.", category:"Conversion", owner:"Site / Product", primaryMetric:"CVR on paid-social mobile entry", killCriteria:"Cell B CVR >= 1.76% = widgets confirmed as cause. Cell B flat = widen investigation.", status:"Running", startDate:"2026-05-12", endDate:"2026-06-07", ice:{impact:9,certainty:7,ease:8}, revenueImpact:118352, linkedIds:["e02","e03","e04"], results:null, createdAt:"2026-05-10", brandId:"default", notes:"Cell A: widgets on. Cell B: widgets off. Scoped to paid-social mobile only." },
-  { id:"e02", title:"PDP Content Fix — Delivery Clarity, Swatches, OOS on Top 20 SKUs", initType:"Process", hypothesis:"Fixing delivery messaging, swatch clarity, and OOS display on the top 20 traffic-driving SKUs will reduce checkout abandonment and improve new-visitor CVR by 15-20% on affected PDPs.", category:"Merchandising", owner:"Merch + Site", primaryMetric:"New-visitor CVR on top 20 SKUs; care ticket volume", killCriteria:"No CVR improvement on affected SKUs after 2 weeks vs prior baseline.", status:"Running", startDate:"2026-05-12", endDate:"2026-05-26", ice:{impact:7,certainty:8,ease:7}, revenueImpact:34112, linkedIds:["e01","e03"], results:null, createdAt:"2026-05-10", brandId:"default", notes:"Runs parallel to widget test." },
-  { id:"e03", title:"Weekly Growth Triage — Collection Health Scorecard", initType:"Process", hypothesis:"A shared weekly triage with a scored collection-page health system will reduce mean time to intervention on conversion problems by at least 50% by eliminating the five-team information silo.", category:"Conversion", owner:"Director of Growth", primaryMetric:"Mean time to intervention; scorecard adoption across 5 functions", killCriteria:"If triage fails to produce one owner-assigned action per week after 3 sessions, redesign.", status:"Running", startDate:"2026-05-12", endDate:"2026-06-30", ice:{impact:6,certainty:9,ease:8}, revenueImpact:0, linkedIds:["e01","e02","e04"], results:null, createdAt:"2026-05-10", brandId:"default", notes:"Monday cadence." },
-  { id:"e04", title:"Mobile PDP QA Walk — New Customer Entry Products", initType:"Research", hypothesis:"A structured mobile PDP audit of new-visitor entry products will uncover rendering, load, and trust issues contributing to the 11-12x CVR gap between new visitors and returning customers.", category:"Conversion", owner:"Director of Growth", primaryMetric:"Actionable issues found per PDP; % resolved within 2 weeks", killCriteria:"Discovery task — output is a prioritized bug list.", status:"Completed", startDate:"2026-05-12", endDate:"2026-05-19", ice:{impact:7,certainty:9,ease:9}, revenueImpact:0, linkedIds:["e01","e02"], results:{ actualOutcome:"14 actionable issues found across 12 PDPs. Swatch rendering broken on 6 lighting SKUs. Delivery messaging absent on 4 living room hero SKUs. Avg load time 5.1s.", keyLearning:"New visitors hit a materially degraded PDP experience independent of widgets — fixing content and load in parallel is not optional.", outcomeClassification:"Success", decisionMade:"8 of 14 issues resolved same week. Remaining 6 tracked in weekly triage.", outcomeCertainty:90, actualRevenueImpact:0 }, createdAt:"2026-05-10", brandId:"default" },
-  { id:"e05", title:"Paid Social Spend Hold — No Budget Increase Until CVR Recovers", initType:"Process", hypothesis:"Holding paid social spend flat until new-visitor CVR recovers to >= 1.76% will improve incremental ROAS from 0.24x by stopping paid volume from flowing into a broken funnel.", category:"Paid Media", owner:"Paid + Director of Growth", primaryMetric:"Incremental ROAS; new-visitor CVR WoW", killCriteria:"Hold lifted when widget test resolves and CVR recovers to >= 1.76%.", status:"Running", startDate:"2026-05-12", endDate:"2026-06-07", ice:{impact:8,certainty:9,ease:9}, revenueImpact:80000, linkedIds:["e01","e06"], results:null, createdAt:"2026-05-10", brandId:"default", notes:"Incremental ROAS last 4W = 0.24x." },
-  { id:"e06", title:"Budget Shift — Paid Social to Retargeting (Post-Fix)", initType:"Campaign", hypothesis:"Shifting 15% of paid social budget into retargeting after PDP fixes are live will yield higher incremental ROAS by re-engaging warm intent with an improved destination.", category:"Paid Media", owner:"Paid", primaryMetric:"Retargeting incremental ROAS vs current paid social ROAS", killCriteria:"Retargeting ROAS below 1.0x after $20k spend at 2-week mark.", status:"Draft", startDate:"2026-06-10", endDate:"2026-07-15", ice:{impact:7,certainty:6,ease:7}, revenueImpact:47000, linkedIds:["e01","e05"], results:null, createdAt:"2026-05-10", brandId:"default", notes:"Do not launch until widget test and PDP fixes complete." },
-  { id:"e07", title:"Collection Rebuild — Top Paid-Social Landing Pages", initType:"A/B Test", hypothesis:"Rebuilding lighting and living room collection pages with in-stock priority sequencing, load-time optimization, and hero-SKU variant gap resolution will recover CVR to prior 4W baseline and support paid social scaling at ROAS above 1.5x.", category:"Conversion", owner:"Site / Product + Merch", primaryMetric:"Collection-page CVR; mobile load time; OOS rate on hero SKUs", killCriteria:"Scope changes if widget test Cell B is not materially better than Cell A.", status:"Draft", startDate:"2026-06-10", endDate:"2026-07-01", ice:{impact:9,certainty:6,ease:5}, revenueImpact:118352, linkedIds:["e01","e02","e04"], results:null, createdAt:"2026-05-10", brandId:"default", notes:"Second move — scope depends on widget test result." },
-  { id:"e08", title:"Sitewide 15% Promo — Rejected", initType:"Campaign", hypothesis:"A sitewide 15% promotional discount will lift CVR quickly and protect topline revenue while conversion infrastructure issues are resolved.", category:"Merchandising", owner:"Finance", primaryMetric:"CVR lift; gross margin impact", killCriteria:"N/A — not pursuing.", status:"Killed", startDate:"2026-05-10", endDate:"2026-05-14", ice:{impact:3,certainty:2,ease:8}, revenueImpact:-118000, linkedIds:[], results:{ actualOutcome:"Decision not to pursue. Gross profit already down $118k last 4W. Decor markdown at 23%.", keyLearning:"Promo compresses margin without addressing root cause — the problem is site experience, not price.", outcomeClassification:"Failed", decisionMade:"Do not pursue. Revisit only after CVR infrastructure is stable.", outcomeCertainty:95, actualRevenueImpact:0 }, createdAt:"2026-05-10", brandId:"default" },
-  { id:"e09", title:"Paid Social +25% Scale — Rejected", initType:"Campaign", hypothesis:"Increasing paid social spend 25% into current winning audiences will accelerate new-customer growth given improving creative CTR.", category:"Paid Media", owner:"Paid", primaryMetric:"New-customer revenue; incremental ROAS", killCriteria:"N/A — not pursuing.", status:"Killed", startDate:"2026-05-10", endDate:"2026-05-14", ice:{impact:4,certainty:2,ease:7}, revenueImpact:-60000, linkedIds:["e05"], results:{ actualOutcome:"Rejected. Incremental ROAS = 0.24x. $80k spend generated $19k incremental revenue.", keyLearning:"Scaling volume into a broken funnel makes the problem more expensive, not better.", outcomeClassification:"Failed", decisionMade:"Hold spend. Confirm attribution methodology first.", outcomeCertainty:92, actualRevenueImpact:-60000 }, createdAt:"2026-05-10", brandId:"default" },
-  { id:"e10", title:"Homepage Hero Redesign — Premium Brand Presentation", initType:"A/B Test", hypothesis:"Redesigning the homepage hero and seasonal brand creative to feel more premium and less promotional will improve trust signals for new visitors and support conversion quality over time.", category:"Retailer", owner:"Retailer", primaryMetric:"New-visitor bounce rate; new-visitor CVR on brand-entry traffic", killCriteria:"No measurable improvement in new-visitor bounce rate or CVR after 4 weeks.", status:"Draft", startDate:"2026-07-01", endDate:"2026-08-01", ice:{impact:5,certainty:4,ease:6}, revenueImpact:22000, linkedIds:["e01","e02"], results:null, createdAt:"2026-05-10", brandId:"default", notes:"Sequenced after widget test and PDP fixes." },
+  { id:"e01", initId:"NH-001", title:"Widget A/B — Pause Personalization on Mobile Collection Pages", initType:"A/B Test", hypothesis:"Removing personalization widgets from paid-social mobile entry traffic to lighting and living room collections will recover CVR toward prior 4W baseline (1.85%) by eliminating load-time and rendering friction introduced in late March.", category:"Conversion", owner:"Site / Product", primaryMetric:"CVR on paid-social mobile entry", killCriteria:"Cell B CVR >= 1.76% = widgets confirmed as cause. Cell B flat = widen investigation.", status:"Running", startDate:"2026-05-12", endDate:"2026-06-07", ice:{impact:9,certainty:7,ease:8}, revenueImpact:118352, linkedIds:["e02","e03","e04"], results:null, createdAt:"2026-05-10", brandId:"default", notes:"Cell A: widgets on. Cell B: widgets off. Scoped to paid-social mobile only." },
+  { id:"e02", initId:"NH-002", title:"PDP Content Fix — Delivery Clarity, Swatches, OOS on Top 20 SKUs", initType:"Process", hypothesis:"Fixing delivery messaging, swatch clarity, and OOS display on the top 20 traffic-driving SKUs will reduce checkout abandonment and improve new-visitor CVR by 15-20% on affected PDPs.", category:"Merchandising", owner:"Merch + Site", primaryMetric:"New-visitor CVR on top 20 SKUs; care ticket volume", killCriteria:"No CVR improvement on affected SKUs after 2 weeks vs prior baseline.", status:"Running", startDate:"2026-05-12", endDate:"2026-05-26", ice:{impact:7,certainty:8,ease:7}, revenueImpact:34112, linkedIds:["e01","e03"], results:null, createdAt:"2026-05-10", brandId:"default", notes:"Runs parallel to widget test." },
+  { id:"e03", initId:"NH-003", title:"Weekly Growth Triage — Collection Health Scorecard", initType:"Process", hypothesis:"A shared weekly triage with a scored collection-page health system will reduce mean time to intervention on conversion problems by at least 50% by eliminating the five-team information silo.", category:"Conversion", owner:"Director of Growth", primaryMetric:"Mean time to intervention; scorecard adoption across 5 functions", killCriteria:"If triage fails to produce one owner-assigned action per week after 3 sessions, redesign.", status:"Running", startDate:"2026-05-12", endDate:"2026-06-30", ice:{impact:6,certainty:9,ease:8}, revenueImpact:0, linkedIds:["e01","e02","e04"], results:null, createdAt:"2026-05-10", brandId:"default", notes:"Monday cadence." },
+  { id:"e04", initId:"NH-004", title:"Mobile PDP QA Walk — New Customer Entry Products", initType:"Research", hypothesis:"A structured mobile PDP audit of new-visitor entry products will uncover rendering, load, and trust issues contributing to the 11-12x CVR gap between new visitors and returning customers.", category:"Conversion", owner:"Director of Growth", primaryMetric:"Actionable issues found per PDP; % resolved within 2 weeks", killCriteria:"Discovery task — output is a prioritized bug list.", status:"Completed", startDate:"2026-05-12", endDate:"2026-05-19", ice:{impact:7,certainty:9,ease:9}, revenueImpact:0, linkedIds:["e01","e02"], results:{ actualOutcome:"14 actionable issues found across 12 PDPs. Swatch rendering broken on 6 lighting SKUs. Delivery messaging absent on 4 living room hero SKUs. Avg load time 5.1s.", keyLearning:"New visitors hit a materially degraded PDP experience independent of widgets — fixing content and load in parallel is not optional.", outcomeClassification:"Success", decisionMade:"8 of 14 issues resolved same week. Remaining 6 tracked in weekly triage.", outcomeCertainty:90, actualRevenueImpact:0 }, createdAt:"2026-05-10", brandId:"default" },
+  { id:"e05", initId:"NH-005", title:"Paid Social Spend Hold — No Budget Increase Until CVR Recovers", initType:"Process", hypothesis:"Holding paid social spend flat until new-visitor CVR recovers to >= 1.76% will improve incremental ROAS from 0.24x by stopping paid volume from flowing into a broken funnel.", category:"Paid Media", owner:"Paid + Director of Growth", primaryMetric:"Incremental ROAS; new-visitor CVR WoW", killCriteria:"Hold lifted when widget test resolves and CVR recovers to >= 1.76%.", status:"Running", startDate:"2026-05-12", endDate:"2026-06-07", ice:{impact:8,certainty:9,ease:9}, revenueImpact:80000, linkedIds:["e01","e06"], results:null, createdAt:"2026-05-10", brandId:"default", notes:"Incremental ROAS last 4W = 0.24x." },
+  { id:"e06", initId:"R1-001", title:"Email Welcome Series — Reduce First-Purchase Drop-off", initType:"Campaign", hypothesis:"A 3-email welcome series sent within 48h of signup will increase first-purchase conversion rate by 12% by building product trust before discount dependency forms.", category:"Retention", owner:"CRM", primaryMetric:"First-purchase CVR within 30 days of signup", killCriteria:"No improvement in first-purchase CVR vs control after 4 weeks with 2,000+ recipients.", status:"Running", startDate:"2026-05-01", endDate:"2026-06-15", ice:{impact:7,certainty:7,ease:8}, revenueImpact:38000, linkedIds:[], results:null, createdAt:"2026-05-01", brandId:"r1", notes:"Retailer 1 has high signup-to-purchase drop-off (68%). Welcome series is low-cost, high-leverage." },
+  { id:"e07", initId:"NH-007", title:"Collection Rebuild — Top Paid-Social Landing Pages", initType:"A/B Test", hypothesis:"Rebuilding lighting and living room collection pages with in-stock priority sequencing, load-time optimization, and hero-SKU variant gap resolution will recover CVR to prior 4W baseline and support paid social scaling at ROAS above 1.5x.", category:"Conversion", owner:"Site / Product + Merch", primaryMetric:"Collection-page CVR; mobile load time; OOS rate on hero SKUs", killCriteria:"Scope changes if widget test Cell B is not materially better than Cell A.", status:"Draft", startDate:"2026-06-10", endDate:"2026-07-01", ice:{impact:9,certainty:6,ease:5}, revenueImpact:118352, linkedIds:["e01","e02","e04"], results:null, createdAt:"2026-05-10", brandId:"default", notes:"Second move — scope depends on widget test result." },
+  { id:"e08", initId:"NH-008", title:"Sitewide 15% Promo — Rejected", initType:"Campaign", hypothesis:"A sitewide 15% promotional discount will lift CVR quickly and protect topline revenue while conversion infrastructure issues are resolved.", category:"Merchandising", owner:"Finance", primaryMetric:"CVR lift; gross margin impact", killCriteria:"N/A — not pursuing.", status:"Killed", startDate:"2026-05-10", endDate:"2026-05-14", ice:{impact:3,certainty:2,ease:8}, revenueImpact:-118000, linkedIds:[], results:{ actualOutcome:"Decision not to pursue. Gross profit already down $118k last 4W. Decor markdown at 23%.", keyLearning:"Promo compresses margin without addressing root cause — the problem is site experience, not price.", outcomeClassification:"Failed", decisionMade:"Do not pursue. Revisit only after CVR infrastructure is stable.", outcomeCertainty:95, actualRevenueImpact:0 }, createdAt:"2026-05-10", brandId:"default" },
+  { id:"e09", initId:"NH-009", title:"Paid Social +25% Scale — Rejected", initType:"Campaign", hypothesis:"Increasing paid social spend 25% into current winning audiences will accelerate new-customer growth given improving creative CTR.", category:"Paid Media", owner:"Paid", primaryMetric:"New-customer revenue; incremental ROAS", killCriteria:"N/A — not pursuing.", status:"Killed", startDate:"2026-05-10", endDate:"2026-05-14", ice:{impact:4,certainty:2,ease:7}, revenueImpact:-60000, linkedIds:["e05"], results:{ actualOutcome:"Rejected. Incremental ROAS = 0.24x. $80k spend generated $19k incremental revenue.", keyLearning:"Scaling volume into a broken funnel makes the problem more expensive, not better.", outcomeClassification:"Failed", decisionMade:"Hold spend. Confirm attribution methodology first.", outcomeCertainty:92, actualRevenueImpact:-60000 }, createdAt:"2026-05-10", brandId:"default" },
+  { id:"e10", initId:"NH-010", title:"Homepage Hero Redesign — Premium Brand Presentation", initType:"A/B Test", hypothesis:"Redesigning the homepage hero and seasonal brand creative to feel more premium and less promotional will improve trust signals for new visitors and support conversion quality over time.", category:"Brand", owner:"Brand", primaryMetric:"New-visitor bounce rate; new-visitor CVR on brand-entry traffic", killCriteria:"No measurable improvement in new-visitor bounce rate or CVR after 4 weeks.", status:"Draft", startDate:"2026-07-01", endDate:"2026-08-01", ice:{impact:5,certainty:4,ease:6}, revenueImpact:22000, linkedIds:["e01","e02"], results:null, createdAt:"2026-05-10", brandId:"default", notes:"Sequenced after widget test and PDP fixes." },
+  { id:"e11", initId:"R2-001", title:"PDP Image Quality Uplift — High-Res Lifestyle Photography", initType:"A/B Test", hypothesis:"Replacing stock product images with high-resolution lifestyle photography on top 15 PDPs will increase add-to-cart rate by 10% by reducing purchase hesitation caused by poor visual trust.", category:"Conversion", owner:"Merchandising", primaryMetric:"Add-to-cart rate on affected PDPs", killCriteria:"No ATC improvement after 3 weeks with 3,000+ sessions per variant.", status:"Completed", startDate:"2026-04-01", endDate:"2026-05-01", ice:{impact:6,certainty:7,ease:5}, revenueImpact:28000, spendCost:8000, resourceCost:4000, linkedIds:[], results:{ actualOutcome:"ATC rate improved 14.2% on lifestyle-image PDPs vs control. Strongest lift on furniture category (+19%). No impact on accessories.", keyLearning:"High-quality lifestyle imagery materially lifts purchase intent on considered purchases — the effect is category-specific, not sitewide.", outcomeClassification:"Success", decisionMade:"Roll out to all furniture PDPs. Accessories deprioritised. Northcove team briefed for similar test.", outcomeCertainty:88, actualRevenueImpact:31000, actualSpendCost:9200, actualResourceCost:4500 }, createdAt:"2026-04-01", brandId:"r2" },
+  { id:"e12", initId:"R2-002", title:"Checkout Flow Simplification — Remove Optional Fields", initType:"A/B Test", hypothesis:"Removing 3 optional form fields from the checkout flow will reduce checkout abandonment by 8% by lowering cognitive load at the point of highest purchase intent.", category:"Conversion", owner:"Product", primaryMetric:"Checkout completion rate; abandonment rate", killCriteria:"No improvement in checkout completion rate after 2 weeks with 1,500+ checkout sessions.", status:"Draft", startDate:"2026-06-01", endDate:"2026-07-01", ice:{impact:8,certainty:8,ease:7}, revenueImpact:52000, spendCost:0, resourceCost:6000, linkedIds:["e11"], results:null, createdAt:"2026-05-10", brandId:"r2", notes:"Informed by e11 learnings — trust signals matter, so friction reduction should amplify the uplift." },
 ];
+
+// Generate human-readable initiative ID
+const generateInitId = (brandId, brands, existingItems) => {
+  const brand = brands && brands.find(b => b.id === brandId);
+  const name  = brand ? brand.name : "XX";
+  const prefix = name.split(/\s+/).map(w => w[0]).join("").toUpperCase().slice(0,3).padEnd(2,"X");
+  const existing = existingItems.filter(e => e.initId && e.initId.startsWith(prefix+"-"));
+  const maxNum = existing.reduce((max, e) => {
+    const n = parseInt((e.initId||"").split("-")[1]||"0");
+    return n > max ? n : max;
+  }, 0);
+  return prefix + "-" + String(maxNum + 1).padStart(3,"0");
+};
 
 const mkDefault = (cats, activeBrand) => ({
   _new:true, id:"e-"+Date.now(), title:"", hypothesis:"",
@@ -123,7 +142,19 @@ const mkDefault = (cats, activeBrand) => ({
 });
 
 // -- AI ------------------------------------------------------------------------
+const getApiKey = () => {
+  try { return localStorage.getItem("gos_apikey") || ""; } catch { return ""; }
+};
+const AI_HEADERS = (key) => ({
+  "Content-Type": "application/json",
+  "x-api-key": key,
+  "anthropic-version": "2023-06-01",
+  "anthropic-dangerously-allow-browser": "true",
+});
+
 async function callExpandHypothesis(rough, title, settings, dataCtx) {
+  const apiKey = getApiKey();
+  if (!apiKey) { alert("Add your Anthropic API key in Settings (gear icon) to use AI features."); return ""; }
   const sys = [
     "You help growth teams write structured initiative hypotheses for "+settings.companyName+",",
     "a "+settings.businessModel+" business.",
@@ -133,7 +164,7 @@ async function callExpandHypothesis(rough, title, settings, dataCtx) {
     dataCtx ? "Data context: "+dataCtx : "",
   ].join(" ");
   const resp = await fetch("https://api.anthropic.com/v1/messages", {
-    method:"POST", headers:{"Content-Type":"application/json"},
+    method:"POST", headers:AI_HEADERS(apiKey),
     body:JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:300, system:sys,
       messages:[{role:"user", content:"Title: "+(title||"none")+". Rough idea: "+rough}] }),
   });
@@ -141,7 +172,31 @@ async function callExpandHypothesis(rough, title, settings, dataCtx) {
   return data.content && data.content[0] ? data.content[0].text.trim() : "";
 }
 
+async function callSynthesiseLearnings(learnings, settings) {
+  const apiKey = getApiKey();
+  if (!apiKey) { alert("Add your Anthropic API key in Settings to use AI features."); return ""; }
+  const lines = learnings.map((l,i)=>String(i+1)+". ["+l.outcome+"]["+l.category+"]["+l.retailer+"] "+l.learning).join("\n");
+  const sys = [
+    "You are a growth strategist analysing learnings from "+settings.companyName+".",
+    "Given a list of initiative learnings (with outcome, category, and retailer labels), produce a concise synthesis.",
+    "Structure your response with these sections:",
+    "PATTERNS: 2-3 recurring themes across multiple learnings (what keeps working or failing).",
+    "CROSS-RETAILER SIGNALS: any learning from one retailer that should be tested at another.",
+    "WATCH OUT: 1-2 failure patterns or repeated mistakes the team should avoid.",
+    "Keep each section to 2-4 bullet points maximum. Be specific and direct. No generic advice.",
+  ].join(" ");
+  const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    method:"POST", headers:AI_HEADERS(apiKey),
+    body:JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:600, system:sys,
+      messages:[{role:"user", content:"Learnings to synthesise:\n"+lines}] }),
+  });
+  const data = await resp.json();
+  return data.content && data.content[0] ? data.content[0].text.trim() : "";
+}
+
 async function callSuggestICE(form, settings, dataCtx) {
+  const apiKey = getApiKey();
+  if (!apiKey) { alert("Add your Anthropic API key in Settings (gear icon) to use AI features."); return null; }
   const sys = [
     "You help growth teams score initiatives using ICE for "+settings.companyName+",",
     "a "+settings.businessModel+" business.",
@@ -162,7 +217,7 @@ async function callSuggestICE(form, settings, dataCtx) {
     "Revenue estimate: $"+(form.revenueImpact||0),
   ].join(". ");
   const resp = await fetch("https://api.anthropic.com/v1/messages", {
-    method:"POST", headers:{"Content-Type":"application/json"},
+    method:"POST", headers:AI_HEADERS(apiKey),
     body:JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:400, system:sys,
       messages:[{role:"user", content:user}] }),
   });
@@ -170,6 +225,30 @@ async function callSuggestICE(form, settings, dataCtx) {
   const raw   = data.content && data.content[0] ? data.content[0].text.trim() : "{}";
   const clean = raw.replace(/```json|```/g,"").trim();
   return JSON.parse(clean);
+}
+
+async function callQuickCapture(description, settings, cats, initTypes) {
+  const apiKey = getApiKey();
+  if (!apiKey) { alert("Add your Anthropic API key in Settings to use AI features."); return null; }
+  const sys = [
+    "You help growth teams structure initiative ideas for "+settings.companyName+", a "+settings.businessModel+" business.",
+    "North star: "+settings.northStarMetric+" (current: "+settings.northStarCurrent+", target: "+settings.northStarTarget+").",
+    "Given a rough description, extract and structure an initiative.",
+    "Return ONLY valid JSON with these keys:",
+    "title (string, concise), hypothesis (string, format: We believe that X will result in Y for Z, because W),",
+    "category (one of: "+cats.join(", ")+"),",
+    "initType (one of: "+initTypes.join(", ")+"),",
+    "primaryMetric (string), killCriteria (string), notes (string, optional context).",
+    "No markdown, no explanation, just the JSON object.",
+  ].join(" ");
+  const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    method:"POST", headers:AI_HEADERS(apiKey),
+    body:JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:600, system:sys,
+      messages:[{role:"user", content:"Rough idea: "+description}] }),
+  });
+  const data = await resp.json();
+  const raw = data.content && data.content[0] ? data.content[0].text.trim() : "{}";
+  return JSON.parse(raw.replace(/```json|```/g,"").trim());
 }
 
 // -- Style helpers -------------------------------------------------------------
@@ -307,6 +386,9 @@ export default function App() {
   const [showTpl,   setShowTpl]   = useState(false);
   const [showSet,   setShowSet]   = useState(false);
   const [showMenu,  setShowMenu]  = useState(false);
+  const [showCapture, setShowCapture] = useState(false);
+  const [captureText, setCaptureText] = useState("");
+  const [captureLoad, setCaptureLoad] = useState(false);
   const [activeBrand, setActiveBrand] = useState("all");
   const [aiLoad,    setAiLoad]    = useState(false);
   const [iceLoad,   setIceLoad]   = useState(false);
@@ -431,6 +513,7 @@ export default function App() {
   const handleSave = ()=>{
     if(!form||!form.title) return;
     const {_new,...data}=form;
+    if(_new && !data.initId) data.initId = generateInitId(data.brandId||"default", brands, items);
     const updated=_new?[data,...items]:items.map(e=>e.id===data.id?data:e);
     saveItems(updated);setNav(_new?"initiatives":"detail");
     setForm(null);setHypReview(null);setIceReview(null);setDataCtx("");
@@ -503,14 +586,17 @@ export default function App() {
           {navBtn("initiatives","Initiatives")}
           {navBtn("library","Library")}
           {(nav==="detail"||nav==="form")&&<button onClick={()=>setNav("initiatives")} style={{...gGh(t),gap:4,padding:"5px 10px"}}><span style={{fontSize:13}}>&#8592;</span> Back</button>}
-          {nav==="initiatives"&&<button onClick={goNew} style={{...gG(t),padding:"5px 10px"}}><span>+</span> New</button>}
-          <button onClick={()=>setShowSet(true)} title="Settings" style={{fontSize:14,padding:"5px 7px",borderRadius:4,cursor:"pointer",background:"transparent",border:"1px solid "+t.border,color:t.textMuted,lineHeight:1}}>{"⚙"}</button>
-          <button onClick={toggleDk} title={dk?"Light mode":"Dark mode"} style={{fontSize:14,padding:"5px 7px",borderRadius:4,cursor:"pointer",background:"transparent",border:"1px solid "+t.border,color:t.textMuted,lineHeight:1}}>{dk?"☀":"☾"}</button>
+          {nav==="initiatives"&&<>
+            <button onClick={()=>setShowCapture(true)} style={{...gGh(t),padding:"5px 10px",fontSize:11}} title="Quick capture — describe an initiative in plain text"><span>&#9889;</span> Quick capture</button>
+            <button onClick={goNew} style={{...gG(t),padding:"5px 10px"}}><span>+</span> New</button>
+          </>}
+          <button onClick={()=>setShowSet(true)} title="Settings" style={{fontSize:14,padding:"5px 7px",borderRadius:4,cursor:"pointer",background:"transparent",border:"1px solid "+t.border,color:t.textMuted,lineHeight:1}}><span dangerouslySetInnerHTML={{__html:"&#9881;"}}/></button>
+          <button onClick={toggleDk} title={dk?"Light mode":"Dark mode"} style={{fontSize:14,padding:"5px 7px",borderRadius:4,cursor:"pointer",background:"transparent",border:"1px solid "+t.border,color:t.textMuted,lineHeight:1}}><span dangerouslySetInnerHTML={{__html:dk?"&#9728;":"&#9790;"}}/></button>
         </div>
         {/* Hamburger — shown on mobile */}
         <button className="hamburger-btn" onClick={()=>setShowMenu(m=>!m)}
           style={{display:"none",fontSize:20,padding:"5px 8px",borderRadius:4,cursor:"pointer",background:"transparent",border:"1px solid "+t.border,color:t.textMuted,lineHeight:1}}>
-          {showMenu?"✕":"☰"}
+          {showMenu?"&#10005;":"&#9776;"}
         </button>
       </div>
       {/* Mobile menu drawer */}
@@ -532,17 +618,20 @@ export default function App() {
             <button onClick={()=>{setNav("initiatives");setShowMenu(false);}} style={{...menuItem(t),fontWeight:nav==="initiatives"?700:400,color:nav==="initiatives"?t.gold:t.text}}>Initiatives</button>
             <button onClick={()=>{setNav("library");setShowMenu(false);}} style={{...menuItem(t),fontWeight:nav==="library"?700:400,color:nav==="library"?t.gold:t.text}}>Library</button>
             {(nav==="detail"||nav==="form")&&<button onClick={()=>{setNav("initiatives");setShowMenu(false);}} style={menuItem(t)}>&#8592; Back</button>}
-            {nav==="initiatives"&&<button onClick={()=>{goNew();setShowMenu(false);}} style={{...menuItem(t),background:t.gold,color:t.goldText,borderRadius:4,justifyContent:"center",fontWeight:700}}>+ New initiative</button>}
+            {nav==="initiatives"&&<>
+              <button onClick={()=>{setShowCapture(true);setShowMenu(false);}} style={{...menuItem(t)}}>&#9889; Quick capture</button>
+              <button onClick={()=>{goNew();setShowMenu(false);}} style={{...menuItem(t),background:t.gold,color:t.goldText,borderRadius:4,justifyContent:"center",fontWeight:700}}>+ New initiative</button>
+            </>}
             <div style={{borderTop:"1px solid "+t.border,marginTop:4,paddingTop:8,display:"flex",gap:8}}>
-              <button onClick={()=>{setShowSet(true);setShowMenu(false);}} style={{...gGh(t),flex:1,justifyContent:"center"}}>⚙ Settings</button>
-              <button onClick={()=>{toggleDk();setShowMenu(false);}} style={{...gGh(t),flex:1,justifyContent:"center"}}>{dk?"☀ Light":"☾ Dark"}</button>
+              <button onClick={()=>{setShowSet(true);setShowMenu(false);}} style={{...gGh(t),flex:1,justifyContent:"center"}}><span dangerouslySetInnerHTML={{__html:"&#9881;"}}/> Settings</button>
+              <button onClick={()=>{toggleDk();setShowMenu(false);}} style={{...gGh(t),flex:1,justifyContent:"center"}}><span dangerouslySetInnerHTML={{__html:dk?"&#9728; Light":"&#9790; Dark"}}/></button>
             </div>
           </div>
         </div>
       )}
 
       {nav==="dashboard"&&<DashView t={t} dk={dk} dash={dash} cats={cats} settings={settings} brands={brands} activeBrand={activeBrand} dRange={dRange} setDRange={setDRange} cFrom={cFrom} cTo={cTo} setCFrom={setCFrom} setCTo={setCTo} onGo={()=>setNav("initiatives")}/>}
-      {nav==="library"&&<LearningLibrary items={items} t={t} dk={dk} cats={cats} brands={brands} activeBrand={activeBrand} onReplicate={(item)=>{const base=mkDefault(cats,activeBrand);setForm({...base,title:"[Replicate] "+item.title,hypothesis:"Based on learning from: "+item.title+". Original: "+item.hypothesis,category:item.category,initType:item.initType,ice:{...item.ice},revenueImpact:item.revenueImpact,notes:"Replicated from initiative "+item.id+". Original learning: "+item.results.keyLearning});setNav("form");}}/>}
+      {nav==="library"&&<LearningLibrary items={items} t={t} dk={dk} cats={cats} brands={brands} activeBrand={activeBrand} settings={settings} onReplicate={(item)=>{const base=mkDefault(cats,activeBrand);setForm({...base,title:"[Replicate] "+item.title,hypothesis:"Based on learning from: "+item.title+". Original: "+item.hypothesis,category:item.category,initType:item.initType,ice:{...item.ice},revenueImpact:item.revenueImpact,notes:"Replicated from initiative "+item.id+". Original learning: "+item.results.keyLearning});setNav("form");}}/>}
 
       {nav==="initiatives"&&(
         <div style={{padding:"16px 20px"}}>
@@ -596,7 +685,10 @@ export default function App() {
                     {item.owner&&<span style={{fontSize:12,color:t.textMuted,fontFamily:t.mono}}>{item.owner.split(" (")[0].split("+")[0].trim()}</span>}
                   </div>
                 </div>
-                <div style={{fontSize:14,fontWeight:700,color:t.text,lineHeight:1.4,marginBottom:4,fontFamily:t.serif}}>{item.title}</div>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}>
+                  {item.initId&&<span style={{fontSize:10,fontWeight:700,color:t.gold,fontFamily:t.mono,background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:3,padding:"1px 6px",flexShrink:0}}>{item.initId}</span>}
+                  <div style={{fontSize:14,fontWeight:700,color:t.text,lineHeight:1.4,fontFamily:t.serif}}>{item.title}</div>
+                </div>
                 {item.hypothesis&&<div style={{fontSize:12,color:t.textMuted,lineHeight:1.5,marginBottom:item.status!=="Draft"?6:0,fontFamily:t.mono}}>{item.hypothesis.slice(0,130)}{item.hypothesis.length>130?"…":""}</div>}
                 {item.status!=="Draft"&&(
                   <div style={{display:"flex",gap:14,alignItems:"center",fontSize:12,color:t.textMuted,fontFamily:t.mono,flexWrap:"wrap"}}>
@@ -633,6 +725,38 @@ export default function App() {
           onCancel={()=>{setForm(null);setHypReview(null);setIceReview(null);setDataCtx("");setNav("initiatives");}}/>
       )}
 
+      {showCapture&&(
+        <Modal t={t} dk={dk} onClose={()=>{setShowCapture(false);setCaptureText("");}} title="Quick capture">
+          <p style={{fontSize:13,color:t.textSub,fontFamily:t.mono,marginBottom:14,lineHeight:1.6}}>
+            Describe the initiative in plain language — one sentence or a few. AI will pre-fill the form. You review and adjust before saving.
+          </p>
+          <FR label="What do you want to test or change?" t={t}>
+            <textarea style={{...gTA(t),fontSize:13}} rows={4} value={captureText} onChange={e=>setCaptureText(e.target.value)}
+              placeholder={"e.g. We should test removing the discount banner on the homepage for new visitors — I think it's training customers to wait for deals rather than buying at full price. Primary metric would be full-price order rate."}/>
+          </FR>
+          {captureText.length>0&&captureText.length<30&&<div style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,marginTop:4}}>{30-captureText.length} more chars to enable AI</div>}
+          <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:14}}>
+            <button style={gGh(t)} onClick={()=>{setShowCapture(false);setCaptureText("");}}>Cancel</button>
+            <button style={{...gG(t),opacity:captureText.length>=30?1:0.4}} disabled={captureText.length<30||captureLoad}
+              onClick={async()=>{
+                setCaptureLoad(true);
+                try {
+                  const result = await callQuickCapture(captureText, settings, cats, INIT_TYPES);
+                  if (result && result.title) {
+                    const base = mkDefault(cats, activeBrand);
+                    setForm({...base, ...result});
+                    setShowCapture(false);
+                    setCaptureText("");
+                    setNav("form");
+                  }
+                } catch(e){ alert("AI extraction failed — try adding more detail."); }
+                setCaptureLoad(false);
+              }}>
+              {captureLoad?<><span style={{display:"inline-block",animation:"spin 1s linear infinite"}}>&#8635;</span> Extracting…</>:<><span>&#9889;</span> Extract with AI</>}
+            </button>
+          </div>
+        </Modal>
+      )}
       {showTpl&&(
         <Modal t={t} dk={dk} onClose={()=>setShowTpl(false)} wide title="Start from a template">
           <p style={{fontSize:13,color:t.textSub,marginBottom:16,fontFamily:t.mono}}>Pick a template to pre-fill the form, or start blank.</p>
@@ -710,13 +834,44 @@ function DashView({t,dk,dash,cats,settings,brands,activeBrand,dRange,setDRange,c
         </div>
         <div style={{display:"flex",gap:20,flexWrap:"wrap"}}>
           <div><div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Current</div><div style={{fontSize:20,fontWeight:700,color:t.gold,fontFamily:t.serif}}>{settings.northStarCurrent}</div></div>
-          <div style={{fontSize:20,color:t.textMuted,alignSelf:"center"}}>→</div>
+          <div style={{fontSize:20,color:t.textMuted,alignSelf:"center"}}>&#8594;</div>
           <div><div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Target</div><div style={{fontSize:20,fontWeight:700,color:t.text,fontFamily:t.serif}}>{settings.northStarTarget}</div></div>
         </div>
         <div style={{marginLeft:"auto",fontSize:11,color:t.textMuted,fontFamily:t.mono,textAlign:"right"}}>
           {activeBrand!=="all"&&<div style={{fontSize:12,fontWeight:600,color:t.gold,marginBottom:2}}>{brandName(activeBrand,brands)}</div>}
           {settings.businessModel}
         </div>
+      </div>
+
+      {/* Executive summary */}
+      <div style={{display:"flex",justifyContent:"flex-end"}}>
+        <button style={{...gGh(t),fontSize:11,padding:"4px 10px"}}
+          onClick={()=>{
+            const retailerLabel = activeBrand==="all"?"All retailers":brandName(activeBrand,brands);
+            const date = new Date().toLocaleDateString("en-CA",{month:"long",day:"numeric",year:"numeric"});
+            const text = [
+              "Growth OS — Weekly Update ("+date+")",
+              "Retailer: "+retailerLabel,
+              "",
+              "PIPELINE",
+              "Active initiatives: "+dash.running+" running, "+dash.pipeline+" in draft",
+              "Revenue at risk: "+fmtCur(dash.revAtRisk),
+              "",
+              "PERFORMANCE",
+              "Win rate: "+(dash.winRate!==null?dash.winRate+"%":"no closed initiatives yet")+" ("+dash.wins+" wins from "+dash.closed+" closed)",
+              "Avg days to close: "+(dash.avgDays||"n/a"),
+              "Avg ICE score: "+(dash.avgIce||"n/a"),
+              "",
+              "FINANCIALS",
+              "Revenue impacted (completed): "+fmtCur(dash.revImpacted),
+              "ROI on closed initiatives: "+(dash.closedROI!==null?dash.closedROI+"x":"not yet measurable"),
+              "Estimate accuracy: "+(dash.calibration!==null?dash.calibration+"%":"not yet measurable"),
+            ].join("\n");
+            try { navigator.clipboard.writeText(text); } catch {}
+            alert("Executive summary copied to clipboard.");
+          }}>
+          &#128203; Copy executive summary
+        </button>
       </div>
 
       {/* Range */}
@@ -736,10 +891,10 @@ function DashView({t,dk,dash,cats,settings,brands,activeBrand,dRange,setDRange,c
         {[
           {l:"Revenue impacted", v:fmtCur(dash.revImpacted), s:"from completed"},
           {l:"Revenue at risk",  v:fmtCur(dash.revAtRisk),   s:"running now"},
-          {l:"Completed",        v:dash.completed,            s:" "},
-          {l:"Killed",           v:dash.killed,               s:" "},
-          {l:"Draft pipeline",   v:dash.pipeline,             s:" "},
-          {l:"Running",          v:dash.running,              s:" "},
+          {l:"Completed",        v:dash.completed,            s:" "},
+          {l:"Killed",           v:dash.killed,               s:" "},
+          {l:"Draft pipeline",   v:dash.pipeline,             s:" "},
+          {l:"Running",          v:dash.running,              s:" "},
           {l:"Win rate",         v:dash.winRate!==null?dash.winRate+"%":"—", s:dash.wins+"/"+dash.closed+" closed"},
           {l:"Avg to close",     v:dash.avgDays||"—",         s:"days, completed"},
           {l:"Avg ICE",          v:dash.avgIce||"—",          s:"all initiatives"},
@@ -748,7 +903,7 @@ function DashView({t,dk,dash,cats,settings,brands,activeBrand,dRange,setDRange,c
           <div key={m.l} style={{...gCd(t),display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",textAlign:"center",padding:"14px 10px",minHeight:100}}>
             <div style={{fontSize:10,letterSpacing:"0.08em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,marginBottom:6,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>{m.l}</div>
             <div style={{fontSize:28,fontWeight:700,color:t.gold,fontFamily:t.serif,lineHeight:1}}>{m.v}</div>
-            {m.s&&m.s!==" "&&<div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginTop:4,whiteSpace:"nowrap"}}>{m.s}</div>}
+            {m.s&&m.s!==" "&&<div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginTop:4,whiteSpace:"nowrap"}}>{m.s}</div>}
           </div>
         ))}
       </div>
@@ -887,7 +1042,10 @@ function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResults,onL
             <ICEChip ice={item.ice} t={t}/>
             <EAlert endDate={item.endDate} status={item.status} t={t} dk={dk}/>
           </div>
-          <h2 style={{margin:0,fontSize:19,fontWeight:700,color:t.text,lineHeight:1.3,letterSpacing:"-0.02em",fontFamily:t.serif}}>{item.title}</h2>
+          <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:2}}>
+            {item.initId&&<span style={{fontSize:11,fontWeight:700,color:t.gold,fontFamily:t.mono,background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:3,padding:"2px 8px",flexShrink:0}}>{item.initId}</span>}
+            <h2 style={{margin:0,fontSize:19,fontWeight:700,color:t.text,lineHeight:1.3,letterSpacing:"-0.02em",fontFamily:t.serif}}>{item.title}</h2>
+          </div>
           {item.owner&&<div style={{fontSize:13,color:t.textMuted,marginTop:5,fontFamily:t.mono}}>{item.owner}</div>}
         </div>
         <div style={{display:"flex",gap:6}}>
@@ -1092,7 +1250,7 @@ function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hypReview,
 
       <div style={gSc(t)}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-          <div style={gSL(t)}>ICE Scoring — Impact · Certainty · Ease</div>
+          <div style={gSL(t)}>ICE Scoring — Impact &#183; Certainty &#183; Ease</div>
           <button style={{...gGh(t),fontSize:11,padding:"2px 9px",opacity:canIce?1:0.4}} onClick={onIceAssist} disabled={!canIce||iceLoad} title={canIce?"Suggest Impact + Certainty with AI":"Add title and hypothesis first"}>
             {iceLoad?<><span style={{display:"inline-block",animation:"spin 1s linear infinite"}}>&#8635;</span> Scoring…</>:<><span style={{fontSize:12}}>&#129302;</span> Suggest Impact + Certainty</>}
           </button>
@@ -1156,14 +1314,7 @@ function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hypReview,
 
       <FR label="Notes" t={t}><textarea style={gTA(t)} rows={2} value={form.notes||""} onChange={e=>f("notes",e.target.value)} placeholder="Sequencing logic, caveats, context"/></FR>
 
-      <FR label="Link related initiatives" t={t}>
-        <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
-          {items.filter(e=>e.id!==form.id).map(e=>{
-            const lnk=form.linkedIds&&form.linkedIds.includes(e.id);
-            return <button key={e.id} onClick={()=>f("linkedIds",lnk?form.linkedIds.filter(id=>id!==e.id):[...(form.linkedIds||[]),e.id])} style={{fontSize:11,padding:"3px 9px",borderRadius:4,cursor:"pointer",background:lnk?(dk?"#122a18":"#edfaf2"):(dk?"#1a1a14":"#f5f5f0"),border:"1px solid "+(lnk?(dk?"#2a7a40":"#7adca0"):t.border),color:lnk?(dk?"#60d080":"#1a7a48"):t.textMuted}}>{lnk?"✓ ":""}{e.title.slice(0,36)}{e.title.length>36?"…":""}</button>;
-          })}
-        </div>
-      </FR>
+      <LinkedInitiativePicker form={form} setForm={setForm} items={items} t={t} dk={dk}/>
 
       <div style={{display:"flex",gap:8,justifyContent:"flex-end",paddingTop:4}}>
         <button style={gGh(t)} onClick={onCancel}>Cancel</button>
@@ -1177,6 +1328,7 @@ function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hypReview,
 function SettingsModal({t,dk,settings,onSave,onClose}) {
   const [local,setLocal]=useState({...settings});
   const [newCat,setNewCat]=useState("");
+  const [apiKey,setApiKey]=useState(()=>{ try{return localStorage.getItem("gos_apikey")||"";}catch{return "";} });
   const f=(k,v)=>setLocal(p=>({...p,[k]:v}));
   const addCat=()=>{const c=newCat.trim();if(!c||local.categories.includes(c))return;f("categories",[...local.categories,c]);setNewCat("");};
   return (
@@ -1197,7 +1349,7 @@ function SettingsModal({t,dk,settings,onSave,onClose}) {
           <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}}>
             {local.categories.map(c=>(
               <span key={c} style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:12,fontWeight:600,color:catColor(c,local.categories,dk),background:dk?"#1e1e14":"#f8f7f2",border:"1px solid "+(dk?"#2a2820":"#ddd8c8"),borderRadius:4,padding:"3px 8px"}}>
-                {c}<button onClick={()=>f("categories",local.categories.filter(x=>x!==c))} style={{background:"none",border:"none",color:"inherit",cursor:"pointer",padding:0,fontSize:12,lineHeight:1,opacity:0.6}}>×</button>
+                {c}<button onClick={()=>f("categories",local.categories.filter(x=>x!==c))} style={{background:"none",border:"none",color:"inherit",cursor:"pointer",padding:0,fontSize:12,lineHeight:1,opacity:0.6}}>&#215;</button>
               </span>
             ))}
           </div>
@@ -1230,21 +1382,106 @@ function SettingsModal({t,dk,settings,onSave,onClose}) {
           <p style={{fontSize:12,color:t.textMuted,fontFamily:t.mono,lineHeight:1.6,margin:"0 0 8px"}}>Planned: Google Sheets (pulling from GA4, Looker, Meta Ads), BigQuery, direct GA4 and Meta Ads APIs. Paste data manually in the initiative form for now.</p>
           <div style={{fontSize:12,color:t.textMuted,fontFamily:t.mono,padding:"10px 12px",background:dk?"#1a1a12":"#f5f5f0",borderRadius:4,border:"1px dashed "+t.border}}>No data sources connected yet.</div>
         </div>
+        <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
+          <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:6,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>AI Integration</div>
+          <p style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,lineHeight:1.5,margin:"0 0 10px"}}>
+            Your API key is stored only in this browser. Never shared or sent anywhere except directly to Anthropic.
+          </p>
+          <FR label="Anthropic API key" t={t}>
+            <input type="password" style={gI(t)} value={apiKey} onChange={e=>setApiKey(e.target.value)} placeholder="sk-ant-api03-..."/>
+          </FR>
+          {apiKey&&<div style={{fontSize:11,color:"#2a9a60",fontFamily:t.mono,marginTop:6}}>Key saved — AI features enabled.</div>}
+        </div>
         <div style={{display:"flex",gap:8,justifyContent:"flex-end",paddingTop:4}}>
           <button style={gGh(t)} onClick={onClose}>Cancel</button>
-          <button style={gG(t)} onClick={()=>onSave(local)}>Save settings</button>
+          <button style={gG(t)} onClick={()=>{ try{localStorage.setItem("gos_apikey",apiKey.trim());}catch{}; onSave(local); }}>Save settings</button>
         </div>
       </div>
     </Modal>
   );
 }
 
+
+// -- Linked Initiative Picker -------------------------------------------------
+function LinkedInitiativePicker({form, setForm, items, t, dk}) {
+  const [query, setQuery] = useState("");
+  const [open,  setOpen]  = useState(false);
+
+  const linked = (form.linkedIds||[]);
+  const f = (v) => setForm(p=>({...p, linkedIds:v}));
+
+  const candidates = items.filter(e=>{
+    if (e.id === form.id) return false;
+    if (!query.trim()) return true;
+    const q = query.toLowerCase();
+    return e.title.toLowerCase().includes(q) || (e.initId||"").toLowerCase().includes(q);
+  }).slice(0, 8);
+
+  const linkedItems = items.filter(e=>linked.includes(e.id));
+
+  const toggle = (id) => {
+    f(linked.includes(id) ? linked.filter(x=>x!==id) : [...linked, id]);
+  };
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+      <label style={{fontSize:12,color:t.textMuted,fontFamily:t.mono}}>Link related initiatives</label>
+
+      {/* Selected chips */}
+      {linkedItems.length>0&&(
+        <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+          {linkedItems.map(e=>(
+            <span key={e.id} style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:11,padding:"3px 9px",borderRadius:4,background:dk?"#122a18":"#edfaf2",border:"1px solid "+(dk?"#2a7a40":"#7adca0"),color:dk?"#60d080":"#1a7a48",fontFamily:t.mono}}>
+              {e.initId&&<span style={{opacity:0.7}}>{e.initId}</span>}
+              {e.title.slice(0,32)}{e.title.length>32?"…":""}
+              <button onClick={()=>toggle(e.id)} style={{background:"none",border:"none",color:"inherit",cursor:"pointer",padding:"0 0 0 2px",fontSize:12,lineHeight:1}}>&#10005;</button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Search input */}
+      <div style={{position:"relative"}}>
+        <input style={gI(t)} value={query}
+          onChange={e=>{setQuery(e.target.value);setOpen(true);}}
+          onFocus={()=>setOpen(true)}
+          onBlur={()=>setTimeout(()=>setOpen(false),200)}
+          placeholder="Search by title or ID (e.g. NH-001)…"/>
+
+        {/* Dropdown */}
+        {open&&candidates.length>0&&(
+          <div style={{position:"absolute",top:"calc(100% + 4px)",left:0,right:0,zIndex:50,background:t.surface,border:"1px solid "+t.border,borderRadius:6,boxShadow:"0 4px 16px rgba(0,0,0,0.12)",maxHeight:220,overflowY:"auto"}}>
+            {candidates.map(e=>{
+              const isLinked = linked.includes(e.id);
+              const c=(dk?SD:SL)[e.status]||SL.Draft;
+              return (
+                <div key={e.id} onMouseDown={()=>toggle(e.id)}
+                  style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",cursor:"pointer",
+                    background:isLinked?(dk?"#122a18":"#edfaf2"):t.surface,
+                    borderBottom:"1px solid "+t.border}}>
+                  <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,minWidth:52,flexShrink:0}}>{e.initId||"—"}</span>
+                  <span style={{fontSize:12,color:t.text,flex:1,fontFamily:t.mono}}>{e.title.slice(0,50)}{e.title.length>50?"…":""}</span>
+                  <span style={{fontSize:10,fontWeight:600,color:c.text,background:c.bg,border:"1px solid "+c.border,borderRadius:3,padding:"1px 5px",flexShrink:0}}>{e.status}</span>
+                  {isLinked&&<span style={{fontSize:11,color:dk?"#60d080":"#1a7a48"}}>&#10003;</span>}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      {!open&&!query&&linkedItems.length===0&&<div style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>Start typing to search initiatives…</div>}
+    </div>
+  );
+}
 // -- Learning Library ---------------------------------------------------------
-function LearningLibrary({items, t, dk, cats, brands, activeBrand, onReplicate}) {
+function LearningLibrary({items, t, dk, cats, brands, activeBrand, onReplicate, settings}) {
   const [activeOutcomes, setActiveOutcomes] = useState(["Jackpot","Success"]);
   const [fCat,  setFCat]  = useState("All");
   const [fType, setFType] = useState("All");
   const [query, setQuery] = useState("");
+  const [synthesis,    setSynthesis]    = useState("");
+  const [synthLoad,    setSynthLoad]    = useState(false);
+  const [synthVisible, setSynthVisible] = useState(false);
 
   const normB = id => (!id||id==="default") ? (brands&&brands[0]&&brands[0].id||"default") : id;
   const closed = useMemo(()=>items.filter(e=>(e.status==="Completed"||e.status==="Killed")&&e.results&&e.results.keyLearning&&(activeBrand==="all"||normB(e.brandId)===normB(activeBrand))),[items,activeBrand,brands]);
@@ -1310,16 +1547,49 @@ function LearningLibrary({items, t, dk, cats, brands, activeBrand, onReplicate})
         </div>
       </div>
 
-      {/* Count */}
-      <div style={{fontSize:12,color:t.textMuted,fontFamily:t.mono}}>
-        {filtered.length} learning{filtered.length!==1?"s":""} {query?"matching":""}
-        {filtered.length===0&&closed.length>0&&<span style={{color:t.gold}}> — try adjusting filters or clicking more outcome tiles above</span>}
+      {/* Count + Synthesise */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+        <div style={{fontSize:12,color:t.textMuted,fontFamily:t.mono}}>
+          {filtered.length} learning{filtered.length!==1?"s":""} {query?"matching":""}
+          {filtered.length===0&&closed.length>0&&<span style={{color:t.gold}}> — try adjusting filters or clicking more outcome tiles above</span>}
+        </div>
+        {filtered.length>=2&&(
+          <button style={{...gGh(t),fontSize:11,padding:"4px 10px"}} disabled={synthLoad}
+            onClick={async()=>{
+              setSynthLoad(true); setSynthVisible(true); setSynthesis("");
+              try {
+                const payload = filtered.map(e=>({
+                  outcome: e.results.outcomeClassification,
+                  category: e.category,
+                  retailer: brandName(e.brandId||"default", brands),
+                  learning: e.results.keyLearning,
+                }));
+                const result = await callSynthesiseLearnings(payload, settings||{companyName:"Growth OS",businessModel:"growth portfolio",northStarMetric:"Revenue",northStarCurrent:"—",northStarTarget:"—"});
+                setSynthesis(result);
+              } catch { setSynthesis("Synthesis failed — check your API key in Settings."); }
+              setSynthLoad(false);
+            }}>
+            {synthLoad?<><span style={{display:"inline-block",animation:"spin 1s linear infinite"}}>&#8635;</span> Synthesising…</>:<><span>&#10024;</span> Synthesise learnings</>}
+          </button>
+        )}
       </div>
+
+      {/* Synthesis panel */}
+      {synthVisible&&(
+        <div style={{...gSc(t),background:dk?"#1a2a18":"#f0faf2",border:"1px solid "+(dk?"#2a6a40":"#7adca0")}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+            <div style={{fontSize:11,fontWeight:700,color:dk?"#60d080":"#1a7a48",fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>AI Synthesis — {filtered.length} learnings</div>
+            <button onClick={()=>setSynthVisible(false)} style={{background:"none",border:"none",color:t.textMuted,cursor:"pointer",fontSize:14}}>&#10005;</button>
+          </div>
+          {synthLoad?<div style={{fontSize:13,color:t.textMuted,fontFamily:t.mono}}>Analysing learnings…</div>
+            :<div style={{fontSize:13,color:t.textSub,lineHeight:1.8,whiteSpace:"pre-wrap",fontFamily:t.mono}}>{synthesis}</div>}
+        </div>
+      )}
 
       {/* Empty state */}
       {closed.length===0&&(
         <div style={{padding:"48px 24px",textAlign:"center",color:t.textMuted,fontFamily:t.mono,border:"1px dashed "+t.border,borderRadius:8}}>
-          <div style={{fontSize:32,marginBottom:12}}>📚</div>
+          <div style={{fontSize:32,marginBottom:12}}>&#128218;</div>
           <div style={{fontSize:14,marginBottom:6,color:t.text}}>No learnings yet</div>
           <div style={{fontSize:12}}>Learnings appear here when you close an initiative and log results.</div>
         </div>

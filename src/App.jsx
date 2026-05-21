@@ -24,8 +24,8 @@ const KEY_SETTINGS = "gos_settings_v2";
 const KEY_THEME    = "gos_theme_v1";
 
 const DEFAULT_SETTINGS = {
-  companyName:      "Northcove Home",
-  businessModel:    "DTC ecommerce — home furnishings and decor",
+  companyName:      "Company Name",
+  businessModel:    "DTC ecommerce",
   northStarMetric:  "Revenue",
   northStarCurrent: "$1.1M/mo",
   northStarTarget:  "$1.4M/mo",
@@ -161,6 +161,7 @@ async function callSuggestICE(form, settings, dataCtx) {
 }
 
 // -- Style helpers -------------------------------------------------------------
+const menuItem = (t) => ({fontSize:14,padding:"10px 12px",background:"transparent",border:"none",color:t.text,cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:8,fontFamily:t.mono,width:"100%"});
 const gG  = (t) => ({fontSize:12,padding:"6px 13px",borderRadius:4,background:t.gold,border:"1px solid "+t.gold,color:t.goldText,cursor:"pointer",fontWeight:700,display:"flex",alignItems:"center",gap:4,fontFamily:t.mono});
 const gGh = (t) => ({fontSize:12,padding:"6px 12px",borderRadius:4,background:"transparent",border:"1px solid "+t.border,color:t.textMuted,cursor:"pointer",display:"flex",alignItems:"center",gap:4,fontFamily:t.mono});
 const gI  = (t) => ({width:"100%",padding:"7px 10px",fontSize:13,fontFamily:t.mono,background:t.inputBg,border:"1px solid "+t.inputBorder,borderRadius:4,color:t.text,boxSizing:"border-box"});
@@ -293,6 +294,7 @@ export default function App() {
   const [confC,     setConfC]     = useState(75);
   const [showTpl,   setShowTpl]   = useState(false);
   const [showSet,   setShowSet]   = useState(false);
+  const [showMenu,  setShowMenu]  = useState(false);
   const [aiLoad,    setAiLoad]    = useState(false);
   const [iceLoad,   setIceLoad]   = useState(false);
   const [hypReview, setHypReview] = useState(null);
@@ -448,44 +450,78 @@ export default function App() {
 
   return (
     <div style={{background:t.bg,minHeight:"100vh",fontFamily:t.serif,color:t.text}}>
-      <style>{"@import url('https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css');*{box-sizing:border-box}@keyframes spin{to{transform:rotate(360deg)}}input[type=range]{accent-color:"+t.gold+"}"}</style>
+      <style>{"@import url('https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css');*{box-sizing:border-box}@keyframes spin{to{transform:rotate(360deg)}}input[type=range]{accent-color:"+t.gold+"}@media(max-width:640px){.desktop-nav{display:none!important}.hamburger-btn{display:block!important}}"}</style>
 
       {/* Header */}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"13px 20px",borderBottom:"1px solid "+t.border,background:t.headerBg,position:"sticky",top:0,zIndex:100}}>
-        <div style={{display:"flex",alignItems:"baseline",gap:6}}>
-          <span style={{fontSize:14,fontWeight:700,letterSpacing:"0.14em",color:t.gold,fontFamily:t.serif}}>GROWTH OS</span>
-          <span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em"}}>{settings.companyName}</span>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 16px",borderBottom:"1px solid "+t.border,background:t.headerBg,position:"sticky",top:0,zIndex:100,minHeight:48}}>
+        <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0,minWidth:0}}>
+          <span style={{fontSize:13,fontWeight:700,letterSpacing:"0.12em",color:t.gold,fontFamily:t.serif,whiteSpace:"nowrap"}}>GROWTH OS</span>
+          <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.04em",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:120}}>{settings.companyName}</span>
         </div>
-        <div style={{display:"flex",gap:6,alignItems:"center"}}>
+        {/* Desktop nav — hidden on mobile via inline media workaround */}
+        <div className="desktop-nav" style={{display:"flex",gap:4,alignItems:"center",flexShrink:0}}>
           {navBtn("dashboard","Dashboard")}
           {navBtn("initiatives","Initiatives")}
-          {(nav==="detail"||nav==="form")&&<button onClick={()=>setNav("initiatives")} style={{...gGh(t),gap:4}}><span style={{fontSize:13}}>&#8592;</span> Back</button>}
-          {nav==="initiatives"&&<button onClick={goNew} style={gG(t)}><span>+</span> New</button>}
-          <button onClick={()=>setShowSet(true)} title="Settings" style={{fontSize:15,padding:"5px 8px",borderRadius:4,cursor:"pointer",background:"transparent",border:"1px solid "+t.border,color:t.textMuted}}>{"⚙"}</button>
-          <button onClick={toggleDk} title={dk?"Light mode":"Dark mode"} style={{fontSize:15,padding:"5px 8px",borderRadius:4,cursor:"pointer",background:"transparent",border:"1px solid "+t.border,color:t.textMuted}}>{dk?"☀":"☾"}</button>
+          {(nav==="detail"||nav==="form")&&<button onClick={()=>setNav("initiatives")} style={{...gGh(t),gap:4,padding:"5px 10px"}}><span style={{fontSize:13}}>&#8592;</span> Back</button>}
+          {nav==="initiatives"&&<button onClick={goNew} style={{...gG(t),padding:"5px 10px"}}><span>+</span> New</button>}
+          <button onClick={()=>setShowSet(true)} title="Settings" style={{fontSize:14,padding:"5px 7px",borderRadius:4,cursor:"pointer",background:"transparent",border:"1px solid "+t.border,color:t.textMuted,lineHeight:1}}>{"⚙"}</button>
+          <button onClick={toggleDk} title={dk?"Light mode":"Dark mode"} style={{fontSize:14,padding:"5px 7px",borderRadius:4,cursor:"pointer",background:"transparent",border:"1px solid "+t.border,color:t.textMuted,lineHeight:1}}>{dk?"☀":"☾"}</button>
         </div>
+        {/* Hamburger — shown on mobile */}
+        <button className="hamburger-btn" onClick={()=>setShowMenu(m=>!m)}
+          style={{display:"none",fontSize:20,padding:"5px 8px",borderRadius:4,cursor:"pointer",background:"transparent",border:"1px solid "+t.border,color:t.textMuted,lineHeight:1}}>
+          {showMenu?"✕":"☰"}
+        </button>
       </div>
+      {/* Mobile menu drawer */}
+      {showMenu&&(
+        <div style={{position:"fixed",inset:0,zIndex:200}} onClick={()=>setShowMenu(false)}>
+          <div style={{position:"absolute",top:48,right:0,left:0,background:t.headerBg,borderBottom:"1px solid "+t.border,padding:"12px 16px",display:"flex",flexDirection:"column",gap:8,boxShadow:"0 4px 16px rgba(0,0,0,0.12)"}}
+            onClick={e=>e.stopPropagation()}>
+            <button onClick={()=>{setNav("dashboard");setShowMenu(false);}} style={{...menuItem(t),fontWeight:nav==="dashboard"?700:400,color:nav==="dashboard"?t.gold:t.text}}>Dashboard</button>
+            <button onClick={()=>{setNav("initiatives");setShowMenu(false);}} style={{...menuItem(t),fontWeight:nav==="initiatives"?700:400,color:nav==="initiatives"?t.gold:t.text}}>Initiatives</button>
+            {(nav==="detail"||nav==="form")&&<button onClick={()=>{setNav("initiatives");setShowMenu(false);}} style={menuItem(t)}>&#8592; Back</button>}
+            {nav==="initiatives"&&<button onClick={()=>{goNew();setShowMenu(false);}} style={{...menuItem(t),background:t.gold,color:t.goldText,borderRadius:4,justifyContent:"center",fontWeight:700}}>+ New initiative</button>}
+            <div style={{borderTop:"1px solid "+t.border,marginTop:4,paddingTop:8,display:"flex",gap:8}}>
+              <button onClick={()=>{setShowSet(true);setShowMenu(false);}} style={{...gGh(t),flex:1,justifyContent:"center"}}>⚙ Settings</button>
+              <button onClick={()=>{toggleDk();setShowMenu(false);}} style={{...gGh(t),flex:1,justifyContent:"center"}}>{dk?"☀ Light":"☾ Dark"}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {nav==="dashboard"&&<DashView t={t} dk={dk} dash={dash} cats={cats} settings={settings} dRange={dRange} setDRange={setDRange} cFrom={cFrom} cTo={cTo} setCFrom={setCFrom} setCTo={setCTo} onGo={()=>setNav("initiatives")}/>}
 
       {nav==="initiatives"&&(
         <div style={{padding:"16px 20px"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:12}}>
+          <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
             <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
               {["All",...STATUSES].map(s=>(
                 <button key={s} onClick={()=>setFSt(s)} style={{fontSize:12,padding:"4px 10px",borderRadius:4,cursor:"pointer",fontFamily:t.mono,background:fSt===s?t.gold:"transparent",border:"1px solid "+(fSt===s?t.gold:t.border),color:fSt===s?t.goldText:t.textMuted}}>{s}</button>
               ))}
             </div>
             <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-              <select value={fCat}  onChange={e=>setFCat(e.target.value)}  style={gSl(t)}>{["All",...cats].map(c=><option key={c}>{c}</option>)}</select>
-              <select value={fType} onChange={e=>setFType(e.target.value)} style={gSl(t)}>{["All",...INIT_TYPES].map(tp=><option key={tp}>{tp}</option>)}</select>
-              <select value={fOwn}  onChange={e=>setFOwn(e.target.value)}  style={gSl(t)}>{owners.map(o=><option key={o}>{o}</option>)}</select>
-              <select value={sort}  onChange={e=>setSort(e.target.value)}  style={gSl(t)}>
-                <option value="ice">ICE Score</option>
-                <option value="endDate">End date</option>
-                <option value="revenue">Revenue</option>
-                <option value="newest">Newest</option>
-              </select>
+              <div style={{display:"flex",flexDirection:"column",gap:2}}>
+                <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Category</label>
+                <select value={fCat} onChange={e=>setFCat(e.target.value)} style={{...gSl(t),minWidth:130}}>{["All",...cats].map(c=><option key={c}>{c}</option>)}</select>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:2}}>
+                <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Type</label>
+                <select value={fType} onChange={e=>setFType(e.target.value)} style={{...gSl(t),minWidth:120}}>{["All",...INIT_TYPES].map(tp=><option key={tp}>{tp}</option>)}</select>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:2}}>
+                <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Owner</label>
+                <select value={fOwn} onChange={e=>setFOwn(e.target.value)} style={{...gSl(t),minWidth:120}}>{owners.map(o=><option key={o}>{o}</option>)}</select>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:2}}>
+                <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Sort by</label>
+                <select value={sort} onChange={e=>setSort(e.target.value)} style={{...gSl(t),minWidth:110}}>
+                  <option value="ice">ICE Score</option>
+                  <option value="endDate">End date</option>
+                  <option value="revenue">Revenue</option>
+                  <option value="newest">Newest</option>
+                </select>
+              </div>
             </div>
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
@@ -636,22 +672,22 @@ function DashView({t,dk,dash,cats,settings,dRange,setDRange,cFrom,cTo,setCFrom,s
       </div>
 
       {/* KPIs */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:8}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:8}}>
         {[
-          {l:"Revenue impacted",v:fmtCur(dash.revImpacted),s:"from completed"},
-          {l:"Revenue at risk",  v:fmtCur(dash.revAtRisk),  s:"running now"},
-          {l:"Completed",        v:dash.completed},
-          {l:"Killed",           v:dash.killed},
-          {l:"Draft pipeline",   v:dash.pipeline},
-          {l:"Running",          v:dash.running},
-          {l:"Win rate",         v:dash.winRate!==null?dash.winRate+"%":"—",s:dash.wins+"/"+dash.closed+" closed"},
-          {l:"Avg days to close",v:dash.avgDays||"—",s:"completed only"},
-          {l:"Avg ICE score",    v:dash.avgIce||"—",s:"all initiatives"},
+          {l:"Revenue impacted", v:fmtCur(dash.revImpacted), s:"from completed"},
+          {l:"Revenue at risk",  v:fmtCur(dash.revAtRisk),   s:"running now"},
+          {l:"Completed",        v:dash.completed,            s:" "},
+          {l:"Killed",           v:dash.killed,               s:" "},
+          {l:"Draft pipeline",   v:dash.pipeline,             s:" "},
+          {l:"Running",          v:dash.running,              s:" "},
+          {l:"Win rate",         v:dash.winRate!==null?dash.winRate+"%":"—", s:dash.wins+"/"+dash.closed+" closed"},
+          {l:"Avg to close",     v:dash.avgDays||"—",         s:"days, completed"},
+          {l:"Avg ICE",          v:dash.avgIce||"—",          s:"all initiatives"},
         ].map(m=>(
-          <div key={m.l} style={gCd(t)}>
-            <div style={gSL(t)}>{m.l}</div>
-            <div style={{fontSize:24,fontWeight:700,color:t.gold,fontFamily:t.serif}}>{m.v}</div>
-            {m.s&&<div style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,marginTop:2}}>{m.s}</div>}
+          <div key={m.l} style={{...gCd(t),display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",textAlign:"center",padding:"14px 10px",minHeight:100}}>
+            <div style={{fontSize:10,letterSpacing:"0.08em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,marginBottom:6,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>{m.l}</div>
+            <div style={{fontSize:28,fontWeight:700,color:t.gold,fontFamily:t.serif,lineHeight:1}}>{m.v}</div>
+            {m.s&&m.s!==" "&&<div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginTop:4,whiteSpace:"nowrap"}}>{m.s}</div>}
           </div>
         ))}
       </div>

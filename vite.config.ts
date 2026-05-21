@@ -4,5 +4,8 @@ import react from '@vitejs/plugin-react'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: '/growth-os/', // <--- This forces the browser to look in the right folder
+  base: '/growth-os/',
+  resolve: {
+    extensions: ['.js', '.jsx', '.ts', '.tsx'] // Explicitly tells the build tool to look for .jsx files
+  }
 })

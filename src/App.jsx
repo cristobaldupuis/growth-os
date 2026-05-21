@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
-
+ 
 const KEY_ITEMS    = "gos_items_v3";
-
+ 
 // Storage helper — works in Claude artifacts (window.storage), StackBlitz (localStorage), or memory
 const store = (() => {
   const mem = {};
@@ -22,7 +22,7 @@ const store = (() => {
 })();
 const KEY_SETTINGS = "gos_settings_v2";
 const KEY_THEME    = "gos_theme_v1";
-
+ 
 const DEFAULT_SETTINGS = {
   companyName:      "Company Name",
   businessModel:    "DTC ecommerce",
@@ -32,11 +32,11 @@ const DEFAULT_SETTINGS = {
   categories:       ["Paid Media","Organic","Conversion","Merchandising","Retention","Brand","Data / Analytics"],
   dataSources:      [],
 };
-
+ 
 const STATUSES  = ["Draft","Running","Completed","Killed"];
 const OUTCOMES  = ["Jackpot","Success","Failed","Inconclusive"];
 const INIT_TYPES = ["A/B Test","Campaign","Process","Research","Infrastructure"];
-
+ 
 const TL = {
   bg:"#f8f8f4", surface:"#ffffff", surfaceAlt:"#f3f2ea",
   border:"#e8e4d8", text:"#1a1a14", textSub:"#555040", textMuted:"#9a9880",
@@ -51,23 +51,23 @@ const TD = {
   headerBg:"#0e0e08", inputBg:"#1a1a12", inputBorder:"#2e2c20",
   mono:"'Courier New',monospace", serif:"'Georgia',serif",
 };
-
+ 
 const SL = { Draft:{bg:"#f4f4ee",border:"#c8c4a8",text:"#666440"}, Running:{bg:"#edfaf2",border:"#7adca0",text:"#1a7a48"}, Completed:{bg:"#eef0fd",border:"#9090e0",text:"#3a3aa0"}, Killed:{bg:"#fdf0f0",border:"#e09090",text:"#a03030"} };
 const SD = { Draft:{bg:"#2a2a1e",border:"#4a4838",text:"#a0a080"}, Running:{bg:"#122a1a",border:"#2a6a40",text:"#5ad080"}, Completed:{bg:"#14142a",border:"#3a3a80",text:"#8080e0"}, Killed:{bg:"#2a1212",border:"#6a2828",text:"#e08080"} };
 const OL = { Jackpot:{bg:"#edfaf2",border:"#7adca0",text:"#1a7a48"}, Success:{bg:"#edfaf6",border:"#7ad4b0",text:"#1a6a50"}, Failed:{bg:"#fdf0f0",border:"#e09090",text:"#a03030"}, Inconclusive:{bg:"#fdf8ee",border:"#e0c070",text:"#8a6010"} };
 const OD = { Jackpot:{bg:"#122a18",border:"#2a7a40",text:"#60d080"}, Success:{bg:"#122820",border:"#2a6a50",text:"#50c898"}, Failed:{bg:"#2a1010",border:"#6a2020",text:"#e07070"}, Inconclusive:{bg:"#2a2410",border:"#6a5818",text:"#d0a838"} };
-
+ 
 // Type badge colors - fixed palette
 const TYPE_L = { "A/B Test":"#2878a0", Campaign:"#a04828", Process:"#4848b0", Research:"#6a4090", Infrastructure:"#208050" };
 const TYPE_D = { "A/B Test":"#50a8d8", Campaign:"#d07050", Process:"#8080e0", Research:"#a870d0", Infrastructure:"#40c880" };
-
+ 
 const CAT_L = ["#b07818","#187860","#4848b0","#b03838","#a04828","#2878a0","#6a4090","#208050"];
 const CAT_D = ["#d4a83a","#3acca0","#8080e0","#e08080","#d07050","#50a8d8","#a870d0","#40c880"];
 const catColor = (cat, cats, dk) => (dk ? CAT_D : CAT_L)[cats.indexOf(cat) % 8] || "#888";
-
+ 
 const iceScore = (i, c, e) => (!i && !c && !e) ? null : Math.round(((i||0)*(c||0)*(e||0)/1000)*100);
 const iceColor = (s, t) => s === null ? t.textMuted : s >= 60 ? t.gold : s >= 30 ? "#c08820" : "#a03030";
-
+ 
 const fmtCur = (n) => {
   if (n === 0) return "—";
   const abs = Math.abs(n);
@@ -78,7 +78,7 @@ const fmtDate = (d) => d ? new Date(d+"T12:00:00").toLocaleDateString("en-CA",{m
 const parseD  = (d) => d ? new Date(d+"T12:00:00") : null;
 const somM    = (d) => new Date(d.getFullYear(), d.getMonth(), 1);
 const eomM    = (d) => new Date(d.getFullYear(), d.getMonth()+1, 0, 23, 59, 59);
-
+ 
 const TEMPLATES = [
   { id:"ab",        label:"A/B Test",          icon:"ti-test-pipe",    initType:"A/B Test",       description:"Split traffic between two variants to measure conversion impact.",           defaults:{ hypothesis:"We believe that [changing X] will result in [metric improvement] for [audience], because [evidence or reasoning].", primaryMetric:"Conversion rate on [page/flow]", killCriteria:"No statistically significant improvement (p<0.05) at [n] sessions per variant within [timeframe]. Use sequential testing.", sampleSize:"[n] sessions per variant", duration:"[2-4] weeks" } },
   { id:"channel",   label:"Channel Experiment", icon:"ti-speakerphone", initType:"Campaign",       description:"Test a new or underinvested acquisition or retention channel.",              defaults:{ hypothesis:"We believe that investing in [channel] will result in [CAC/ROAS/volume] improvement for [audience segment], because [analogues or prior signal].", primaryMetric:"Incremental ROAS / CAC vs current channel mix", killCriteria:"ROAS below [threshold] after [$spend] at [timeframe].", sampleSize:"$[budget] test spend", duration:"[3-6] weeks" } },
@@ -87,7 +87,7 @@ const TEMPLATES = [
   { id:"lifecycle", label:"Lifecycle / CRM",    icon:"ti-mail",         initType:"Campaign",       description:"Test a new email, SMS, or retention flow targeting a specific segment.",      defaults:{ hypothesis:"We believe that [new flow / message] sent to [segment] will result in [reactivation / retention / LTV] improvement, because [segment behaviour or prior engagement signal].", primaryMetric:"Reactivation rate / repeat purchase rate within [n] days", killCriteria:"Response rate below [threshold] after [n] sends to [n]+ recipients.", sampleSize:"[n] customers", duration:"[4-6] weeks" } },
   { id:"merch",     label:"Merch / Assortment", icon:"ti-shirt",        initType:"Process",        description:"Test a merchandising change — bundle, sequencing, curation, or OOS handling.", defaults:{ hypothesis:"We believe that [merchandising change] will result in [AOV / attach rate / return rate] improvement, because [customer behaviour or friction identified].", primaryMetric:"AOV / attach rate / return rate on affected SKUs or pages", killCriteria:"No improvement vs prior 2W baseline after [n] orders or [timeframe].", sampleSize:"[n] orders / [n] sessions", duration:"[2-4] weeks" } },
 ];
-
+ 
 const SEED = [
   { id:"e01", title:"Widget A/B — Pause Personalization on Mobile Collection Pages", initType:"A/B Test", hypothesis:"Removing personalization widgets from paid-social mobile entry traffic to lighting and living room collections will recover CVR toward prior 4W baseline (1.85%) by eliminating load-time and rendering friction introduced in late March.", category:"Conversion", owner:"Site / Product", primaryMetric:"CVR on paid-social mobile entry", killCriteria:"Cell B CVR >= 1.76% = widgets confirmed as cause. Cell B flat = widen investigation.", status:"Running", startDate:"2026-05-12", endDate:"2026-06-07", ice:{impact:9,certainty:7,ease:8}, revenueImpact:118352, linkedIds:["e02","e03","e04"], results:null, createdAt:"2026-05-10", notes:"Cell A: widgets on. Cell B: widgets off. Scoped to paid-social mobile only." },
   { id:"e02", title:"PDP Content Fix — Delivery Clarity, Swatches, OOS on Top 20 SKUs", initType:"Process", hypothesis:"Fixing delivery messaging, swatch clarity, and OOS display on the top 20 traffic-driving SKUs will reduce checkout abandonment and improve new-visitor CVR by 15-20% on affected PDPs.", category:"Merchandising", owner:"Merch + Site", primaryMetric:"New-visitor CVR on top 20 SKUs; care ticket volume", killCriteria:"No CVR improvement on affected SKUs after 2 weeks vs prior baseline.", status:"Running", startDate:"2026-05-12", endDate:"2026-05-26", ice:{impact:7,certainty:8,ease:7}, revenueImpact:34112, linkedIds:["e01","e03"], results:null, createdAt:"2026-05-10", notes:"Runs parallel to widget test." },
@@ -100,16 +100,17 @@ const SEED = [
   { id:"e09", title:"Paid Social +25% Scale — Rejected", initType:"Campaign", hypothesis:"Increasing paid social spend 25% into current winning audiences will accelerate new-customer growth given improving creative CTR.", category:"Paid Media", owner:"Paid", primaryMetric:"New-customer revenue; incremental ROAS", killCriteria:"N/A — not pursuing.", status:"Killed", startDate:"2026-05-10", endDate:"2026-05-14", ice:{impact:4,certainty:2,ease:7}, revenueImpact:-60000, linkedIds:["e05"], results:{ actualOutcome:"Rejected. Incremental ROAS = 0.24x. $80k spend generated $19k incremental revenue.", keyLearning:"Scaling volume into a broken funnel makes the problem more expensive, not better.", outcomeClassification:"Failed", decisionMade:"Hold spend. Confirm attribution methodology first.", outcomeCertainty:92, actualRevenueImpact:-60000 }, createdAt:"2026-05-10" },
   { id:"e10", title:"Homepage Hero Redesign — Premium Brand Presentation", initType:"A/B Test", hypothesis:"Redesigning the homepage hero and seasonal brand creative to feel more premium and less promotional will improve trust signals for new visitors and support conversion quality over time.", category:"Brand", owner:"Brand", primaryMetric:"New-visitor bounce rate; new-visitor CVR on brand-entry traffic", killCriteria:"No measurable improvement in new-visitor bounce rate or CVR after 4 weeks.", status:"Draft", startDate:"2026-07-01", endDate:"2026-08-01", ice:{impact:5,certainty:4,ease:6}, revenueImpact:22000, linkedIds:["e01","e02"], results:null, createdAt:"2026-05-10", notes:"Sequenced after widget test and PDP fixes." },
 ];
-
+ 
 const mkDefault = (cats) => ({
   _new:true, id:"e-"+Date.now(), title:"", hypothesis:"",
   category:cats[0]||"", initType:"A/B Test", owner:"",
   primaryMetric:"", killCriteria:"", status:"Draft",
   startDate:"", endDate:"", ice:{impact:5,certainty:5,ease:5},
-  revenueImpact:0, linkedIds:[], results:null,
+  revenueImpact:0, spendCost:0, resourceCost:0, linkedIds:[], results:null,
   createdAt:new Date().toISOString().slice(0,10), notes:"",
+  brandId:"default",
 });
-
+ 
 // -- AI ------------------------------------------------------------------------
 async function callExpandHypothesis(rough, title, settings, dataCtx) {
   const sys = [
@@ -128,7 +129,7 @@ async function callExpandHypothesis(rough, title, settings, dataCtx) {
   const data = await resp.json();
   return data.content && data.content[0] ? data.content[0].text.trim() : "";
 }
-
+ 
 async function callSuggestICE(form, settings, dataCtx) {
   const sys = [
     "You help growth teams score initiatives using ICE for "+settings.companyName+",",
@@ -159,7 +160,7 @@ async function callSuggestICE(form, settings, dataCtx) {
   const clean = raw.replace(/```json|```/g,"").trim();
   return JSON.parse(clean);
 }
-
+ 
 // -- Style helpers -------------------------------------------------------------
 const menuItem = (t) => ({fontSize:14,padding:"10px 12px",background:"transparent",border:"none",color:t.text,cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:8,fontFamily:t.mono,width:"100%"});
 const gG  = (t) => ({fontSize:12,padding:"6px 13px",borderRadius:4,background:t.gold,border:"1px solid "+t.gold,color:t.goldText,cursor:"pointer",fontWeight:700,display:"flex",alignItems:"center",gap:4,fontFamily:t.mono});
@@ -170,7 +171,7 @@ const gSl = (t) => ({...gI(t),cursor:"pointer"});
 const gSc = (t) => ({background:t.surface,border:"1px solid "+t.border,borderRadius:8,padding:"13px 16px"});
 const gSL = (t) => ({fontSize:10,letterSpacing:"0.10em",textTransform:"uppercase",color:t.textMuted,marginBottom:8,fontFamily:t.mono});
 const gCd = (t) => ({background:t.surface,border:"1px solid "+t.border,borderRadius:8,padding:"12px 15px"});
-
+ 
 function FR({label,t,children}) {
   return (
     <div style={{display:"flex",flexDirection:"column",gap:5}}>
@@ -179,7 +180,7 @@ function FR({label,t,children}) {
     </div>
   );
 }
-
+ 
 // -- Atoms ---------------------------------------------------------------------
 function Bdg({label,color,bg,border,small}) {
   return <span style={{display:"inline-block",fontSize:small?10:11,fontWeight:600,letterSpacing:"0.03em",padding:small?"1px 6px":"2px 8px",borderRadius:4,border:"1px solid "+(border||"#ccc"),background:bg||"#f5f5f0",color:color||"#666",whiteSpace:"nowrap"}}>{label}</span>;
@@ -191,13 +192,13 @@ function TBdg({type,dk}) {
   const color = (dk?TYPE_D:TYPE_L)[type]||"#888";
   return <Bdg label={type} color={color} bg={dk?"#1e1e14":"#f8f7f2"} border={dk?"#2a2820":"#ddd8c8"} small/>;
 }
-
+ 
 function ICEChip({ice,t}) {
   const s = iceScore(ice&&ice.impact, ice&&ice.certainty, ice&&ice.ease);
   if (s===null) return <span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>No ICE</span>;
   return <span style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:11,fontWeight:700,color:iceColor(s,t),fontFamily:t.mono,border:"1px solid "+t.border,borderRadius:4,padding:"2px 7px"}}>ICE {s}</span>;
 }
-
+ 
 function CBar({pct,t}) {
   const col = pct>=80?t.gold:pct>=60?"#c08820":"#c04040";
   return (
@@ -209,7 +210,7 @@ function CBar({pct,t}) {
     </div>
   );
 }
-
+ 
 function EAlert({endDate,status,t,dk}) {
   if (!["Running","Draft"].includes(status)||!endDate) return null;
   const days = Math.ceil((new Date(endDate+"T12:00:00")-new Date())/86400000);
@@ -217,7 +218,7 @@ function EAlert({endDate,status,t,dk}) {
   const urg = days<=3;
   return <span style={{fontSize:11,fontWeight:600,padding:"2px 8px",borderRadius:4,background:urg?(dk?"#2a1010":"#fdf0f0"):(dk?"#2a2410":"#fdf8ee"),color:urg?"#e07070":"#c09828",border:"1px solid "+(urg?"#6a2828":"#c09828")}}>{days<=0?"End date passed":"Ends in "+days+"d"}</span>;
 }
-
+ 
 function Spark({vals,color,w,h}) {
   if (!vals||vals.length<2) return <span style={{fontSize:11,color:"#aaa"}}>—</span>;
   const W=w||120,H=h||28,mx=Math.max(...vals,1);
@@ -229,7 +230,7 @@ function Spark({vals,color,w,h}) {
     </svg>
   );
 }
-
+ 
 function ICESliders({ice,onChange,t}) {
   const dims = [
     {key:"impact",    label:"Impact",    hint:"How big is the upside? 1=negligible, 10=game-changing"},
@@ -258,7 +259,7 @@ function ICESliders({ice,onChange,t}) {
     </div>
   );
 }
-
+ 
 function Modal({t,dk,onClose,children,title,wide}) {
   return (
     <div style={{position:"fixed",inset:0,background:dk?"rgba(0,0,0,0.7)":"rgba(20,18,10,0.4)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:300,padding:20}}
@@ -273,7 +274,7 @@ function Modal({t,dk,onClose,children,title,wide}) {
     </div>
   );
 }
-
+ 
 // -- App -----------------------------------------------------------------------
 export default function App() {
   const [items,     setItems]     = useState([]);
@@ -304,10 +305,10 @@ export default function App() {
   const [cFrom,     setCFrom]     = useState("");
   const [cTo,       setCTo]       = useState("");
   const [loaded,    setLoaded]    = useState(false);
-
+ 
   const t    = dk ? TD : TL;
   const cats = settings.categories || DEFAULT_SETTINGS.categories;
-
+ 
   useEffect(()=>{
     // Theme persisted in memory only (localStorage not available in all environments)
     const load = async ()=>{
@@ -321,14 +322,14 @@ export default function App() {
     };
     load();
   },[]);
-
+ 
   const saveItems    = d => { setItems(d); try{store.set(KEY_ITEMS,JSON.stringify(d));}catch{} };
   const saveSettings = s => { setSettings(s); try{store.set(KEY_SETTINGS,JSON.stringify(s));}catch{} };
   const toggleDk     = ()=> { setDk(n => !n); };
-
+ 
   const sel    = useMemo(()=>items.find(e=>e.id===selId),[items,selId]);
   const owners = useMemo(()=>["All",...new Set(items.map(e=>e.owner).filter(Boolean).map(o=>o.split(" (")[0].split("+")[0].trim()))],[items]);
-
+ 
   const bounds = useMemo(()=>{
     const now=new Date();
     if(dRange==="thisMonth") return {from:somM(now),to:eomM(now)};
@@ -336,13 +337,13 @@ export default function App() {
     if(dRange==="custom"&&cFrom&&cTo) return{from:new Date(cFrom+"T00:00:00"),to:new Date(cTo+"T23:59:59")};
     return null;
   },[dRange,cFrom,cTo]);
-
+ 
   const inRange = item=>{
     if(!bounds) return true;
     const d=parseD(item.endDate)||parseD(item.createdAt);
     return d&&d>=bounds.from&&d<=bounds.to;
   };
-
+ 
   const dash = useMemo(()=>{
     const ranged    = items.filter(inRange);
     const completed = ranged.filter(e=>e.status==="Completed");
@@ -358,6 +359,16 @@ export default function App() {
     const totalEstimated   = closedWithActual.reduce((s,e)=>s+e.revenueImpact,0);
     const totalActual      = closedWithActual.reduce((s,e)=>s+e.results.actualRevenueImpact,0);
     const calibration      = totalEstimated!==0?Math.round((totalActual/totalEstimated)*100):null;
+    const totalEstCost     = items.reduce((s,e)=>s+(e.spendCost||0)+(e.resourceCost||0),0);
+    const closedWithActualCost = closed.filter(e=>e.results&&typeof e.results.actualSpendCost==="number");
+    const totalActualCost  = closedWithActualCost.reduce((s,e)=>s+(e.results.actualSpendCost||0)+(e.results.actualResourceCost||0),0);
+    const closedROI        = (()=>{
+      const subset=closed.filter(e=>e.results&&typeof e.results.actualRevenueImpact==="number"&&typeof e.results.actualSpendCost==="number");
+      if(!subset.length) return null;
+      const rev=subset.reduce((s,e)=>s+(e.results.actualRevenueImpact||0),0);
+      const cost=subset.reduce((s,e)=>s+(e.results.actualSpendCost||0)+(e.results.actualResourceCost||0),0);
+      return cost>0?Math.round((rev/cost)*100)/100:null;
+    })();
     const durs   = completed.filter(e=>e.startDate&&e.endDate).map(e=>Math.round((parseD(e.endDate)-parseD(e.startDate))/86400000));
     const avgDays= durs.length>0?Math.round(durs.reduce((a,b)=>a+b,0)/durs.length):null;
     const catCounts  = {}; cats.forEach(c=>{catCounts[c]=items.filter(e=>e.category===c).length;});
@@ -371,9 +382,9 @@ export default function App() {
       started:weeks.map(w=>items.filter(e=>{const d=parseD(e.startDate);return d&&d>=w.wS&&d<=w.wE;}).length),
       closed: weeks.map(w=>items.filter(e=>{const d=parseD(e.endDate);return d&&d>=w.wS&&d<=w.wE&&(e.status==="Completed"||e.status==="Killed");}).length),
     };
-    return {completed:completed.length,killed:killed.length,pipeline:pipeline.length,running:running.length,revImpacted,revAtRisk,totalEstimated,totalActual,calibration,winRate,wins:wins.length,closed:closed.length,avgDays,catCounts,typeCounts,outCounts,vel,avgIce};
+    return {completed:completed.length,killed:killed.length,pipeline:pipeline.length,running:running.length,revImpacted,revAtRisk,totalEstimated,totalActual,calibration,totalEstCost,totalActualCost,closedROI,winRate,wins:wins.length,closed:closed.length,avgDays,catCounts,typeCounts,outCounts,vel,avgIce};
   },[items,bounds,cats]);
-
+ 
   const filtered = useMemo(()=>{
     let list=items.slice();
     if(fSt!=="All")   list=list.filter(e=>e.status===fSt);
@@ -388,18 +399,18 @@ export default function App() {
     });
     return list;
   },[items,fSt,fCat,fType,fOwn,sort]);
-
+ 
   const goDetail = id=>{setSelId(id);setNav("detail");};
   const goNew    = ()=>setShowTpl(true);
   const goEdit   = item=>{setForm({...item});setNav("form");};
-
+ 
   const startFromTemplate = tpl=>{
     const base=mkDefault(cats);
     const defs=tpl?tpl.defaults:{};
     setForm({...base,...defs,initType:tpl?tpl.initType:"A/B Test"});
     setShowTpl(false);setNav("form");
   };
-
+ 
   const handleSave = ()=>{
     if(!form||!form.title) return;
     const {_new,...data}=form;
@@ -407,12 +418,12 @@ export default function App() {
     saveItems(updated);setNav(_new?"initiatives":"detail");
     setForm(null);setHypReview(null);setIceReview(null);setDataCtx("");
   };
-
+ 
   const reqStatus = s=>{
     if(s==="Completed"||s==="Killed"){setPendS(s);setConfC(sel&&sel.ice&&sel.ice.certainty?sel.ice.certainty*10:75);setShowSM(true);}
     else saveItems(items.map(e=>e.id===selId?{...e,status:s}:e));
   };
-
+ 
   const applyStatus = (s,conf)=>{
     const updated=items.map(e=>e.id===selId?{...e,status:s}:e);
     saveItems(updated);setShowSM(false);
@@ -420,38 +431,42 @@ export default function App() {
     if((s==="Completed"||s==="Killed")&&exp&&!exp.results)
       setTimeout(()=>{setRForm({actualOutcome:"",keyLearning:"",outcomeClassification:"Success",decisionMade:"",outcomeCertainty:conf,actualRevenueImpact:""});setShowR(true);},150);
   };
-
+ 
   const saveResults = ()=>{
     if(!rForm||!rForm.keyLearning) return;
-    const r={...rForm,actualRevenueImpact:rForm.actualRevenueImpact!==""?parseInt(rForm.actualRevenueImpact)||0:null};
+    const r={...rForm,
+      actualRevenueImpact:rForm.actualRevenueImpact!==""?parseInt(rForm.actualRevenueImpact)||0:null,
+      actualSpendCost:rForm.actualSpendCost!==""&&rForm.actualSpendCost!==undefined?parseInt(rForm.actualSpendCost)||0:null,
+      actualResourceCost:rForm.actualResourceCost!==""&&rForm.actualResourceCost!==undefined?parseInt(rForm.actualResourceCost)||0:null,
+    };
     saveItems(items.map(e=>e.id===selId?{...e,results:r}:e));
     setShowR(false);
   };
-
+ 
   const handleAiExpand = async()=>{
     if(!form||!form.hypothesis||form.hypothesis.length<60) return;
     setAiLoad(true);
     try{const x=await callExpandHypothesis(form.hypothesis,form.title,settings,dataCtx);if(x)setHypReview({proposed:x});}catch{}
     setAiLoad(false);
   };
-
+ 
   const handleIceAssist = async()=>{
     if(!form||!form.hypothesis) return;
     setIceLoad(true);
     try{const x=await callSuggestICE(form,settings,dataCtx);if(x&&x.impact)setIceReview(x);}catch{}
     setIceLoad(false);
   };
-
+ 
   if(!loaded) return <div style={{background:t.bg,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{color:t.textMuted,fontFamily:t.mono}}>Loading Growth OS…</span></div>;
-
+ 
   const navBtn=(v,lbl)=>(
     <button key={v} onClick={()=>setNav(v)} style={{fontSize:12,padding:"5px 12px",borderRadius:4,cursor:"pointer",fontFamily:t.mono,background:nav===v?t.gold:"transparent",border:"1px solid "+(nav===v?t.gold:t.border),color:nav===v?t.goldText:t.textMuted}}>{lbl}</button>
   );
-
+ 
   return (
     <div style={{background:t.bg,minHeight:"100vh",fontFamily:t.serif,color:t.text}}>
       <style>{"@import url('https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css');*{box-sizing:border-box}@keyframes spin{to{transform:rotate(360deg)}}input[type=range]{accent-color:"+t.gold+"}@media(max-width:640px){.desktop-nav{display:none!important}.hamburger-btn{display:block!important}}"}</style>
-
+ 
       {/* Header */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 16px",borderBottom:"1px solid "+t.border,background:t.headerBg,position:"sticky",top:0,zIndex:100,minHeight:48}}>
         <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0,minWidth:0}}>
@@ -462,6 +477,7 @@ export default function App() {
         <div className="desktop-nav" style={{display:"flex",gap:4,alignItems:"center",flexShrink:0}}>
           {navBtn("dashboard","Dashboard")}
           {navBtn("initiatives","Initiatives")}
+          {navBtn("library","Library")}
           {(nav==="detail"||nav==="form")&&<button onClick={()=>setNav("initiatives")} style={{...gGh(t),gap:4,padding:"5px 10px"}}><span style={{fontSize:13}}>&#8592;</span> Back</button>}
           {nav==="initiatives"&&<button onClick={goNew} style={{...gG(t),padding:"5px 10px"}}><span>+</span> New</button>}
           <button onClick={()=>setShowSet(true)} title="Settings" style={{fontSize:14,padding:"5px 7px",borderRadius:4,cursor:"pointer",background:"transparent",border:"1px solid "+t.border,color:t.textMuted,lineHeight:1}}>{"⚙"}</button>
@@ -480,6 +496,7 @@ export default function App() {
             onClick={e=>e.stopPropagation()}>
             <button onClick={()=>{setNav("dashboard");setShowMenu(false);}} style={{...menuItem(t),fontWeight:nav==="dashboard"?700:400,color:nav==="dashboard"?t.gold:t.text}}>Dashboard</button>
             <button onClick={()=>{setNav("initiatives");setShowMenu(false);}} style={{...menuItem(t),fontWeight:nav==="initiatives"?700:400,color:nav==="initiatives"?t.gold:t.text}}>Initiatives</button>
+            <button onClick={()=>{setNav("library");setShowMenu(false);}} style={{...menuItem(t),fontWeight:nav==="library"?700:400,color:nav==="library"?t.gold:t.text}}>Library</button>
             {(nav==="detail"||nav==="form")&&<button onClick={()=>{setNav("initiatives");setShowMenu(false);}} style={menuItem(t)}>&#8592; Back</button>}
             {nav==="initiatives"&&<button onClick={()=>{goNew();setShowMenu(false);}} style={{...menuItem(t),background:t.gold,color:t.goldText,borderRadius:4,justifyContent:"center",fontWeight:700}}>+ New initiative</button>}
             <div style={{borderTop:"1px solid "+t.border,marginTop:4,paddingTop:8,display:"flex",gap:8}}>
@@ -489,9 +506,10 @@ export default function App() {
           </div>
         </div>
       )}
-
+ 
       {nav==="dashboard"&&<DashView t={t} dk={dk} dash={dash} cats={cats} settings={settings} dRange={dRange} setDRange={setDRange} cFrom={cFrom} cTo={cTo} setCFrom={setCFrom} setCTo={setCTo} onGo={()=>setNav("initiatives")}/>}
-
+      {nav==="library"&&<LearningLibrary items={items} t={t} dk={dk} cats={cats} onReplicate={(item)=>{const base=mkDefault(cats);setForm({...base,title:"[Replicate] "+item.title,hypothesis:"Based on learning from: "+item.title+". Original: "+item.hypothesis,category:item.category,initType:item.initType,ice:{...item.ice},revenueImpact:item.revenueImpact,notes:"Replicated from initiative "+item.id+". Original learning: "+item.results.keyLearning});setNav("form");}}/>}
+ 
       {nav==="initiatives"&&(
         <div style={{padding:"16px 20px"}}>
           <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
@@ -557,16 +575,16 @@ export default function App() {
           </div>
         </div>
       )}
-
+ 
       {nav==="detail"&&sel&&(
         <DetailView item={sel} items={items} t={t} dk={dk} cats={cats}
           onEdit={()=>goEdit(sel)}
           onDelete={()=>{saveItems(items.filter(e=>e.id!==sel.id));setNav("initiatives");}}
           onStatus={reqStatus}
-          onResults={()=>{setRForm(sel.results?{...sel.results,actualRevenueImpact:sel.results.actualRevenueImpact!=null?sel.results.actualRevenueImpact:""}:{actualOutcome:"",keyLearning:"",outcomeClassification:"Success",decisionMade:"",outcomeCertainty:75,actualRevenueImpact:""});setShowR(true);}}
+          onResults={()=>{setRForm(sel.results?{...sel.results,actualRevenueImpact:sel.results.actualRevenueImpact!=null?sel.results.actualRevenueImpact:"",actualSpendCost:sel.results.actualSpendCost!=null?sel.results.actualSpendCost:"",actualResourceCost:sel.results.actualResourceCost!=null?sel.results.actualResourceCost:""}:{actualOutcome:"",keyLearning:"",outcomeClassification:"Success",decisionMade:"",outcomeCertainty:75,actualRevenueImpact:"",actualSpendCost:"",actualResourceCost:""});setShowR(true);}}
           onLink={goDetail}/>
       )}
-
+ 
       {nav==="form"&&form&&(
         <FormView form={form} setForm={setForm} items={items} t={t} dk={dk} cats={cats}
           aiLoad={aiLoad} iceLoad={iceLoad} hypReview={hypReview} iceReview={iceReview}
@@ -579,7 +597,7 @@ export default function App() {
           onSave={handleSave}
           onCancel={()=>{setForm(null);setHypReview(null);setIceReview(null);setDataCtx("");setNav("initiatives");}}/>
       )}
-
+ 
       {showTpl&&(
         <Modal t={t} dk={dk} onClose={()=>setShowTpl(false)} wide title="Start from a template">
           <p style={{fontSize:13,color:t.textSub,marginBottom:16,fontFamily:t.mono}}>Pick a template to pre-fill the form, or start blank.</p>
@@ -600,9 +618,9 @@ export default function App() {
           <button onClick={()=>startFromTemplate(null)} style={{...gGh(t),width:"100%",justifyContent:"center"}}>Start blank</button>
         </Modal>
       )}
-
+ 
       {showSet&&<SettingsModal t={t} dk={dk} settings={settings} onSave={s=>{saveSettings(s);setShowSet(false);}} onClose={()=>setShowSet(false)}/>}
-
+ 
       {showSM&&(
         <Modal t={t} dk={dk} onClose={()=>{setShowSM(false);setPendS(null);}} title={"Mark as "+pendS}>
           <p style={{fontSize:13,color:t.textSub,marginBottom:16,fontFamily:t.mono}}>Confirm outcome certainty before closing — how confident are you in the result based on data collected?</p>
@@ -616,7 +634,7 @@ export default function App() {
           </div>
         </Modal>
       )}
-
+ 
       {showR&&rForm&&(
         <Modal t={t} dk={dk} onClose={()=>setShowR(false)} wide title="Log results">
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
@@ -631,6 +649,10 @@ export default function App() {
             </FR>
             <FR label="Decision made" t={t}><textarea style={gTA(t)} rows={2} value={rForm.decisionMade} onChange={e=>setRForm({...rForm,decisionMade:e.target.value})}/></FR>
             <FR label="Actual revenue impact ($) — leave blank if not measurable" t={t}><input style={gI(t)} type="number" value={rForm.actualRevenueImpact} placeholder="e.g. 42000 or -15000" onChange={e=>setRForm({...rForm,actualRevenueImpact:e.target.value})}/></FR>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <FR label="Actual media / spend cost ($)" t={t}><input style={gI(t)} type="number" value={rForm.actualSpendCost||""} placeholder="leave blank if unchanged" onChange={e=>setRForm({...rForm,actualSpendCost:e.target.value})}/></FR>
+              <FR label="Actual resource cost ($)" t={t}><input style={gI(t)} type="number" value={rForm.actualResourceCost||""} placeholder="leave blank if unchanged" onChange={e=>setRForm({...rForm,actualResourceCost:e.target.value})}/></FR>
+            </div>
             <div style={{display:"flex",justifyContent:"flex-end"}}><button style={gG(t)} onClick={saveResults} disabled={!rForm.keyLearning}>Save results</button></div>
           </div>
         </Modal>
@@ -638,7 +660,7 @@ export default function App() {
     </div>
   );
 }
-
+ 
 // -- Dashboard -----------------------------------------------------------------
 function DashView({t,dk,dash,cats,settings,dRange,setDRange,cFrom,cTo,setCFrom,setCTo,onGo}) {
   const maxCat  = Math.max(...Object.values(dash.catCounts),1);
@@ -658,7 +680,7 @@ function DashView({t,dk,dash,cats,settings,dRange,setDRange,cFrom,cTo,setCFrom,s
         </div>
         <div style={{marginLeft:"auto",fontSize:11,color:t.textMuted,fontFamily:t.mono}}>{settings.businessModel}</div>
       </div>
-
+ 
       {/* Range */}
       <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
         {[["thisMonth","This month"],["lastMonth","Last month"],["custom","Custom"]].map(([v,l])=>(
@@ -670,32 +692,33 @@ function DashView({t,dk,dash,cats,settings,dRange,setDRange,cFrom,cTo,setCFrom,s
           <input type="date" value={cTo} onChange={e=>setCTo(e.target.value)} style={{fontSize:12,padding:"4px 8px",borderRadius:4,border:"1px solid "+t.border,background:t.inputBg,color:t.text,fontFamily:t.mono}}/>
         </>}
       </div>
-
+ 
       {/* KPIs */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:8}}>
         {[
           {l:"Revenue impacted", v:fmtCur(dash.revImpacted), s:"from completed"},
           {l:"Revenue at risk",  v:fmtCur(dash.revAtRisk),   s:"running now"},
-          {l:"Completed",        v:dash.completed,            s:" "},
-          {l:"Killed",           v:dash.killed,               s:" "},
-          {l:"Draft pipeline",   v:dash.pipeline,             s:" "},
-          {l:"Running",          v:dash.running,              s:" "},
+          {l:"Completed",        v:dash.completed,            s:" "},
+          {l:"Killed",           v:dash.killed,               s:" "},
+          {l:"Draft pipeline",   v:dash.pipeline,             s:" "},
+          {l:"Running",          v:dash.running,              s:" "},
           {l:"Win rate",         v:dash.winRate!==null?dash.winRate+"%":"—", s:dash.wins+"/"+dash.closed+" closed"},
           {l:"Avg to close",     v:dash.avgDays||"—",         s:"days, completed"},
           {l:"Avg ICE",          v:dash.avgIce||"—",          s:"all initiatives"},
+          {l:"Closed ROI",        v:dash.closedROI!==null?dash.closedROI+"x":"—", s:"actual rev / cost"},
         ].map(m=>(
           <div key={m.l} style={{...gCd(t),display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",textAlign:"center",padding:"14px 10px",minHeight:100}}>
             <div style={{fontSize:10,letterSpacing:"0.08em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,marginBottom:6,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>{m.l}</div>
             <div style={{fontSize:28,fontWeight:700,color:t.gold,fontFamily:t.serif,lineHeight:1}}>{m.v}</div>
-            {m.s&&m.s!==" "&&<div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginTop:4,whiteSpace:"nowrap"}}>{m.s}</div>}
+            {m.s&&m.s!==" "&&<div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginTop:4,whiteSpace:"nowrap"}}>{m.s}</div>}
           </div>
         ))}
       </div>
-
+ 
       {/* Calibration card */}
       <div style={{...gCd(t),border:"1px solid "+(dash.calibration!==null?(dash.calibration>=80?t.goldBorder:dash.calibration>=50?"#c0a030":t.border):t.border)}}>
         <div style={gSL(t)}>Revenue estimate calibration</div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16,alignItems:"center"}}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16,alignItems:"center",marginBottom:dash.totalEstCost>0?12:0}}>
           <div>
             <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Total estimated</div>
             <div style={{fontSize:20,fontWeight:700,color:t.text,fontFamily:t.serif}}>{fmtCur(dash.totalEstimated)}</div>
@@ -712,8 +735,27 @@ function DashView({t,dk,dash,cats,settings,dRange,setDRange,cFrom,cTo,setCFrom,s
             {dash.calibration!==null&&<div style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,marginTop:2}}>{dash.calibration>=80?"Well calibrated":dash.calibration>=50?"Moderate accuracy":"Overestimating"}</div>}
           </div>
         </div>
+        {dash.totalEstCost>0&&(
+          <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid "+t.border,display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16}}>
+            <div>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Total est. cost</div>
+              <div style={{fontSize:18,fontWeight:700,color:t.text,fontFamily:t.serif}}>{fmtCur(dash.totalEstCost)}</div>
+            </div>
+            <div>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Total actual cost</div>
+              <div style={{fontSize:18,fontWeight:700,color:t.text,fontFamily:t.serif}}>{dash.totalActualCost>0?fmtCur(dash.totalActualCost):"—"}</div>
+            </div>
+            <div>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Closed ROI</div>
+              <div style={{fontSize:22,fontWeight:700,fontFamily:t.serif,color:dash.closedROI===null?t.textMuted:dash.closedROI>=2?t.gold:dash.closedROI>=1?"#c08820":"#c04040"}}>
+                {dash.closedROI!==null?dash.closedROI+"x":"—"}
+              </div>
+              {dash.closedROI!==null&&<div style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,marginTop:2}}>{dash.closedROI>=3?"Strong return":dash.closedROI>=1?"Positive":"Negative"}</div>}
+            </div>
+          </div>
+        )}
       </div>
-
+ 
       {/* Velocity + Category + Type */}
       <div style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) minmax(0,1fr)",gap:12}}>
         <div style={gCd(t)}>
@@ -750,7 +792,7 @@ function DashView({t,dk,dash,cats,settings,dRange,setDRange,cFrom,cTo,setCFrom,s
           </div>
         </div>
       </div>
-
+ 
       {/* Type breakdown */}
       <div style={gCd(t)}>
         <div style={gSL(t)}>By initiative type</div>
@@ -772,7 +814,7 @@ function DashView({t,dk,dash,cats,settings,dRange,setDRange,cFrom,cTo,setCFrom,s
           })}
         </div>
       </div>
-
+ 
       {/* Outcome breakdown */}
       <div style={gCd(t)}>
         <div style={gSL(t)}>Outcome breakdown — all closed</div>
@@ -785,12 +827,12 @@ function DashView({t,dk,dash,cats,settings,dRange,setDRange,cFrom,cTo,setCFrom,s
           );})}
         </div>
       </div>
-
+ 
       <button style={{...gGh(t),alignSelf:"flex-start"}} onClick={onGo}><span style={{fontSize:12}}>&#9776;</span> View initiatives</button>
     </div>
   );
 }
-
+ 
 // -- Detail --------------------------------------------------------------------
 function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResults,onLink}) {
   const linked = items.filter(e=>item.linkedIds&&item.linkedIds.includes(e.id));
@@ -815,7 +857,7 @@ function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResults,onL
           <button style={{...gGh(t),color:"#c03030",borderColor:dk?"#6a2828":"#e09090"}} onClick={()=>{if(confirm("Delete this initiative?"))onDelete();}}><span style={{fontSize:12}}>&#128465;</span></button>
         </div>
       </div>
-
+ 
       {/* Status */}
       <div style={{...gSc(t),background:t.surfaceAlt}}>
         <div style={gSL(t)}>Status</div>
@@ -828,12 +870,12 @@ function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResults,onL
           )}
         </div>
       </div>
-
+ 
       <div style={gSc(t)}>
         <div style={gSL(t)}>Hypothesis</div>
         <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:14}}>{item.hypothesis||<span style={{color:t.textMuted,fontStyle:"italic"}}>No hypothesis yet.</span>}</p>
       </div>
-
+ 
       {item.ice&&(
         <div style={gSc(t)}>
           <div style={gSL(t)}>ICE scoring</div>
@@ -853,32 +895,66 @@ function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResults,onL
           </div>
         </div>
       )}
-
-      {/* Revenue estimate vs actual */}
-      {(item.revenueImpact!==0||item.results?.actualRevenueImpact!=null)&&(
+ 
+      {/* Investment & return */}
+      {(item.revenueImpact!==0||(item.spendCost||0)>0||(item.resourceCost||0)>0||item.results?.actualRevenueImpact!=null)&&(
         <div style={gSc(t)}>
-          <div style={gSL(t)}>Revenue impact</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr"+(item.results?.actualRevenueImpact!=null?" 1fr":""),gap:16}}>
-            <div>
-              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Estimated</div>
-              <div style={{fontSize:20,fontWeight:700,color:t.text,fontFamily:t.serif}}>{fmtCur(item.revenueImpact)}</div>
-            </div>
-            {item.results?.actualRevenueImpact!=null&&<>
-              <div>
-                <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Actual</div>
-                <div style={{fontSize:20,fontWeight:700,color:t.gold,fontFamily:t.serif}}>{fmtCur(item.results.actualRevenueImpact)}</div>
-              </div>
-              {item.revenueImpact!==0&&(
-                <div>
-                  <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Accuracy</div>
-                  <div style={{fontSize:20,fontWeight:700,fontFamily:t.serif,color:t.gold}}>{Math.round((item.results.actualRevenueImpact/item.revenueImpact)*100)}%</div>
-                </div>
-              )}
-            </>}
+          <div style={gSL(t)}>Investment and return</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:12}}>
+            {(item.spendCost||0)>0&&<div>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Est. spend cost</div>
+              <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.serif}}>{fmtCur(item.spendCost)}</div>
+            </div>}
+            {(item.resourceCost||0)>0&&<div>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Est. resource cost</div>
+              <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.serif}}>{fmtCur(item.resourceCost)}</div>
+            </div>}
+            {((item.spendCost||0)+(item.resourceCost||0))>0&&<div>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Total est. cost</div>
+              <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.serif}}>{fmtCur((item.spendCost||0)+(item.resourceCost||0))}</div>
+            </div>}
+            {item.revenueImpact!==0&&<div>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Est. revenue</div>
+              <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.serif}}>{fmtCur(item.revenueImpact)}</div>
+            </div>}
+            {item.revenueImpact!==0&&((item.spendCost||0)+(item.resourceCost||0))>0&&<div>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Est. ROI</div>
+              <div style={{fontSize:16,fontWeight:700,color:t.gold,fontFamily:t.serif}}>{((item.revenueImpact||0)/((item.spendCost||0)+(item.resourceCost||0))).toFixed(1)}x</div>
+            </div>}
           </div>
+          {item.results?.actualRevenueImpact!=null&&(
+            <div style={{marginTop:14,paddingTop:12,borderTop:"1px solid "+t.border}}>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:8,letterSpacing:"0.06em",textTransform:"uppercase"}}>Actual results</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:12}}>
+                {item.results.actualSpendCost!=null&&<div>
+                  <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Actual spend cost</div>
+                  <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.serif}}>{fmtCur(item.results.actualSpendCost)}</div>
+                </div>}
+                {item.results.actualResourceCost!=null&&<div>
+                  <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Actual resource cost</div>
+                  <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.serif}}>{fmtCur(item.results.actualResourceCost)}</div>
+                </div>}
+                <div>
+                  <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Actual revenue</div>
+                  <div style={{fontSize:16,fontWeight:700,color:t.gold,fontFamily:t.serif}}>{fmtCur(item.results.actualRevenueImpact)}</div>
+                </div>
+                {(()=>{
+                  const actCost=(item.results.actualSpendCost||0)+(item.results.actualResourceCost||0);
+                  const actRev=item.results.actualRevenueImpact||0;
+                  if(!actCost) return null;
+                  const roi=(actRev/actCost).toFixed(1);
+                  const color=parseFloat(roi)>=2?t.gold:parseFloat(roi)>=1?"#c08820":"#c04040";
+                  return <div>
+                    <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Actual ROI</div>
+                    <div style={{fontSize:20,fontWeight:700,color,fontFamily:t.serif}}>{roi}x</div>
+                  </div>;
+                })()}
+              </div>
+            </div>
+          )}
         </div>
       )}
-
+ 
       {item.status!=="Draft"&&(
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:8}}>
           {[{l:"Primary metric",v:item.primaryMetric},{l:"Start date",v:fmtDate(item.startDate)},{l:"End date",v:fmtDate(item.endDate)},{l:"Sample size",v:item.sampleSize||"—"},{l:"Duration",v:item.duration||"—"}].map(m=>(
@@ -889,10 +965,10 @@ function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResults,onL
           ))}
         </div>
       )}
-
+ 
       {item.killCriteria&&item.status!=="Draft"&&<div style={gSc(t)}><div style={gSL(t)}>Kill criteria</div><p style={{margin:0,color:t.textSub,lineHeight:1.6,fontSize:13}}>{item.killCriteria}</p></div>}
       {item.notes&&<div style={gSc(t)}><div style={gSL(t)}>Notes</div><p style={{margin:0,color:t.textSub,lineHeight:1.6,fontSize:13}}>{item.notes}</p></div>}
-
+ 
       {item.results&&(()=>{
         const c=(dk?OD:OL)[item.results.outcomeClassification]||{};
         return (
@@ -913,7 +989,7 @@ function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResults,onL
           </div>
         );
       })()}
-
+ 
       {linked.length>0&&(
         <div style={gSc(t)}>
           <div style={gSL(t)}>Linked initiatives</div>
@@ -931,7 +1007,7 @@ function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResults,onL
     </div>
   );
 }
-
+ 
 // -- Form ----------------------------------------------------------------------
 function FormView({form,setForm,items,t,dk,cats,aiLoad,iceLoad,hypReview,iceReview,dataCtx,setDataCtx,onAi,onIceAssist,onAcceptHyp,onRejectHyp,onAcceptIce,onRejectIce,onSave,onCancel}) {
   const f=(k,v)=>setForm(p=>({...p,[k]:v}));
@@ -940,9 +1016,9 @@ function FormView({form,setForm,items,t,dk,cats,aiLoad,iceLoad,hypReview,iceRevi
   return (
     <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:14}}>
       <div style={{fontSize:18,fontWeight:700,color:t.text,fontFamily:t.serif}}>{form._new?"New initiative":"Edit initiative"}</div>
-
+ 
       <FR label="Title *" t={t}><input style={gI(t)} value={form.title} onChange={e=>f("title",e.target.value)} placeholder="Clear, specific title"/></FR>
-
+ 
       <div>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
           <label style={{fontSize:12,color:t.textMuted,fontFamily:t.mono}}>Hypothesis</label>
@@ -963,18 +1039,18 @@ function FormView({form,setForm,items,t,dk,cats,aiLoad,iceLoad,hypReview,iceRevi
           </div>
         )}
       </div>
-
+ 
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
         <FR label="Category" t={t}><select style={gSl(t)} value={form.category} onChange={e=>f("category",e.target.value)}>{cats.map(c=><option key={c}>{c}</option>)}</select></FR>
         <FR label="Type" t={t}><select style={gSl(t)} value={form.initType||"A/B Test"} onChange={e=>f("initType",e.target.value)}>{INIT_TYPES.map(tp=><option key={tp}>{tp}</option>)}</select></FR>
         <FR label="Owner" t={t}><input style={gI(t)} value={form.owner||""} onChange={e=>f("owner",e.target.value)}/></FR>
       </div>
-
+ 
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
         <FR label="Status" t={t}><select style={gSl(t)} value={form.status} onChange={e=>f("status",e.target.value)}>{STATUSES.map(s=><option key={s}>{s}</option>)}</select></FR>
         <FR label="Primary metric" t={t}><input style={gI(t)} value={form.primaryMetric||""} onChange={e=>f("primaryMetric",e.target.value)}/></FR>
       </div>
-
+ 
       <div style={gSc(t)}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
           <div style={gSL(t)}>ICE Scoring — Impact · Certainty · Ease</div>
@@ -1004,20 +1080,33 @@ function FormView({form,setForm,items,t,dk,cats,aiLoad,iceLoad,hypReview,iceRevi
         )}
         <ICESliders ice={form.ice||{impact:5,certainty:5,ease:5}} onChange={v=>f("ice",v)} t={t}/>
       </div>
-
+ 
       <FR label="Kill criteria" t={t}><textarea style={gTA(t)} rows={2} value={form.killCriteria||""} onChange={e=>f("killCriteria",e.target.value)}/></FR>
-
+ 
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
         <FR label="Start date" t={t}><input style={gI(t)} type="date" value={form.startDate||""} onChange={e=>f("startDate",e.target.value)}/></FR>
         <FR label="End date" t={t}><input style={gI(t)} type="date" value={form.endDate||""} onChange={e=>f("endDate",e.target.value)}/></FR>
       </div>
-
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+ 
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
         <FR label="Sample size" t={t}><input style={gI(t)} value={form.sampleSize||""} onChange={e=>f("sampleSize",e.target.value)}/></FR>
         <FR label="Duration" t={t}><input style={gI(t)} value={form.duration||""} onChange={e=>f("duration",e.target.value)}/></FR>
-        <FR label="Revenue impact ($)" t={t}><input style={gI(t)} type="number" value={form.revenueImpact||0} onChange={e=>f("revenueImpact",parseInt(e.target.value)||0)}/></FR>
       </div>
-
+      <div style={{...gSc(t)}}>
+        <div style={gSL(t)}>Investment & return</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+          <FR label="Est. media / spend cost ($)" t={t}><input style={gI(t)} type="number" value={form.spendCost||0} onChange={e=>f("spendCost",parseInt(e.target.value)||0)} placeholder="0"/></FR>
+          <FR label="Est. resource cost ($)" t={t}><input style={gI(t)} type="number" value={form.resourceCost||0} onChange={e=>f("resourceCost",parseInt(e.target.value)||0)} placeholder="0"/></FR>
+          <FR label="Est. revenue impact ($)" t={t}><input style={gI(t)} type="number" value={form.revenueImpact||0} onChange={e=>f("revenueImpact",parseInt(e.target.value)||0)} placeholder="0"/></FR>
+        </div>
+        {((form.spendCost||0)+(form.resourceCost||0))>0&&(
+          <div style={{marginTop:10,padding:"8px 12px",background:t.surfaceAlt,borderRadius:4,fontSize:12,fontFamily:t.mono,color:t.textMuted,display:"flex",gap:16,flexWrap:"wrap"}}>
+            <span>Total est. cost: <strong style={{color:t.text}}>{fmtCur((form.spendCost||0)+(form.resourceCost||0))}</strong></span>
+            {(form.revenueImpact||0)>0&&<span>Est. ROI: <strong style={{color:t.gold}}>{((form.revenueImpact||0)/((form.spendCost||0)+(form.resourceCost||0))).toFixed(1)}x</strong></span>}
+          </div>
+        )}
+      </div>
+ 
       <div style={{...gSc(t),border:"1px dashed "+t.border}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
           <div style={gSL(t)}>Data context <span style={{fontWeight:400,textTransform:"none",letterSpacing:0,color:t.textMuted}}>(optional — used by AI)</span></div>
@@ -1025,9 +1114,9 @@ function FormView({form,setForm,items,t,dk,cats,aiLoad,iceLoad,hypReview,iceRevi
         </div>
         <textarea style={{...gTA(t),fontSize:12}} rows={3} value={dataCtx} onChange={e=>setDataCtx(e.target.value)} placeholder={"Paste relevant metrics here — CVR, ROAS, sessions, revenue trends, etc.\nExample: Paid social CVR last 4W: 0.42% vs prior 4W: 1.85%. ROAS: 0.24x.\nFuture: will connect to Google Sheets, GA4, Meta Ads."}/>
       </div>
-
+ 
       <FR label="Notes" t={t}><textarea style={gTA(t)} rows={2} value={form.notes||""} onChange={e=>f("notes",e.target.value)} placeholder="Sequencing logic, caveats, context"/></FR>
-
+ 
       <FR label="Link related initiatives" t={t}>
         <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
           {items.filter(e=>e.id!==form.id).map(e=>{
@@ -1036,7 +1125,7 @@ function FormView({form,setForm,items,t,dk,cats,aiLoad,iceLoad,hypReview,iceRevi
           })}
         </div>
       </FR>
-
+ 
       <div style={{display:"flex",gap:8,justifyContent:"flex-end",paddingTop:4}}>
         <button style={gGh(t)} onClick={onCancel}>Cancel</button>
         <button style={gG(t)} onClick={onSave} disabled={!form.title}>Save</button>
@@ -1044,7 +1133,7 @@ function FormView({form,setForm,items,t,dk,cats,aiLoad,iceLoad,hypReview,iceRevi
     </div>
   );
 }
-
+ 
 // -- Settings ------------------------------------------------------------------
 function SettingsModal({t,dk,settings,onSave,onClose}) {
   const [local,setLocal]=useState({...settings});
@@ -1092,5 +1181,155 @@ function SettingsModal({t,dk,settings,onSave,onClose}) {
         </div>
       </div>
     </Modal>
+  );
+}
+ 
+// -- Learning Library ---------------------------------------------------------
+function LearningLibrary({items, t, dk, cats, onReplicate}) {
+  const [activeOutcomes, setActiveOutcomes] = useState(["Jackpot","Success"]);
+  const [fCat,  setFCat]  = useState("All");
+  const [fType, setFType] = useState("All");
+  const [query, setQuery] = useState("");
+ 
+  const closed = useMemo(()=>items.filter(e=>(e.status==="Completed"||e.status==="Killed")&&e.results&&e.results.keyLearning),[items]);
+ 
+  const counts = useMemo(()=>{
+    const c={};
+    ["Jackpot","Success","Failed","Inconclusive"].forEach(o=>{c[o]=closed.filter(e=>e.results.outcomeClassification===o).length;});
+    return c;
+  },[closed]);
+ 
+  const filtered = useMemo(()=>{
+    return closed.filter(e=>{
+      if(!activeOutcomes.includes(e.results.outcomeClassification)) return false;
+      if(fCat!=="All"&&e.category!==fCat) return false;
+      if(fType!=="All"&&e.initType!==fType) return false;
+      if(query.trim()){
+        const q=query.toLowerCase();
+        return e.results.keyLearning.toLowerCase().includes(q)||e.title.toLowerCase().includes(q);
+      }
+      return true;
+    }).sort((a,b)=>(b.endDate||b.createdAt).localeCompare(a.endDate||a.createdAt));
+  },[closed,activeOutcomes,fCat,fType,query]);
+ 
+  const toggleOutcome = (o)=>{
+    setActiveOutcomes(prev=>prev.includes(o)?prev.filter(x=>x!==o):[...prev,o]);
+  };
+ 
+  const gI2 = (t)=>({...gI(t),width:"auto",flex:1,minWidth:160});
+ 
+  return (
+    <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:16}}>
+ 
+      {/* Outcome summary tiles */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
+        {["Jackpot","Success","Failed","Inconclusive"].map(o=>{
+          const c=(dk?OD:OL)[o]||{};
+          const active=activeOutcomes.includes(o);
+          return (
+            <button key={o} onClick={()=>toggleOutcome(o)}
+              style={{border:"2px solid "+(active?c.border:t.border),borderRadius:8,padding:"12px 10px",
+                background:active?c.bg:t.surface,cursor:"pointer",textAlign:"center",
+                transition:"all 0.15s",opacity:active?1:0.45}}>
+              <div style={{fontSize:28,fontWeight:700,color:active?c.text:t.textMuted,fontFamily:t.serif,lineHeight:1}}>{counts[o]||0}</div>
+              <div style={{fontSize:11,fontWeight:600,color:active?c.text:t.textMuted,fontFamily:t.mono,marginTop:4,letterSpacing:"0.04em"}}>{o}</div>
+            </button>
+          );
+        })}
+      </div>
+ 
+      {/* Search + filters */}
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"flex-end"}}>
+        <div style={{display:"flex",flexDirection:"column",gap:2,flex:1,minWidth:180}}>
+          <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Search learnings</label>
+          <input style={gI2(t)} value={query} onChange={e=>setQuery(e.target.value)} placeholder="Keyword across learnings and titles..."/>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:2}}>
+          <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Category</label>
+          <select value={fCat} onChange={e=>setFCat(e.target.value)} style={{...gSl(t),minWidth:130}}>{["All",...cats].map(c=><option key={c}>{c}</option>)}</select>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:2}}>
+          <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Type</label>
+          <select value={fType} onChange={e=>setFType(e.target.value)} style={{...gSl(t),minWidth:120}}>{["All",...INIT_TYPES].map(tp=><option key={tp}>{tp}</option>)}</select>
+        </div>
+      </div>
+ 
+      {/* Count */}
+      <div style={{fontSize:12,color:t.textMuted,fontFamily:t.mono}}>
+        {filtered.length} learning{filtered.length!==1?"s":""} {query?"matching":""}
+        {filtered.length===0&&closed.length>0&&<span style={{color:t.gold}}> — try adjusting filters or clicking more outcome tiles above</span>}
+      </div>
+ 
+      {/* Empty state */}
+      {closed.length===0&&(
+        <div style={{padding:"48px 24px",textAlign:"center",color:t.textMuted,fontFamily:t.mono,border:"1px dashed "+t.border,borderRadius:8}}>
+          <div style={{fontSize:32,marginBottom:12}}>📚</div>
+          <div style={{fontSize:14,marginBottom:6,color:t.text}}>No learnings yet</div>
+          <div style={{fontSize:12}}>Learnings appear here when you close an initiative and log results.</div>
+        </div>
+      )}
+ 
+      {/* Learning cards */}
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {filtered.map(item=>{
+          const c=(dk?OD:OL)[item.results.outcomeClassification]||{};
+          const isWin=item.results.outcomeClassification==="Jackpot"||item.results.outcomeClassification==="Success";
+          return (
+            <div key={item.id} style={{background:t.surface,border:"1px solid "+(c.border||t.border),borderRadius:8,overflow:"hidden"}}>
+              {/* Outcome stripe */}
+              <div style={{height:3,background:c.border||t.border}}/>
+              <div style={{padding:"16px 18px"}}>
+                {/* Badges row */}
+                <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center",marginBottom:12}}>
+                  <OBdg o={item.results.outcomeClassification} dk={dk}/>
+                  <CBdg cat={item.category} cats={cats} dk={dk}/>
+                  <TBdg type={item.initType} dk={dk}/>
+                  {item.endDate&&<span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,marginLeft:"auto"}}>{fmtDate(item.endDate)}</span>}
+                </div>
+ 
+                {/* The learning — hero element */}
+                <div style={{borderLeft:"3px solid "+c.border,paddingLeft:14,marginBottom:14}}>
+                  <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:6}}>Key learning</div>
+                  <p style={{margin:0,fontSize:16,fontWeight:600,color:t.text,lineHeight:1.6,fontFamily:t.serif,fontStyle:"italic"}}>
+                    "{item.results.keyLearning}"
+                  </p>
+                </div>
+ 
+                {/* Initiative title */}
+                <div style={{fontSize:12,color:t.textMuted,fontFamily:t.mono,marginBottom:item.results.decisionMade?10:0}}>
+                  From: <span style={{color:t.textSub,fontWeight:600}}>{item.title}</span>
+                </div>
+ 
+                {/* Decision made — collapsed but visible */}
+                {item.results.decisionMade&&(
+                  <div style={{fontSize:12,color:t.textSub,fontFamily:t.mono,lineHeight:1.5,padding:"8px 10px",background:t.surfaceAlt,borderRadius:4,marginBottom:10}}>
+                    <span style={{color:t.textMuted,fontSize:10,textTransform:"uppercase",letterSpacing:"0.06em"}}>Decision: </span>
+                    {item.results.decisionMade}
+                  </div>
+                )}
+ 
+                {/* Revenue delta if available */}
+                {item.revenueImpact!==0&&(
+                  <div style={{display:"flex",gap:16,fontSize:12,fontFamily:t.mono,color:t.textMuted,marginBottom:10}}>
+                    <span>Est: <strong style={{color:t.text}}>{fmtCur(item.revenueImpact)}</strong></span>
+                    {item.results.actualRevenueImpact!=null&&(
+                      <span>Actual: <strong style={{color:t.gold}}>{fmtCur(item.results.actualRevenueImpact)}</strong></span>
+                    )}
+                  </div>
+                )}
+ 
+                {/* Actions */}
+                {isWin&&(
+                  <button onClick={()=>onReplicate(item)}
+                    style={{...gG(t),fontSize:11,padding:"5px 12px",marginTop:4}}>
+                    &#8635; Replicate this initiative
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }

@@ -1483,13 +1483,11 @@ function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResults,onL
 // -- Test Validity Panel -------------------------------------------------------
 // Stats helpers (no deps)
 function calcSampleSize(baseRate, mde, alpha) {
-  // Two-sided z-test for proportions
-  // alpha: 0.05 → 90% CI, 0.10 → 80% CI — we expose 90% and 95%
-  const z_alpha = alpha === 0.05 ? 1.96 : 1.645;  // two-sided
-  const z_beta  = 0.8416;  // 80% power (standard)
+  // Two-sided z-test for proportions, 80% power
+  const z_alpha = alpha === 0.05 ? 1.96 : 1.645;
+  const z_beta  = 0.8416;
   const p1 = baseRate / 100;
   const p2 = p1 * (1 + mde / 100);
-  const p_bar = (p1 + p2) / 2;
   if (p2 <= 0 || p2 >= 1 || p1 <= 0 || p1 >= 1) return null;
   const n = ((z_alpha + z_beta) ** 2 * (p1 * (1 - p1) + p2 * (1 - p2))) /
             ((p2 - p1) ** 2);
@@ -1497,7 +1495,8 @@ function calcSampleSize(baseRate, mde, alpha) {
 }
 
 function calcZStat(convC, sessC, convV, sessV) {
-  if (!sessC || !sessV || !convC || !convV) return null;
+  // Guard only on sessions — zero conversions is valid data, not missing data
+  if (!sessC || !sessV) return null;
   const p1 = convC / sessC;
   const p2 = convV / sessV;
   const p  = (convC + convV) / (sessC + sessV);
@@ -1507,14 +1506,14 @@ function calcZStat(convC, sessC, convV, sessV) {
 }
 
 function zToConfidence(z) {
-  // Approx two-sided p-value → confidence using normal CDF approximation
   if (z === null) return null;
   const absZ = Math.abs(z);
-  // Abramowitz and Stegun approximation
+  // Abramowitz and Stegun approximation (max error 7.5e-8)
   const t_ = 1 / (1 + 0.2316419 * absZ);
   const poly = t_ * (0.319381530 + t_ * (-0.356563782 + t_ * (1.781477937 + t_ * (-1.821255978 + t_ * 1.330274429))));
   const phi = 1 - (1 / Math.sqrt(2 * Math.PI)) * Math.exp(-0.5 * absZ * absZ) * poly;
-  return phi * 2 - 1; // two-sided confidence
+  // Clamp to [0, 1] to guard against floating point overshoot at extreme z-values
+  return Math.min(1, Math.max(0, phi * 2 - 1));
 }
 
 function TestValidityPanel({ item, t, dk, onSaveTestValidity }) {
@@ -1537,7 +1536,7 @@ function TestValidityPanel({ item, t, dk, onSaveTestValidity }) {
   const conf95    = confidence !== null && confidence >= 0.95;
   const hasData   = convC !== "" && sessC !== "" && convV !== "" && sessV !== "";
 
-  const uplift = (Number(sessC) > 0 && Number(sessV) > 0)
+  const uplift = (Number(sessC) > 0 && Number(sessV) > 0 && Number(convC) > 0)
     ? (((Number(convV) / Number(sessV)) - (Number(convC) / Number(sessC))) / (Number(convC) / Number(sessC)) * 100).toFixed(1)
     : null;
 

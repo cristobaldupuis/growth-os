@@ -4,7 +4,7 @@ Growth OS is an interactive execution framework and experiment tracking applicat
 Built for multi-brand portfolios and high-velocity growth teams, it enables growth leaders, product managers, and marketing architects to prioritize high-leverage initiatives, maintain absolute data hygiene, and continuously calibrate performance estimates against actual revenue outcomes.
 
 🔗 Live Environments
-🚀 Launch Live Application: marketerslab.com (or https://cristobaldupuis.github.io/growth-os/)
+🚀 Launch Live Application: https://cristobaldupuis.github.io/growth-os/
 
 ⚡ Open Interactive Code Sandbox: StackBlitz
 

@@ -565,72 +565,62 @@ export default function App() {
 
   return (
     <div style={{background:t.bg,minHeight:"100vh",fontFamily:t.serif,color:t.text}}>
-      <style>{"@import url('https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css');*{box-sizing:border-box}@keyframes spin{to{transform:rotate(360deg)}}input[type=range]{accent-color:"+t.gold+"}@media(max-width:640px){.desktop-nav{display:none!important}.hamburger-btn{display:block!important}}"}</style>
+      <style>{"@import url('https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css');*{box-sizing:border-box}@keyframes spin{to{transform:rotate(360deg)}}input[type=range]{accent-color:"+t.gold+"}"}</style>
 
-      {/* Header */}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 16px",borderBottom:"1px solid "+t.border,background:t.headerBg,position:"sticky",top:0,zIndex:100,minHeight:48}}>
-        <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0,minWidth:0}}>
-          <span style={{fontSize:13,fontWeight:700,letterSpacing:"0.12em",color:t.gold,fontFamily:t.serif,whiteSpace:"nowrap"}}>GROWTH OS</span>
-          <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.04em",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:120}}>{settings.companyName}</span>
-        </div>
-        {/* Desktop nav — hidden on mobile via inline media workaround */}
-        <div className="desktop-nav" style={{display:"flex",gap:4,alignItems:"center",flexShrink:0}}>
-          {brands.length>1&&(
-            <select value={activeBrand} onChange={e=>setActiveBrand(e.target.value)}
-              style={{fontSize:11,padding:"4px 8px",borderRadius:4,border:"1px solid "+t.gold,background:activeBrand==="all"?t.surface:t.goldBg,color:activeBrand==="all"?t.textMuted:t.gold,fontFamily:t.mono,cursor:"pointer",maxWidth:130}}>
-              <option value="all">All retailers</option>
-              {brands.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
-          )}
-          {navBtn("dashboard","Dashboard")}
-          {navBtn("initiatives","Initiatives")}
-          {navBtn("library","Library")}
-          {(nav==="detail"||nav==="form")&&<button onClick={()=>setNav("initiatives")} style={{...gGh(t),gap:4,padding:"5px 10px"}}><span style={{fontSize:13}}>&#8592;</span> Back</button>}
-          {nav==="initiatives"&&<>
-            <button onClick={()=>setShowCapture(true)} style={{...gGh(t),padding:"5px 10px",fontSize:11}} title="Quick capture — describe an initiative in plain text"><span>&#9889;</span> Quick capture</button>
-            <button onClick={goNew} style={{...gG(t),padding:"5px 10px"}}><span>+</span> New</button>
-          </>}
-          <button onClick={()=>setShowSet(true)} title="Settings" style={{fontSize:14,padding:"5px 7px",borderRadius:4,cursor:"pointer",background:"transparent",border:"1px solid "+t.border,color:t.textMuted,lineHeight:1}}><span dangerouslySetInnerHTML={{__html:"&#9881;"}}/></button>
-          <button onClick={toggleDk} title={dk?"Light mode":"Dark mode"} style={{fontSize:14,padding:"5px 7px",borderRadius:4,cursor:"pointer",background:"transparent",border:"1px solid "+t.border,color:t.textMuted,lineHeight:1}}><span dangerouslySetInnerHTML={{__html:dk?"&#9728;":"&#9790;"}}/></button>
-        </div>
-        {/* Hamburger — shown on mobile */}
-        <button className="hamburger-btn" onClick={()=>setShowMenu(m=>!m)}
-          style={{display:"none",fontSize:20,padding:"5px 8px",borderRadius:4,cursor:"pointer",background:"transparent",border:"1px solid "+t.border,color:t.textMuted,lineHeight:1}}>
-          {showMenu?"&#10005;":"&#9776;"}
-        </button>
-      </div>
-      {/* Mobile menu drawer */}
-      {showMenu&&(
-        <div style={{position:"fixed",inset:0,zIndex:200}} onClick={()=>setShowMenu(false)}>
-          <div style={{position:"absolute",top:48,right:0,left:0,background:t.headerBg,borderBottom:"1px solid "+t.border,padding:"12px 16px",display:"flex",flexDirection:"column",gap:8,boxShadow:"0 4px 16px rgba(0,0,0,0.12)"}}
-            onClick={e=>e.stopPropagation()}>
+      {/* Header — two rows */}
+      <div style={{background:t.headerBg,borderBottom:"1px solid "+t.border,position:"sticky",top:0,zIndex:100}}>
+        {/* Row 1: wordmark + retailer + utilities */}
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 16px",borderBottom:"1px solid "+t.border}}>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <span style={{fontSize:13,fontWeight:700,letterSpacing:"0.12em",color:t.gold,fontFamily:t.serif,whiteSpace:"nowrap"}}>GROWTH OS</span>
+            <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.04em",whiteSpace:"nowrap"}}>{settings.companyName}</span>
             {brands.length>1&&(
-              <div style={{padding:"4px 12px"}}>
-                <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:4}}>Brand</div>
-                <select value={activeBrand} onChange={e=>{setActiveBrand(e.target.value);setShowMenu(false);}}
-                  style={{...gSl(t),width:"100%"}}>
-                  <option value="all">All retailers</option>
-                  {brands.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
-                </select>
-              </div>
+              <select value={activeBrand} onChange={e=>setActiveBrand(e.target.value)}
+                style={{fontSize:11,padding:"3px 8px",borderRadius:4,border:"1px solid "+t.gold,background:activeBrand==="all"?t.surface:t.goldBg,color:activeBrand==="all"?t.textMuted:t.gold,fontFamily:t.mono,cursor:"pointer",maxWidth:140}}>
+                <option value="all">All retailers</option>
+                {brands.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
             )}
-            <button onClick={()=>{setNav("dashboard");setShowMenu(false);}} style={{...menuItem(t),fontWeight:nav==="dashboard"?700:400,color:nav==="dashboard"?t.gold:t.text}}>Dashboard</button>
-            <button onClick={()=>{setNav("initiatives");setShowMenu(false);}} style={{...menuItem(t),fontWeight:nav==="initiatives"?700:400,color:nav==="initiatives"?t.gold:t.text}}>Initiatives</button>
-            <button onClick={()=>{setNav("library");setShowMenu(false);}} style={{...menuItem(t),fontWeight:nav==="library"?700:400,color:nav==="library"?t.gold:t.text}}>Library</button>
-            {(nav==="detail"||nav==="form")&&<button onClick={()=>{setNav("initiatives");setShowMenu(false);}} style={menuItem(t)}>&#8592; Back</button>}
-            {nav==="initiatives"&&<>
-              <button onClick={()=>{setShowCapture(true);setShowMenu(false);}} style={{...menuItem(t)}}>&#9889; Quick capture</button>
-              <button onClick={()=>{goNew();setShowMenu(false);}} style={{...menuItem(t),background:t.gold,color:t.goldText,borderRadius:4,justifyContent:"center",fontWeight:700}}>+ New initiative</button>
-            </>}
-            <div style={{borderTop:"1px solid "+t.border,marginTop:4,paddingTop:8,display:"flex",gap:8}}>
-              <button onClick={()=>{setShowSet(true);setShowMenu(false);}} style={{...gGh(t),flex:1,justifyContent:"center"}}><span dangerouslySetInnerHTML={{__html:"&#9881;"}}/> Settings</button>
-              <button onClick={()=>{toggleDk();setShowMenu(false);}} style={{...gGh(t),flex:1,justifyContent:"center"}}><span dangerouslySetInnerHTML={{__html:dk?"&#9728; Light":"&#9790; Dark"}}/></button>
-            </div>
+          </div>
+          <div style={{display:"flex",gap:5,alignItems:"center"}}>
+            <button onClick={()=>setShowSet(true)} title="Settings"
+              style={{fontSize:13,padding:"4px 7px",borderRadius:4,cursor:"pointer",background:"transparent",border:"1px solid "+t.border,color:t.textMuted,lineHeight:1}}>
+              <span dangerouslySetInnerHTML={{__html:"&#9881;"}}/>
+            </button>
+            <button onClick={toggleDk} title={dk?"Light mode":"Dark mode"}
+              style={{fontSize:13,padding:"4px 7px",borderRadius:4,cursor:"pointer",background:"transparent",border:"1px solid "+t.border,color:t.textMuted,lineHeight:1}}>
+              <span dangerouslySetInnerHTML={{__html:dk?"&#9728;":"&#9790;"}}/>
+            </button>
           </div>
         </div>
-      )}
+        {/* Row 2: nav + contextual actions */}
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 16px",flexWrap:"wrap",gap:4}}>
+          <div style={{display:"flex",gap:3,alignItems:"center",flexWrap:"wrap"}}>
+            {navBtn("dashboard","Dashboard")}
+            {navBtn("initiatives","Initiatives")}
+            {navBtn("library","Library")}
+            {navBtn("triage","Triage")}
+            {(nav==="detail"||nav==="form")&&(
+              <button onClick={()=>setNav("initiatives")} style={{...gGh(t),padding:"4px 10px",fontSize:12}}>
+                <span style={{fontSize:12}}>&#8592;</span> Back
+              </button>
+            )}
+          </div>
+          {nav==="initiatives"&&(
+            <div style={{display:"flex",gap:5,alignItems:"center"}}>
+              <button onClick={()=>setShowCapture(true)} style={{...gGh(t),padding:"4px 10px",fontSize:11}}>
+                &#9889; Quick capture
+              </button>
+              <button onClick={goNew} style={{...gG(t),padding:"4px 10px",fontSize:12}}>
+                + New
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
 
       {nav==="dashboard"&&<DashView t={t} dk={dk} dash={dash} cats={cats} settings={settings} brands={brands} activeBrand={activeBrand} dRange={dRange} setDRange={setDRange} cFrom={cFrom} cTo={cTo} setCFrom={setCFrom} setCTo={setCTo} onGo={()=>setNav("initiatives")}/>}
+      {nav==="triage"&&<TriageView items={items} t={t} dk={dk} cats={cats} brands={brands} activeBrand={activeBrand} onDetail={goDetail}/>}
       {nav==="library"&&<LearningLibrary items={items} t={t} dk={dk} cats={cats} brands={brands} activeBrand={activeBrand} settings={settings} onReplicate={(item)=>{const base=mkDefault(cats,activeBrand);setForm({...base,title:"[Replicate] "+item.title,hypothesis:"Based on learning from: "+item.title+". Original: "+item.hypothesis,category:item.category,initType:item.initType,ice:{...item.ice},revenueImpact:item.revenueImpact,notes:"Replicated from initiative "+item.id+". Original learning: "+item.results.keyLearning});setNav("form");}}/>}
 
       {nav==="initiatives"&&(
@@ -1021,7 +1011,7 @@ function DashView({t,dk,dash,cats,settings,brands,activeBrand,dRange,setDRange,c
         </div>
       </div>
 
-      <button style={{...gGh(t),alignSelf:"flex-start"}} onClick={onGo}><span style={{fontSize:12}}>&#9776;</span> View initiatives</button>
+      <button style={{...gGh(t),alignSelf:"flex-start"}} onClick={onGo}>View initiatives</button>
     </div>
   );
 }
@@ -1402,6 +1392,152 @@ function SettingsModal({t,dk,settings,onSave,onClose}) {
 }
 
 
+
+// -- Triage View --------------------------------------------------------------
+function TriageView({items, t, dk, cats, brands, activeBrand, onDetail}) {
+  const today = new Date();
+  const in7  = new Date(today); in7.setDate(today.getDate()+7);
+  const parseD = d => d ? new Date(d+"T12:00:00") : null;
+  const fmtDate = d => d ? new Date(d+"T12:00:00").toLocaleDateString("en-CA",{month:"short",day:"numeric"}) : "—";
+
+  const brandFilter = e => activeBrand==="all" || (e.brandId||"default")===activeBrand;
+
+  const running = items.filter(e=>e.status==="Running"&&brandFilter(e));
+  const draft   = items.filter(e=>e.status==="Draft"&&brandFilter(e));
+
+  // Buckets
+  const endingSoon  = running.filter(e=>{ const d=parseD(e.endDate); return d&&d<=in7&&d>=today; });
+  const overdue     = running.filter(e=>{ const d=parseD(e.endDate); return d&&d<today; });
+  const needsAction = running.filter(e=>!e.killCriteria||!e.primaryMetric||!e.owner);
+  const highStake   = running.filter(e=>e.revenueImpact>=50000);
+  const topDrafts   = draft.filter(e=>{ const s=e.ice?(e.ice.impact||0)*(e.ice.certainty||0)*(e.ice.ease||0):0; return s>0; })
+    .sort((a,b)=>(b.ice.impact*b.ice.certainty*b.ice.ease)-(a.ice.impact*a.ice.certainty*a.ice.ease))
+    .slice(0,3);
+
+  const totalAtRisk = running.reduce((s,e)=>s+Math.max(0,e.revenueImpact),0);
+  const fmtCur = n => { if(n===0)return"—"; const abs=Math.abs(n); return(abs>=1000?"$"+Math.round(abs/1000)+"k":"$"+abs); };
+
+  const SBdg2 = ({s}) => { const c=(dk?SD:SL)[s]||SL.Draft; return <span style={{fontSize:10,fontWeight:600,color:c.text,background:c.bg,border:"1px solid "+c.border,borderRadius:3,padding:"1px 5px"}}>{s}</span>; };
+
+  const Section = ({title, color, items: list, emptyMsg, children}) => (
+    <div style={{...gSc(t),borderLeft:"3px solid "+color}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:list.length?12:0}}>
+        <div style={{fontSize:11,fontWeight:700,color,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>{title}</div>
+        <span style={{fontSize:12,fontWeight:700,color,fontFamily:t.mono}}>{list.length}</span>
+      </div>
+      {list.length===0
+        ? <div style={{fontSize:12,color:t.textMuted,fontFamily:t.mono}}>{emptyMsg}</div>
+        : <div style={{display:"flex",flexDirection:"column",gap:8}}>{children}</div>}
+    </div>
+  );
+
+  const InitRow = ({item, showEndDate, showRevenue, urgentDate}) => {
+    const daysLeft = item.endDate ? Math.ceil((parseD(item.endDate)-today)/86400000) : null;
+    return (
+      <div onClick={()=>onDetail(item.id)}
+        style={{display:"flex",alignItems:"flex-start",gap:10,padding:"10px 12px",borderRadius:6,
+          background:t.surfaceAlt,cursor:"pointer",border:"1px solid "+t.border}}>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4,flexWrap:"wrap"}}>
+            {item.initId&&<span style={{fontSize:10,fontWeight:700,color:t.gold,fontFamily:t.mono,background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:3,padding:"1px 5px"}}>{item.initId}</span>}
+            <SBdg2 s={item.status}/>
+            {brands&&brands.length>1&&<span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono}}>{(brands.find(b=>b.id===(item.brandId||"default"))||brands[0]||{}).name}</span>}
+          </div>
+          <div style={{fontSize:13,fontWeight:600,color:t.text,fontFamily:t.serif,marginBottom:2}}>{item.title}</div>
+          {item.primaryMetric&&<div style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>{item.primaryMetric.slice(0,60)}{item.primaryMetric.length>60?"…":""}</div>}
+        </div>
+        <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4,flexShrink:0}}>
+          {showRevenue&&item.revenueImpact>0&&<span style={{fontSize:12,fontWeight:700,color:t.gold,fontFamily:t.serif}}>{fmtCur(item.revenueImpact)}</span>}
+          {showEndDate&&item.endDate&&(
+            <span style={{fontSize:11,fontWeight:600,fontFamily:t.mono,
+              color:daysLeft!==null&&daysLeft<=3?"#e07070":daysLeft!==null&&daysLeft<=7?"#c09828":t.textMuted}}>
+              {daysLeft!==null&&daysLeft<0?"Overdue":daysLeft!==null&&daysLeft===0?"Due today":"Ends "+fmtDate(item.endDate)}
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:14}}>
+
+      {/* Header summary */}
+      <div style={{...gSc(t),background:t.goldBg,border:"1px solid "+t.goldBorder}}>
+        <div style={{fontSize:10,letterSpacing:"0.10em",textTransform:"uppercase",color:t.gold,fontFamily:t.mono,marginBottom:8}}>Weekly triage — {new Date().toLocaleDateString("en-CA",{weekday:"long",month:"long",day:"numeric"})}</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(110px,1fr))",gap:12}}>
+          {[
+            {l:"Running",      v:running.length},
+            {l:"Ending this week", v:endingSoon.length+overdue.length},
+            {l:"Revenue at risk", v:fmtCur(totalAtRisk)},
+            {l:"Needs attention",  v:needsAction.length+overdue.length},
+          ].map(m=>(
+            <div key={m.l}>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>{m.l}</div>
+              <div style={{fontSize:22,fontWeight:700,color:t.gold,fontFamily:t.serif}}>{m.v}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Overdue */}
+      <Section title="Overdue — end date passed" color="#e07070" items={overdue} emptyMsg="Nothing overdue.">
+        {overdue.map(e=><InitRow key={e.id} item={e} showEndDate showRevenue/>)}
+      </Section>
+
+      {/* Ending this week */}
+      <Section title="Ending this week — decide now" color="#c09828" items={endingSoon} emptyMsg="Nothing ending this week.">
+        {endingSoon.map(e=><InitRow key={e.id} item={e} showEndDate showRevenue/>)}
+      </Section>
+
+      {/* High stakes */}
+      <Section title="High stakes — $50k+ revenue at risk" color={dk?"#8080e0":"#4848b0"} items={highStake} emptyMsg="No high-stakes initiatives running.">
+        {highStake.map(e=><InitRow key={e.id} item={e} showEndDate showRevenue/>)}
+      </Section>
+
+      {/* Incomplete — missing owner / metric / kill criteria */}
+      <Section title="Incomplete setup — missing owner, metric, or kill criteria" color={dk?"#e08080":"#a03030"} items={needsAction} emptyMsg="All running initiatives are properly configured.">
+        {needsAction.map(e=>(
+          <div key={e.id} onClick={()=>onDetail(e.id)}
+            style={{...gSc(t),cursor:"pointer",padding:"10px 12px"}}>
+            <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:4,flexWrap:"wrap"}}>
+              {e.initId&&<span style={{fontSize:10,fontWeight:700,color:t.gold,fontFamily:t.mono,background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:3,padding:"1px 5px"}}>{e.initId}</span>}
+            </div>
+            <div style={{fontSize:13,fontWeight:600,color:t.text,marginBottom:6,fontFamily:t.serif}}>{e.title}</div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {!e.owner&&<span style={{fontSize:11,fontFamily:t.mono,color:"#e07070",background:dk?"#2a1010":"#fdf0f0",border:"1px solid #e09090",borderRadius:3,padding:"1px 6px"}}>No owner</span>}
+              {!e.primaryMetric&&<span style={{fontSize:11,fontFamily:t.mono,color:"#e07070",background:dk?"#2a1010":"#fdf0f0",border:"1px solid #e09090",borderRadius:3,padding:"1px 6px"}}>No metric</span>}
+              {!e.killCriteria&&<span style={{fontSize:11,fontFamily:t.mono,color:"#e07070",background:dk?"#2a1010":"#fdf0f0",border:"1px solid #e09090",borderRadius:3,padding:"1px 6px"}}>No kill criteria</span>}
+            </div>
+          </div>
+        ))}
+      </Section>
+
+      {/* Top drafts ready to start */}
+      <Section title="Top drafts by ICE — ready to prioritise" color={dk?"#3acca0":"#187860"} items={topDrafts} emptyMsg="No scored drafts in the pipeline.">
+        {topDrafts.map(e=>(
+          <div key={e.id} onClick={()=>onDetail(e.id)}
+            style={{...gSc(t),cursor:"pointer",padding:"10px 12px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+              <div>
+                <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:4}}>
+                  {e.initId&&<span style={{fontSize:10,fontWeight:700,color:t.gold,fontFamily:t.mono,background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:3,padding:"1px 5px"}}>{e.initId}</span>}
+                  {brands&&brands.length>1&&<span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono}}>{(brands.find(b=>b.id===(e.brandId||"default"))||brands[0]||{}).name}</span>}
+                </div>
+                <div style={{fontSize:13,fontWeight:600,color:t.text,fontFamily:t.serif}}>{e.title}</div>
+                {e.revenueImpact>0&&<div style={{fontSize:12,color:t.textMuted,fontFamily:t.mono,marginTop:2}}>{fmtCur(e.revenueImpact)} estimated impact</div>}
+              </div>
+              <span style={{fontSize:11,fontWeight:700,color:t.gold,fontFamily:t.mono,background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:4,padding:"3px 8px",flexShrink:0}}>
+                ICE {Math.round(((e.ice.impact||0)*(e.ice.certainty||0)*(e.ice.ease||0)/1000)*100)}
+              </span>
+            </div>
+          </div>
+        ))}
+      </Section>
+
+    </div>
+  );
+}
 // -- Linked Initiative Picker -------------------------------------------------
 function LinkedInitiativePicker({form, setForm, items, t, dk}) {
   const [query, setQuery] = useState("");

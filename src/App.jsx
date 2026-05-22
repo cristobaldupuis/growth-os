@@ -399,6 +399,10 @@ export default function App() {
   const [cFrom,     setCFrom]     = useState("");
   const [cTo,       setCTo]       = useState("");
   const [loaded,    setLoaded]    = useState(false);
+  const [showImport,setShowImport]= useState(false);
+  const [importRows,setImportRows]= useState([]);
+  const [importErrs,setImportErrs]= useState([]);
+  const [importDone,setImportDone]= useState(false);
 
   const t    = dk ? TD : TL;
   const cats   = settings.categories || DEFAULT_SETTINGS.categories;
@@ -557,6 +561,206 @@ export default function App() {
     setIceLoad(false);
   };
 
+
+  // -- CSV helpers (import + export) ------------------------------------------
+
+  // Column definitions — single source of truth for both export and import
+  const CSV_COLS = [
+    "initId","title","initType","category","status","brandId","owner",
+    "hypothesis","primaryMetric","killCriteria","startDate","endDate",
+    "sampleSize","duration","ice_impact","ice_certainty","ice_ease",
+    "revenueImpact","spendCost","resourceCost","notes",
+    "results_actualOutcome","results_keyLearning","results_outcomeClassification",
+    "results_decisionMade","results_outcomeCertainty","results_actualRevenueImpact",
+    "results_actualSpendCost","results_actualResourceCost",
+  ];
+
+  const itemToCSVRow = (item) => ({
+    initId:           item.initId || "",
+    title:            item.title || "",
+    initType:         item.initType || "",
+    category:         item.category || "",
+    status:           item.status || "",
+    brandId:          brandName(item.brandId || "default", brands),
+    owner:            item.owner || "",
+    hypothesis:       item.hypothesis || "",
+    primaryMetric:    item.primaryMetric || "",
+    killCriteria:     item.killCriteria || "",
+    startDate:        item.startDate || "",
+    endDate:          item.endDate || "",
+    sampleSize:       item.sampleSize || "",
+    duration:         item.duration || "",
+    ice_impact:       item.ice?.impact ?? "",
+    ice_certainty:    item.ice?.certainty ?? "",
+    ice_ease:         item.ice?.ease ?? "",
+    revenueImpact:    item.revenueImpact ?? "",
+    spendCost:        item.spendCost ?? "",
+    resourceCost:     item.resourceCost ?? "",
+    notes:            item.notes || "",
+    results_actualOutcome:          item.results?.actualOutcome || "",
+    results_keyLearning:            item.results?.keyLearning || "",
+    results_outcomeClassification:  item.results?.outcomeClassification || "",
+    results_decisionMade:           item.results?.decisionMade || "",
+    results_outcomeCertainty:       item.results?.outcomeCertainty ?? "",
+    results_actualRevenueImpact:    item.results?.actualRevenueImpact ?? "",
+    results_actualSpendCost:        item.results?.actualSpendCost ?? "",
+    results_actualResourceCost:     item.results?.actualResourceCost ?? "",
+  });
+
+  const escapeCSV = (v) => {
+    const s = String(v ?? "");
+    return s.includes(",") || s.includes('"') || s.includes("\n") ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+
+  const downloadCSV = (rows, filename) => {
+    const header = CSV_COLS.join(",");
+    const body = rows.map(r => CSV_COLS.map(c => escapeCSV(r[c])).join(",")).join("\n");
+    const csv = header + "\n" + body;
+    const encoded = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
+    const a = document.createElement("a"); a.href = encoded; a.download = filename; a.click();
+  };
+
+  const handleExportCSV = (rowsToExport, filename) => {
+    downloadCSV(rowsToExport.map(itemToCSVRow), filename);
+  };
+
+  const TEMPLATE_URL = "https://docs.google.com/spreadsheets/d/1Oar4THeAKIGvvBzKUmqwfWersaUdLqqoq-FW_jBvS1E/edit?gid=896589738#gid=896589738";
+  const handleDownloadTemplate = () => { window.open(TEMPLATE_URL, "_blank"); };
+
+  const normaliseDate = (raw) => {
+    if (!raw) return "";
+    const s = raw.trim();
+    // Already ISO
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    // M/D/YYYY or MM/DD/YYYY
+    const slash = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (slash) return slash[3] + "-" + slash[1].padStart(2,"0") + "-" + slash[2].padStart(2,"0");
+    // D-M-YYYY
+    const dash = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+    if (dash) return dash[3] + "-" + dash[2].padStart(2,"0") + "-" + dash[1].padStart(2,"0");
+    return "";  // unparseable — drop it and flag
+  };
+
+  const parseCSV = (text) => {
+    const lines = text.split(/\r?\n/).filter(l => l.trim());
+    if (lines.length < 2) return { headers: [], rows: [] };
+    const splitLine = (line) => {
+      const result = []; let cur = ""; let inQ = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') { if (inQ && line[i+1] === '"') { cur += '"'; i++; } else inQ = !inQ; }
+        else if (ch === ',' && !inQ) { result.push(cur.trim()); cur = ""; }
+        else cur += ch;
+      }
+      result.push(cur.trim()); return result;
+    };
+    const headers = splitLine(lines[0]).map(h => h.replace(/\s*\*\s*$/, "").trim());
+    const rows = lines.slice(1).map(l => {
+      const vals = splitLine(l);
+      const obj = {};
+      headers.forEach((h, i) => { obj[h] = (vals[i] || "").replace(/^"|"$/g, "").trim(); });
+      return obj;
+    }).filter(r => r.title || r.initId);
+    return { headers, rows };
+  };
+
+  const handleCSVFile = (file) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const { rows } = parseCSV(e.target.result);
+      const errs = [];
+      const parsed = rows.map((r, idx) => {
+        const rowErrs = [];
+        if (!r.title) rowErrs.push("Missing title");
+        if (r.status && !STATUSES.includes(r.status)) rowErrs.push("Unknown status: " + r.status);
+        if (r.initType && !INIT_TYPES.includes(r.initType)) rowErrs.push("Unknown type: " + r.initType);
+
+        // Date normalisation
+        const sd = normaliseDate(r.startDate);
+        const ed = normaliseDate(r.endDate);
+        if (r.startDate && !sd) rowErrs.push("Unparseable startDate: " + r.startDate);
+        if (r.endDate   && !ed) rowErrs.push("Unparseable endDate: " + r.endDate);
+
+        // initId match — primary key
+        const existingById  = r.initId ? items.find(e => e.initId === r.initId.trim()) : null;
+        const isUpdate = !!existingById;
+        if (isUpdate) rowErrs.push("Will update existing initiative " + r.initId);
+
+        // Brand: match by name (trimmed), fall back to default
+        const matchedBrand = brands.find(b => b.name.trim().toLowerCase() === (r.brandId||"").trim().toLowerCase());
+        const resolvedBrandId = matchedBrand ? matchedBrand.id : (existingById?.brandId || "default");
+
+        if (rowErrs.length) errs.push({ row: idx + 2, title: r.title || r.initId || "(no title)", issues: rowErrs, isUpdate });
+
+        const clamp = (v, lo, hi) => { const n = parseInt(v); return isNaN(n) ? lo : Math.min(hi, Math.max(lo, n)); };
+        const numOrNull = (v) => (v !== "" && v !== undefined && v !== null) ? (parseInt(v) || 0) : null;
+
+        const item = {
+          // Preserve existing id/initId on update, generate fresh on create
+          id:     existingById ? existingById.id     : "csv-" + Date.now() + "-" + idx,
+          initId: existingById ? existingById.initId : (r.initId?.trim() || generateInitId(resolvedBrandId, brands, items)),
+          title:  r.title || existingById?.title || "",
+          initType: INIT_TYPES.includes(r.initType) ? r.initType : (existingById?.initType || "A/B Test"),
+          category: r.category || existingById?.category || cats[0] || "",
+          status:   STATUSES.includes(r.status)   ? r.status   : (existingById?.status   || "Draft"),
+          brandId:  resolvedBrandId,
+          owner:    r.owner    !== undefined ? r.owner    : (existingById?.owner    || ""),
+          hypothesis:    r.hypothesis    || existingById?.hypothesis    || "",
+          primaryMetric: r.primaryMetric || existingById?.primaryMetric || "",
+          killCriteria:  r.killCriteria  || existingById?.killCriteria  || "",
+          startDate: sd || existingById?.startDate || "",
+          endDate:   ed || existingById?.endDate   || "",
+          sampleSize: r.sampleSize || existingById?.sampleSize || "",
+          duration:   r.duration   || existingById?.duration   || "",
+          ice: {
+            impact:    clamp(r.ice_impact,    1, 10) || existingById?.ice?.impact    || 5,
+            certainty: clamp(r.ice_certainty, 1, 10) || existingById?.ice?.certainty || 5,
+            ease:      clamp(r.ice_ease,      1, 10) || existingById?.ice?.ease      || 5,
+          },
+          revenueImpact: r.revenueImpact !== "" ? (parseInt(r.revenueImpact) || 0) : (existingById?.revenueImpact || 0),
+          spendCost:     r.spendCost     !== "" ? (parseInt(r.spendCost)     || 0) : (existingById?.spendCost     || 0),
+          resourceCost:  r.resourceCost  !== "" ? (parseInt(r.resourceCost)  || 0) : (existingById?.resourceCost  || 0),
+          notes: r.notes || existingById?.notes || "",
+          linkedIds: existingById?.linkedIds || [],
+          createdAt: existingById?.createdAt || new Date().toISOString().slice(0, 10),
+          testValidity: existingById?.testValidity || null,
+          results: r.results_keyLearning ? {
+            actualOutcome: r.results_actualOutcome || "",
+            keyLearning:   r.results_keyLearning,
+            outcomeClassification: ["Jackpot","Success","Failed","Inconclusive"].includes(r.results_outcomeClassification)
+              ? r.results_outcomeClassification : "Inconclusive",
+            decisionMade: r.results_decisionMade || "",
+            outcomeCertainty: parseInt(r.results_outcomeCertainty) || 75,
+            actualRevenueImpact: numOrNull(r.results_actualRevenueImpact),
+            actualSpendCost:     numOrNull(r.results_actualSpendCost),
+            actualResourceCost:  numOrNull(r.results_actualResourceCost),
+          } : (existingById?.results || null),
+          _fromCSV: true,
+          _isUpdate: isUpdate,
+        };
+        return item;
+      });
+      setImportRows(parsed);
+      setImportErrs(errs);
+      setImportDone(false);
+    };
+    reader.readAsText(file);
+  };
+
+  const confirmImport = () => {
+    let updated = [...items];
+    importRows.forEach(row => {
+      if (row._isUpdate) {
+        updated = updated.map(e => e.id === row.id ? { ...row } : e);
+      } else {
+        updated = [row, ...updated];
+      }
+    });
+    saveItems(updated);
+    setImportDone(true);
+    setTimeout(() => { setShowImport(false); setImportRows([]); setImportErrs([]); setImportDone(false); }, 1800);
+  };
+
   if(!loaded) return <div style={{background:t.bg,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{color:t.textMuted,fontFamily:t.mono}}>Loading Growth OS…</span></div>;
 
   const navBtn=(v,lbl)=>(
@@ -610,6 +814,12 @@ export default function App() {
             <div style={{display:"flex",gap:5,alignItems:"center"}}>
               <button onClick={()=>setShowCapture(true)} style={{...gGh(t),padding:"4px 10px",fontSize:11}}>
                 &#9889; Quick capture
+              </button>
+              <button onClick={()=>{setImportRows([]);setImportErrs([]);setImportDone(false);setShowImport(true);}} style={{...gGh(t),padding:"4px 10px",fontSize:11}}>
+                &#8645; Import CSV
+              </button>
+              <button onClick={()=>handleExportCSV(filtered,"GrowthOS_export_"+new Date().toISOString().slice(0,10)+".csv")} style={{...gGh(t),padding:"4px 10px",fontSize:11}} title="Export current filtered view as CSV">
+                &#8659; Export CSV
               </button>
               <button onClick={goNew} style={{...gG(t),padding:"4px 10px",fontSize:12}}>
                 + New
@@ -699,7 +909,8 @@ export default function App() {
           onDelete={()=>{saveItems(items.filter(e=>e.id!==sel.id));setNav("initiatives");}}
           onStatus={reqStatus}
           onResults={()=>{setRForm(sel.results?{...sel.results,actualRevenueImpact:sel.results.actualRevenueImpact!=null?sel.results.actualRevenueImpact:"",actualSpendCost:sel.results.actualSpendCost!=null?sel.results.actualSpendCost:"",actualResourceCost:sel.results.actualResourceCost!=null?sel.results.actualResourceCost:""}:{actualOutcome:"",keyLearning:"",outcomeClassification:"Success",decisionMade:"",outcomeCertainty:75,actualRevenueImpact:"",actualSpendCost:"",actualResourceCost:""});setShowR(true);}}
-          onLink={goDetail}/>
+          onLink={goDetail}
+          onSaveTestValidity={tv=>{saveItems(items.map(e=>e.id===sel.id?{...e,testValidity:tv}:e));}}/>
       )}
 
       {nav==="form"&&form&&(
@@ -769,6 +980,77 @@ export default function App() {
       )}
 
       {showSet&&<SettingsModal t={t} dk={dk} settings={settings} onSave={s=>{saveSettings(s);setShowSet(false);}} onClose={()=>setShowSet(false)}/>}
+
+      {showImport&&(
+        <Modal t={t} dk={dk} onClose={()=>{setShowImport(false);setImportRows([]);setImportErrs([]);setImportDone(false);}} wide title="Import CSV">
+          <div style={{display:"flex",flexDirection:"column",gap:14}}>
+            {importDone?(
+              <div style={{textAlign:"center",padding:"24px 0"}}>
+                <div style={{fontSize:28,marginBottom:8}}>&#10003;</div>
+                <div style={{fontSize:15,fontWeight:700,color:t.text,fontFamily:t.serif,marginBottom:4}}>{importRows.length} initiative{importRows.length!==1?"s":""} imported</div>
+                <div style={{fontSize:12,color:t.textMuted,fontFamily:t.mono}}>Closing…</div>
+              </div>
+            ) : importRows.length === 0 ? (
+              <>
+                <p style={{fontSize:13,color:t.textSub,fontFamily:t.mono,lineHeight:1.6,marginBottom:4}}>
+                  Upload a CSV exported from the Growth OS Import Template. Column headers must match the template exactly.
+                </p>
+                <label style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:10,padding:"28px 20px",border:"2px dashed "+t.border,borderRadius:8,cursor:"pointer",background:t.surfaceAlt}}>
+                  <span style={{fontSize:28}}>&#128196;</span>
+                  <span style={{fontSize:13,fontWeight:700,color:t.text,fontFamily:t.mono}}>Click to choose a CSV file</span>
+                  <span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>or drag and drop here</span>
+                  <input type="file" accept=".csv" style={{display:"none"}} onChange={e=>{if(e.target.files[0])handleCSVFile(e.target.files[0]);}}/>
+                </label>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,padding:"10px 12px",background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:6}}>
+                  <span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,lineHeight:1.5}}>
+                    First time? Download the CSV template — correct headers, one example row.
+                  </span>
+                  <button style={{...gG(t),fontSize:11,padding:"4px 11px",flexShrink:0}} onClick={handleDownloadTemplate}>
+                    &#8599; Open template in Google Sheets
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{padding:"10px 14px",background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:6,display:"flex",gap:16,flexWrap:"wrap"}}>
+                  <div><span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>Rows parsed: </span><strong style={{color:t.text,fontFamily:t.mono}}>{importRows.length}</strong></div>
+                  <div><span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>New: </span><strong style={{color:dk?"#60d080":"#1a7a48",fontFamily:t.mono}}>{importRows.filter(r=>!r._isUpdate).length}</strong></div>
+                  <div><span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>Updates: </span><strong style={{color:dk?"#d0a838":"#8a6010",fontFamily:t.mono}}>{importRows.filter(r=>r._isUpdate).length}</strong></div>
+                  {importErrs.length>0&&<div><span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>Warnings: </span><strong style={{color:dk?"#e08080":"#a03030",fontFamily:t.mono}}>{importErrs.length}</strong></div>}
+                </div>
+                {importErrs.length>0&&(
+                  <div style={{maxHeight:120,overflowY:"auto",display:"flex",flexDirection:"column",gap:4}}>
+                    {importErrs.map((e,i)=>(
+                      <div key={i} style={{fontSize:11,fontFamily:t.mono,padding:"5px 10px",background:dk?"#2a1212":"#fdf0f0",border:"1px solid "+(dk?"#6a2828":"#e09090"),borderRadius:4,color:dk?"#e08080":"#a03030"}}>
+                        Row {e.row} — <strong>{e.title}</strong>: {e.issues.join("; ")}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div style={{maxHeight:200,overflowY:"auto",display:"flex",flexDirection:"column",gap:4}}>
+                  {importRows.map((row,i)=>{
+                    const sc=(dk?SD:SL)[row.status]||SL.Draft;
+                    return(
+                      <div key={i} style={{display:"flex",gap:8,alignItems:"center",padding:"7px 10px",background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:5}}>
+                        <span style={{fontSize:10,padding:"2px 7px",borderRadius:3,background:sc.bg,border:"1px solid "+sc.border,color:sc.text,fontFamily:t.mono,fontWeight:600,flexShrink:0}}>{row.status}</span>
+                        {row._isUpdate&&<span style={{fontSize:10,color:dk?"#d0a838":"#8a6010",fontFamily:t.mono,flexShrink:0}}>update</span>}
+                        <span style={{fontSize:12,color:t.text,fontFamily:t.mono,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{row.title}</span>
+                        <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,flexShrink:0}}>{row.category}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{display:"flex",gap:8,justifyContent:"space-between",alignItems:"center",paddingTop:4}}>
+                  <button style={gGh(t)} onClick={()=>{setImportRows([]);setImportErrs([]);}}>&#8592; Re-upload</button>
+                  <button style={gG(t)} onClick={confirmImport}>
+                    Import {importRows.length} initiative{importRows.length!==1?"s":""}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </Modal>
+      )}
 
       {showSM&&(
         <Modal t={t} dk={dk} onClose={()=>{setShowSM(false);setPendS(null);}} title={"Mark as "+pendS}>
@@ -1017,7 +1299,7 @@ function DashView({t,dk,dash,cats,settings,brands,activeBrand,dRange,setDRange,c
 }
 
 // -- Detail --------------------------------------------------------------------
-function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResults,onLink}) {
+function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResults,onLink,onSaveTestValidity}) {
   const linked = items.filter(e=>item.linkedIds&&item.linkedIds.includes(e.id));
   const score  = iceScore(item.ice&&item.ice.impact,item.ice&&item.ice.certainty,item.ice&&item.ice.ease);
   return (
@@ -1155,6 +1437,10 @@ function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResults,onL
       {item.killCriteria&&item.status!=="Draft"&&<div style={gSc(t)}><div style={gSL(t)}>Kill criteria</div><p style={{margin:0,color:t.textSub,lineHeight:1.6,fontSize:13}}>{item.killCriteria}</p></div>}
       {item.notes&&<div style={gSc(t)}><div style={gSL(t)}>Notes</div><p style={{margin:0,color:t.textSub,lineHeight:1.6,fontSize:13}}>{item.notes}</p></div>}
 
+      {(item.status==="Running"||item.status==="Completed"||item.status==="Killed")&&(
+        <TestValidityPanel key={item.id} item={item} t={t} dk={dk} onSaveTestValidity={onSaveTestValidity}/>
+      )}
+
       {item.results&&(()=>{
         const c=(dk?OD:OL)[item.results.outcomeClassification]||{};
         return (
@@ -1190,6 +1476,244 @@ function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResults,onL
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// -- Test Validity Panel -------------------------------------------------------
+// Stats helpers (no deps)
+function calcSampleSize(baseRate, mde, alpha) {
+  // Two-sided z-test for proportions
+  // alpha: 0.05 → 90% CI, 0.10 → 80% CI — we expose 90% and 95%
+  const z_alpha = alpha === 0.05 ? 1.96 : 1.645;  // two-sided
+  const z_beta  = 0.8416;  // 80% power (standard)
+  const p1 = baseRate / 100;
+  const p2 = p1 * (1 + mde / 100);
+  const p_bar = (p1 + p2) / 2;
+  if (p2 <= 0 || p2 >= 1 || p1 <= 0 || p1 >= 1) return null;
+  const n = ((z_alpha + z_beta) ** 2 * (p1 * (1 - p1) + p2 * (1 - p2))) /
+            ((p2 - p1) ** 2);
+  return Math.ceil(n);
+}
+
+function calcZStat(convC, sessC, convV, sessV) {
+  if (!sessC || !sessV || !convC || !convV) return null;
+  const p1 = convC / sessC;
+  const p2 = convV / sessV;
+  const p  = (convC + convV) / (sessC + sessV);
+  const se = Math.sqrt(p * (1 - p) * (1 / sessC + 1 / sessV));
+  if (se === 0) return null;
+  return (p2 - p1) / se;
+}
+
+function zToConfidence(z) {
+  // Approx two-sided p-value → confidence using normal CDF approximation
+  if (z === null) return null;
+  const absZ = Math.abs(z);
+  // Abramowitz and Stegun approximation
+  const t_ = 1 / (1 + 0.2316419 * absZ);
+  const poly = t_ * (0.319381530 + t_ * (-0.356563782 + t_ * (1.781477937 + t_ * (-1.821255978 + t_ * 1.330274429))));
+  const phi = 1 - (1 / Math.sqrt(2 * Math.PI)) * Math.exp(-0.5 * absZ * absZ) * poly;
+  return phi * 2 - 1; // two-sided confidence
+}
+
+function TestValidityPanel({ item, t, dk, onSaveTestValidity }) {
+  const [baseRate, setBaseRate] = useState(item.testValidity?.baseRate ?? 2);
+  const [mde,      setMde]      = useState(item.testValidity?.mde ?? 10);
+  const [sigAlpha, setSigAlpha] = useState(item.testValidity?.sigAlpha ?? 0.05);
+
+  const [convC,    setConvC]    = useState(item.testValidity?.convC ?? "");
+  const [sessC,    setSessC]    = useState(item.testValidity?.sessC ?? "");
+  const [convV,    setConvV]    = useState(item.testValidity?.convV ?? "");
+  const [sessV,    setSessV]    = useState(item.testValidity?.sessV ?? "");
+
+  const [counterfactual, setCounterfactual] = useState(item.testValidity?.counterfactual ?? "");
+
+  // Derived
+  const n         = calcSampleSize(baseRate, mde, sigAlpha);
+  const zStat     = calcZStat(Number(convC), Number(sessC), Number(convV), Number(sessV));
+  const confidence= zToConfidence(zStat);
+  const conf90    = confidence !== null && confidence >= 0.90;
+  const conf95    = confidence !== null && confidence >= 0.95;
+  const hasData   = convC !== "" && sessC !== "" && convV !== "" && sessV !== "";
+
+  const uplift = (Number(sessC) > 0 && Number(sessV) > 0)
+    ? (((Number(convV) / Number(sessV)) - (Number(convC) / Number(sessC))) / (Number(convC) / Number(sessC)) * 100).toFixed(1)
+    : null;
+
+  const dirty = JSON.stringify({baseRate,mde,sigAlpha,convC,sessC,convV,sessV,counterfactual}) !==
+    JSON.stringify({
+      baseRate: item.testValidity?.baseRate ?? 2,
+      mde:      item.testValidity?.mde ?? 10,
+      sigAlpha: item.testValidity?.sigAlpha ?? 0.05,
+      convC:    item.testValidity?.convC ?? "",
+      sessC:    item.testValidity?.sessC ?? "",
+      convV:    item.testValidity?.convV ?? "",
+      sessV:    item.testValidity?.sessV ?? "",
+      counterfactual: item.testValidity?.counterfactual ?? "",
+    });
+
+  const sigColor = conf95 ? (dk ? "#60d080" : "#1a7a48")
+                 : conf90 ? (dk ? "#d0a838" : "#8a6010")
+                 : (dk ? "#e08080" : "#a03030");
+  const sigBg    = conf95 ? (dk ? "#122a18" : "#edfaf2")
+                 : conf90 ? (dk ? "#2a2410" : "#fdf8ee")
+                 : (dk ? "#2a1212" : "#fdf0f0");
+  const sigBorder= conf95 ? (dk ? "#2a7a40" : "#7adca0")
+                 : conf90 ? (dk ? "#6a5818" : "#e0c070")
+                 : (dk ? "#6a2828" : "#e09090");
+
+  const labelStyle = {fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:3};
+  const numStyle   = {fontSize:20,fontWeight:700,fontFamily:t.serif};
+
+  return (
+    <div style={{...gSc(t),border:"1px solid "+(dk?"#3a3010":"#ddd090"),background:dk?"#1e1c0a":"#fffef5"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+        <div style={{...gSL(t),marginBottom:0}}>Test Validity</div>
+        {dirty&&(
+          <button style={{...gG(t),fontSize:11,padding:"3px 10px"}}
+            onClick={()=>onSaveTestValidity({baseRate,mde,sigAlpha,convC,sessC,convV,sessV,counterfactual})}>
+            Save
+          </button>
+        )}
+      </div>
+
+      {/* 1 — Sample size calculator */}
+      <div style={{marginBottom:14,paddingBottom:14,borderBottom:"1px solid "+t.border}}>
+        <div style={{fontSize:11,fontWeight:700,color:t.textSub,fontFamily:t.mono,marginBottom:10,letterSpacing:"0.04em"}}>
+          &#8680; Sample size calculator
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:10}}>
+          <div>
+            <div style={labelStyle}>Baseline CVR (%)</div>
+            <input style={{...gI(t),fontSize:13}} type="number" min="0.1" max="99" step="0.1"
+              value={baseRate} onChange={e=>setBaseRate(parseFloat(e.target.value)||0)}/>
+          </div>
+          <div>
+            <div style={labelStyle}>Min detectable effect (%)</div>
+            <input style={{...gI(t),fontSize:13}} type="number" min="1" max="200" step="1"
+              value={mde} onChange={e=>setMde(parseFloat(e.target.value)||0)}/>
+          </div>
+          <div>
+            <div style={labelStyle}>Confidence level</div>
+            <select style={{...gSl(t),fontSize:13}} value={sigAlpha} onChange={e=>setSigAlpha(parseFloat(e.target.value))}>
+              <option value={0.05}>95%</option>
+              <option value={0.10}>90%</option>
+            </select>
+          </div>
+        </div>
+        {n !== null ? (
+          <div style={{display:"flex",gap:24,alignItems:"baseline",padding:"10px 12px",background:t.surfaceAlt,borderRadius:6,border:"1px solid "+t.border}}>
+            <div>
+              <div style={labelStyle}>Sessions needed per variant</div>
+              <div style={{...numStyle,color:t.gold}}>{n.toLocaleString()}</div>
+            </div>
+            <div>
+              <div style={labelStyle}>Total sessions</div>
+              <div style={{...numStyle,fontSize:16,color:t.textSub}}>{(n*2).toLocaleString()}</div>
+            </div>
+            <div style={{marginLeft:"auto",fontSize:11,color:t.textMuted,fontFamily:t.mono,maxWidth:180,lineHeight:1.5}}>
+              Assumes 80% power, two-sided test.<br/>
+              Detects a {mde}% relative change from {baseRate}% CVR.
+            </div>
+          </div>
+        ) : (
+          <div style={{fontSize:12,color:t.textMuted,fontFamily:t.mono}}>Enter valid inputs above to calculate.</div>
+        )}
+      </div>
+
+      {/* 2 — Statistical significance */}
+      <div style={{marginBottom:14,paddingBottom:14,borderBottom:"1px solid "+t.border}}>
+        <div style={{fontSize:11,fontWeight:700,color:t.textSub,fontFamily:t.mono,marginBottom:10,letterSpacing:"0.04em"}}>
+          &#8680; Statistical significance — current results
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:10}}>
+          {[
+            {label:"Control conversions",  val:convC,  set:setConvC},
+            {label:"Control sessions",     val:sessC,  set:setSessC},
+            {label:"Variant conversions",  val:convV,  set:setConvV},
+            {label:"Variant sessions",     val:sessV,  set:setSessV},
+          ].map(f_=>(
+            <div key={f_.label}>
+              <div style={labelStyle}>{f_.label}</div>
+              <input style={{...gI(t),fontSize:13}} type="number" min="0" step="1"
+                value={f_.val} onChange={e=>f_.set(e.target.value)}
+                placeholder="—"/>
+            </div>
+          ))}
+        </div>
+        {hasData && zStat !== null ? (
+          <div style={{padding:"10px 12px",background:sigBg,border:"1px solid "+sigBorder,borderRadius:6}}>
+            <div style={{display:"flex",gap:24,alignItems:"baseline",flexWrap:"wrap"}}>
+              <div>
+                <div style={{...labelStyle,color:sigColor}}>Confidence</div>
+                <div style={{...numStyle,color:sigColor}}>
+                  {(confidence * 100).toFixed(1)}%
+                </div>
+              </div>
+              <div>
+                <div style={{...labelStyle}}>Z-statistic</div>
+                <div style={{...numStyle,fontSize:16,color:t.textSub}}>{zStat.toFixed(2)}</div>
+              </div>
+              {uplift !== null && (
+                <div>
+                  <div style={labelStyle}>Observed uplift</div>
+                  <div style={{...numStyle,fontSize:16,color:parseFloat(uplift)>=0?(dk?"#60d080":"#1a7a48"):(dk?"#e08080":"#a03030")}}>
+                    {parseFloat(uplift)>=0?"+":""}{uplift}%
+                  </div>
+                </div>
+              )}
+              <div style={{marginLeft:"auto",display:"flex",flexDirection:"column",gap:4}}>
+                <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                  <div style={{width:8,height:8,borderRadius:"50%",background:conf95?"#4caf50":"#ccc"}}/>
+                  <span style={{fontSize:11,fontFamily:t.mono,color:conf95?sigColor:t.textMuted}}>
+                    {conf95 ? "95% confidence reached" : "95% not yet reached"}
+                  </span>
+                </div>
+                <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                  <div style={{width:8,height:8,borderRadius:"50%",background:conf90?"#c08820":"#ccc"}}/>
+                  <span style={{fontSize:11,fontFamily:t.mono,color:conf90?sigColor:t.textMuted}}>
+                    {conf90 ? "90% confidence reached" : "90% not yet reached"}
+                  </span>
+                </div>
+              </div>
+            </div>
+            {!conf90&&hasData&&(
+              <div style={{marginTop:8,fontSize:11,color:t.textMuted,fontFamily:t.mono,lineHeight:1.5}}>
+                Test has not reached statistical significance. Avoid calling a winner early — let it run to the target sample size.
+              </div>
+            )}
+          </div>
+        ) : (
+          <div style={{fontSize:12,color:t.textMuted,fontFamily:t.mono,padding:"8px 0"}}>
+            Enter conversion and session counts to evaluate significance.
+          </div>
+        )}
+      </div>
+
+      {/* 3 — Incrementality / counterfactual */}
+      <div>
+        <div style={{fontSize:11,fontWeight:700,color:t.textSub,fontFamily:t.mono,marginBottom:6,letterSpacing:"0.04em"}}>
+          &#8680; Incrementality — counterfactual definition
+        </div>
+        <div style={{fontSize:12,color:t.textMuted,fontFamily:t.mono,marginBottom:8,lineHeight:1.5}}>
+          Required before marking this initiative Completed. What would have happened without this change?
+        </div>
+        <textarea style={{...gTA(t),fontSize:13}} rows={3}
+          value={counterfactual}
+          onChange={e=>setCounterfactual(e.target.value)}
+          placeholder={"e.g. Without this test, paid social would have continued driving traffic into a 1.2% CVR funnel — at current spend, that's approx. $80k/mo in lost revenue vs the 1.76% baseline."}/>
+        {item.status==="Completed" && !counterfactual && (
+          <div style={{marginTop:6,padding:"6px 10px",background:dk?"#2a1212":"#fdf0f0",border:"1px solid "+(dk?"#6a2828":"#e09090"),borderRadius:4,fontSize:11,color:dk?"#e08080":"#a03030",fontFamily:t.mono}}>
+            &#9888; Counterfactual is required for Completed initiatives. Define what success would look like vs the null scenario.
+          </div>
+        )}
+        {counterfactual && (
+          <div style={{marginTop:6,fontSize:11,color:dk?"#60d080":"#1a7a48",fontFamily:t.mono}}>
+            &#10003; Counterfactual defined — incrementality claim is documented.
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -43,35 +43,37 @@ const OUTCOMES  = ["Jackpot","Success","Failed","Inconclusive"];
 const INIT_TYPES = ["A/B Test","Campaign","Process","Research","Infrastructure"];
 
 const TL = {
-  bg:"#f8f8f4", surface:"#ffffff", surfaceAlt:"#f3f2ea",
-  border:"#e8e4d8", text:"#1a1a14", textSub:"#555040", textMuted:"#9a9880",
-  gold:"#c08820", goldText:"#ffffff", goldBg:"#fdf8ee", goldBorder:"#e8c870",
-  headerBg:"#ffffff", inputBg:"#ffffff", inputBorder:"#e0dcd0",
-  mono:"'Courier New',monospace", serif:"'Georgia',serif",
+  bg:"#EBE8E1", surface:"#FFFFFF", surfaceAlt:"#F7F6F2",
+  border:"#DCD9D2", text:"#1A1A1A", textSub:"#595959", textMuted:"#8C8C8C",
+  gold:"#DDBD61", goldText:"#1A1A1A", goldBg:"#FDFBF5", goldBorder:"#E8D9AB",
+  headerBg:"#FFFFFF", inputBg:"#FFFFFF", inputBorder:"#DCD9D2",
+  mono:"ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+  serif:"system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
 };
 const TD = {
-  bg:"#111108", surface:"#161610", surfaceAlt:"#1d1d12",
-  border:"#2a2820", text:"#e8e4d4", textSub:"#a8a488", textMuted:"#666450",
-  gold:"#d4a83a", goldText:"#111111", goldBg:"#2a2410", goldBorder:"#6a5820",
-  headerBg:"#0e0e08", inputBg:"#1a1a12", inputBorder:"#2e2c20",
-  mono:"'Courier New',monospace", serif:"'Georgia',serif",
+  bg:"#0F0F0F", surface:"#1A1A1A", surfaceAlt:"#262626",
+  border:"#333333", text:"#F5F5F5", textSub:"#A3A3A3", textMuted:"#737373",
+  gold:"#DDBD61", goldText:"#0F0F0F", goldBg:"#2A2410", goldBorder:"#6A5820",
+  headerBg:"#0F0F0F", inputBg:"#1A1A1A", inputBorder:"#333333",
+  mono:"ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+  serif:"system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
 };
 
 const SL = { Draft:{bg:"#f4f4ee",border:"#c8c4a8",text:"#666440"}, Running:{bg:"#edfaf2",border:"#7adca0",text:"#1a7a48"}, Completed:{bg:"#eef0fd",border:"#9090e0",text:"#3a3aa0"}, Killed:{bg:"#fdf0f0",border:"#e09090",text:"#a03030"} };
-const SD = { Draft:{bg:"#2a2a1e",border:"#4a4838",text:"#a0a080"}, Running:{bg:"#122a1a",border:"#2a6a40",text:"#5ad080"}, Completed:{bg:"#14142a",border:"#3a3a80",text:"#8080e0"}, Killed:{bg:"#2a1212",border:"#6a2828",text:"#e08080"} };
+const SD = { Draft:{bg:"#2a2a1e",border:"#5a5840",text:"#c0be98"}, Running:{bg:"#0e2a18",border:"#3a8050",text:"#70e898"}, Completed:{bg:"#12142e",border:"#5050a0",text:"#9898f0"}, Killed:{bg:"#2a1010",border:"#803030",text:"#f09090"} };
 const OL = { Jackpot:{bg:"#edfaf2",border:"#7adca0",text:"#1a7a48"}, Success:{bg:"#edfaf6",border:"#7ad4b0",text:"#1a6a50"}, Failed:{bg:"#fdf0f0",border:"#e09090",text:"#a03030"}, Inconclusive:{bg:"#fdf8ee",border:"#e0c070",text:"#8a6010"} };
-const OD = { Jackpot:{bg:"#122a18",border:"#2a7a40",text:"#60d080"}, Success:{bg:"#122820",border:"#2a6a50",text:"#50c898"}, Failed:{bg:"#2a1010",border:"#6a2020",text:"#e07070"}, Inconclusive:{bg:"#2a2410",border:"#6a5818",text:"#d0a838"} };
+const OD = { Jackpot:{bg:"#0e2818",border:"#3a8848",text:"#78e898"}, Success:{bg:"#0e2620",border:"#338060",text:"#60d8a8"}, Failed:{bg:"#2a1010",border:"#803030",text:"#f08080"}, Inconclusive:{bg:"#2a2210",border:"#806820",text:"#e8c048"} };
 
 // Type badge colors - fixed palette
 const TYPE_L = { "A/B Test":"#2878a0", Campaign:"#a04828", Process:"#4848b0", Research:"#6a4090", Infrastructure:"#208050" };
-const TYPE_D = { "A/B Test":"#50a8d8", Campaign:"#d07050", Process:"#8080e0", Research:"#a870d0", Infrastructure:"#40c880" };
+const TYPE_D = { "A/B Test":"#60b8e8", Campaign:"#e88060", Process:"#9898f0", Research:"#c088e0", Infrastructure:"#50d890" };
 
 const CAT_L = ["#b07818","#187860","#4848b0","#b03838","#a04828","#2878a0","#6a4090","#208050"];
-const CAT_D = ["#d4a83a","#3acca0","#8080e0","#e08080","#d07050","#50a8d8","#a870d0","#40c880"];
+const CAT_D = ["#e8bc48","#48dab0","#9898f0","#f09090","#e88060","#60b8e8","#c088e0","#50d890"];
 const catColor = (cat, cats, dk) => (dk ? CAT_D : CAT_L)[cats.indexOf(cat) % 8] || "#888";
 
 const BRAND_COLORS_L = ["#b07818","#187860","#4848b0","#b03838","#a04828","#2878a0"];
-const BRAND_COLORS_D = ["#d4a83a","#3acca0","#8080e0","#e08080","#d07050","#50a8d8"];
+const BRAND_COLORS_D = ["#e8bc48","#48dab0","#9898f0","#f09090","#e88060","#60b8e8"];
 const brandColor = (brandId, brands, dk) => {
   const idx = brands.findIndex(b=>b.id===brandId);
   return (dk?BRAND_COLORS_D:BRAND_COLORS_L)[idx%6]||"#888";
@@ -81,7 +83,7 @@ const brandName = (brandId, brands) => {
   return (brands.find(b=>b.id===brandId)||{name:brandId}).name;
 };
 const iceScore = (i, c, e) => (!i && !c && !e) ? null : Math.round(((i||0)*(c||0)*(e||0)/1000)*100);
-const iceColor = (s, t) => s === null ? t.textMuted : s >= 60 ? t.gold : s >= 30 ? "#c08820" : "#a03030";
+const iceColor = (s, t) => s === null ? t.textMuted : s >= 60 ? t.gold : s >= 30 ? "#C49A2A" : "#C04040";
 
 const fmtCur = (n) => {
   if (n === 0) return "—";
@@ -252,15 +254,15 @@ async function callQuickCapture(description, settings, cats, initTypes) {
 }
 
 // -- Style helpers -------------------------------------------------------------
-const menuItem = (t) => ({fontSize:14,padding:"10px 12px",background:"transparent",border:"none",color:t.text,cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:8,fontFamily:t.mono,width:"100%"});
-const gG  = (t) => ({fontSize:12,padding:"6px 13px",borderRadius:4,background:t.gold,border:"1px solid "+t.gold,color:t.goldText,cursor:"pointer",fontWeight:700,display:"flex",alignItems:"center",gap:4,fontFamily:t.mono});
-const gGh = (t) => ({fontSize:12,padding:"6px 12px",borderRadius:4,background:"transparent",border:"1px solid "+t.border,color:t.textMuted,cursor:"pointer",display:"flex",alignItems:"center",gap:4,fontFamily:t.mono});
-const gI  = (t) => ({width:"100%",padding:"7px 10px",fontSize:13,fontFamily:t.mono,background:t.inputBg,border:"1px solid "+t.inputBorder,borderRadius:4,color:t.text,boxSizing:"border-box"});
-const gTA = (t) => ({...gI(t),resize:"vertical"});
+const menuItem = (t) => ({fontSize:14,padding:"10px 12px",background:"transparent",border:"none",color:t.text,cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:8,fontFamily:t.serif,width:"100%"});
+const gG  = (t) => ({fontSize:12,padding:"7px 14px",borderRadius:6,background:t.gold,border:"none",color:t.goldText,cursor:"pointer",fontWeight:700,display:"flex",alignItems:"center",gap:4,fontFamily:t.serif,letterSpacing:"0.01em"});
+const gGh = (t) => ({fontSize:12,padding:"6px 13px",borderRadius:6,background:"transparent",border:"1px solid "+t.border,color:t.textSub,cursor:"pointer",display:"flex",alignItems:"center",gap:4,fontFamily:t.serif});
+const gI  = (t) => ({width:"100%",padding:"8px 10px",fontSize:13,fontFamily:t.serif,background:t.inputBg,border:"1px solid "+t.inputBorder,borderRadius:6,color:t.text,boxSizing:"border-box"});
+const gTA = (t) => ({...gI(t),resize:"vertical",fontFamily:t.mono});
 const gSl = (t) => ({...gI(t),cursor:"pointer"});
-const gSc = (t) => ({background:t.surface,border:"1px solid "+t.border,borderRadius:8,padding:"13px 16px"});
-const gSL = (t) => ({fontSize:10,letterSpacing:"0.10em",textTransform:"uppercase",color:t.textMuted,marginBottom:8,fontFamily:t.mono});
-const gCd = (t) => ({background:t.surface,border:"1px solid "+t.border,borderRadius:8,padding:"12px 15px"});
+const gSc = (t) => ({background:t.surface,border:"1px solid "+t.border,borderRadius:10,padding:"13px 16px",boxShadow:"0 2px 8px rgba(0,0,0,0.06)"});
+const gSL = (t) => ({fontSize:10,letterSpacing:"0.10em",textTransform:"uppercase",color:t.textSub,marginBottom:8,fontFamily:t.mono,fontWeight:700});
+const gCd = (t,dk) => ({background:t.surface,border:dk?"1px solid "+t.border:"none",borderRadius:10,padding:"14px 16px",boxShadow:dk?"0 4px 12px rgba(0,0,0,0.25)":"0 4px 12px rgba(0,0,0,0.06)"});
 
 function FR({label,t,children}) {
   return (
@@ -273,20 +275,29 @@ function FR({label,t,children}) {
 
 // -- Atoms ---------------------------------------------------------------------
 function Bdg({label,color,bg,border,small}) {
-  return <span style={{display:"inline-block",fontSize:small?10:11,fontWeight:600,letterSpacing:"0.03em",padding:small?"1px 6px":"2px 8px",borderRadius:4,border:"1px solid "+(border||"#ccc"),background:bg||"#f5f5f0",color:color||"#666",whiteSpace:"nowrap"}}>{label}</span>;
+  return <span style={{display:"inline-block",fontSize:small?10:11,fontWeight:600,letterSpacing:"0.04em",padding:small?"2px 6px":"2px 9px",borderRadius:5,border:"1px solid "+(border||"#ccc"),background:bg||"#f5f5f0",color:color||"#666",whiteSpace:"nowrap"}}>{label}</span>;
 }
 function SBdg({s,dk})        { const c=(dk?SD:SL)[s]||SL.Draft; return <Bdg label={s} color={c.text} bg={c.bg} border={c.border}/>; }
 function OBdg({o,dk})        { const c=(dk?OD:OL)[o]||{};        return <Bdg label={o} color={c.text} bg={c.bg} border={c.border}/>; }
-function CBdg({cat,cats,dk}) { return <Bdg label={cat} color={catColor(cat,cats,dk)} bg={dk?"#1e1e14":"#f8f7f2"} border={dk?"#2a2820":"#ddd8c8"}/>; }
+function CBdg({cat,cats,dk}) {
+  const color = catColor(cat,cats,dk);
+  const bg = dk ? "rgba(255,255,255,0.06)" : "#f8f7f2";
+  const border = dk ? "rgba(255,255,255,0.12)" : "#ddd8c8";
+  return <Bdg label={cat} color={color} bg={bg} border={border}/>;
+}
 function TBdg({type,dk}) {
   const color = (dk?TYPE_D:TYPE_L)[type]||"#888";
-  return <Bdg label={type} color={color} bg={dk?"#1e1e14":"#f8f7f2"} border={dk?"#2a2820":"#ddd8c8"} small/>;
+  const bg = dk ? "rgba(255,255,255,0.06)" : "#f8f7f2";
+  const border = dk ? "rgba(255,255,255,0.12)" : "#ddd8c8";
+  return <Bdg label={type} color={color} bg={bg} border={border} small/>;
 }
 
-function ICEChip({ice,t}) {
+function ICEChip({ice,t,dk}) {
   const s = iceScore(ice&&ice.impact, ice&&ice.certainty, ice&&ice.ease);
   if (s===null) return <span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>No ICE</span>;
-  return <span style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:11,fontWeight:700,color:iceColor(s,t),fontFamily:t.mono,border:"1px solid "+t.border,borderRadius:4,padding:"2px 7px"}}>ICE {s}</span>;
+  const col = iceColor(s,t);
+  const bg  = dk ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.04)";
+  return <span style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:11,fontWeight:700,color:col,fontFamily:t.mono,background:bg,border:"1px solid "+col,borderRadius:4,padding:"2px 8px",letterSpacing:"0.04em"}}>ICE {s}</span>;
 }
 
 function CBar({pct,t}) {
@@ -764,7 +775,7 @@ export default function App() {
   if(!loaded) return <div style={{background:t.bg,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{color:t.textMuted,fontFamily:t.mono}}>Loading Growth OS…</span></div>;
 
   const navBtn=(v,lbl)=>(
-    <button key={v} onClick={()=>setNav(v)} style={{fontSize:12,padding:"5px 12px",borderRadius:4,cursor:"pointer",fontFamily:t.mono,background:nav===v?t.gold:"transparent",border:"1px solid "+(nav===v?t.gold:t.border),color:nav===v?t.goldText:t.textMuted}}>{lbl}</button>
+    <button key={v} onClick={()=>setNav(v)} style={{fontSize:13,padding:"5px 14px",borderRadius:6,cursor:"pointer",fontFamily:t.serif,fontWeight:nav===v?600:400,background:nav===v?t.gold:"transparent",border:"1px solid "+(nav===v?t.gold:"transparent"),color:nav===v?t.goldText:t.textSub}}>{lbl}</button>
   );
 
   return (
@@ -776,8 +787,8 @@ export default function App() {
         {/* Row 1: wordmark + retailer + utilities */}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 16px",borderBottom:"1px solid "+t.border}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <span style={{fontSize:13,fontWeight:700,letterSpacing:"0.12em",color:t.gold,fontFamily:t.serif,whiteSpace:"nowrap"}}>GROWTH OS</span>
-            <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.04em",whiteSpace:"nowrap"}}>{settings.companyName}</span>
+            <span style={{fontSize:13,fontWeight:700,letterSpacing:"0.10em",color:t.gold,fontFamily:t.mono,whiteSpace:"nowrap"}}>GROWTH OS</span>
+            <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,letterSpacing:"0.04em",whiteSpace:"nowrap"}}>{settings.companyName}</span>
             {brands.length>1&&(
               <select value={activeBrand} onChange={e=>setActiveBrand(e.target.value)}
                 style={{fontSize:11,padding:"3px 8px",borderRadius:4,border:"1px solid "+t.gold,background:activeBrand==="all"?t.surface:t.goldBg,color:activeBrand==="all"?t.textMuted:t.gold,fontFamily:t.mono,cursor:"pointer",maxWidth:140}}>
@@ -838,24 +849,24 @@ export default function App() {
           <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
             <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
               {["All",...STATUSES].map(s=>(
-                <button key={s} onClick={()=>setFSt(s)} style={{fontSize:12,padding:"4px 10px",borderRadius:4,cursor:"pointer",fontFamily:t.mono,background:fSt===s?t.gold:"transparent",border:"1px solid "+(fSt===s?t.gold:t.border),color:fSt===s?t.goldText:t.textMuted}}>{s}</button>
+                <button key={s} onClick={()=>setFSt(s)} style={{fontSize:12,padding:"5px 12px",borderRadius:6,cursor:"pointer",fontFamily:t.serif,fontWeight:fSt===s?600:400,background:fSt===s?t.gold:"transparent",border:"1px solid "+(fSt===s?t.gold:t.border),color:fSt===s?t.goldText:t.textSub}}>{s}</button>
               ))}
             </div>
             <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
-                <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Category</label>
+                <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase",fontWeight:600}}>Category</label>
                 <select value={fCat} onChange={e=>setFCat(e.target.value)} style={{...gSl(t),minWidth:130}}>{["All",...cats].map(c=><option key={c}>{c}</option>)}</select>
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
-                <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Type</label>
+                <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase",fontWeight:600}}>Type</label>
                 <select value={fType} onChange={e=>setFType(e.target.value)} style={{...gSl(t),minWidth:120}}>{["All",...INIT_TYPES].map(tp=><option key={tp}>{tp}</option>)}</select>
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
-                <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Owner</label>
+                <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase",fontWeight:600}}>Owner</label>
                 <select value={fOwn} onChange={e=>setFOwn(e.target.value)} style={{...gSl(t),minWidth:120}}>{owners.map(o=><option key={o}>{o}</option>)}</select>
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
-                <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Sort by</label>
+                <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase",fontWeight:600}}>Sort by</label>
                 <select value={sort} onChange={e=>setSort(e.target.value)} style={{...gSl(t),minWidth:110}}>
                   <option value="ice">ICE Score</option>
                   <option value="endDate">End date</option>
@@ -868,7 +879,7 @@ export default function App() {
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
             {filtered.length===0&&<div style={{padding:48,textAlign:"center",color:t.textMuted}}>No initiatives match your filters.</div>}
             {filtered.map(item=>(
-              <div key={item.id} onClick={()=>goDetail(item.id)} style={{...gCd(t),cursor:"pointer"}}>
+              <div key={item.id} onClick={()=>goDetail(item.id)} style={{...gCd(t,dk),cursor:"pointer"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:6}}>
                   <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
                     <CBdg cat={item.category} cats={cats} dk={dk}/>
@@ -879,19 +890,19 @@ export default function App() {
                     <EAlert endDate={item.endDate} status={item.status} t={t} dk={dk}/>
                   </div>
                   <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                    <ICEChip ice={item.ice} t={t}/>
-                    {item.revenueImpact!==0&&<span style={{fontSize:13,fontWeight:700,color:t.gold,fontFamily:t.serif}}>{fmtCur(item.revenueImpact)}</span>}
-                    {item.results&&typeof item.results.actualRevenueImpact==="number"&&<span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>actual: {fmtCur(item.results.actualRevenueImpact)}</span>}
-                    {item.owner&&<span style={{fontSize:12,color:t.textMuted,fontFamily:t.mono}}>{item.owner.split(" (")[0].split("+")[0].trim()}</span>}
+                    <ICEChip ice={item.ice} t={t} dk={dk}/>
+                    {item.revenueImpact!==0&&<span style={{fontSize:16,fontWeight:700,color:t.gold,fontFamily:t.mono,letterSpacing:"-0.01em"}}>{fmtCur(item.revenueImpact)}</span>}
+                    {item.results&&typeof item.results.actualRevenueImpact==="number"&&<span style={{fontSize:12,fontWeight:600,color:t.textSub,fontFamily:t.mono}}>actual: <span style={{color:t.gold}}>{fmtCur(item.results.actualRevenueImpact)}</span></span>}
+                    {item.owner&&<span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>{item.owner.split(" (")[0].split("+")[0].trim()}</span>}
                   </div>
                 </div>
-                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}>
-                  {item.initId&&<span style={{fontSize:10,fontWeight:700,color:t.gold,fontFamily:t.mono,background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:3,padding:"1px 6px",flexShrink:0}}>{item.initId}</span>}
-                  <div style={{fontSize:14,fontWeight:700,color:t.text,lineHeight:1.4,fontFamily:t.serif}}>{item.title}</div>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5,flexWrap:"wrap"}}>
+                  {item.initId&&<span style={{fontSize:10,fontWeight:700,color:t.gold,fontFamily:t.mono,background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:4,padding:"2px 7px",flexShrink:0,letterSpacing:"0.04em"}}>{item.initId}</span>}
+                  <div style={{fontSize:14,fontWeight:600,color:t.text,lineHeight:1.4,fontFamily:t.serif}}>{item.title}</div>
                 </div>
-                {item.hypothesis&&<div style={{fontSize:12,color:t.textMuted,lineHeight:1.5,marginBottom:item.status!=="Draft"?6:0,fontFamily:t.mono}}>{item.hypothesis.slice(0,130)}{item.hypothesis.length>130?"…":""}</div>}
+                {item.hypothesis&&<div style={{fontSize:12,color:t.textSub,lineHeight:1.6,marginBottom:item.status!=="Draft"?6:0,fontFamily:t.serif}}>{item.hypothesis.slice(0,130)}{item.hypothesis.length>130?"…":""}</div>}
                 {item.status!=="Draft"&&(
-                  <div style={{display:"flex",gap:14,alignItems:"center",fontSize:12,color:t.textMuted,fontFamily:t.mono,flexWrap:"wrap"}}>
+                  <div style={{display:"flex",gap:14,alignItems:"center",fontSize:11,color:t.textMuted,fontFamily:t.mono,flexWrap:"wrap",marginTop:2}}>
                     {item.primaryMetric&&<span>{item.primaryMetric.slice(0,48)}{item.primaryMetric.length>48?"…":""}</span>}
                     {item.endDate&&<span>End: {fmtDate(item.endDate)}</span>}
                     {item.linkedIds&&item.linkedIds.length>0&&<span>{item.linkedIds.length} linked</span>}
@@ -963,7 +974,7 @@ export default function App() {
           <p style={{fontSize:13,color:t.textSub,marginBottom:16,fontFamily:t.mono}}>Pick a template to pre-fill the form, or start blank.</p>
           <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:16}}>
             {TEMPLATES.map(tpl=>(
-              <div key={tpl.id} onClick={()=>startFromTemplate(tpl)} style={{...gCd(t),cursor:"pointer",display:"flex",alignItems:"flex-start",gap:12}}>
+              <div key={tpl.id} onClick={()=>startFromTemplate(tpl)} style={{...gCd(t,dk),cursor:"pointer",display:"flex",alignItems:"flex-start",gap:12}}>
                 <div style={{fontSize:20,color:t.gold,marginTop:1}}><span style={{fontSize:18}}>&#9670;</span></div>
                 <div>
                   <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:2}}>
@@ -1099,17 +1110,17 @@ function DashView({t,dk,dash,cats,settings,brands,activeBrand,dRange,setDRange,c
   return (
     <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:14}}>
       {/* North star */}
-      <div style={{...gCd(t),background:t.goldBg,border:"1px solid "+t.goldBorder,display:"flex",alignItems:"center",gap:24,flexWrap:"wrap"}}>
+      <div style={{...gCd(t,dk),background:t.goldBg,border:"1px solid "+t.goldBorder,display:"flex",alignItems:"center",gap:24,flexWrap:"wrap"}}>
         <div>
-          <div style={{fontSize:10,letterSpacing:"0.10em",textTransform:"uppercase",color:t.gold,fontFamily:t.mono,marginBottom:4}}>North star</div>
-          <div style={{fontSize:15,fontWeight:700,color:t.text,fontFamily:t.serif}}>{settings.northStarMetric}</div>
+          <div style={{fontSize:9,letterSpacing:"0.12em",textTransform:"uppercase",color:t.gold,fontFamily:t.mono,marginBottom:5,fontWeight:700}}>North star</div>
+          <div style={{fontSize:15,fontWeight:600,color:t.text,fontFamily:t.serif}}>{settings.northStarMetric}</div>
         </div>
         <div style={{display:"flex",gap:20,flexWrap:"wrap"}}>
-          <div><div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Current</div><div style={{fontSize:20,fontWeight:700,color:t.gold,fontFamily:t.serif}}>{settings.northStarCurrent}</div></div>
-          <div style={{fontSize:20,color:t.textMuted,alignSelf:"center"}}>&#8594;</div>
-          <div><div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Target</div><div style={{fontSize:20,fontWeight:700,color:t.text,fontFamily:t.serif}}>{settings.northStarTarget}</div></div>
+          <div><div style={{fontSize:9,color:t.textSub,fontFamily:t.mono,marginBottom:4,fontWeight:600,letterSpacing:"0.06em",textTransform:"uppercase"}}>Current</div><div style={{fontSize:22,fontWeight:700,color:t.gold,fontFamily:t.mono,letterSpacing:"-0.02em"}}>{settings.northStarCurrent}</div></div>
+          <div style={{fontSize:18,color:t.textMuted,alignSelf:"center"}}>&#8594;</div>
+          <div><div style={{fontSize:9,color:t.textSub,fontFamily:t.mono,marginBottom:4,fontWeight:600,letterSpacing:"0.06em",textTransform:"uppercase"}}>Target</div><div style={{fontSize:22,fontWeight:700,color:t.text,fontFamily:t.mono,letterSpacing:"-0.02em"}}>{settings.northStarTarget}</div></div>
         </div>
-        <div style={{marginLeft:"auto",fontSize:11,color:t.textMuted,fontFamily:t.mono,textAlign:"right"}}>
+        <div style={{marginLeft:"auto",fontSize:11,color:t.textSub,fontFamily:t.mono,textAlign:"right"}}>
           {activeBrand!=="all"&&<div style={{fontSize:12,fontWeight:600,color:t.gold,marginBottom:2}}>{brandName(activeBrand,brands)}</div>}
           {settings.businessModel}
         </div>
@@ -1172,29 +1183,29 @@ function DashView({t,dk,dash,cats,settings,brands,activeBrand,dRange,setDRange,c
           {l:"Avg ICE",          v:dash.avgIce||"—",          s:"all initiatives"},
           {l:"Closed ROI",        v:dash.closedROI!==null?dash.closedROI+"x":"—", s:"actual rev / cost"},
         ].map(m=>(
-          <div key={m.l} style={{...gCd(t),display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",textAlign:"center",padding:"14px 10px",minHeight:100}}>
-            <div style={{fontSize:10,letterSpacing:"0.08em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,marginBottom:6,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>{m.l}</div>
-            <div style={{fontSize:28,fontWeight:700,color:t.gold,fontFamily:t.serif,lineHeight:1}}>{m.v}</div>
-            {m.s&&m.s!==" "&&<div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginTop:4,whiteSpace:"nowrap"}}>{m.s}</div>}
+          <div key={m.l} style={{...gCd(t,dk),display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",textAlign:"center",padding:"18px 10px",minHeight:108}}>
+            <div style={{fontSize:9,letterSpacing:"0.12em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,marginBottom:10,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%",fontWeight:600}}>{m.l}</div>
+            <div style={{fontSize:30,fontWeight:700,color:t.gold,fontFamily:t.mono,lineHeight:1,letterSpacing:"-0.02em"}}>{m.v}</div>
+            {m.s&&m.s!==" "&&<div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginTop:6,whiteSpace:"nowrap"}}>{m.s}</div>}
           </div>
         ))}
       </div>
 
       {/* Calibration card */}
-      <div style={{...gCd(t),border:"1px solid "+(dash.calibration!==null?(dash.calibration>=80?t.goldBorder:dash.calibration>=50?"#c0a030":t.border):t.border)}}>
+      <div style={{...gCd(t,dk),border:"1px solid "+(dash.calibration!==null?(dash.calibration>=80?t.goldBorder:dash.calibration>=50?"#c0a030":t.border):t.border)}}>
         <div style={gSL(t)}>Revenue estimate calibration</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16,alignItems:"center",marginBottom:dash.totalEstCost>0?12:0}}>
           <div>
-            <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Total estimated</div>
-            <div style={{fontSize:20,fontWeight:700,color:t.text,fontFamily:t.serif}}>{fmtCur(dash.totalEstimated)}</div>
+            <div style={{fontSize:10,color:t.textSub,fontFamily:t.mono,marginBottom:4,fontWeight:600,letterSpacing:"0.06em",textTransform:"uppercase"}}>Total estimated</div>
+            <div style={{fontSize:22,fontWeight:700,color:t.text,fontFamily:t.mono,letterSpacing:"-0.01em"}}>{fmtCur(dash.totalEstimated)}</div>
           </div>
           <div>
-            <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Total actual</div>
-            <div style={{fontSize:20,fontWeight:700,color:t.gold,fontFamily:t.serif}}>{fmtCur(dash.totalActual)}</div>
+            <div style={{fontSize:10,color:t.textSub,fontFamily:t.mono,marginBottom:4,fontWeight:600,letterSpacing:"0.06em",textTransform:"uppercase"}}>Total actual</div>
+            <div style={{fontSize:22,fontWeight:700,color:t.gold,fontFamily:t.mono,letterSpacing:"-0.01em"}}>{fmtCur(dash.totalActual)}</div>
           </div>
           <div>
-            <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Accuracy</div>
-            <div style={{fontSize:24,fontWeight:700,fontFamily:t.serif,color:dash.calibration===null?t.textMuted:dash.calibration>=80?t.gold:dash.calibration>=50?"#c08820":"#c04040"}}>
+            <div style={{fontSize:10,color:t.textSub,fontFamily:t.mono,marginBottom:4,fontWeight:600,letterSpacing:"0.06em",textTransform:"uppercase"}}>Accuracy</div>
+            <div style={{fontSize:26,fontWeight:700,fontFamily:t.mono,letterSpacing:"-0.02em",color:dash.calibration===null?t.textMuted:dash.calibration>=80?t.gold:dash.calibration>=50?"#C49A2A":"#C04040"}}>
               {dash.calibration!==null?dash.calibration+"%":"—"}
             </div>
             {dash.calibration!==null&&<div style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,marginTop:2}}>{dash.calibration>=80?"Well calibrated":dash.calibration>=50?"Moderate accuracy":"Overestimating"}</div>}
@@ -1203,16 +1214,16 @@ function DashView({t,dk,dash,cats,settings,brands,activeBrand,dRange,setDRange,c
         {dash.totalEstCost>0&&(
           <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid "+t.border,display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16}}>
             <div>
-              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Total est. cost</div>
-              <div style={{fontSize:18,fontWeight:700,color:t.text,fontFamily:t.serif}}>{fmtCur(dash.totalEstCost)}</div>
+              <div style={{fontSize:10,color:t.textSub,fontFamily:t.mono,marginBottom:4,fontWeight:600,letterSpacing:"0.06em",textTransform:"uppercase"}}>Total est. cost</div>
+              <div style={{fontSize:20,fontWeight:700,color:t.text,fontFamily:t.mono,letterSpacing:"-0.01em"}}>{fmtCur(dash.totalEstCost)}</div>
             </div>
             <div>
-              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Total actual cost</div>
-              <div style={{fontSize:18,fontWeight:700,color:t.text,fontFamily:t.serif}}>{dash.totalActualCost>0?fmtCur(dash.totalActualCost):"—"}</div>
+              <div style={{fontSize:10,color:t.textSub,fontFamily:t.mono,marginBottom:4,fontWeight:600,letterSpacing:"0.06em",textTransform:"uppercase"}}>Total actual cost</div>
+              <div style={{fontSize:20,fontWeight:700,color:t.text,fontFamily:t.mono,letterSpacing:"-0.01em"}}>{dash.totalActualCost>0?fmtCur(dash.totalActualCost):"—"}</div>
             </div>
             <div>
-              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Closed ROI</div>
-              <div style={{fontSize:22,fontWeight:700,fontFamily:t.serif,color:dash.closedROI===null?t.textMuted:dash.closedROI>=2?t.gold:dash.closedROI>=1?"#c08820":"#c04040"}}>
+              <div style={{fontSize:10,color:t.textSub,fontFamily:t.mono,marginBottom:4,fontWeight:600,letterSpacing:"0.06em",textTransform:"uppercase"}}>Closed ROI</div>
+              <div style={{fontSize:24,fontWeight:700,fontFamily:t.mono,letterSpacing:"-0.02em",color:dash.closedROI===null?t.textMuted:dash.closedROI>=2?t.gold:dash.closedROI>=1?"#C49A2A":"#C04040"}}>
                 {dash.closedROI!==null?dash.closedROI+"x":"—"}
               </div>
               {dash.closedROI!==null&&<div style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,marginTop:2}}>{dash.closedROI>=3?"Strong return":dash.closedROI>=1?"Positive":"Negative"}</div>}
@@ -1223,12 +1234,12 @@ function DashView({t,dk,dash,cats,settings,brands,activeBrand,dRange,setDRange,c
 
       {/* Velocity + Category + Type */}
       <div style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) minmax(0,1fr)",gap:12}}>
-        <div style={gCd(t)}>
+        <div style={gCd(t,dk)}>
           <div style={gSL(t)}>Velocity — last 8 weeks</div>
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
             {[{label:"Started / week",vals:dash.vel.started,color:dk?"#5ad080":"#1a7a48"},{label:"Closed / week",vals:dash.vel.closed,color:dk?"#8080e0":"#4848b0"}].map(row=>(
               <div key={row.label}>
-                <div style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,marginBottom:4}}>{row.label}</div>
+                <div style={{fontSize:11,color:t.textSub,fontFamily:t.mono,marginBottom:4,fontWeight:600}}>{row.label}</div>
                 <div style={{display:"flex",alignItems:"center",gap:10}}>
                   <Spark vals={row.vals} color={row.color} w={120} h={26}/>
                   <span style={{fontSize:20,fontWeight:700,color:t.text,fontFamily:t.serif}}>{row.vals[row.vals.length-1]}</span>
@@ -1237,7 +1248,7 @@ function DashView({t,dk,dash,cats,settings,brands,activeBrand,dRange,setDRange,c
             ))}
           </div>
         </div>
-        <div style={gCd(t)}>
+        <div style={gCd(t,dk)}>
           <div style={gSL(t)}>By category</div>
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             {cats.map(cat=>{
@@ -1246,7 +1257,7 @@ function DashView({t,dk,dash,cats,settings,brands,activeBrand,dRange,setDRange,c
                 <div key={cat}>
                   <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
                     <span style={{fontSize:12,color:t.textSub,fontFamily:t.mono}}>{cat}</span>
-                    <span style={{fontSize:12,color:t.textMuted,fontFamily:t.mono}}>{n}</span>
+                    <span style={{fontSize:12,color:t.textSub,fontFamily:t.mono}}>{n}</span>
                   </div>
                   <div style={{height:5,background:t.border,borderRadius:3}}>
                     <div style={{width:pct+"%",height:"100%",borderRadius:3,background:catColor(cat,cats,dk)}}/>
@@ -1259,7 +1270,7 @@ function DashView({t,dk,dash,cats,settings,brands,activeBrand,dRange,setDRange,c
       </div>
 
       {/* Type breakdown */}
-      <div style={gCd(t)}>
+      <div style={gCd(t,dk)}>
         <div style={gSL(t)}>By initiative type</div>
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           {INIT_TYPES.map(tp=>{
@@ -1281,7 +1292,7 @@ function DashView({t,dk,dash,cats,settings,brands,activeBrand,dRange,setDRange,c
       </div>
 
       {/* Outcome breakdown */}
-      <div style={gCd(t)}>
+      <div style={gCd(t,dk)}>
         <div style={gSL(t)}>Outcome breakdown — all closed</div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
           {OUTCOMES.map(o=>{const c=(dk?OD:OL)[o]||{};return(
@@ -1311,7 +1322,7 @@ function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResults,onL
             <TBdg type={item.initType} dk={dk}/>
             <SBdg s={item.status} dk={dk}/>
             {item.results&&<OBdg o={item.results.outcomeClassification} dk={dk}/>}
-            <ICEChip ice={item.ice} t={t}/>
+            <ICEChip ice={item.ice} t={t} dk={dk}/>
             <EAlert endDate={item.endDate} status={item.status} t={t} dk={dk}/>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:2}}>
@@ -1468,7 +1479,7 @@ function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResults,onL
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
             {linked.map(l=>(
               <div key={l.id} onClick={()=>onLink(l.id)} style={{background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:6,padding:"10px 14px",cursor:"pointer"}}>
-                <div style={{display:"flex",gap:5,marginBottom:4}}><CBdg cat={l.category} cats={cats} dk={dk}/><TBdg type={l.initType} dk={dk}/><SBdg s={l.status} dk={dk}/>{l.results&&<OBdg o={l.results.outcomeClassification} dk={dk}/>}<ICEChip ice={l.ice} t={t}/></div>
+                <div style={{display:"flex",gap:5,marginBottom:4}}><CBdg cat={l.category} cats={cats} dk={dk}/><TBdg type={l.initType} dk={dk}/><SBdg s={l.status} dk={dk}/>{l.results&&<OBdg o={l.results.outcomeClassification} dk={dk}/>}<ICEChip ice={l.ice} t={t} dk={dk}/></div>
                 <div style={{fontSize:13,color:t.text,fontWeight:600}}>{l.title}</div>
                 {l.results&&l.results.keyLearning&&<div style={{fontSize:12,color:t.textMuted,marginTop:3,fontStyle:"italic"}}>"{l.results.keyLearning}"</div>}
               </div>

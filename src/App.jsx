@@ -1,6 +1,19 @@
 import { useState, useEffect, useMemo } from "react";
+import {
+  COMPANY_NAME, BUSINESS_MODEL,
+  NORTH_STAR_METRIC, NORTH_STAR_CURRENT, NORTH_STAR_TARGET,
+  BRANDS as CONFIG_BRANDS,
+  CATEGORIES,
+  AGENTS as CONFIG_AGENTS,
+  TEMPLATES,
+  SEED,
+} from "./config.js";
 
 const KEY_ITEMS    = "gos_items_v4";
+const KEY_SETTINGS = "gos_settings_v2";
+const KEY_THEME    = "gos_theme_v1";
+const KEY_DEBATES  = "gos_debates_v1";
+const KEY_METRICS  = "gos_metrics_v1";
 
 // Storage helper — works in Claude artifacts (window.storage), StackBlitz (localStorage), or memory
 const store = (() => {
@@ -20,45 +33,125 @@ const store = (() => {
     },
   };
 })();
-const KEY_SETTINGS = "gos_settings_v2";
-const KEY_THEME    = "gos_theme_v1";
-const KEY_DEBATES  = "gos_debates_v1";
-
-const DEFAULT_AGENTS = [
-  { id:"cmo", label:"CMO", icon:"📣", color:"#2878a0",
-    lens:"brand narrative, paid acquisition efficiency, creative testing, channel mix, top-of-funnel demand generation, and customer perception",
-    blindspot:"often underweights unit economics and margin impact of acquisition spend" },
-  { id:"cfo", label:"CFO", icon:"📊", color:"#c08820",
-    lens:"contribution margin, CAC payback, gross profit per order, pricing architecture, promotional discount discipline, and cash flow timing",
-    blindspot:"often underweights long-term compounding of brand and LTV investments" },
-  { id:"cgo", label:"CGO", icon:"🚀", color:"#208050",
-    lens:"customer lifetime value, cohort retention, subscription velocity, referral loops, repeat purchase rate, and omnichannel expansion",
-    blindspot:"often underweights operational complexity and supply chain constraints of growth initiatives" },
-  { id:"coo", label:"COO", icon:"⚙️", color:"#7040a0",
-    lens:"inventory velocity, fulfilment cost per order, shelf-life risk, supplier lead times, SKU rationalisation, and operational scalability",
-    blindspot:"often underweights brand equity and customer experience trade-offs of operational decisions" },
-];
+const DEFAULT_AGENTS = CONFIG_AGENTS;
 
 const DEFAULT_SETTINGS = {
-  companyName:      "Growth OS",
-  businessModel:    "Multi-retailer growth portfolio",
-  northStarMetric:  "Portfolio Revenue",
-  northStarCurrent: "$1.1M/mo",
-  northStarTarget:  "$1.4M/mo",
-  categories:       ["Paid Media","Organic","Conversion","Merchandising","Retention","Brand","Data / Analytics"],
+  companyName:      COMPANY_NAME,
+  businessModel:    BUSINESS_MODEL,
+  northStarMetric:  NORTH_STAR_METRIC,
+  northStarCurrent: NORTH_STAR_CURRENT,
+  northStarTarget:  NORTH_STAR_TARGET,
+  categories:       CATEGORIES,
   dataSources:      [],
-  brands:           [
-    {id:"default", name:"Northcove Home"},
-    {id:"r1",      name:"Retailer 1"},
-    {id:"r2",      name:"Retailer 2"},
-  ],
-  agents: DEFAULT_AGENTS,
+  brands:           CONFIG_BRANDS,
+  agents:           DEFAULT_AGENTS,
 };
 
 const STATUSES  = ["Draft","Running","Completed","Killed"];
 const OUTCOMES  = ["Jackpot","Success","Failed","Inconclusive"];
 const INIT_TYPES = ["A/B Test","Campaign","Process","Research","Infrastructure"];
 const BLOCKERS  = ["None","Waiting on Engineering","Waiting on Creative","Waiting on Merch/Inventory","Waiting on Legal","Waiting on Finance","Waiting on Leadership"];
+
+// Weekly metrics — source definitions and their fields
+const METRIC_SOURCES = [
+  { id:"manual",      label:"Manual",       icon:"✏️",
+    fields:[
+      {key:"revenue",     label:"Revenue ($)",          type:"number", hint:"Total revenue this period"},
+      {key:"spend",       label:"Ad Spend ($)",          type:"number", hint:"Total paid media spend"},
+      {key:"cac",         label:"CAC ($)",               type:"number", hint:"Cost to acquire one customer"},
+      {key:"roas",        label:"ROAS",                  type:"number", hint:"Return on ad spend (e.g. 3.2)"},
+      {key:"cvr",         label:"CVR (%)",               type:"number", hint:"Conversion rate (e.g. 2.4 for 2.4%)"},
+      {key:"aov",         label:"AOV ($)",               type:"number", hint:"Average order value"},
+      {key:"traffic",     label:"Sessions / Traffic",    type:"number", hint:"Total sessions or visits"},
+      {key:"conversions", label:"Total Conversions",     type:"number", hint:"Total orders / goal completions"},
+      {key:"notes",       label:"Notes",                 type:"text",   hint:"Any context for this week"},
+    ]
+  },
+  { id:"meta",        label:"Meta Ads",     icon:"📘",
+    fields:[
+      {key:"spend",       label:"Spend ($)",             type:"number", hint:"Total Meta spend"},
+      {key:"revenue",     label:"Revenue ($)",           type:"number", hint:"Attributed revenue"},
+      {key:"roas",        label:"ROAS",                  type:"number", hint:"Return on ad spend"},
+      {key:"cac",         label:"CAC ($)",               type:"number", hint:"Cost per acquisition"},
+      {key:"impressions", label:"Impressions",           type:"number", hint:"Total impressions"},
+      {key:"clicks",      label:"Clicks",                type:"number", hint:"Total link clicks"},
+      {key:"cpm",         label:"CPM ($)",               type:"number", hint:"Cost per 1000 impressions"},
+      {key:"ctr",         label:"CTR (%)",               type:"number", hint:"Click-through rate"},
+      {key:"conversions", label:"Conversions",           type:"number", hint:"Meta-attributed conversions"},
+      {key:"notes",       label:"Notes",                 type:"text",   hint:"Campaign context"},
+    ]
+  },
+  { id:"ga4",         label:"Google Analytics (GA4)", icon:"📊",
+    fields:[
+      {key:"sessions",    label:"Sessions",              type:"number", hint:"Total sessions"},
+      {key:"traffic",     label:"Users",                 type:"number", hint:"Total users"},
+      {key:"cvr",         label:"CVR (%)",               type:"number", hint:"Session conversion rate"},
+      {key:"revenue",     label:"Revenue ($)",           type:"number", hint:"Ecommerce revenue"},
+      {key:"conversions", label:"Transactions",          type:"number", hint:"Total transactions"},
+      {key:"aov",         label:"AOV ($)",               type:"number", hint:"Average order value"},
+      {key:"bounce",      label:"Bounce / Eng. Rate (%)",type:"number", hint:"Bounce or engagement rate"},
+      {key:"notes",       label:"Notes",                 type:"text",   hint:"Any anomalies or context"},
+    ]
+  },
+  { id:"google_ads",  label:"Google Ads",   icon:"🔵",
+    fields:[
+      {key:"spend",       label:"Spend ($)",             type:"number", hint:"Total Google Ads spend"},
+      {key:"revenue",     label:"Conv. Value ($)",       type:"number", hint:"Total conversion value"},
+      {key:"roas",        label:"ROAS",                  type:"number", hint:"Conv. value / cost"},
+      {key:"clicks",      label:"Clicks",                type:"number", hint:"Total clicks"},
+      {key:"impressions", label:"Impressions",           type:"number", hint:"Total impressions"},
+      {key:"cpc",         label:"Avg CPC ($)",           type:"number", hint:"Average cost per click"},
+      {key:"ctr",         label:"CTR (%)",               type:"number", hint:"Click-through rate"},
+      {key:"conversions", label:"Conversions",           type:"number", hint:"Total goal completions"},
+      {key:"notes",       label:"Notes",                 type:"text",   hint:"Campaign context"},
+    ]
+  },
+];
+
+// CSV column aliases — maps common export headers to our canonical field keys
+const METRIC_CSV_ALIASES = {
+  // date
+  "date":"date","week":"date","week_start":"date","period":"date","report_date":"date",
+  // brand
+  "brand":"brand","retailer":"brand","account":"brand","property":"brand",
+  // source
+  "source":"source","platform":"source","channel":"source",
+  // revenue
+  "revenue":"revenue","total_revenue":"revenue","purchase_revenue":"revenue",
+  "transaction_revenue":"revenue","conv._value":"revenue","conversion_value":"revenue",
+  // spend
+  "spend":"spend","cost":"spend","ad_spend":"spend","amount_spent":"spend","total_spend":"spend",
+  // cac
+  "cac":"cac","cost_per_acquisition":"cac","cost_per_purchase":"cac","cpa":"cac",
+  // roas
+  "roas":"roas","return_on_ad_spend":"roas","purchase_roas":"roas",
+  // cvr
+  "cvr":"cvr","conversion_rate":"cvr","conv._rate":"cvr","session_conversion_rate":"cvr",
+  // aov
+  "aov":"aov","average_order_value":"aov","avg_order_value":"aov",
+  // traffic
+  "traffic":"traffic","sessions":"sessions","users":"traffic","visitors":"traffic",
+  "total_users":"traffic",
+  // sessions (ga4 specific — keep separate)
+  "sessions":"sessions",
+  // conversions
+  "conversions":"conversions","transactions":"conversions","purchases":"conversions",
+  "conv.":"conversions",
+  // impressions
+  "impressions":"impressions",
+  // clicks
+  "clicks":"clicks","link_clicks":"clicks",
+  // cpm
+  "cpm":"cpm","cost_per_1000_impressions":"cpm",
+  // ctr
+  "ctr":"ctr","click-through_rate":"ctr","click_through_rate":"ctr",
+  // cpc
+  "cpc":"cpc","avg._cpc":"cpc","avg_cpc":"cpc","average_cpc":"cpc",
+  // bounce
+  "bounce":"bounce","bounce_rate":"bounce","engagement_rate":"bounce",
+  // notes
+  "notes":"notes","note":"notes","comment":"notes","comments":"notes",
+};
 
 const TL = {
   bg:"#EBE8E1", surface:"#FFFFFF", surfaceAlt:"#F7F6F2",
@@ -114,35 +207,65 @@ const parseD  = (d) => d ? new Date(d+"T12:00:00") : null;
 const somM    = (d) => new Date(d.getFullYear(), d.getMonth(), 1);
 const eomM    = (d) => new Date(d.getFullYear(), d.getMonth()+1, 0, 23, 59, 59);
 
-const TEMPLATES = [
-  { id:"ab",        label:"A/B Test",          icon:"ti-test-pipe",    initType:"A/B Test",       description:"Split traffic between two variants to measure conversion impact.",           defaults:{ hypothesis:"We believe that [changing X] will result in [metric improvement] for [audience], because [evidence or reasoning].", primaryMetric:"Conversion rate on [page/flow]", killCriteria:"No statistically significant improvement (p<0.05) at [n] sessions per variant within [timeframe]. Use sequential testing.", sampleSize:"[n] sessions per variant", duration:"[2-4] weeks" } },
-  { id:"channel",   label:"Channel Experiment", icon:"ti-speakerphone", initType:"Campaign",       description:"Test a new or underinvested acquisition or retention channel.",              defaults:{ hypothesis:"We believe that investing in [channel] will result in [CAC/ROAS/volume] improvement for [audience segment], because [analogues or prior signal].", primaryMetric:"Incremental ROAS / CAC vs current channel mix", killCriteria:"ROAS below [threshold] after [$spend] at [timeframe].", sampleSize:"$[budget] test spend", duration:"[3-6] weeks" } },
-  { id:"pricing",   label:"Pricing / Promo",    icon:"ti-tag",          initType:"Campaign",       description:"Test price point, discount structure, or promotional mechanic.",              defaults:{ hypothesis:"We believe that [price change / promo structure] will result in [revenue / margin / conversion] improvement, because [price elasticity signal or competitive context].", primaryMetric:"Revenue per visitor; gross margin impact", killCriteria:"No improvement in revenue per visitor after [n] orders. Gross margin must not fall below [threshold].", sampleSize:"[n] orders", duration:"[2-3] weeks" } },
-  { id:"landing",   label:"Landing Page / PDP", icon:"ti-layout",       initType:"A/B Test",       description:"Test content, layout, or trust signals on a conversion-driving page.",        defaults:{ hypothesis:"We believe that [content/layout change] on [page] will result in [CVR/ATC/bounce improvement] for [traffic segment], because [friction or trust signal identified].", primaryMetric:"CVR on [page]; secondary: ATC rate / bounce rate", killCriteria:"No CVR improvement on affected pages after [n] sessions or [timeframe] vs prior baseline.", sampleSize:"[n] sessions", duration:"[2-3] weeks" } },
-  { id:"lifecycle", label:"Lifecycle / CRM",    icon:"ti-mail",         initType:"Campaign",       description:"Test a new email, SMS, or retention flow targeting a specific segment.",      defaults:{ hypothesis:"We believe that [new flow / message] sent to [segment] will result in [reactivation / retention / LTV] improvement, because [segment behaviour or prior engagement signal].", primaryMetric:"Reactivation rate / repeat purchase rate within [n] days", killCriteria:"Response rate below [threshold] after [n] sends to [n]+ recipients.", sampleSize:"[n] customers", duration:"[4-6] weeks" } },
-  { id:"merch",     label:"Merch / Assortment", icon:"ti-shirt",        initType:"Process",        description:"Test a merchandising change — bundle, sequencing, curation, or OOS handling.", defaults:{ hypothesis:"We believe that [merchandising change] will result in [AOV / attach rate / return rate] improvement, because [customer behaviour or friction identified].", primaryMetric:"AOV / attach rate / return rate on affected SKUs or pages", killCriteria:"No improvement vs prior 2W baseline after [n] orders or [timeframe].", sampleSize:"[n] orders / [n] sessions", duration:"[2-4] weeks" } },
-];
+// Parse a weekly metrics CSV — header-driven, order-independent
+function parseMetricsCSV(text) {
+  const lines = text.trim().split(/\r?\n/).filter(l=>l.trim());
+  if (lines.length < 2) return { rows:[], errors:["File appears empty or has no data rows."] };
 
-const SEED = [
-  { id:"e01", initId:"NH-001", title:"Widget A/B — Pause Personalization on Mobile Collection Pages", initType:"A/B Test", hypothesis:"Removing personalization widgets from paid-social mobile entry traffic to lighting and living room collections will recover CVR toward prior 4W baseline (1.85%) by eliminating load-time and rendering friction introduced in late March.", category:"Conversion", owner:"Site / Product", primaryMetric:"CVR on paid-social mobile entry", killCriteria:"Cell B CVR >= 1.76% = widgets confirmed as cause. Cell B flat = widen investigation.", status:"Running", startDate:"2026-05-12", endDate:"2026-06-07", ice:{impact:9,certainty:7,ease:8}, revenueImpact:118352, linkedIds:["e02","e03","e04"], results:null, createdAt:"2026-05-10", brandId:"default", notes:"Cell A: widgets on. Cell B: widgets off. Scoped to paid-social mobile only." },
-  { id:"e02", initId:"NH-002", title:"PDP Content Fix — Delivery Clarity, Swatches, OOS on Top 20 SKUs", initType:"Process", hypothesis:"Fixing delivery messaging, swatch clarity, and OOS display on the top 20 traffic-driving SKUs will reduce checkout abandonment and improve new-visitor CVR by 15-20% on affected PDPs.", category:"Merchandising", owner:"Merch + Site", primaryMetric:"New-visitor CVR on top 20 SKUs; care ticket volume", killCriteria:"No CVR improvement on affected SKUs after 2 weeks vs prior baseline.", status:"Running", startDate:"2026-05-12", endDate:"2026-05-26", ice:{impact:7,certainty:8,ease:7}, revenueImpact:34112, linkedIds:["e01","e03"], results:null, createdAt:"2026-05-10", brandId:"default", notes:"Runs parallel to widget test." },
-  { id:"e03", initId:"NH-003", title:"Weekly Growth Triage — Collection Health Scorecard", initType:"Process", hypothesis:"A shared weekly triage with a scored collection-page health system will reduce mean time to intervention on conversion problems by at least 50% by eliminating the five-team information silo.", category:"Conversion", owner:"Director of Growth", primaryMetric:"Mean time to intervention; scorecard adoption across 5 functions", killCriteria:"If triage fails to produce one owner-assigned action per week after 3 sessions, redesign.", status:"Running", startDate:"2026-05-12", endDate:"2026-06-30", ice:{impact:6,certainty:9,ease:8}, revenueImpact:0, linkedIds:["e01","e02","e04"], results:null, createdAt:"2026-05-10", brandId:"default", notes:"Monday cadence." },
-  { id:"e04", initId:"NH-004", title:"Mobile PDP QA Walk — New Customer Entry Products", initType:"Research", hypothesis:"A structured mobile PDP audit of new-visitor entry products will uncover rendering, load, and trust issues contributing to the 11-12x CVR gap between new visitors and returning customers.", category:"Conversion", owner:"Director of Growth", primaryMetric:"Actionable issues found per PDP; % resolved within 2 weeks", killCriteria:"Discovery task — output is a prioritized bug list.", status:"Completed", startDate:"2026-05-12", endDate:"2026-05-19", ice:{impact:7,certainty:9,ease:9}, revenueImpact:0, linkedIds:["e01","e02"], results:{ actualOutcome:"14 actionable issues found across 12 PDPs. Swatch rendering broken on 6 lighting SKUs. Delivery messaging absent on 4 living room hero SKUs. Avg load time 5.1s.", keyLearning:"New visitors hit a materially degraded PDP experience independent of widgets — fixing content and load in parallel is not optional.", outcomeClassification:"Success", decisionMade:"8 of 14 issues resolved same week. Remaining 6 tracked in weekly triage.", outcomeCertainty:90, actualRevenueImpact:0 }, createdAt:"2026-05-10", brandId:"default" },
-  { id:"e05", initId:"NH-005", title:"Paid Social Spend Hold — No Budget Increase Until CVR Recovers", initType:"Process", hypothesis:"Holding paid social spend flat until new-visitor CVR recovers to >= 1.76% will improve incremental ROAS from 0.24x by stopping paid volume from flowing into a broken funnel.", category:"Paid Media", owner:"Paid + Director of Growth", primaryMetric:"Incremental ROAS; new-visitor CVR WoW", killCriteria:"Hold lifted when widget test resolves and CVR recovers to >= 1.76%.", status:"Running", startDate:"2026-05-12", endDate:"2026-06-07", ice:{impact:8,certainty:9,ease:9}, revenueImpact:80000, linkedIds:["e01","e06"], results:null, createdAt:"2026-05-10", brandId:"default", notes:"Incremental ROAS last 4W = 0.24x." },
-  { id:"e06", initId:"R1-001", title:"Email Welcome Series — Reduce First-Purchase Drop-off", initType:"Campaign", hypothesis:"A 3-email welcome series sent within 48h of signup will increase first-purchase conversion rate by 12% by building product trust before discount dependency forms.", category:"Retention", owner:"CRM", primaryMetric:"First-purchase CVR within 30 days of signup", killCriteria:"No improvement in first-purchase CVR vs control after 4 weeks with 2,000+ recipients.", status:"Running", startDate:"2026-05-01", endDate:"2026-06-15", ice:{impact:7,certainty:7,ease:8}, revenueImpact:38000, linkedIds:[], results:null, createdAt:"2026-05-01", brandId:"r1", notes:"Retailer 1 has high signup-to-purchase drop-off (68%). Welcome series is low-cost, high-leverage." },
-  { id:"e07", initId:"NH-007", title:"Collection Rebuild — Top Paid-Social Landing Pages", initType:"A/B Test", hypothesis:"Rebuilding lighting and living room collection pages with in-stock priority sequencing, load-time optimization, and hero-SKU variant gap resolution will recover CVR to prior 4W baseline and support paid social scaling at ROAS above 1.5x.", category:"Conversion", owner:"Site / Product + Merch", primaryMetric:"Collection-page CVR; mobile load time; OOS rate on hero SKUs", killCriteria:"Scope changes if widget test Cell B is not materially better than Cell A.", status:"Draft", startDate:"2026-06-10", endDate:"2026-07-01", ice:{impact:9,certainty:6,ease:5}, revenueImpact:118352, linkedIds:["e01","e02","e04"], results:null, createdAt:"2026-05-10", brandId:"default", notes:"Second move — scope depends on widget test result." },
-  { id:"e08", initId:"NH-008", title:"Sitewide 15% Promo — Rejected", initType:"Campaign", hypothesis:"A sitewide 15% promotional discount will lift CVR quickly and protect topline revenue while conversion infrastructure issues are resolved.", category:"Merchandising", owner:"Finance", primaryMetric:"CVR lift; gross margin impact", killCriteria:"N/A — not pursuing.", status:"Killed", startDate:"2026-05-10", endDate:"2026-05-14", ice:{impact:3,certainty:2,ease:8}, revenueImpact:-118000, linkedIds:[], results:{ actualOutcome:"Decision not to pursue. Gross profit already down $118k last 4W. Decor markdown at 23%.", keyLearning:"Promo compresses margin without addressing root cause — the problem is site experience, not price.", outcomeClassification:"Failed", decisionMade:"Do not pursue. Revisit only after CVR infrastructure is stable.", outcomeCertainty:95, actualRevenueImpact:0 }, createdAt:"2026-05-10", brandId:"default" },
-  { id:"e09", initId:"NH-009", title:"Paid Social +25% Scale — Rejected", initType:"Campaign", hypothesis:"Increasing paid social spend 25% into current winning audiences will accelerate new-customer growth given improving creative CTR.", category:"Paid Media", owner:"Paid", primaryMetric:"New-customer revenue; incremental ROAS", killCriteria:"N/A — not pursuing.", status:"Killed", startDate:"2026-05-10", endDate:"2026-05-14", ice:{impact:4,certainty:2,ease:7}, revenueImpact:-60000, linkedIds:["e05"], results:{ actualOutcome:"Rejected. Incremental ROAS = 0.24x. $80k spend generated $19k incremental revenue.", keyLearning:"Scaling volume into a broken funnel makes the problem more expensive, not better.", outcomeClassification:"Failed", decisionMade:"Hold spend. Confirm attribution methodology first.", outcomeCertainty:92, actualRevenueImpact:-60000 }, createdAt:"2026-05-10", brandId:"default" },
-  { id:"e10", initId:"NH-010", title:"Homepage Hero Redesign — Premium Brand Presentation", initType:"A/B Test", hypothesis:"Redesigning the homepage hero and seasonal brand creative to feel more premium and less promotional will improve trust signals for new visitors and support conversion quality over time.", category:"Brand", owner:"Brand", primaryMetric:"New-visitor bounce rate; new-visitor CVR on brand-entry traffic", killCriteria:"No measurable improvement in new-visitor bounce rate or CVR after 4 weeks.", status:"Draft", startDate:"2026-07-01", endDate:"2026-08-01", ice:{impact:5,certainty:4,ease:6}, revenueImpact:22000, linkedIds:["e01","e02"], results:null, createdAt:"2026-05-10", brandId:"default", notes:"Sequenced after widget test and PDP fixes." },
-  { id:"e11", initId:"R2-001", title:"PDP Image Quality Uplift — High-Res Lifestyle Photography", initType:"A/B Test", hypothesis:"Replacing stock product images with high-resolution lifestyle photography on top 15 PDPs will increase add-to-cart rate by 10% by reducing purchase hesitation caused by poor visual trust.", category:"Conversion", owner:"Merchandising", primaryMetric:"Add-to-cart rate on affected PDPs", killCriteria:"No ATC improvement after 3 weeks with 3,000+ sessions per variant.", status:"Completed", startDate:"2026-04-01", endDate:"2026-05-01", ice:{impact:6,certainty:7,ease:5}, revenueImpact:28000, spendCost:8000, resourceCost:4000, linkedIds:[], results:{ actualOutcome:"ATC rate improved 14.2% on lifestyle-image PDPs vs control. Strongest lift on furniture category (+19%). No impact on accessories.", keyLearning:"High-quality lifestyle imagery materially lifts purchase intent on considered purchases — the effect is category-specific, not sitewide.", outcomeClassification:"Success", decisionMade:"Roll out to all furniture PDPs. Accessories deprioritised. Northcove team briefed for similar test.", outcomeCertainty:88, actualRevenueImpact:31000, actualSpendCost:9200, actualResourceCost:4500 }, createdAt:"2026-04-01", brandId:"r2" },
-  { id:"e12", initId:"R2-002", title:"Checkout Flow Simplification — Remove Optional Fields", initType:"A/B Test", hypothesis:"Removing 3 optional form fields from the checkout flow will reduce checkout abandonment by 8% by lowering cognitive load at the point of highest purchase intent.", category:"Conversion", owner:"Product", primaryMetric:"Checkout completion rate; abandonment rate", killCriteria:"No improvement in checkout completion rate after 2 weeks with 1,500+ checkout sessions.", status:"Draft", startDate:"2026-06-01", endDate:"2026-07-01", ice:{impact:8,certainty:8,ease:7}, revenueImpact:52000, spendCost:0, resourceCost:6000, linkedIds:["e11"], results:null, createdAt:"2026-05-10", brandId:"r2", notes:"Informed by e11 learnings — trust signals matter, so friction reduction should amplify the uplift." },
-];
+  const rawHeaders = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g,"").toLowerCase().replace(/\s+/g,"_"));
+  const mapped = rawHeaders.map(h => METRIC_CSV_ALIASES[h] || h);
+
+  const errors = [];
+  const rows = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const vals = lines[i].split(",").map(v => v.trim().replace(/^"|"$/g,""));
+    if (vals.every(v=>!v)) continue;
+    const obj = {};
+    rawHeaders.forEach((_, j) => { obj[mapped[j]] = vals[j] || ""; });
+
+    // Require at minimum: date
+    if (!obj.date) { errors.push(`Row ${i+1}: missing date — skipped`); continue; }
+
+    // Normalise date to YYYY-MM-DD
+    const d = new Date(obj.date+"T12:00:00");
+    if (isNaN(d)) { errors.push(`Row ${i+1}: unrecognised date "${obj.date}" — skipped`); continue; }
+    obj.date = d.toISOString().slice(0,10);
+
+    // Normalise numeric fields
+    const numericKeys = ["revenue","spend","cac","roas","cvr","aov","traffic","sessions","conversions","impressions","clicks","cpm","ctr","cpc","bounce"];
+    const metrics = {};
+    numericKeys.forEach(k => {
+      if (obj[k] !== undefined && obj[k] !== "") {
+        const n = parseFloat(obj[k].replace(/[$,%]/g,""));
+        if (!isNaN(n)) metrics[k] = n;
+      }
+    });
+    if (obj.notes) metrics.notes = obj.notes;
+    // Carry through any unmapped custom columns
+    Object.keys(obj).forEach(k => {
+      if (!["date","brand","source","notes",...numericKeys].includes(k) && obj[k]) {
+        metrics[k] = obj[k];
+      }
+    });
+
+    rows.push({
+      date:  obj.date,
+      brand: obj.brand || "default",
+      source: obj.source || "manual",
+      metrics,
+    });
+  }
+
+  return { rows, errors };
+}
 
 // Generate human-readable initiative ID
 const generateInitId = (brandId, brands, existingItems) => {
-  const brand = brands && brands.find(b => b.id === brandId);
-  const name  = brand ? brand.name : "XX";
-  const prefix = name.split(/\s+/).map(w => w[0]).join("").toUpperCase().slice(0,3).padEnd(2,"X");
+  const brand  = brands && brands.find(b => b.id === brandId);
+  const prefix = brand?.code
+    ? brand.code.toUpperCase().slice(0,3)
+    : (brand ? brand.name.split(/\s+/).map(w=>w[0]).join("").toUpperCase().slice(0,3).padEnd(2,"X") : "XX");
   const existing = existingItems.filter(e => e.initId && e.initId.startsWith(prefix+"-"));
   const maxNum = existing.reduce((max, e) => {
     const n = parseInt((e.initId||"").split("-")[1]||"0");
@@ -164,19 +287,19 @@ const mkDefault = (cats, activeBrand) => ({
 });
 
 // -- AI ------------------------------------------------------------------------
-const getApiKey = () => {
-  try { return localStorage.getItem("gos_apikey") || ""; } catch { return ""; }
-};
-const AI_HEADERS = (key) => ({
+// All AI calls route through the Vercel proxy — API key never touches the browser.
+const PROXY_URL    = "/api/proxy";
+const GOS_SECRET   = import.meta.env.VITE_GOS_SECRET || "";
+
+const AI_HEADERS = () => ({
   "Content-Type": "application/json",
-  "x-api-key": key,
-  "anthropic-version": "2023-06-01",
-  "anthropic-dangerously-allow-browser": "true",
+  "x-gos-secret": GOS_SECRET,
 });
 
+// Legacy — kept so existing call sites that check for a key still work during transition
+const getApiKey = () => GOS_SECRET ? "proxied" : "";
+
 async function callExpandHypothesis(rough, title, settings, dataCtx) {
-  const apiKey = getApiKey();
-  if (!apiKey) { alert("Add your Anthropic API key in Settings (gear icon) to use AI features."); return ""; }
   const sys = [
     "You help growth teams write structured initiative hypotheses for "+settings.companyName+",",
     "a "+settings.businessModel+" business.",
@@ -185,8 +308,8 @@ async function callExpandHypothesis(rough, title, settings, dataCtx) {
     "One sentence. No markdown. Use the title to inform the change. Be specific about mechanism. Return only the hypothesis.",
     dataCtx ? "Data context: "+dataCtx : "",
   ].join(" ");
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
-    method:"POST", headers:AI_HEADERS(apiKey),
+  const resp = await fetch(PROXY_URL, {
+    method:"POST", headers:AI_HEADERS(),
     body:JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:300, system:sys,
       messages:[{role:"user", content:"Title: "+(title||"none")+". Rough idea: "+rough}] }),
   });
@@ -195,8 +318,6 @@ async function callExpandHypothesis(rough, title, settings, dataCtx) {
 }
 
 async function callSynthesiseLearnings(learnings, settings) {
-  const apiKey = getApiKey();
-  if (!apiKey) { alert("Add your Anthropic API key in Settings to use AI features."); return ""; }
   const lines = learnings.map((l,i)=>String(i+1)+". ["+l.outcome+"]["+l.category+"]["+l.retailer+"] "+l.learning).join("\n");
   const sys = [
     "You are a growth strategist analysing learnings from "+settings.companyName+".",
@@ -207,8 +328,8 @@ async function callSynthesiseLearnings(learnings, settings) {
     "WATCH OUT: 1-2 failure patterns or repeated mistakes the team should avoid.",
     "Keep each section to 2-4 bullet points maximum. Be specific and direct. No generic advice.",
   ].join(" ");
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
-    method:"POST", headers:AI_HEADERS(apiKey),
+  const resp = await fetch(PROXY_URL, {
+    method:"POST", headers:AI_HEADERS(),
     body:JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:600, system:sys,
       messages:[{role:"user", content:"Learnings to synthesise:\n"+lines}] }),
   });
@@ -217,8 +338,6 @@ async function callSynthesiseLearnings(learnings, settings) {
 }
 
 async function callSuggestICE(form, settings, dataCtx) {
-  const apiKey = getApiKey();
-  if (!apiKey) { alert("Add your Anthropic API key in Settings (gear icon) to use AI features."); return null; }
   const sys = [
     "You help growth teams score initiatives using ICE for "+settings.companyName+",",
     "a "+settings.businessModel+" business.",
@@ -238,8 +357,8 @@ async function callSuggestICE(form, settings, dataCtx) {
     "Kill criteria: "+(form.killCriteria||"none"),
     "Revenue estimate: $"+(form.revenueImpact||0),
   ].join(". ");
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
-    method:"POST", headers:AI_HEADERS(apiKey),
+  const resp = await fetch(PROXY_URL, {
+    method:"POST", headers:AI_HEADERS(),
     body:JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:400, system:sys,
       messages:[{role:"user", content:user}] }),
   });
@@ -250,8 +369,6 @@ async function callSuggestICE(form, settings, dataCtx) {
 }
 
 async function callQuickCapture(description, settings, cats, initTypes) {
-  const apiKey = getApiKey();
-  if (!apiKey) { alert("Add your Anthropic API key in Settings to use AI features."); return null; }
   const sys = [
     "You help growth teams structure initiative ideas for "+settings.companyName+", a "+settings.businessModel+" business.",
     "North star: "+settings.northStarMetric+" (current: "+settings.northStarCurrent+", target: "+settings.northStarTarget+").",
@@ -263,8 +380,8 @@ async function callQuickCapture(description, settings, cats, initTypes) {
     "primaryMetric (string), killCriteria (string), notes (string, optional context).",
     "No markdown, no explanation, just the JSON object.",
   ].join(" ");
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
-    method:"POST", headers:AI_HEADERS(apiKey),
+  const resp = await fetch(PROXY_URL, {
+    method:"POST", headers:AI_HEADERS(),
     body:JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:600, system:sys,
       messages:[{role:"user", content:"Rough idea: "+description}] }),
   });
@@ -409,7 +526,7 @@ function buildPortfolioTools(items, settings, brands, activeBrand) {
 }
 
 // Build a concise portfolio snapshot (still used as initial context)
-function buildPortfolioContext(items, settings, brands, activeBrand) {
+function buildPortfolioContext(items, settings, brands, activeBrand, weeklyMetrics) {
   const tools = buildPortfolioTools(items, settings, brands, activeBrand);
   const summary = tools.execute("get_portfolio_summary");
   const running = tools.execute("get_running_initiatives");
@@ -422,6 +539,69 @@ function buildPortfolioContext(items, settings, brands, activeBrand) {
 
   const gapCats = coverage.filter(c=>c.running===0&&c.draft===0).map(c=>c.category).join(", ");
 
+  // Build live metrics block
+  let metricsBlock = "";
+  if (weeklyMetrics && weeklyMetrics.length > 0) {
+    const now = new Date();
+    const recentCutoff = new Date(now.getTime() - 35 * 24 * 60 * 60 * 1000); // last 5 weeks
+    const recent = weeklyMetrics
+      .filter(m => new Date(m.date+"T12:00:00") >= recentCutoff)
+      .sort((a,b) => b.date.localeCompare(a.date));
+
+    const latestDate = recent[0]?.date;
+    const daysSinceLast = latestDate
+      ? Math.floor((now - new Date(latestDate+"T12:00:00")) / 86400000)
+      : null;
+
+    const stalenessNote = daysSinceLast !== null && daysSinceLast > 10
+      ? ` ⚠️ Note: metrics are ${daysSinceLast} days old — treat as directional.`
+      : "";
+
+    // Group by brand+source for latest week
+    const latestByBrandSource = {};
+    recent.forEach(m => {
+      const key = `${m.brand}::${m.source}`;
+      if (!latestByBrandSource[key]) latestByBrandSource[key] = m;
+    });
+
+    // For each brand+source, find previous week for WoW delta
+    const prevByBrandSource = {};
+    recent.forEach(m => {
+      const key = `${m.brand}::${m.source}`;
+      if (latestByBrandSource[key] && m.date < latestByBrandSource[key].date) {
+        if (!prevByBrandSource[key] || m.date > prevByBrandSource[key].date) {
+          prevByBrandSource[key] = m;
+        }
+      }
+    });
+
+    const metricsLines = Object.entries(latestByBrandSource).map(([key, latest]) => {
+      const [brand, source] = key.split("::");
+      const prev = prevByBrandSource[key];
+      const brandLabel = brand === "default" ? (brands[0]?.name || "Portfolio") : (brands.find(b=>b.id===brand)?.name || brand);
+      const srcDef = METRIC_SOURCES.find(s=>s.id===source);
+      const srcLabel = srcDef ? srcDef.label : source;
+
+      const metricParts = Object.entries(latest.metrics)
+        .filter(([k]) => k !== "notes")
+        .map(([k, v]) => {
+          const label = k.toUpperCase();
+          let delta = "";
+          if (prev && prev.metrics[k] !== undefined && typeof v === "number") {
+            const d = ((v - prev.metrics[k]) / Math.max(Math.abs(prev.metrics[k]), 0.01) * 100);
+            delta = " (" + (d >= 0 ? "+" : "") + d.toFixed(1) + "% WoW)";
+          }
+          return `${label}: ${typeof v === "number" ? v.toLocaleString() : v}${delta}`;
+        }).join(" | ");
+
+      return `  [${brandLabel} · ${srcLabel}] ${latest.date}: ${metricParts}`;
+    }).join("\n") || "  (none logged)";
+
+    metricsBlock = `\nLIVE METRICS${stalenessNote}:\n${metricsLines}`;
+  } else {
+    metricsBlock = "\nLIVE METRICS: Not yet logged — agents should note data is manually estimated only.";
+  }
+
   return `COMPANY: ${settings.companyName} | ${settings.businessModel}
 NORTH STAR: ${settings.northStarMetric} | Now: ${settings.northStarCurrent} → Target: ${settings.northStarTarget}
 PORTFOLIO: ${summary.running} running | ${summary.draft} draft | ${summary.blocked_count} blocked | Win rate: ${summary.win_rate} | Avg ICE: ${summary.avg_ice}
@@ -433,13 +613,11 @@ ${runStr}
 TOP UNINITIATED DRAFTS (by ICE):
 ${topDrafts.slice(0,4).map(e=>`  [ICE ${e.ice}] "${e.title}" | ${e.category} | ${e.est_revenue}`).join("\n")||"  (none)"}
 
-UNCOVERED CATEGORIES (zero initiatives): ${gapCats||"none"}`.trim();
+UNCOVERED CATEGORIES (zero initiatives): ${gapCats||"none"}${metricsBlock}`.trim();
 }
 
 // Single agent turn with tool use — agentic: agent decides what data to fetch
 async function callAgentTurn(agent, portfolioCtx, userContext, messageHistory, portfolioTools, isFirstTurn) {
-  const apiKey = getApiKey();
-  if (!apiKey) throw new Error("No API key");
 
   const sys = `You are the ${agent.label} (${agent.icon}) in a C-Suite strategy debate about what this company should be doing that it currently isn't.
 
@@ -463,8 +641,8 @@ Max 180 words per turn. No filler. Speak like a real board-room executive.`;
   const MAX_TOOL_ITERS = 4;
 
   while (iterations < MAX_TOOL_ITERS) {
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
-      method:"POST", headers:AI_HEADERS(apiKey),
+    const resp = await fetch(PROXY_URL, {
+      method:"POST", headers:AI_HEADERS(),
       body: JSON.stringify({
         model:"claude-sonnet-4-20250514", max_tokens:600, system:sys,
         tools: portfolioTools.definitions,
@@ -512,8 +690,6 @@ Max 180 words per turn. No filler. Speak like a real board-room executive.`;
 
 // Moderator — decides what happens next after each agent turn
 async function callModerator(portfolioCtx, userContext, transcript, agents, turnCount, maxTurns) {
-  const apiKey = getApiKey();
-  if (!apiKey) throw new Error("No API key");
 
   const agentLabels = agents.map(a=>a.label).join(", ");
   const transcriptStr = transcript.map(m=>`${m.icon} ${m.label}: ${m.text}`).join("\n\n---\n\n");
@@ -537,8 +713,8 @@ Rules:
 - "synthesise": the debate has surfaced enough distinct perspectives and is ready to close (use after turn 4 minimum, or when all agents have spoken and consensus is emerging)
 - Force "synthesise" if turnCount >= ${maxTurns - 1}`;
 
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
-    method:"POST", headers:AI_HEADERS(apiKey),
+  const resp = await fetch(PROXY_URL, {
+    method:"POST", headers:AI_HEADERS(),
     body: JSON.stringify({
       model:"claude-sonnet-4-20250514", max_tokens:300, system:sys,
       messages:[{role:"user", content:`Portfolio:\n${portfolioCtx}\n\nContext:\n${userContext||"none"}\n\nTranscript so far:\n${transcriptStr}\n\nDecide what happens next.`}],
@@ -552,8 +728,6 @@ Rules:
 
 // Final synthesis — reads full debate + tool outputs, returns 3 structured initiatives
 async function callDebateSynthesis(portfolioCtx, userContext, transcript, cats, settings, portfolioTools) {
-  const apiKey = getApiKey();
-  if (!apiKey) throw new Error("No API key");
 
   // Give synthesis access to full data too
   const winRate   = portfolioTools.execute("get_win_rate_by_category");
@@ -588,8 +762,8 @@ Return ONLY a valid JSON array of exactly 3 objects. No markdown, no preamble:
   "whyNotAlreadyRunning": "honest one-sentence on why this gap exists in the portfolio"
 }`;
 
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
-    method:"POST", headers:AI_HEADERS(apiKey),
+  const resp = await fetch(PROXY_URL, {
+    method:"POST", headers:AI_HEADERS(),
     body: JSON.stringify({
       model:"claude-sonnet-4-20250514", max_tokens:3500, system:sys,
       messages:[{role:"user", content:
@@ -770,20 +944,24 @@ export default function App() {
   const [importDone,setImportDone]= useState(false);
   const [showCopilot,setShowCopilot]=useState(false);
   const [debates,   setDebates]   = useState([]);
+  const [weeklyMetrics, setWeeklyMetrics] = useState([]);
+  const [showPulse, setShowPulse] = useState(false);
+  const [showMetricsImport, setShowMetricsImport] = useState(false);
 
   const t    = dk ? TD : TL;
   const cats   = settings.categories || DEFAULT_SETTINGS.categories;
-  const brands = settings.brands || DEFAULT_SETTINGS.brands || [{id:"default",name:"Northcove Home"}];
+  const brands = settings.brands || DEFAULT_SETTINGS.brands || CONFIG_BRANDS;
 
   useEffect(()=>{
     // Theme persisted in memory only (localStorage not available in all environments)
     const load = async ()=>{
       try {
-        const [ir,sr,dr] = await Promise.all([store.get(KEY_ITEMS),store.get(KEY_SETTINGS),store.get(KEY_DEBATES)]);
+        const [ir,sr,dr,mr] = await Promise.all([store.get(KEY_ITEMS),store.get(KEY_SETTINGS),store.get(KEY_DEBATES),store.get(KEY_METRICS)]);
         setItems(ir&&ir.value?JSON.parse(ir.value):SEED);
         if(!ir||!ir.value) store.set(KEY_ITEMS,JSON.stringify(SEED));
         if(sr&&sr.value) setSettings(JSON.parse(sr.value));
         if(dr&&dr.value) setDebates(JSON.parse(dr.value));
+        if(mr&&mr.value) setWeeklyMetrics(JSON.parse(mr.value));
       } catch { setItems(SEED); }
       setLoaded(true);
     };
@@ -793,6 +971,7 @@ export default function App() {
   const saveItems    = d => { setItems(d); try{store.set(KEY_ITEMS,JSON.stringify(d));}catch{} };
   const saveSettings = s => { setSettings(s); try{store.set(KEY_SETTINGS,JSON.stringify(s));}catch{} };
   const saveDebates  = d => { setDebates(d); try{store.set(KEY_DEBATES,JSON.stringify(d));}catch{} };
+  const saveMetrics  = m => { setWeeklyMetrics(m); try{store.set(KEY_METRICS,JSON.stringify(m));}catch{} };
   const toggleDk     = ()=> { setDk(n => !n); };
 
   const agents = (settings.agents && settings.agents.length > 0) ? settings.agents : DEFAULT_AGENTS;
@@ -1145,62 +1324,61 @@ export default function App() {
       {/* Header — two rows */}
       <div style={{background:t.headerBg,borderBottom:"1px solid "+t.border,position:"sticky",top:0,zIndex:100}}>
         {/* Row 1: wordmark + retailer + utilities */}
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 16px",borderBottom:"1px solid "+t.border}}>
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <span style={{fontSize:13,fontWeight:700,letterSpacing:"0.12em",color:t.gold,fontFamily:t.serif,whiteSpace:"nowrap"}}>GROWTH OS</span>
-            <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.04em",whiteSpace:"nowrap"}}>{settings.companyName}</span>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",borderBottom:"1px solid "+t.border,minWidth:0}}>
+          <div style={{display:"flex",alignItems:"center",gap:6,minWidth:0,flex:1,overflow:"hidden"}}>
+            <span style={{fontSize:13,fontWeight:700,letterSpacing:"0.12em",color:t.gold,fontFamily:t.serif,whiteSpace:"nowrap",flexShrink:0}}>GROWTH OS</span>
             {brands.length>1&&(
               <select value={activeBrand} onChange={e=>setActiveBrand(e.target.value)}
-                style={{fontSize:11,padding:"3px 8px",borderRadius:4,border:"1px solid "+t.gold,background:activeBrand==="all"?t.surface:t.goldBg,color:activeBrand==="all"?t.textMuted:t.gold,fontFamily:t.mono,cursor:"pointer",maxWidth:140}}>
-                <option value="all">All retailers</option>
+                style={{fontSize:11,padding:"3px 6px",borderRadius:4,border:"1px solid "+t.gold,background:activeBrand==="all"?t.surface:t.goldBg,color:activeBrand==="all"?t.textMuted:t.gold,fontFamily:t.mono,cursor:"pointer",maxWidth:120,minWidth:0,flexShrink:1}}>
+                <option value="all">All</option>
                 {brands.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
             )}
           </div>
-          <div style={{display:"flex",gap:5,alignItems:"center"}}>
+          <div style={{display:"flex",gap:4,alignItems:"center",flexShrink:0}}>
             <button onClick={()=>setShowCopilot(true)}
-              style={{fontSize:12,padding:"4px 11px",borderRadius:4,cursor:"pointer",
+              style={{fontSize:11,padding:"4px 9px",borderRadius:4,cursor:"pointer",
                 background:"linear-gradient(135deg,"+t.gold+" 0%,#e0a030 100%)",
                 border:"none",color:t.goldText,fontWeight:700,fontFamily:t.mono,
-                display:"flex",alignItems:"center",gap:5,
+                display:"flex",alignItems:"center",gap:4,whiteSpace:"nowrap",
                 boxShadow:"0 1px 4px rgba(192,136,32,0.25)"}}>
               ✦ Signal
             </button>
             <button onClick={()=>setShowSet(true)} title="Settings"
-              style={{fontSize:13,padding:"4px 7px",borderRadius:4,cursor:"pointer",background:"transparent",border:"1px solid "+t.border,color:t.textMuted,lineHeight:1}}>
+              style={{fontSize:13,padding:"4px 7px",borderRadius:4,cursor:"pointer",background:"transparent",border:"1px solid "+t.border,color:t.textMuted,lineHeight:1,flexShrink:0}}>
               <span dangerouslySetInnerHTML={{__html:"&#9881;"}}/>
             </button>
             <button onClick={toggleDk} title={dk?"Light mode":"Dark mode"}
-              style={{fontSize:13,padding:"4px 7px",borderRadius:4,cursor:"pointer",background:"transparent",border:"1px solid "+t.border,color:t.textMuted,lineHeight:1}}>
+              style={{fontSize:13,padding:"4px 7px",borderRadius:4,cursor:"pointer",background:"transparent",border:"1px solid "+t.border,color:t.textMuted,lineHeight:1,flexShrink:0}}>
               <span dangerouslySetInnerHTML={{__html:dk?"&#9728;":"&#9790;"}}/>
             </button>
           </div>
         </div>
-        {/* Row 2: nav + contextual actions */}
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 16px",flexWrap:"wrap",gap:4}}>
-          <div style={{display:"flex",gap:3,alignItems:"center",flexWrap:"wrap"}}>
+        {/* Row 2: nav — horizontal scroll on mobile, no wrap */}
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"0 12px",overflowX:"auto",WebkitOverflowScrolling:"touch",scrollbarWidth:"none"}}>
+          <div style={{display:"flex",gap:2,alignItems:"center",flexShrink:0}}>
             {navBtn("dashboard","Dashboard")}
             {navBtn("initiatives","Initiatives")}
             {navBtn("library","Library")}
             {navBtn("triage","Triage")}
             {(nav==="detail"||nav==="form")&&(
-              <button onClick={()=>setNav("initiatives")} style={{...gGh(t),padding:"4px 10px",fontSize:12}}>
+              <button onClick={()=>setNav("initiatives")} style={{...gGh(t),padding:"4px 10px",fontSize:12,whiteSpace:"nowrap"}}>
                 <span style={{fontSize:12}}>&#8592;</span> Back
               </button>
             )}
           </div>
           {nav==="initiatives"&&(
-            <div style={{display:"flex",gap:5,alignItems:"center"}}>
-              <button onClick={()=>setShowCapture(true)} style={{...gGh(t),padding:"4px 10px",fontSize:11}}>
-                &#9889; Quick capture
+            <div style={{display:"flex",gap:4,alignItems:"center",flexShrink:0,paddingLeft:8}}>
+              <button onClick={()=>setShowCapture(true)} style={{...gGh(t),padding:"4px 8px",fontSize:13,whiteSpace:"nowrap"}} title="Quick capture">
+                &#9889;
               </button>
-              <button onClick={()=>{setImportRows([]);setImportErrs([]);setImportDone(false);setShowImport(true);}} style={{...gGh(t),padding:"4px 10px",fontSize:11}}>
-                &#8645; Import CSV
+              <button onClick={()=>{setImportRows([]);setImportErrs([]);setImportDone(false);setShowImport(true);}} style={{...gGh(t),padding:"4px 8px",fontSize:13,whiteSpace:"nowrap"}} title="Import CSV">
+                &#8645;
               </button>
-              <button onClick={()=>handleExportCSV(filtered,"GrowthOS_export_"+new Date().toISOString().slice(0,10)+".csv")} style={{...gGh(t),padding:"4px 10px",fontSize:11}} title="Export current filtered view as CSV">
-                &#8659; Export CSV
+              <button onClick={()=>handleExportCSV(filtered,"GrowthOS_export_"+new Date().toISOString().slice(0,10)+".csv")} style={{...gGh(t),padding:"4px 8px",fontSize:13,whiteSpace:"nowrap"}} title="Export CSV">
+                &#8659;
               </button>
-              <button onClick={goNew} style={{...gG(t),padding:"4px 10px",fontSize:12}}>
+              <button onClick={goNew} style={{...gG(t),padding:"4px 10px",fontSize:12,whiteSpace:"nowrap"}}>
                 + New
               </button>
             </div>
@@ -1208,7 +1386,7 @@ export default function App() {
         </div>
       </div>
 
-      {nav==="dashboard"&&<DashView t={t} dk={dk} dash={dash} cats={cats} settings={settings} brands={brands} activeBrand={activeBrand} dRange={dRange} setDRange={setDRange} cFrom={cFrom} cTo={cTo} setCFrom={setCFrom} setCTo={setCTo} onGo={()=>setNav("initiatives")}/>}
+      {nav==="dashboard"&&<DashView t={t} dk={dk} dash={dash} cats={cats} settings={settings} brands={brands} activeBrand={activeBrand} weeklyMetrics={weeklyMetrics} onLog={()=>setShowPulse(true)} onImport={()=>setShowMetricsImport(true)} dRange={dRange} setDRange={setDRange} cFrom={cFrom} cTo={cTo} setCFrom={setCFrom} setCTo={setCTo} onGo={()=>setNav("initiatives")}/>}
       {nav==="triage"&&<TriageView items={items} t={t} dk={dk} cats={cats} brands={brands} activeBrand={activeBrand} onDetail={goDetail}/>}
       {nav==="library"&&<LearningLibrary items={items} t={t} dk={dk} cats={cats} brands={brands} activeBrand={activeBrand} settings={settings} onReplicate={(item)=>{const base=mkDefault(cats,activeBrand);setForm({...base,title:"[Replicate] "+item.title,hypothesis:"Based on learning from: "+item.title+". Original: "+item.hypothesis,category:item.category,initType:item.initType,ice:{...item.ice},revenueImpact:item.revenueImpact,notes:"Replicated from initiative "+item.id+". Original learning: "+item.results.keyLearning});setNav("form");}}/>}
 
@@ -1479,6 +1657,7 @@ export default function App() {
           activeBrand={activeBrand}
           agents={agents}
           debates={debates}
+          weeklyMetrics={weeklyMetrics}
           onSaveDebate={debate => saveDebates([debate, ...debates].slice(0,20))}
           onAddToBacklog={(initiative) => {
             const base = mkDefault(cats, activeBrand);
@@ -1497,6 +1676,24 @@ export default function App() {
             saveItems([newItem, ...items]);
           }}
           onClose={() => setShowCopilot(false)}
+        />
+      )}
+      {showPulse&&(
+        <MetricsLogModal
+          t={t} dk={dk}
+          settings={settings}
+          brands={brands}
+          weeklyMetrics={weeklyMetrics}
+          onSave={saveMetrics}
+          onClose={()=>setShowPulse(false)}
+        />
+      )}
+      {showMetricsImport&&(
+        <MetricsImportModal
+          t={t} dk={dk}
+          weeklyMetrics={weeklyMetrics}
+          onSave={saveMetrics}
+          onClose={()=>setShowMetricsImport(false)}
         />
       )}
     </div>
@@ -1647,7 +1844,7 @@ function IdeaCard({idea, idx, results, setResults, added, onAdd, t, dk, cats, ag
   );
 }
 
-function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand, agents, debates, onSaveDebate, onAddToBacklog, onClose}) {
+function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand, agents, debates, weeklyMetrics, onSaveDebate, onAddToBacklog, onClose}) {
   const [tab,        setTab]       = useState("debate"); // debate | history
   const [context,    setContext]   = useState("");
   const [running,    setRunning]   = useState(false);
@@ -1660,12 +1857,12 @@ function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand, agents
   const [phase,      setPhase]     = useState("input");
   const [turnCount,  setTurnCount] = useState(0);
 
-  const portfolioCtx = buildPortfolioContext(items, settings, brands, activeBrand);
+  const portfolioCtx = buildPortfolioContext(items, settings, brands, activeBrand, weeklyMetrics);
   const portfolioTools = buildPortfolioTools(items, settings, brands, activeBrand);
 
   const runDebate = async () => {
     const apiKey = getApiKey();
-    if (!apiKey) { setError("Add your Anthropic API key in ⚙ Settings to use AI features."); return; }
+    if (!apiKey) { setError("AI features are not configured. Contact the app administrator."); return; }
 
     setRunning(true); setError(""); setTranscript([]); setResults(null);
     setAdded({}); setPhase("debating"); setTurnCount(0); setModNote("");
@@ -1947,7 +2144,7 @@ function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand, agents
                   A Moderator routes the debate dynamically. The CSO synthesises into 3 net-new initiatives with champion and dissenting voice.
                   <br/><br/>
                   <strong style={{color:t.textSub}}>Add situation context above for sharper results.</strong>
-                  <br/>Requires Anthropic API key in ⚙ Settings.
+                  <br/>Use Signal AI to analyse your portfolio.
                 </div>
               </div>
             )}
@@ -2004,8 +2201,387 @@ function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand, agents
   );
 }
 
+// -- Weekly Pulse --------------------------------------------------------------
+function WeeklyPulseSection({t, dk, settings, brands, weeklyMetrics, onLog, onImport}) {
+  const [expanded, setExpanded] = useState(true);
+
+  const now = new Date();
+  const recentCutoff = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000); // 4 weeks
+
+  // Latest entry across all brand+source combos
+  const sorted = [...(weeklyMetrics||[])].sort((a,b)=>b.date.localeCompare(a.date));
+  const latestDate = sorted[0]?.date || null;
+  const daysSince = latestDate ? Math.floor((now - new Date(latestDate+"T12:00:00")) / 86400000) : null;
+  const isStale = daysSince !== null && daysSince > 7;
+  const isEmpty = !weeklyMetrics || weeklyMetrics.length === 0;
+
+  // Last 4 distinct weeks
+  const weeks = [...new Set(sorted.map(m=>m.date))].slice(0,4);
+
+  // Revenue sparkline: sum revenue across all brands for each of last 4 weeks
+  const revenueByWeek = weeks.map(w =>
+    weeklyMetrics.filter(m=>m.date===w).reduce((s,m)=>s+(m.metrics.revenue||0),0)
+  ).reverse();
+
+  // Build a summary table: brands × latest week metrics (revenue, spend, roas)
+  const summaryRows = brands.map(b => {
+    const brandId = b.id;
+    const latestEntries = sorted.filter(m => (m.brand === brandId || (brandId==="default"&&(!m.brand||m.brand==="default"))));
+    const latestEntry = latestEntries[0];
+    const prevEntry = latestEntries.find(m => m.date < (latestEntry?.date||""));
+
+    if (!latestEntry) return { brand: b.name, date: null, metrics: null };
+
+    const delta = (key) => {
+      if (!prevEntry || prevEntry.metrics[key]==null || latestEntry.metrics[key]==null) return null;
+      const d = ((latestEntry.metrics[key] - prevEntry.metrics[key]) / Math.max(Math.abs(prevEntry.metrics[key]),0.01)) * 100;
+      return d;
+    };
+
+    return {
+      brand: b.name,
+      date: latestEntry.date,
+      source: latestEntry.source,
+      revenue: latestEntry.metrics.revenue ?? null,
+      spend: latestEntry.metrics.spend ?? null,
+      roas: latestEntry.metrics.roas ?? null,
+      cvr: latestEntry.metrics.cvr ?? null,
+      revDelta: delta("revenue"),
+      roasDelta: delta("roas"),
+    };
+  });
+
+  const deltaEl = (d) => {
+    if (d === null) return null;
+    const pos = d >= 0;
+    return <span style={{fontSize:10,fontWeight:600,fontFamily:t.mono,color:pos?"#2a8a50":"#c03030",marginLeft:3}}>{pos?"▲":"▼"}{Math.abs(d).toFixed(1)}%</span>;
+  };
+
+  const stalenessColor = isStale ? (dk?"#d0a838":"#8a6010") : (dk?"#5ad080":"#1a7a48");
+  const stalenessBg   = isStale ? (dk?"#2a2410":"#fdf8ee") : (dk?"#122a18":"#edfaf2");
+  const stalenessBorder = isStale ? (dk?"#6a5818":"#e0c070") : (dk?"#2a7a40":"#7adca0");
+
+  return (
+    <div style={{...gCd(t,dk),border:"1px solid "+t.border}}>
+      {/* Header row */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <button onClick={()=>setExpanded(e=>!e)} style={{background:"none",border:"none",cursor:"pointer",color:t.textMuted,fontSize:13,padding:0,lineHeight:1}}>
+            {expanded?"▾":"▸"}
+          </button>
+          <span style={{fontSize:11,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono}}>Weekly Pulse</span>
+          {!isEmpty && (
+            <span style={{fontSize:10,padding:"2px 7px",borderRadius:3,background:stalenessBg,border:"1px solid "+stalenessBorder,color:stalenessColor,fontFamily:t.mono,fontWeight:600}}>
+              {isStale ? `Last logged ${daysSince}d ago ⚠️` : `Updated ${daysSince===0?"today":daysSince+"d ago"}`}
+            </span>
+          )}
+        </div>
+        <div style={{display:"flex",gap:5}}>
+          <button onClick={onImport} style={{...gGh(t),fontSize:11,padding:"3px 9px"}}>⬆ Import CSV</button>
+          <button onClick={onLog}    style={{...gG(t),fontSize:11,padding:"3px 9px"}}>+ Log this week</button>
+        </div>
+      </div>
+
+      {expanded && (
+        <div style={{marginTop:12}}>
+          {isEmpty ? (
+            <div style={{padding:"18px 0",textAlign:"center",color:t.textMuted,fontFamily:t.mono,fontSize:12,border:"1px dashed "+t.border,borderRadius:6}}>
+              <div style={{fontSize:22,marginBottom:6}}>📊</div>
+              No metrics logged yet. Click "Log this week" or import a CSV to start tracking.
+            </div>
+          ) : (
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {/* Revenue sparkline strip */}
+              {revenueByWeek.some(v=>v>0) && (
+                <div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:t.surfaceAlt,borderRadius:5}}>
+                  <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,minWidth:60}}>Revenue</span>
+                  <Spark vals={revenueByWeek} color={t.gold} w={100} h={24}/>
+                  <span style={{fontSize:11,fontWeight:700,color:t.gold,fontFamily:t.mono,marginLeft:4}}>
+                    {fmtCur(revenueByWeek[revenueByWeek.length-1])}
+                  </span>
+                  <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginLeft:"auto"}}>last {weeks.length} entries</span>
+                </div>
+              )}
+
+              {/* Summary table */}
+              <div style={{overflowX:"auto"}}>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,fontFamily:t.mono}}>
+                  <thead>
+                    <tr style={{borderBottom:"1px solid "+t.border}}>
+                      {["Brand","Date","Source","Revenue","Spend","ROAS","CVR"].map(h=>(
+                        <th key={h} style={{textAlign:"left",padding:"4px 8px",color:t.textMuted,fontWeight:600,letterSpacing:"0.05em",fontSize:10,textTransform:"uppercase",whiteSpace:"nowrap"}}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {summaryRows.map((row,i)=>(
+                      <tr key={i} style={{borderBottom:"1px solid "+t.border,opacity:row.date?1:0.4}}>
+                        <td style={{padding:"6px 8px",color:t.text,fontWeight:600,whiteSpace:"nowrap"}}>{row.brand}</td>
+                        <td style={{padding:"6px 8px",color:t.textMuted,whiteSpace:"nowrap"}}>{row.date?fmtDate(row.date):"—"}</td>
+                        <td style={{padding:"6px 8px",color:t.textMuted,whiteSpace:"nowrap"}}>
+                          {row.source ? (METRIC_SOURCES.find(s=>s.id===row.source)?.label||row.source) : "—"}
+                        </td>
+                        <td style={{padding:"6px 8px",color:t.gold,fontWeight:700,whiteSpace:"nowrap"}}>
+                          {row.revenue!=null?fmtCur(row.revenue):"—"}{deltaEl(row.revDelta)}
+                        </td>
+                        <td style={{padding:"6px 8px",color:t.textSub,whiteSpace:"nowrap"}}>{row.spend!=null?fmtCur(row.spend):"—"}</td>
+                        <td style={{padding:"6px 8px",color:t.textSub,whiteSpace:"nowrap"}}>
+                          {row.roas!=null?row.roas.toFixed(2)+"x":"—"}{deltaEl(row.roasDelta)}
+                        </td>
+                        <td style={{padding:"6px 8px",color:t.textSub,whiteSpace:"nowrap"}}>{row.cvr!=null?row.cvr.toFixed(2)+"%":"—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Weekly metrics log modal — manual entry per brand, source-filtered fields
+function MetricsLogModal({t, dk, settings, brands, weeklyMetrics, onSave, onClose}) {
+  const today = new Date().toISOString().slice(0,10);
+  const [date, setDate] = useState(today);
+  const [rows, setRows] = useState(
+    brands.map(b => ({ brandId: b.id, source: "manual", metrics: {} }))
+  );
+
+  const updateRow = (idx, field, val) => {
+    setRows(r => r.map((row,i) => i===idx ? {...row, [field]: val} : row));
+  };
+  const updateMetric = (idx, key, val) => {
+    setRows(r => r.map((row,i) => i===idx ? {...row, metrics:{...row.metrics,[key]:val}} : row));
+  };
+
+  const handleSave = () => {
+    const newEntries = rows
+      .filter(row => Object.values(row.metrics).some(v => v !== "" && v !== undefined))
+      .map(row => {
+        const src = METRIC_SOURCES.find(s=>s.id===row.source);
+        const cleanMetrics = {};
+        if (src) {
+          src.fields.forEach(f => {
+            const v = row.metrics[f.key];
+            if (v !== "" && v !== undefined) {
+              cleanMetrics[f.key] = f.type === "number" ? parseFloat(v)||0 : v;
+            }
+          });
+        }
+        return { date, brand: row.brandId, source: row.source, metrics: cleanMetrics };
+      });
+
+    if (!newEntries.length) { onClose(); return; }
+
+    // Deduplicate: replace existing entries for same date+brand+source
+    const filtered = weeklyMetrics.filter(m =>
+      !newEntries.some(e => e.date===m.date && e.brand===m.brand && e.source===m.source)
+    );
+    onSave([...newEntries, ...filtered].sort((a,b)=>b.date.localeCompare(a.date)));
+    onClose();
+  };
+
+  return (
+    <Modal t={t} dk={dk} onClose={onClose} wide title="Log this week's metrics">
+      <div style={{display:"flex",flexDirection:"column",gap:14}}>
+        <FR label="Week ending / reporting date" t={t}>
+          <input type="date" style={gI(t)} value={date} onChange={e=>setDate(e.target.value)}/>
+        </FR>
+
+        {rows.map((row, idx) => {
+          const brand = brands[idx];
+          const srcDef = METRIC_SOURCES.find(s=>s.id===row.source);
+          return (
+            <div key={idx} style={{border:"1px solid "+t.border,borderRadius:6,padding:"12px 14px",background:t.surfaceAlt}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+                <div style={{fontSize:13,fontWeight:700,color:t.text,fontFamily:t.serif}}>{brand.name}</div>
+                <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                  {METRIC_SOURCES.map(s=>(
+                    <button key={s.id} onClick={()=>updateRow(idx,"source",s.id)}
+                      style={{fontSize:10,padding:"3px 8px",borderRadius:4,cursor:"pointer",fontFamily:t.mono,
+                        background:row.source===s.id?t.gold:"transparent",
+                        border:"1px solid "+(row.source===s.id?t.gold:t.border),
+                        color:row.source===s.id?t.goldText:t.textMuted,fontWeight:row.source===s.id?700:400}}>
+                      {s.icon} {s.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:8}}>
+                {srcDef && srcDef.fields.map(f=>(
+                  <div key={f.key} style={{display:"flex",flexDirection:"column",gap:3}}>
+                    <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono}}>{f.label}</label>
+                    {f.type==="text"
+                      ? <input style={{...gI(t),fontSize:12}} value={row.metrics[f.key]||""} placeholder={f.hint} onChange={e=>updateMetric(idx,f.key,e.target.value)}/>
+                      : <input style={{...gI(t),fontSize:12}} type="number" step="any" value={row.metrics[f.key]||""} placeholder={f.hint} onChange={e=>updateMetric(idx,f.key,e.target.value)}/>
+                    }
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+
+        <div style={{display:"flex",gap:8,justifyContent:"flex-end",paddingTop:4}}>
+          <button style={gGh(t)} onClick={onClose}>Cancel</button>
+          <button style={gG(t)} onClick={handleSave}>Save metrics</button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// Weekly metrics CSV import modal
+function MetricsImportModal({t, dk, weeklyMetrics, onSave, onClose}) {
+  const [step, setStep] = useState("upload"); // upload | preview | done
+  const [parsed, setParsed] = useState({rows:[], errors:[]});
+  const [conflictMode, setConflictMode] = useState("overwrite"); // overwrite | skip
+
+  const handleFile = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const result = parseMetricsCSV(ev.target.result);
+      setParsed(result);
+      setStep("preview");
+    };
+    reader.readAsText(file);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const result = parseMetricsCSV(ev.target.result);
+      setParsed(result);
+      setStep("preview");
+    };
+    reader.readAsText(file);
+  };
+
+  const handleConfirm = () => {
+    const existing = [...weeklyMetrics];
+    let merged;
+    if (conflictMode === "overwrite") {
+      const filtered = existing.filter(m =>
+        !parsed.rows.some(r => r.date===m.date && r.brand===m.brand && r.source===m.source)
+      );
+      merged = [...parsed.rows, ...filtered].sort((a,b)=>b.date.localeCompare(a.date));
+    } else {
+      // skip: only add rows that don't already exist
+      const newOnly = parsed.rows.filter(r =>
+        !existing.some(m => m.date===r.date && m.brand===r.brand && m.source===r.source)
+      );
+      merged = [...newOnly, ...existing].sort((a,b)=>b.date.localeCompare(a.date));
+    }
+    onSave(merged);
+    setStep("done");
+    setTimeout(onClose, 1200);
+  };
+
+  const conflicts = parsed.rows.filter(r =>
+    weeklyMetrics.some(m => m.date===r.date && m.brand===r.brand && m.source===r.source)
+  );
+
+  return (
+    <Modal t={t} dk={dk} onClose={onClose} wide title="Import metrics CSV">
+      <div style={{display:"flex",flexDirection:"column",gap:12}}>
+        {step==="done" && (
+          <div style={{padding:"24px",textAlign:"center",color:dk?"#60d080":"#1a7a48",fontFamily:t.mono,fontSize:13}}>
+            ✓ Metrics imported successfully
+          </div>
+        )}
+
+        {step==="upload" && (
+          <>
+            <div onDrop={handleDrop} onDragOver={e=>e.preventDefault()}
+              style={{border:"2px dashed "+t.border,borderRadius:8,padding:"28px",textAlign:"center",cursor:"pointer",background:t.surfaceAlt}}
+              onClick={()=>document.getElementById("metrics-csv-input").click()}>
+              <div style={{fontSize:28,marginBottom:8}}>📂</div>
+              <div style={{fontSize:13,color:t.text,marginBottom:4}}>Drop your CSV here or click to upload</div>
+              <div style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>Header-driven — column order doesn't matter. See template for required columns.</div>
+              <input id="metrics-csv-input" type="file" accept=".csv" style={{display:"none"}} onChange={handleFile}/>
+            </div>
+            <div style={{background:dk?"#1a1a12":"#f5f5f0",borderRadius:6,padding:"10px 12px",fontSize:11,fontFamily:t.mono,color:t.textMuted,lineHeight:1.7}}>
+              <strong style={{color:t.textSub}}>Required columns:</strong> date, brand, source<br/>
+              <strong style={{color:t.textSub}}>Common columns:</strong> revenue, spend, roas, cvr, cac, aov, traffic, conversions, impressions, clicks, cpm, ctr, notes<br/>
+              <strong style={{color:t.textSub}}>Source values:</strong> manual, meta, ga4, google_ads<br/>
+              Column names are case-insensitive. Spaces and underscores are treated the same. Common export aliases (e.g. "Amount Spent", "Conv. Value") are recognised automatically.
+            </div>
+          </>
+        )}
+
+        {step==="preview" && (
+          <>
+            {parsed.errors.length > 0 && (
+              <div style={{display:"flex",flexDirection:"column",gap:3,maxHeight:100,overflowY:"auto"}}>
+                {parsed.errors.map((e,i)=>(
+                  <div key={i} style={{fontSize:11,fontFamily:t.mono,padding:"4px 8px",background:dk?"#2a1212":"#fdf0f0",border:"1px solid "+(dk?"#6a2828":"#e09090"),borderRadius:4,color:dk?"#e08080":"#a03030"}}>{e}</div>
+                ))}
+              </div>
+            )}
+
+            <div style={{fontSize:12,fontFamily:t.mono,color:t.textSub}}>
+              {parsed.rows.length} row{parsed.rows.length!==1?"s":""} ready to import
+              {conflicts.length > 0 && <span style={{color:dk?"#d0a838":"#8a6010"}}> · {conflicts.length} conflict{conflicts.length!==1?"s":""} with existing data</span>}
+            </div>
+
+            {conflicts.length > 0 && (
+              <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+                <span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>On conflict:</span>
+                {[["overwrite","Overwrite existing"],["skip","Keep existing"]].map(([v,l])=>(
+                  <button key={v} onClick={()=>setConflictMode(v)}
+                    style={{fontSize:11,padding:"3px 9px",borderRadius:4,cursor:"pointer",fontFamily:t.mono,
+                      background:conflictMode===v?t.gold:"transparent",border:"1px solid "+(conflictMode===v?t.gold:t.border),
+                      color:conflictMode===v?t.goldText:t.textMuted}}>{l}</button>
+                ))}
+              </div>
+            )}
+
+            <div style={{maxHeight:220,overflowY:"auto",display:"flex",flexDirection:"column",gap:3}}>
+              {parsed.rows.map((row,i)=>{
+                const isConflict = weeklyMetrics.some(m=>m.date===row.date&&m.brand===row.brand&&m.source===row.source);
+                const srcDef = METRIC_SOURCES.find(s=>s.id===row.source);
+                return (
+                  <div key={i} style={{display:"flex",gap:8,alignItems:"center",padding:"6px 10px",
+                    background:isConflict?(dk?"#2a2410":"#fdf8ee"):t.surfaceAlt,
+                    border:"1px solid "+(isConflict?(dk?"#6a5818":"#e0c070"):t.border),borderRadius:4}}>
+                    <span style={{fontSize:10,fontFamily:t.mono,color:t.textMuted,minWidth:80,flexShrink:0}}>{row.date}</span>
+                    <span style={{fontSize:11,fontFamily:t.mono,color:t.text,fontWeight:600,minWidth:80,flexShrink:0}}>{row.brand}</span>
+                    <span style={{fontSize:10,fontFamily:t.mono,color:t.textMuted,minWidth:60,flexShrink:0}}>{srcDef?.label||row.source}</span>
+                    <span style={{fontSize:10,fontFamily:t.mono,color:t.textMuted,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                      {Object.entries(row.metrics).filter(([k])=>k!=="notes").map(([k,v])=>`${k}: ${v}`).join(" · ")}
+                    </span>
+                    {isConflict&&<span style={{fontSize:9,color:dk?"#d0a838":"#8a6010",fontFamily:t.mono,flexShrink:0}}>conflict</span>}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div style={{display:"flex",gap:8,justifyContent:"space-between",paddingTop:4}}>
+              <button style={gGh(t)} onClick={()=>setStep("upload")}>← Re-upload</button>
+              <div style={{display:"flex",gap:8}}>
+                <button style={gGh(t)} onClick={onClose}>Cancel</button>
+                <button style={gG(t)} onClick={handleConfirm} disabled={!parsed.rows.length}>
+                  Import {parsed.rows.length} row{parsed.rows.length!==1?"s":""}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
 // -- Dashboard -----------------------------------------------------------------
-function DashView({t,dk,dash,cats,settings,brands,activeBrand,dRange,setDRange,cFrom,cTo,setCFrom,setCTo,onGo}) {
+function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetrics,onLog,onImport,dRange,setDRange,cFrom,cTo,setCFrom,setCTo,onGo}) {
   const maxCat  = Math.max(...Object.values(dash.catCounts),1);
   const maxType = Math.max(...Object.values(dash.typeCounts),1);
   return (
@@ -2026,6 +2602,16 @@ function DashView({t,dk,dash,cats,settings,brands,activeBrand,dRange,setDRange,c
           {settings.businessModel}
         </div>
       </div>
+
+      {/* Weekly Pulse */}
+      <WeeklyPulseSection
+        t={t} dk={dk}
+        settings={settings}
+        brands={brands}
+        weeklyMetrics={weeklyMetrics}
+        onLog={onLog}
+        onImport={onImport}
+      />
 
       {/* Executive summary */}
       <div style={{display:"flex",justifyContent:"flex-end"}}>
@@ -2829,7 +3415,6 @@ function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hypReview,
 function SettingsModal({t,dk,settings,onSave,onClose}) {
   const [local,setLocal]=useState({...settings});
   const [newCat,setNewCat]=useState("");
-  const [apiKey,setApiKey]=useState(()=>{ try{return localStorage.getItem("gos_apikey")||"";}catch{return "";} });
   const f=(k,v)=>setLocal(p=>({...p,[k]:v}));
   const addCat=()=>{const c=newCat.trim();if(!c||local.categories.includes(c))return;f("categories",[...local.categories,c]);setNewCat("");};
   return (
@@ -2921,19 +3506,9 @@ function SettingsModal({t,dk,settings,onSave,onClose}) {
           <p style={{fontSize:12,color:t.textMuted,fontFamily:t.mono,lineHeight:1.6,margin:"0 0 8px"}}>Planned: Google Sheets (pulling from GA4, Looker, Meta Ads), BigQuery, direct GA4 and Meta Ads APIs. Paste data manually in the initiative form for now.</p>
           <div style={{fontSize:12,color:t.textMuted,fontFamily:t.mono,padding:"10px 12px",background:dk?"#1a1a12":"#f5f5f0",borderRadius:4,border:"1px dashed "+t.border}}>No data sources connected yet.</div>
         </div>
-        <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
-          <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:6,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>AI Integration</div>
-          <p style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,lineHeight:1.5,margin:"0 0 10px"}}>
-            Your API key is stored only in this browser. Never shared or sent anywhere except directly to Anthropic.
-          </p>
-          <FR label="Anthropic API key" t={t}>
-            <input type="password" style={gI(t)} value={apiKey} onChange={e=>setApiKey(e.target.value)} placeholder="sk-ant-api03-..."/>
-          </FR>
-          {apiKey&&<div style={{fontSize:11,color:"#2a9a60",fontFamily:t.mono,marginTop:6}}>Key saved — AI features enabled.</div>}
-        </div>
         <div style={{display:"flex",gap:8,justifyContent:"flex-end",paddingTop:4}}>
           <button style={gGh(t)} onClick={onClose}>Cancel</button>
-          <button style={gG(t)} onClick={()=>{ try{localStorage.setItem("gos_apikey",apiKey.trim());}catch{}; onSave(local); }}>Save settings</button>
+          <button style={gG(t)} onClick={()=>{ onSave(local); }}>Save settings</button>
         </div>
       </div>
     </Modal>
@@ -3082,10 +3657,10 @@ function TriageView({items, t, dk, cats, brands, activeBrand, onDetail}) {
             border:"1px solid "+(allClear?(dk?"#2a7a40":"#7adca0"):t.border)}}>
 
             {/* Header row */}
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:allClear?4:12}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:allClear?4:12}}>
               <div style={{fontSize:10,letterSpacing:"0.10em",textTransform:"uppercase",
-                color:allClear?(dk?"#60d080":"#1a7a48"):t.textMuted,fontFamily:t.mono,fontWeight:700}}>
-                {new Date().toLocaleDateString("en-CA",{weekday:"long",month:"long",day:"numeric"})}
+                color:allClear?(dk?"#60d080":"#1a7a48"):t.textMuted,fontFamily:t.mono,fontWeight:700,whiteSpace:"nowrap"}}>
+                {new Date().toLocaleDateString("en-CA",{month:"short",day:"numeric"})}
               </div>
               <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono}}>{revLine}</div>
             </div>
@@ -3358,7 +3933,7 @@ function LearningLibrary({items, t, dk, cats, brands, activeBrand, onReplicate, 
                   retailer: brandName(e.brandId||"default", brands),
                   learning: e.results.keyLearning,
                 }));
-                const result = await callSynthesiseLearnings(payload, settings||{companyName:"Growth OS",businessModel:"growth portfolio",northStarMetric:"Revenue",northStarCurrent:"—",northStarTarget:"—"});
+                const result = await callSynthesiseLearnings(payload, settings||{companyName:COMPANY_NAME,businessModel:BUSINESS_MODEL,northStarMetric:NORTH_STAR_METRIC,northStarCurrent:"—",northStarTarget:"—"});
                 setSynthesis(result);
               } catch { setSynthesis("Synthesis failed — check your API key in Settings."); }
               setSynthLoad(false);

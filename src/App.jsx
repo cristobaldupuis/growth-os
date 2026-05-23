@@ -61,18 +61,20 @@ const INIT_TYPES = ["A/B Test","Campaign","Process","Research","Infrastructure"]
 const BLOCKERS  = ["None","Waiting on Engineering","Waiting on Creative","Waiting on Merch/Inventory","Waiting on Legal","Waiting on Finance","Waiting on Leadership"];
 
 const TL = {
-  bg:"#f8f8f4", surface:"#ffffff", surfaceAlt:"#f3f2ea",
-  border:"#e8e4d8", text:"#1a1a14", textSub:"#555040", textMuted:"#9a9880",
-  gold:"#c08820", goldText:"#ffffff", goldBg:"#fdf8ee", goldBorder:"#e8c870",
-  headerBg:"#ffffff", inputBg:"#ffffff", inputBorder:"#e0dcd0",
-  mono:"'Courier New',monospace", serif:"'Georgia',serif",
+  bg:"#EBE8E1", surface:"#FFFFFF", surfaceAlt:"#F7F6F2",
+  border:"#DCD9D2", text:"#1A1A1A", textSub:"#595959", textMuted:"#8C8C8C",
+  gold:"#DDBD61", goldText:"#1A1A1A", goldBg:"#FDFBF5", goldBorder:"#E8D9AB",
+  headerBg:"#FFFFFF", inputBg:"#FFFFFF", inputBorder:"#DCD9D2",
+  mono:"ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+  serif:"system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
 };
 const TD = {
-  bg:"#111108", surface:"#161610", surfaceAlt:"#1d1d12",
-  border:"#2a2820", text:"#e8e4d4", textSub:"#a8a488", textMuted:"#666450",
-  gold:"#d4a83a", goldText:"#111111", goldBg:"#2a2410", goldBorder:"#6a5820",
-  headerBg:"#0e0e08", inputBg:"#1a1a12", inputBorder:"#2e2c20",
-  mono:"'Courier New',monospace", serif:"'Georgia',serif",
+  bg:"#0F0F0F", surface:"#1A1A1A", surfaceAlt:"#262626",
+  border:"#333333", text:"#F5F5F5", textSub:"#A3A3A3", textMuted:"#737373",
+  gold:"#DDBD61", goldText:"#0F0F0F", goldBg:"#2A2410", goldBorder:"#6A5820",
+  headerBg:"#0F0F0F", inputBg:"#1A1A1A", inputBorder:"#333333",
+  mono:"ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+  serif:"system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
 };
 
 const SL = { Draft:{bg:"#f4f4ee",border:"#c8c4a8",text:"#666440"}, Running:{bg:"#edfaf2",border:"#7adca0",text:"#1a7a48"}, Completed:{bg:"#eef0fd",border:"#9090e0",text:"#3a3aa0"}, Killed:{bg:"#fdf0f0",border:"#e09090",text:"#a03030"} };
@@ -608,9 +610,11 @@ const gGh = (t) => ({fontSize:12,padding:"6px 12px",borderRadius:4,background:"t
 const gI  = (t) => ({width:"100%",padding:"7px 10px",fontSize:13,fontFamily:t.mono,background:t.inputBg,border:"1px solid "+t.inputBorder,borderRadius:4,color:t.text,boxSizing:"border-box"});
 const gTA = (t) => ({...gI(t),resize:"vertical"});
 const gSl = (t) => ({...gI(t),cursor:"pointer"});
-const gSc = (t) => ({background:t.surface,border:"1px solid "+t.border,borderRadius:8,padding:"13px 16px"});
-const gSL = (t) => ({fontSize:10,letterSpacing:"0.10em",textTransform:"uppercase",color:t.textMuted,marginBottom:8,fontFamily:t.mono});
-const gCd = (t) => ({background:t.surface,border:"1px solid "+t.border,borderRadius:8,padding:"12px 15px"});
+const gSc = (t,dk) => ({background:t.surface,border:"1px solid "+t.border,borderRadius:10,padding:"14px 17px",boxShadow:dk?"0 2px 8px rgba(0,0,0,0.28)":"0 2px 8px rgba(0,0,0,0.05)"});
+const gSL = (t) => ({fontSize:10,letterSpacing:"0.10em",textTransform:"uppercase",color:t.textMuted,marginBottom:8,fontFamily:t.mono,fontWeight:600});
+const gCd = (t,dk) => ({background:t.surface,borderRadius:10,padding:"14px 16px",boxShadow:dk?"0 4px 16px rgba(0,0,0,0.32)":"0 4px 12px rgba(0,0,0,0.06)"});
+// Financial metric style — large, high-contrast, instantly scannable
+const gFin = (t) => ({fontFamily:t.mono,fontWeight:700,fontSize:28,letterSpacing:"-0.02em",color:t.gold,lineHeight:1});
 
 function FR({label,t,children}) {
   return (
@@ -1243,7 +1247,7 @@ export default function App() {
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
             {filtered.length===0&&<div style={{padding:48,textAlign:"center",color:t.textMuted}}>No initiatives match your filters.</div>}
             {filtered.map(item=>(
-              <div key={item.id} onClick={()=>goDetail(item.id)} style={{...gCd(t),cursor:"pointer"}}>
+              <div key={item.id} onClick={()=>goDetail(item.id)} style={{...gCd(t,dk),cursor:"pointer"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:6}}>
                   <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
                     <CBdg cat={item.category} cats={cats} dk={dk}/>
@@ -1256,9 +1260,9 @@ export default function App() {
                   </div>
                   <div style={{display:"flex",gap:8,alignItems:"center"}}>
                     <ICEChip ice={item.ice} t={t}/>
-                    {item.revenueImpact!==0&&<span style={{fontSize:13,fontWeight:700,color:t.gold,fontFamily:t.serif}}>{fmtCur(item.revenueImpact)}</span>}
+                    {item.revenueImpact!==0&&<span style={{fontSize:17,fontWeight:700,color:t.gold,fontFamily:t.mono,letterSpacing:"-0.02em"}}>{fmtCur(item.revenueImpact)}</span>}
                     {item.results&&typeof item.results.actualRevenueImpact==="number"&&<span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>actual: {fmtCur(item.results.actualRevenueImpact)}</span>}
-                    {item.owner&&<span style={{fontSize:12,color:t.textMuted,fontFamily:t.mono}}>{item.owner.split(" (")[0].split("+")[0].trim()}</span>}
+                    {item.owner&&<span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>{item.owner.split(" (")[0].split("+")[0].trim()}</span>}
                   </div>
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}>
@@ -1339,7 +1343,7 @@ export default function App() {
           <p style={{fontSize:13,color:t.textSub,marginBottom:16,fontFamily:t.mono}}>Pick a template to pre-fill the form, or start blank.</p>
           <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:16}}>
             {TEMPLATES.map(tpl=>(
-              <div key={tpl.id} onClick={()=>startFromTemplate(tpl)} style={{...gCd(t),cursor:"pointer",display:"flex",alignItems:"flex-start",gap:12}}>
+              <div key={tpl.id} onClick={()=>startFromTemplate(tpl)} style={{...gCd(t,dk),cursor:"pointer",display:"flex",alignItems:"flex-start",gap:12}}>
                 <div style={{fontSize:20,color:t.gold,marginTop:1}}><span style={{fontSize:18}}>&#9670;</span></div>
                 <div>
                   <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:2}}>
@@ -1816,7 +1820,7 @@ function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand, agents
             </div>
 
             {/* Portfolio snapshot — collapsible */}
-            <details style={{...gSc(t),background:t.surfaceAlt}}>
+            <details style={{...gSc(t,dk),background:t.surfaceAlt}}>
               <summary style={{fontSize:11,fontWeight:600,color:t.textSub,fontFamily:t.mono,cursor:"pointer",listStyle:"none",display:"flex",justifyContent:"space-between"}}>
                 <span>📋 Portfolio the agents will read</span>
                 <span style={{color:t.textMuted,fontWeight:400}}>▼</span>
@@ -1957,7 +1961,7 @@ function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand, agents
                   No saved debates yet. Run your first debate and it will appear here.
                 </div>
               ):debates.map((d,i)=>(
-                <div key={d.id} style={{...gSc(t)}}>
+                <div key={d.id} style={{...gSc(t,dk)}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
                     <div>
                       <div style={{fontSize:11,fontWeight:700,color:t.text,fontFamily:t.mono}}>
@@ -2007,15 +2011,15 @@ function DashView({t,dk,dash,cats,settings,brands,activeBrand,dRange,setDRange,c
   return (
     <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:14}}>
       {/* North star */}
-      <div style={{...gCd(t),background:t.goldBg,border:"1px solid "+t.goldBorder,display:"flex",alignItems:"center",gap:24,flexWrap:"wrap"}}>
+      <div style={{...gCd(t,dk),background:t.goldBg,border:"1px solid "+t.goldBorder,display:"flex",alignItems:"center",gap:24,flexWrap:"wrap"}}>
         <div>
           <div style={{fontSize:10,letterSpacing:"0.10em",textTransform:"uppercase",color:t.gold,fontFamily:t.mono,marginBottom:4}}>North star</div>
           <div style={{fontSize:15,fontWeight:700,color:t.text,fontFamily:t.serif}}>{settings.northStarMetric}</div>
         </div>
         <div style={{display:"flex",gap:20,flexWrap:"wrap"}}>
-          <div><div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Current</div><div style={{fontSize:20,fontWeight:700,color:t.gold,fontFamily:t.serif}}>{settings.northStarCurrent}</div></div>
+          <div><div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Current</div><div style={{fontSize:26,fontWeight:700,color:t.gold,fontFamily:t.mono,letterSpacing:"-0.02em"}}>{settings.northStarCurrent}</div></div>
           <div style={{fontSize:20,color:t.textMuted,alignSelf:"center"}}>&#8594;</div>
-          <div><div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Target</div><div style={{fontSize:20,fontWeight:700,color:t.text,fontFamily:t.serif}}>{settings.northStarTarget}</div></div>
+          <div><div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Target</div><div style={{fontSize:26,fontWeight:700,color:t.text,fontFamily:t.mono,letterSpacing:"-0.02em"}}>{settings.northStarTarget}</div></div>
         </div>
         <div style={{marginLeft:"auto",fontSize:11,color:t.textMuted,fontFamily:t.mono,textAlign:"right"}}>
           {activeBrand!=="all"&&<div style={{fontSize:12,fontWeight:600,color:t.gold,marginBottom:2}}>{brandName(activeBrand,brands)}</div>}
@@ -2079,26 +2083,32 @@ function DashView({t,dk,dash,cats,settings,brands,activeBrand,dRange,setDRange,c
           {l:"Avg to close",     v:dash.avgDays||"—",         s:"days, completed"},
           {l:"Avg ICE",          v:dash.avgIce||"—",          s:"all initiatives"},
           {l:"Closed ROI",        v:dash.closedROI!==null?dash.closedROI+"x":"—", s:"actual rev / cost"},
-        ].map(m=>(
-          <div key={m.l} style={{...gCd(t),display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",textAlign:"center",padding:"14px 10px",minHeight:100}}>
+        ].map(m=>{
+          const isMoney = typeof m.v === "string" && m.v.startsWith("$");
+          const isPct   = typeof m.v === "string" && m.v.endsWith("%");
+          const isMulti = typeof m.v === "string" && m.v.endsWith("x");
+          const isFinancial = isMoney || isPct || isMulti;
+          return (
+          <div key={m.l} style={{...gCd(t,dk),display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",textAlign:"center",padding:"16px 10px",minHeight:100}}>
             <div style={{fontSize:10,letterSpacing:"0.08em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,marginBottom:6,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>{m.l}</div>
-            <div style={{fontSize:28,fontWeight:700,color:t.gold,fontFamily:t.serif,lineHeight:1}}>{m.v}</div>
+            <div style={{fontSize:isFinancial?30:28,fontWeight:700,color:t.gold,fontFamily:isFinancial?t.mono:t.serif,lineHeight:1,letterSpacing:isFinancial?"-0.02em":"normal"}}>{m.v}</div>
             {m.s&&m.s!==" "&&<div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginTop:4,whiteSpace:"nowrap"}}>{m.s}</div>}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Calibration card */}
-      <div style={{...gCd(t),border:"1px solid "+(dash.calibration!==null?(dash.calibration>=80?t.goldBorder:dash.calibration>=50?"#c0a030":t.border):t.border)}}>
+      <div style={{...gCd(t,dk),border:"1px solid "+(dash.calibration!==null?(dash.calibration>=80?t.goldBorder:dash.calibration>=50?"#c0a030":t.border):t.border)}}>
         <div style={gSL(t)}>Revenue estimate calibration</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16,alignItems:"center",marginBottom:dash.totalEstCost>0?12:0}}>
           <div>
             <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Total estimated</div>
-            <div style={{fontSize:20,fontWeight:700,color:t.text,fontFamily:t.serif}}>{fmtCur(dash.totalEstimated)}</div>
+            <div style={{fontSize:22,fontWeight:700,color:t.text,fontFamily:t.mono,letterSpacing:"-0.02em"}}>{fmtCur(dash.totalEstimated)}</div>
           </div>
           <div>
             <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Total actual</div>
-            <div style={{fontSize:20,fontWeight:700,color:t.gold,fontFamily:t.serif}}>{fmtCur(dash.totalActual)}</div>
+            <div style={{fontSize:22,fontWeight:700,color:t.gold,fontFamily:t.mono,letterSpacing:"-0.02em"}}>{fmtCur(dash.totalActual)}</div>
           </div>
           <div>
             <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Accuracy</div>
@@ -2131,7 +2141,7 @@ function DashView({t,dk,dash,cats,settings,brands,activeBrand,dRange,setDRange,c
 
       {/* Velocity + Category + Type */}
       <div style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) minmax(0,1fr)",gap:12}}>
-        <div style={gCd(t)}>
+        <div style={gCd(t,dk)}>
           <div style={gSL(t)}>Velocity — last 8 weeks</div>
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
             {[{label:"Started / week",vals:dash.vel.started,color:dk?"#5ad080":"#1a7a48"},{label:"Closed / week",vals:dash.vel.closed,color:dk?"#8080e0":"#4848b0"}].map(row=>(
@@ -2145,7 +2155,7 @@ function DashView({t,dk,dash,cats,settings,brands,activeBrand,dRange,setDRange,c
             ))}
           </div>
         </div>
-        <div style={gCd(t)}>
+        <div style={gCd(t,dk)}>
           <div style={gSL(t)}>By category</div>
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             {cats.map(cat=>{
@@ -2167,7 +2177,7 @@ function DashView({t,dk,dash,cats,settings,brands,activeBrand,dRange,setDRange,c
       </div>
 
       {/* Type breakdown */}
-      <div style={gCd(t)}>
+      <div style={gCd(t,dk)}>
         <div style={gSL(t)}>By initiative type</div>
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           {INIT_TYPES.map(tp=>{
@@ -2189,7 +2199,7 @@ function DashView({t,dk,dash,cats,settings,brands,activeBrand,dRange,setDRange,c
       </div>
 
       {/* Outcome breakdown */}
-      <div style={gCd(t)}>
+      <div style={gCd(t,dk)}>
         <div style={gSL(t)}>Outcome breakdown — all closed</div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
           {OUTCOMES.map(o=>{const c=(dk?OD:OL)[o]||{};return(
@@ -2236,7 +2246,7 @@ function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResults,onL
       </div>
 
       {/* Status */}
-      <div style={{...gSc(t),background:t.surfaceAlt}}>
+      <div style={{...gSc(t,dk),background:t.surfaceAlt}}>
         <div style={gSL(t)}>Status</div>
         <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
           {STATUSES.map(s=>{const c=(dk?SD:SL)[s]||{},act=item.status===s;return(
@@ -2259,7 +2269,7 @@ function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResults,onL
         </div>
       )}
 
-      <div style={gSc(t)}>
+      <div style={gSc(t,dk)}>
         <div style={gSL(t)}>Hypothesis framework</div>
         {/* Backwards compatibility: show legacy description if structured fields absent */}
         {(item.observation||item.hypothesis||item.successMetric) ? (
@@ -2293,7 +2303,7 @@ function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResults,onL
       </div>
 
       {item.ice&&(
-        <div style={gSc(t)}>
+        <div style={gSc(t,dk)}>
           <div style={gSL(t)}>ICE scoring</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr) auto",gap:12,alignItems:"center"}}>
             {[["Impact",item.ice.impact],["Certainty",item.ice.certainty],["Ease",item.ice.ease]].map(([l,v])=>(
@@ -2314,7 +2324,7 @@ function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResults,onL
 
       {/* Investment & return */}
       {(item.revenueImpact!==0||(item.spendCost||0)>0||(item.resourceCost||0)>0||item.results?.actualRevenueImpact!=null)&&(
-        <div style={gSc(t)}>
+        <div style={gSc(t,dk)}>
           <div style={gSL(t)}>Investment and return</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:12}}>
             {(item.spendCost||0)>0&&<div>
@@ -2382,8 +2392,8 @@ function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResults,onL
         </div>
       )}
 
-      {item.killCriteria&&item.status!=="Draft"&&<div style={gSc(t)}><div style={gSL(t)}>Kill criteria</div><p style={{margin:0,color:t.textSub,lineHeight:1.6,fontSize:13}}>{item.killCriteria}</p></div>}
-      {item.notes&&<div style={gSc(t)}><div style={gSL(t)}>Notes</div><p style={{margin:0,color:t.textSub,lineHeight:1.6,fontSize:13}}>{item.notes}</p></div>}
+      {item.killCriteria&&item.status!=="Draft"&&<div style={gSc(t,dk)}><div style={gSL(t)}>Kill criteria</div><p style={{margin:0,color:t.textSub,lineHeight:1.6,fontSize:13}}>{item.killCriteria}</p></div>}
+      {item.notes&&<div style={gSc(t,dk)}><div style={gSL(t)}>Notes</div><p style={{margin:0,color:t.textSub,lineHeight:1.6,fontSize:13}}>{item.notes}</p></div>}
 
       {(item.status==="Running"||item.status==="Completed"||item.status==="Killed")&&(
         <TestValidityPanel key={item.id} item={item} t={t} dk={dk} onSaveTestValidity={onSaveTestValidity}/>
@@ -2392,7 +2402,7 @@ function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResults,onL
       {item.results&&(()=>{
         const c=(dk?OD:OL)[item.results.outcomeClassification]||{};
         return (
-          <div style={{...gSc(t),background:c.bg,border:"1px solid "+c.border}}>
+          <div style={{...gSc(t,dk),background:c.bg,border:"1px solid "+c.border}}>
             <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:12}}>
               <div style={gSL(t)}>Results</div>
               <OBdg o={item.results.outcomeClassification} dk={dk}/>
@@ -2411,7 +2421,7 @@ function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResults,onL
       })()}
 
       {linked.length>0&&(
-        <div style={gSc(t)}>
+        <div style={gSc(t,dk)}>
           <div style={gSL(t)}>Linked initiatives</div>
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
             {linked.map(l=>(
@@ -2514,7 +2524,7 @@ function TestValidityPanel({ item, t, dk, onSaveTestValidity }) {
   const numStyle   = {fontSize:20,fontWeight:700,fontFamily:t.serif};
 
   return (
-    <div style={{...gSc(t),border:"1px solid "+(dk?"#3a3010":"#ddd090"),background:dk?"#1e1c0a":"#fffef5"}}>
+    <div style={{...gSc(t,dk),border:"1px solid "+(dk?"#3a3010":"#ddd090"),background:dk?"#1e1c0a":"#fffef5"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
         <div style={{...gSL(t),marginBottom:0}}>Test Validity</div>
         {dirty&&(
@@ -2676,7 +2686,7 @@ function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hypReview,
 
       <FR label="Title *" t={t}><input style={gI(t)} value={form.title} onChange={e=>f("title",e.target.value)} placeholder="Clear, specific title"/></FR>
 
-      <div style={gSc(t)}>
+      <div style={gSc(t,dk)}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
           <div style={gSL(t)}>Hypothesis framework</div>
         </div>
@@ -2739,7 +2749,7 @@ function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hypReview,
         )}
       </FR>
 
-      <div style={gSc(t)}>
+      <div style={gSc(t,dk)}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
           <div style={gSL(t)}>ICE Scoring — Impact &#183; Certainty &#183; Ease</div>
           <button style={{...gGh(t),fontSize:11,padding:"2px 9px",opacity:canIce?1:0.4}} onClick={onIceAssist} disabled={!canIce||iceLoad} title={canIce?"Suggest Impact + Certainty with AI":"Add title and hypothesis first"}>
@@ -2780,7 +2790,7 @@ function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hypReview,
         <FR label="Sample size" t={t}><input style={gI(t)} value={form.sampleSize||""} onChange={e=>f("sampleSize",e.target.value)}/></FR>
         <FR label="Duration" t={t}><input style={gI(t)} value={form.duration||""} onChange={e=>f("duration",e.target.value)}/></FR>
       </div>
-      <div style={{...gSc(t)}}>
+      <div style={{...gSc(t,dk)}}>
         <div style={gSL(t)}>Investment & return</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
           <FR label="Est. media / spend cost ($)" t={t}><input style={gI(t)} type="number" value={form.spendCost||0} onChange={e=>f("spendCost",parseInt(e.target.value)||0)} placeholder="0"/></FR>
@@ -2795,7 +2805,7 @@ function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hypReview,
         )}
       </div>
 
-      <div style={{...gSc(t),border:"1px dashed "+t.border}}>
+      <div style={{...gSc(t,dk),border:"1px dashed "+t.border}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
           <div style={gSL(t)}>Data context <span style={{fontWeight:400,textTransform:"none",letterSpacing:0,color:t.textMuted}}>(optional — used by AI)</span></div>
           <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,background:t.border,padding:"2px 6px",borderRadius:3}}>Placeholder</span>
@@ -2959,7 +2969,7 @@ function TriageView({items, t, dk, cats, brands, activeBrand, onDetail}) {
   const SBdg2 = ({s}) => { const c=(dk?SD:SL)[s]||SL.Draft; return <span style={{fontSize:10,fontWeight:600,color:c.text,background:c.bg,border:"1px solid "+c.border,borderRadius:3,padding:"1px 5px"}}>{s}</span>; };
 
   const Section = ({title, color, items: list, emptyMsg, children}) => (
-    <div style={{...gSc(t),borderLeft:"3px solid "+color}}>
+    <div style={{...gSc(t,dk),borderLeft:"3px solid "+color}}>
       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:list.length?12:0}}>
         <div style={{fontSize:11,fontWeight:700,color,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>{title}</div>
         <span style={{fontSize:12,fontWeight:700,color,fontFamily:t.mono}}>{list.length}</span>
@@ -3068,7 +3078,7 @@ function TriageView({items, t, dk, cats, brands, activeBrand, onDetail}) {
         const allClear = signals.length === 0;
 
         return (
-          <div style={{...gSc(t), background: allClear?(dk?"#122a18":"#edfaf2"):t.surface,
+          <div style={{...gSc(t,dk), background: allClear?(dk?"#122a18":"#edfaf2"):t.surface,
             border:"1px solid "+(allClear?(dk?"#2a7a40":"#7adca0"):t.border)}}>
 
             {/* Header row */}
@@ -3121,7 +3131,7 @@ function TriageView({items, t, dk, cats, brands, activeBrand, onDetail}) {
           {l:"Revenue at risk",  v:fmtCur(totalAtRisk)},
           {l:"Needs attention",  v:needsAction.length+overdue.length},
         ].map(m=>(
-          <div key={m.l} style={{...gCd(t),padding:"10px 12px"}}>
+          <div key={m.l} style={{...gCd(t,dk),padding:"10px 12px"}}>
             <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:3}}>{m.l}</div>
             <div style={{fontSize:20,fontWeight:700,color:t.gold,fontFamily:t.serif}}>{m.v}</div>
           </div>
@@ -3147,7 +3157,7 @@ function TriageView({items, t, dk, cats, brands, activeBrand, onDetail}) {
       <Section title="Incomplete setup — missing owner, metric, or kill criteria" color={dk?"#e08080":"#a03030"} items={needsAction} emptyMsg="All running initiatives are properly configured.">
         {needsAction.map(e=>(
           <div key={e.id} onClick={()=>onDetail(e.id)}
-            style={{...gSc(t),cursor:"pointer",padding:"10px 12px"}}>
+            style={{...gSc(t,dk),cursor:"pointer",padding:"10px 12px"}}>
             <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:4,flexWrap:"wrap"}}>
               {e.initId&&<span style={{fontSize:10,fontWeight:700,color:t.gold,fontFamily:t.mono,background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:3,padding:"1px 5px"}}>{e.initId}</span>}
             </div>
@@ -3165,7 +3175,7 @@ function TriageView({items, t, dk, cats, brands, activeBrand, onDetail}) {
       <Section title="Top drafts by ICE — ready to prioritise" color={dk?"#3acca0":"#187860"} items={topDrafts} emptyMsg="No scored drafts in the pipeline.">
         {topDrafts.map(e=>(
           <div key={e.id} onClick={()=>onDetail(e.id)}
-            style={{...gSc(t),cursor:"pointer",padding:"10px 12px"}}>
+            style={{...gSc(t,dk),cursor:"pointer",padding:"10px 12px"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
               <div>
                 <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:4}}>
@@ -3360,7 +3370,7 @@ function LearningLibrary({items, t, dk, cats, brands, activeBrand, onReplicate, 
 
       {/* Synthesis panel */}
       {synthVisible&&(
-        <div style={{...gSc(t),background:dk?"#1a2a18":"#f0faf2",border:"1px solid "+(dk?"#2a6a40":"#7adca0")}}>
+        <div style={{...gSc(t,dk),background:dk?"#1a2a18":"#f0faf2",border:"1px solid "+(dk?"#2a6a40":"#7adca0")}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
             <div style={{fontSize:11,fontWeight:700,color:dk?"#60d080":"#1a7a48",fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>AI Synthesis — {filtered.length} learnings</div>
             <button onClick={()=>setSynthVisible(false)} style={{background:"none",border:"none",color:t.textMuted,cursor:"pointer",fontSize:14}}>&#10005;</button>

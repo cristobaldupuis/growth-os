@@ -22,6 +22,22 @@ const store = (() => {
 })();
 const KEY_SETTINGS = "gos_settings_v2";
 const KEY_THEME    = "gos_theme_v1";
+const KEY_DEBATES  = "gos_debates_v1";
+
+const DEFAULT_AGENTS = [
+  { id:"cmo", label:"CMO", icon:"📣", color:"#2878a0",
+    lens:"brand narrative, paid acquisition efficiency, creative testing, channel mix, top-of-funnel demand generation, and customer perception",
+    blindspot:"often underweights unit economics and margin impact of acquisition spend" },
+  { id:"cfo", label:"CFO", icon:"📊", color:"#c08820",
+    lens:"contribution margin, CAC payback, gross profit per order, pricing architecture, promotional discount discipline, and cash flow timing",
+    blindspot:"often underweights long-term compounding of brand and LTV investments" },
+  { id:"cgo", label:"CGO", icon:"🚀", color:"#208050",
+    lens:"customer lifetime value, cohort retention, subscription velocity, referral loops, repeat purchase rate, and omnichannel expansion",
+    blindspot:"often underweights operational complexity and supply chain constraints of growth initiatives" },
+  { id:"coo", label:"COO", icon:"⚙️", color:"#7040a0",
+    lens:"inventory velocity, fulfilment cost per order, shelf-life risk, supplier lead times, SKU rationalisation, and operational scalability",
+    blindspot:"often underweights brand equity and customer experience trade-offs of operational decisions" },
+];
 
 const DEFAULT_SETTINGS = {
   companyName:      "Growth OS",
@@ -36,44 +52,44 @@ const DEFAULT_SETTINGS = {
     {id:"r1",      name:"Retailer 1"},
     {id:"r2",      name:"Retailer 2"},
   ],
+  agents: DEFAULT_AGENTS,
 };
 
 const STATUSES  = ["Draft","Running","Completed","Killed"];
 const OUTCOMES  = ["Jackpot","Success","Failed","Inconclusive"];
 const INIT_TYPES = ["A/B Test","Campaign","Process","Research","Infrastructure"];
+const BLOCKERS  = ["None","Waiting on Engineering","Waiting on Creative","Waiting on Merch/Inventory","Waiting on Legal","Waiting on Finance","Waiting on Leadership"];
 
 const TL = {
-  bg:"#EBE8E1", surface:"#FFFFFF", surfaceAlt:"#F7F6F2",
-  border:"#DCD9D2", text:"#1A1A1A", textSub:"#595959", textMuted:"#8C8C8C",
-  gold:"#DDBD61", goldText:"#1A1A1A", goldBg:"#FDFBF5", goldBorder:"#E8D9AB",
-  headerBg:"#FFFFFF", inputBg:"#FFFFFF", inputBorder:"#DCD9D2",
-  mono:"ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-  serif:"system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  bg:"#f8f8f4", surface:"#ffffff", surfaceAlt:"#f3f2ea",
+  border:"#e8e4d8", text:"#1a1a14", textSub:"#555040", textMuted:"#9a9880",
+  gold:"#c08820", goldText:"#ffffff", goldBg:"#fdf8ee", goldBorder:"#e8c870",
+  headerBg:"#ffffff", inputBg:"#ffffff", inputBorder:"#e0dcd0",
+  mono:"'Courier New',monospace", serif:"'Georgia',serif",
 };
 const TD = {
-  bg:"#0F0F0F", surface:"#1A1A1A", surfaceAlt:"#262626",
-  border:"#333333", text:"#F5F5F5", textSub:"#A3A3A3", textMuted:"#737373",
-  gold:"#DDBD61", goldText:"#0F0F0F", goldBg:"#2A2410", goldBorder:"#6A5820",
-  headerBg:"#0F0F0F", inputBg:"#1A1A1A", inputBorder:"#333333",
-  mono:"ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-  serif:"system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  bg:"#111108", surface:"#161610", surfaceAlt:"#1d1d12",
+  border:"#2a2820", text:"#e8e4d4", textSub:"#a8a488", textMuted:"#666450",
+  gold:"#d4a83a", goldText:"#111111", goldBg:"#2a2410", goldBorder:"#6a5820",
+  headerBg:"#0e0e08", inputBg:"#1a1a12", inputBorder:"#2e2c20",
+  mono:"'Courier New',monospace", serif:"'Georgia',serif",
 };
 
 const SL = { Draft:{bg:"#f4f4ee",border:"#c8c4a8",text:"#666440"}, Running:{bg:"#edfaf2",border:"#7adca0",text:"#1a7a48"}, Completed:{bg:"#eef0fd",border:"#9090e0",text:"#3a3aa0"}, Killed:{bg:"#fdf0f0",border:"#e09090",text:"#a03030"} };
-const SD = { Draft:{bg:"#2a2a1e",border:"#5a5840",text:"#c0be98"}, Running:{bg:"#0e2a18",border:"#3a8050",text:"#70e898"}, Completed:{bg:"#12142e",border:"#5050a0",text:"#9898f0"}, Killed:{bg:"#2a1010",border:"#803030",text:"#f09090"} };
+const SD = { Draft:{bg:"#2a2a1e",border:"#4a4838",text:"#a0a080"}, Running:{bg:"#122a1a",border:"#2a6a40",text:"#5ad080"}, Completed:{bg:"#14142a",border:"#3a3a80",text:"#8080e0"}, Killed:{bg:"#2a1212",border:"#6a2828",text:"#e08080"} };
 const OL = { Jackpot:{bg:"#edfaf2",border:"#7adca0",text:"#1a7a48"}, Success:{bg:"#edfaf6",border:"#7ad4b0",text:"#1a6a50"}, Failed:{bg:"#fdf0f0",border:"#e09090",text:"#a03030"}, Inconclusive:{bg:"#fdf8ee",border:"#e0c070",text:"#8a6010"} };
-const OD = { Jackpot:{bg:"#0e2818",border:"#3a8848",text:"#78e898"}, Success:{bg:"#0e2620",border:"#338060",text:"#60d8a8"}, Failed:{bg:"#2a1010",border:"#803030",text:"#f08080"}, Inconclusive:{bg:"#2a2210",border:"#806820",text:"#e8c048"} };
+const OD = { Jackpot:{bg:"#122a18",border:"#2a7a40",text:"#60d080"}, Success:{bg:"#122820",border:"#2a6a50",text:"#50c898"}, Failed:{bg:"#2a1010",border:"#6a2020",text:"#e07070"}, Inconclusive:{bg:"#2a2410",border:"#6a5818",text:"#d0a838"} };
 
 // Type badge colors - fixed palette
 const TYPE_L = { "A/B Test":"#2878a0", Campaign:"#a04828", Process:"#4848b0", Research:"#6a4090", Infrastructure:"#208050" };
-const TYPE_D = { "A/B Test":"#60b8e8", Campaign:"#e88060", Process:"#9898f0", Research:"#c088e0", Infrastructure:"#50d890" };
+const TYPE_D = { "A/B Test":"#50a8d8", Campaign:"#d07050", Process:"#8080e0", Research:"#a870d0", Infrastructure:"#40c880" };
 
 const CAT_L = ["#b07818","#187860","#4848b0","#b03838","#a04828","#2878a0","#6a4090","#208050"];
-const CAT_D = ["#e8bc48","#48dab0","#9898f0","#f09090","#e88060","#60b8e8","#c088e0","#50d890"];
+const CAT_D = ["#d4a83a","#3acca0","#8080e0","#e08080","#d07050","#50a8d8","#a870d0","#40c880"];
 const catColor = (cat, cats, dk) => (dk ? CAT_D : CAT_L)[cats.indexOf(cat) % 8] || "#888";
 
 const BRAND_COLORS_L = ["#b07818","#187860","#4848b0","#b03838","#a04828","#2878a0"];
-const BRAND_COLORS_D = ["#e8bc48","#48dab0","#9898f0","#f09090","#e88060","#60b8e8"];
+const BRAND_COLORS_D = ["#d4a83a","#3acca0","#8080e0","#e08080","#d07050","#50a8d8"];
 const brandColor = (brandId, brands, dk) => {
   const idx = brands.findIndex(b=>b.id===brandId);
   return (dk?BRAND_COLORS_D:BRAND_COLORS_L)[idx%6]||"#888";
@@ -83,7 +99,7 @@ const brandName = (brandId, brands) => {
   return (brands.find(b=>b.id===brandId)||{name:brandId}).name;
 };
 const iceScore = (i, c, e) => (!i && !c && !e) ? null : Math.round(((i||0)*(c||0)*(e||0)/1000)*100);
-const iceColor = (s, t) => s === null ? t.textMuted : s >= 60 ? t.gold : s >= 30 ? "#C49A2A" : "#C04040";
+const iceColor = (s, t) => s === null ? t.textMuted : s >= 60 ? t.gold : s >= 30 ? "#c08820" : "#a03030";
 
 const fmtCur = (n) => {
   if (n === 0) return "—";
@@ -135,12 +151,14 @@ const generateInitId = (brandId, brands, existingItems) => {
 
 const mkDefault = (cats, activeBrand) => ({
   _new:true, id:"e-"+Date.now(), title:"", hypothesis:"",
+  observation:"", successMetric:"",
   category:cats[0]||"", initType:"A/B Test", owner:"",
   primaryMetric:"", killCriteria:"", status:"Draft",
   startDate:"", endDate:"", ice:{impact:5,certainty:5,ease:5},
   revenueImpact:0, spendCost:0, resourceCost:0, linkedIds:[], results:null,
   createdAt:new Date().toISOString().slice(0,10), notes:"",
   brandId: activeBrand && activeBrand!=="all" ? activeBrand : "default",
+  blocker:"None",
 });
 
 // -- AI ------------------------------------------------------------------------
@@ -253,16 +271,346 @@ async function callQuickCapture(description, settings, cats, initTypes) {
   return JSON.parse(raw.replace(/```json|```/g,"").trim());
 }
 
+// -- Agentic C-Suite Debate System v2 -----------------------------------------
+// Tools the agents can call against the live portfolio
+
+function buildPortfolioTools(items, settings, brands, activeBrand) {
+  const filter = e => activeBrand === "all" || (e.brandId||"default") === activeBrand;
+  const all = items.filter(filter);
+  const iceS = e => e.ice ? Math.round(((e.ice.impact||0)*(e.ice.certainty||0)*(e.ice.ease||0)/1000)*100) : 0;
+
+  return {
+    // Tool definitions sent to the API
+    definitions: [
+      {
+        name: "get_portfolio_summary",
+        description: "Get high-level portfolio statistics: running count, draft count, revenue at risk, win rate, avg ICE, north star gap.",
+        input_schema: { type:"object", properties:{}, required:[] }
+      },
+      {
+        name: "get_running_initiatives",
+        description: "Get all currently running initiatives with title, category, revenue at risk, owner, and any blockers.",
+        input_schema: { type:"object", properties:{}, required:[] }
+      },
+      {
+        name: "get_category_coverage",
+        description: "Get a breakdown of how many initiatives (running + draft) exist per category, revealing coverage gaps.",
+        input_schema: { type:"object", properties:{}, required:[] }
+      },
+      {
+        name: "get_win_rate_by_category",
+        description: "Get historical win rate and average actual revenue impact broken down by initiative category.",
+        input_schema: { type:"object", properties:{}, required:[] }
+      },
+      {
+        name: "get_top_draft_opportunities",
+        description: "Get the highest-ICE draft initiatives that are not yet running — the best uninitiated opportunities.",
+        input_schema: { type:"object", properties:{}, required:[] }
+      },
+      {
+        name: "get_failure_patterns",
+        description: "Get what has failed or been killed, with key learnings, to avoid repeating mistakes.",
+        input_schema: { type:"object", properties:{}, required:[] }
+      },
+      {
+        name: "get_blocked_initiatives",
+        description: "Get all initiatives currently blocked and what they are waiting on.",
+        input_schema: { type:"object", properties:{}, required:[] }
+      },
+      {
+        name: "get_revenue_gap_analysis",
+        description: "Calculate the gap between north star current and target, and how much running initiatives cover it.",
+        input_schema: { type:"object", properties:{}, required:[] }
+      },
+    ],
+
+    // Tool executor — called when model uses a tool
+    execute(toolName) {
+      const running  = all.filter(e => e.status==="Running");
+      const draft    = all.filter(e => e.status==="Draft");
+      const closed   = all.filter(e => e.status==="Completed"||e.status==="Killed");
+      const wins     = closed.filter(e => e.results&&(e.results.outcomeClassification==="Jackpot"||e.results.outcomeClassification==="Success"));
+      const failures = closed.filter(e => e.results&&(e.results.outcomeClassification==="Failed"||e.results.outcomeClassification==="Inconclusive"));
+      const blocked  = running.filter(e => e.blocker&&e.blocker!=="None");
+
+      switch(toolName) {
+        case "get_portfolio_summary": {
+          const revAtRisk = running.reduce((s,e)=>s+Math.max(0,e.revenueImpact||0),0);
+          const winRate   = closed.length>0?Math.round((wins.length/closed.length)*100):null;
+          const iceScores = all.filter(e=>e.ice).map(iceS).filter(s=>s>0);
+          const avgIce    = iceScores.length>0?Math.round(iceScores.reduce((a,b)=>a+b,0)/iceScores.length):null;
+          return { running:running.length, draft:draft.length, closed:closed.length,
+            revenue_at_risk:`$${revAtRisk.toLocaleString()}`, win_rate:winRate!==null?winRate+"%":"n/a",
+            avg_ice:avgIce||"n/a", blocked_count:blocked.length,
+            north_star:{ metric:settings.northStarMetric, current:settings.northStarCurrent, target:settings.northStarTarget }};
+        }
+        case "get_running_initiatives":
+          return running.map(e=>({
+            id:e.initId, title:e.title, category:e.category, owner:e.owner||"unassigned",
+            revenue_at_risk:`$${(e.revenueImpact||0).toLocaleString()}`,
+            blocker:e.blocker&&e.blocker!=="None"?e.blocker:"none",
+            ice:iceS(e), end_date:e.endDate||"no end date",
+          }));
+        case "get_category_coverage": {
+          const cats = settings.categories || DEFAULT_SETTINGS.categories;
+          return cats.map(cat=>({
+            category:cat,
+            running:running.filter(e=>e.category===cat).length,
+            draft:draft.filter(e=>e.category===cat).length,
+            total:all.filter(e=>e.category===cat).length,
+          })).sort((a,b)=>(b.running+b.draft)-(a.running+a.draft));
+        }
+        case "get_win_rate_by_category": {
+          const cats = [...new Set(closed.map(e=>e.category))];
+          return cats.map(cat=>{
+            const catClosed = closed.filter(e=>e.category===cat);
+            const catWins   = catClosed.filter(e=>e.results&&(e.results.outcomeClassification==="Jackpot"||e.results.outcomeClassification==="Success"));
+            const actuals   = catClosed.filter(e=>e.results&&typeof e.results.actualRevenueImpact==="number");
+            const avgActual = actuals.length>0?Math.round(actuals.reduce((s,e)=>s+(e.results.actualRevenueImpact||0),0)/actuals.length):null;
+            return { category:cat, closed:catClosed.length, wins:catWins.length,
+              win_rate:catClosed.length>0?Math.round((catWins.length/catClosed.length)*100)+"%":"n/a",
+              avg_actual_revenue:avgActual!==null?`$${avgActual.toLocaleString()}`:"no data" };
+          }).sort((a,b)=>b.closed-a.closed);
+        }
+        case "get_top_draft_opportunities":
+          return draft.sort((a,b)=>iceS(b)-iceS(a)).slice(0,6).map(e=>({
+            id:e.initId, title:e.title, category:e.category,
+            ice:iceS(e), est_revenue:`$${(e.revenueImpact||0).toLocaleString()}`,
+            hypothesis:(e.hypothesis||"").slice(0,120)+"…",
+          }));
+        case "get_failure_patterns":
+          return failures.slice(0,6).map(e=>({
+            title:e.title, category:e.category,
+            outcome:e.results?.outcomeClassification,
+            key_learning:e.results?.keyLearning||"no learning recorded",
+            decision:e.results?.decisionMade||"no decision recorded",
+          }));
+        case "get_blocked_initiatives":
+          return blocked.map(e=>({
+            id:e.initId, title:e.title, category:e.category,
+            blocked_by:e.blocker, revenue_at_risk:`$${(e.revenueImpact||0).toLocaleString()}`,
+          }));
+        case "get_revenue_gap_analysis": {
+          const revAtRisk = running.reduce((s,e)=>s+Math.max(0,e.revenueImpact||0),0);
+          const draftRev  = draft.reduce((s,e)=>s+Math.max(0,e.revenueImpact||0),0);
+          return {
+            current:settings.northStarCurrent, target:settings.northStarTarget,
+            revenue_at_risk_from_running:`$${revAtRisk.toLocaleString()}`,
+            potential_from_draft_pipeline:`$${draftRev.toLocaleString()}`,
+            note:"Revenue at risk = estimated impact of running initiatives. Does not account for probability of success."
+          };
+        }
+        default: return { error:`Unknown tool: ${toolName}` };
+      }
+    }
+  };
+}
+
+// Build a concise portfolio snapshot (still used as initial context)
+function buildPortfolioContext(items, settings, brands, activeBrand) {
+  const tools = buildPortfolioTools(items, settings, brands, activeBrand);
+  const summary = tools.execute("get_portfolio_summary");
+  const running = tools.execute("get_running_initiatives");
+  const coverage = tools.execute("get_category_coverage");
+  const topDrafts = tools.execute("get_top_draft_opportunities");
+
+  const runStr = running.slice(0,8).map(e =>
+    `  [${e.id||"?"}] "${e.title}" | ${e.category} | ${e.revenue_at_risk}${e.blocker!=="none"?" | ⚠️ "+e.blocker:""}`
+  ).join("\n") || "  (none)";
+
+  const gapCats = coverage.filter(c=>c.running===0&&c.draft===0).map(c=>c.category).join(", ");
+
+  return `COMPANY: ${settings.companyName} | ${settings.businessModel}
+NORTH STAR: ${settings.northStarMetric} | Now: ${settings.northStarCurrent} → Target: ${settings.northStarTarget}
+PORTFOLIO: ${summary.running} running | ${summary.draft} draft | ${summary.blocked_count} blocked | Win rate: ${summary.win_rate} | Avg ICE: ${summary.avg_ice}
+REVENUE AT RISK: ${summary.revenue_at_risk}
+
+RUNNING:
+${runStr}
+
+TOP UNINITIATED DRAFTS (by ICE):
+${topDrafts.slice(0,4).map(e=>`  [ICE ${e.ice}] "${e.title}" | ${e.category} | ${e.est_revenue}`).join("\n")||"  (none)"}
+
+UNCOVERED CATEGORIES (zero initiatives): ${gapCats||"none"}`.trim();
+}
+
+// Single agent turn with tool use — agentic: agent decides what data to fetch
+async function callAgentTurn(agent, portfolioCtx, userContext, messageHistory, portfolioTools, isFirstTurn) {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("No API key");
+
+  const sys = `You are the ${agent.label} (${agent.icon}) in a C-Suite strategy debate about what this company should be doing that it currently isn't.
+
+Your strategic lens: ${agent.lens}.
+Your known blindspot (acknowledge it when honest to do so): ${agent.blindspot}.
+
+You have access to tools that query the live portfolio data. Use them before forming opinions — don't guess at data you can look up.
+Be direct, commercially specific, and reference actual initiatives by name. Push back on other executives when their proposals conflict with your lens.
+Your goal: surface HIGH-IMPACT net-new opportunities the team is NOT currently running.
+Max 180 words per turn. No filler. Speak like a real board-room executive.`;
+
+  const firstUserMsg = `Portfolio snapshot:\n${portfolioCtx}\n\nSituation context:\n${userContext||"None provided."}\n\nOpen the debate. Use your tools to look deeper at anything in the portfolio that concerns you, then make your case for what's being overlooked.`;
+
+  const messages = isFirstTurn
+    ? [{ role:"user", content: firstUserMsg }]
+    : [...messageHistory, { role:"user", content:`${agent.label}: It's your turn. Use tools if needed, then give your take — push back on what's been said or add what's being missed.` }];
+
+  // Agentic loop — agent may call multiple tools before responding
+  let currentMessages = messages;
+  let iterations = 0;
+  const MAX_TOOL_ITERS = 4;
+
+  while (iterations < MAX_TOOL_ITERS) {
+    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      method:"POST", headers:AI_HEADERS(apiKey),
+      body: JSON.stringify({
+        model:"claude-sonnet-4-20250514", max_tokens:600, system:sys,
+        tools: portfolioTools.definitions,
+        messages: currentMessages,
+      }),
+    });
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error.message);
+
+    const stopReason = data.stop_reason;
+    const content = data.content || [];
+
+    if (stopReason === "tool_use") {
+      // Execute all tool calls
+      const toolResults = content
+        .filter(b => b.type === "tool_use")
+        .map(b => ({
+          type:"tool_result",
+          tool_use_id: b.id,
+          content: JSON.stringify(portfolioTools.execute(b.name)),
+        }));
+
+      // Add assistant turn + tool results to history
+      currentMessages = [
+        ...currentMessages,
+        { role:"assistant", content },
+        { role:"user", content: toolResults },
+      ];
+      iterations++;
+    } else {
+      // Final text response
+      const text = content.filter(b=>b.type==="text").map(b=>b.text).join("").trim();
+      // Return text + the tool calls made (for transparency in UI)
+      const toolsUsed = content.filter(b=>b.type==="tool_use").map(b=>b.name);
+      // Also gather tool calls from the loop
+      const allToolsUsed = currentMessages
+        .flatMap(m => Array.isArray(m.content) ? m.content : [])
+        .filter(b => b.type==="tool_use")
+        .map(b=>b.name);
+      return { text, toolsUsed:[...new Set(allToolsUsed)] };
+    }
+  }
+  throw new Error("Agent exceeded tool iteration limit");
+}
+
+// Moderator — decides what happens next after each agent turn
+async function callModerator(portfolioCtx, userContext, transcript, agents, turnCount, maxTurns) {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("No API key");
+
+  const agentLabels = agents.map(a=>a.label).join(", ");
+  const transcriptStr = transcript.map(m=>`${m.icon} ${m.label}: ${m.text}`).join("\n\n---\n\n");
+
+  const sys = `You are the debate Moderator for a C-Suite strategy session.
+Your job: read the current debate and decide what happens next.
+Agents available: ${agentLabels}.
+Current turn: ${turnCount}. Maximum turns: ${maxTurns}.
+
+Return ONLY a JSON object (no markdown) with this structure:
+{
+  "decision": "continue" | "followup" | "synthesise",
+  "next_agent": "<agent label — required if decision is continue or followup>",
+  "followup_prompt": "<specific question to put to next_agent — required if decision is followup, null otherwise>",
+  "reason": "<one sentence on why you made this decision>"
+}
+
+Rules:
+- "continue": normal next turn, rotate to an agent who hasn't spoken recently
+- "followup": a specific unresolved tension or challenge needs addressing before moving on — direct a question at one agent
+- "synthesise": the debate has surfaced enough distinct perspectives and is ready to close (use after turn 4 minimum, or when all agents have spoken and consensus is emerging)
+- Force "synthesise" if turnCount >= ${maxTurns - 1}`;
+
+  const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    method:"POST", headers:AI_HEADERS(apiKey),
+    body: JSON.stringify({
+      model:"claude-sonnet-4-20250514", max_tokens:300, system:sys,
+      messages:[{role:"user", content:`Portfolio:\n${portfolioCtx}\n\nContext:\n${userContext||"none"}\n\nTranscript so far:\n${transcriptStr}\n\nDecide what happens next.`}],
+    }),
+  });
+  const data = await resp.json();
+  if (data.error) throw new Error(data.error.message);
+  const raw = data.content?.[0]?.text?.trim()||"{}";
+  return JSON.parse(raw.replace(/```json|```/g,"").trim());
+}
+
+// Final synthesis — reads full debate + tool outputs, returns 3 structured initiatives
+async function callDebateSynthesis(portfolioCtx, userContext, transcript, cats, settings, portfolioTools) {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("No API key");
+
+  // Give synthesis access to full data too
+  const winRate   = portfolioTools.execute("get_win_rate_by_category");
+  const failures  = portfolioTools.execute("get_failure_patterns");
+  const coverage  = portfolioTools.execute("get_category_coverage");
+  const dataAppendix = `\nDATA APPENDIX:\nWin rates by category: ${JSON.stringify(winRate)}\nFailures: ${JSON.stringify(failures)}\nCoverage: ${JSON.stringify(coverage)}`;
+
+  const transcriptStr = transcript.map(m=>`${m.icon} ${m.label}:\n${m.text}`).join("\n\n---\n\n");
+
+  const sys = `You are a Chief Strategy Officer synthesising a C-Suite debate into net-new growth initiatives.
+Rules:
+- These must be NET NEW — not already in the active or draft pipeline.
+- Ground each in specific signals from the debate and data.
+- Rank by expected impact, highest first.
+- Capture who championed it and who dissented so the exec team sees the risk surface.
+- Be brutally specific — no generic advice.
+
+Return ONLY a valid JSON array of exactly 3 objects. No markdown, no preamble:
+{
+  "title": "concise specific title (max 12 words)",
+  "observation": "2-3 sentences grounded in the portfolio data that justify this",
+  "hypothesis": "We believe that [specific change] will result in [measurable outcome] for [context], because [evidence from debate/data].",
+  "successMetric": "single measurable KPI that defines a win",
+  "primaryMetric": "short label",
+  "killCriteria": "specific stop/pivot condition",
+  "category": "one of: ${cats.join(", ")}",
+  "initType": "one of: ${INIT_TYPES.join(", ")}",
+  "ice": { "impact": <1-10>, "certainty": <1-10>, "ease": <1-10> },
+  "revenueImpact": <integer dollar estimate>,
+  "championedBy": "<agent label> — <one sentence why they pushed for this>",
+  "dissentVoice": "<agent label who pushed back> — <their specific objection>",
+  "whyNotAlreadyRunning": "honest one-sentence on why this gap exists in the portfolio"
+}`;
+
+  const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    method:"POST", headers:AI_HEADERS(apiKey),
+    body: JSON.stringify({
+      model:"claude-sonnet-4-20250514", max_tokens:3500, system:sys,
+      messages:[{role:"user", content:
+        `Portfolio:\n${portfolioCtx}${dataAppendix}\n\nContext:\n${userContext||"None."}\n\nDebate:\n${transcriptStr}\n\nSynthesize the 3 highest-impact net-new initiatives.`
+      }],
+    }),
+  });
+  const data = await resp.json();
+  if (data.error) throw new Error(data.error.message);
+  const raw = data.content?.[0]?.text?.trim()||"[]";
+  return JSON.parse(raw.replace(/```json|```/g,"").trim());
+}
+
 // -- Style helpers -------------------------------------------------------------
-const menuItem = (t) => ({fontSize:14,padding:"10px 12px",background:"transparent",border:"none",color:t.text,cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:8,fontFamily:t.serif,width:"100%"});
-const gG  = (t) => ({fontSize:12,padding:"7px 14px",borderRadius:6,background:t.gold,border:"none",color:t.goldText,cursor:"pointer",fontWeight:700,display:"flex",alignItems:"center",gap:4,fontFamily:t.serif,letterSpacing:"0.01em"});
-const gGh = (t) => ({fontSize:12,padding:"6px 13px",borderRadius:6,background:"transparent",border:"1px solid "+t.border,color:t.textSub,cursor:"pointer",display:"flex",alignItems:"center",gap:4,fontFamily:t.serif});
-const gI  = (t) => ({width:"100%",padding:"8px 10px",fontSize:13,fontFamily:t.serif,background:t.inputBg,border:"1px solid "+t.inputBorder,borderRadius:6,color:t.text,boxSizing:"border-box"});
-const gTA = (t) => ({...gI(t),resize:"vertical",fontFamily:t.mono});
+const menuItem = (t) => ({fontSize:14,padding:"10px 12px",background:"transparent",border:"none",color:t.text,cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:8,fontFamily:t.mono,width:"100%"});
+const gG  = (t) => ({fontSize:12,padding:"6px 13px",borderRadius:4,background:t.gold,border:"1px solid "+t.gold,color:t.goldText,cursor:"pointer",fontWeight:700,display:"flex",alignItems:"center",gap:4,fontFamily:t.mono});
+const gGh = (t) => ({fontSize:12,padding:"6px 12px",borderRadius:4,background:"transparent",border:"1px solid "+t.border,color:t.textMuted,cursor:"pointer",display:"flex",alignItems:"center",gap:4,fontFamily:t.mono});
+const gI  = (t) => ({width:"100%",padding:"7px 10px",fontSize:13,fontFamily:t.mono,background:t.inputBg,border:"1px solid "+t.inputBorder,borderRadius:4,color:t.text,boxSizing:"border-box"});
+const gTA = (t) => ({...gI(t),resize:"vertical"});
 const gSl = (t) => ({...gI(t),cursor:"pointer"});
-const gSc = (t) => ({background:t.surface,border:"1px solid "+t.border,borderRadius:10,padding:"13px 16px",boxShadow:"0 2px 8px rgba(0,0,0,0.06)"});
-const gSL = (t) => ({fontSize:10,letterSpacing:"0.10em",textTransform:"uppercase",color:t.textSub,marginBottom:8,fontFamily:t.mono,fontWeight:700});
-const gCd = (t,dk) => ({background:t.surface,border:dk?"1px solid "+t.border:"none",borderRadius:10,padding:"14px 16px",boxShadow:dk?"0 4px 12px rgba(0,0,0,0.25)":"0 4px 12px rgba(0,0,0,0.06)"});
+const gSc = (t) => ({background:t.surface,border:"1px solid "+t.border,borderRadius:8,padding:"13px 16px"});
+const gSL = (t) => ({fontSize:10,letterSpacing:"0.10em",textTransform:"uppercase",color:t.textMuted,marginBottom:8,fontFamily:t.mono});
+const gCd = (t) => ({background:t.surface,border:"1px solid "+t.border,borderRadius:8,padding:"12px 15px"});
 
 function FR({label,t,children}) {
   return (
@@ -275,29 +623,31 @@ function FR({label,t,children}) {
 
 // -- Atoms ---------------------------------------------------------------------
 function Bdg({label,color,bg,border,small}) {
-  return <span style={{display:"inline-block",fontSize:small?10:11,fontWeight:600,letterSpacing:"0.04em",padding:small?"2px 6px":"2px 9px",borderRadius:5,border:"1px solid "+(border||"#ccc"),background:bg||"#f5f5f0",color:color||"#666",whiteSpace:"nowrap"}}>{label}</span>;
+  return <span style={{display:"inline-block",fontSize:small?10:11,fontWeight:600,letterSpacing:"0.03em",padding:small?"1px 6px":"2px 8px",borderRadius:4,border:"1px solid "+(border||"#ccc"),background:bg||"#f5f5f0",color:color||"#666",whiteSpace:"nowrap"}}>{label}</span>;
 }
 function SBdg({s,dk})        { const c=(dk?SD:SL)[s]||SL.Draft; return <Bdg label={s} color={c.text} bg={c.bg} border={c.border}/>; }
 function OBdg({o,dk})        { const c=(dk?OD:OL)[o]||{};        return <Bdg label={o} color={c.text} bg={c.bg} border={c.border}/>; }
-function CBdg({cat,cats,dk}) {
-  const color = catColor(cat,cats,dk);
-  const bg = dk ? "rgba(255,255,255,0.06)" : "#f8f7f2";
-  const border = dk ? "rgba(255,255,255,0.12)" : "#ddd8c8";
-  return <Bdg label={cat} color={color} bg={bg} border={border}/>;
-}
+function CBdg({cat,cats,dk}) { return <Bdg label={cat} color={catColor(cat,cats,dk)} bg={dk?"#1e1e14":"#f8f7f2"} border={dk?"#2a2820":"#ddd8c8"}/>; }
 function TBdg({type,dk}) {
   const color = (dk?TYPE_D:TYPE_L)[type]||"#888";
-  const bg = dk ? "rgba(255,255,255,0.06)" : "#f8f7f2";
-  const border = dk ? "rgba(255,255,255,0.12)" : "#ddd8c8";
-  return <Bdg label={type} color={color} bg={bg} border={border} small/>;
+  return <Bdg label={type} color={color} bg={dk?"#1e1e14":"#f8f7f2"} border={dk?"#2a2820":"#ddd8c8"} small/>;
 }
 
-function ICEChip({ice,t,dk}) {
+function BlockerBadge({blocker}) {
+  if (!blocker || blocker === "None") return null;
+  return (
+    <span style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:11,fontWeight:800,
+      background:"#1a1400",color:"#ffd700",border:"2px solid #ffd700",borderRadius:4,
+      padding:"3px 9px",letterSpacing:"0.03em",whiteSpace:"nowrap",boxShadow:"0 0 0 1px #b8a000"}}>
+      ⚠️ BLOCKED: {blocker}
+    </span>
+  );
+}
+
+function ICEChip({ice,t}) {
   const s = iceScore(ice&&ice.impact, ice&&ice.certainty, ice&&ice.ease);
   if (s===null) return <span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>No ICE</span>;
-  const col = iceColor(s,t);
-  const bg  = dk ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.04)";
-  return <span style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:11,fontWeight:700,color:col,fontFamily:t.mono,background:bg,border:"1px solid "+col,borderRadius:4,padding:"2px 8px",letterSpacing:"0.04em"}}>ICE {s}</span>;
+  return <span style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:11,fontWeight:700,color:iceColor(s,t),fontFamily:t.mono,border:"1px solid "+t.border,borderRadius:4,padding:"2px 7px"}}>ICE {s}</span>;
 }
 
 function CBar({pct,t}) {
@@ -414,6 +764,8 @@ export default function App() {
   const [importRows,setImportRows]= useState([]);
   const [importErrs,setImportErrs]= useState([]);
   const [importDone,setImportDone]= useState(false);
+  const [showCopilot,setShowCopilot]=useState(false);
+  const [debates,   setDebates]   = useState([]);
 
   const t    = dk ? TD : TL;
   const cats   = settings.categories || DEFAULT_SETTINGS.categories;
@@ -423,10 +775,11 @@ export default function App() {
     // Theme persisted in memory only (localStorage not available in all environments)
     const load = async ()=>{
       try {
-        const [ir,sr] = await Promise.all([store.get(KEY_ITEMS),store.get(KEY_SETTINGS)]);
+        const [ir,sr,dr] = await Promise.all([store.get(KEY_ITEMS),store.get(KEY_SETTINGS),store.get(KEY_DEBATES)]);
         setItems(ir&&ir.value?JSON.parse(ir.value):SEED);
         if(!ir||!ir.value) store.set(KEY_ITEMS,JSON.stringify(SEED));
         if(sr&&sr.value) setSettings(JSON.parse(sr.value));
+        if(dr&&dr.value) setDebates(JSON.parse(dr.value));
       } catch { setItems(SEED); }
       setLoaded(true);
     };
@@ -435,7 +788,10 @@ export default function App() {
 
   const saveItems    = d => { setItems(d); try{store.set(KEY_ITEMS,JSON.stringify(d));}catch{} };
   const saveSettings = s => { setSettings(s); try{store.set(KEY_SETTINGS,JSON.stringify(s));}catch{} };
+  const saveDebates  = d => { setDebates(d); try{store.set(KEY_DEBATES,JSON.stringify(d));}catch{} };
   const toggleDk     = ()=> { setDk(n => !n); };
+
+  const agents = (settings.agents && settings.agents.length > 0) ? settings.agents : DEFAULT_AGENTS;
 
   const sel    = useMemo(()=>items.find(e=>e.id===selId),[items,selId]);
   const owners = useMemo(()=>["All",...new Set(items.map(e=>e.owner).filter(Boolean).map(o=>o.split(" (")[0].split("+")[0].trim()))],[items]);
@@ -775,7 +1131,7 @@ export default function App() {
   if(!loaded) return <div style={{background:t.bg,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{color:t.textMuted,fontFamily:t.mono}}>Loading Growth OS…</span></div>;
 
   const navBtn=(v,lbl)=>(
-    <button key={v} onClick={()=>setNav(v)} style={{fontSize:13,padding:"5px 14px",borderRadius:6,cursor:"pointer",fontFamily:t.serif,fontWeight:nav===v?600:400,background:nav===v?t.gold:"transparent",border:"1px solid "+(nav===v?t.gold:"transparent"),color:nav===v?t.goldText:t.textSub}}>{lbl}</button>
+    <button key={v} onClick={()=>setNav(v)} style={{fontSize:12,padding:"5px 12px",borderRadius:4,cursor:"pointer",fontFamily:t.mono,background:nav===v?t.gold:"transparent",border:"1px solid "+(nav===v?t.gold:t.border),color:nav===v?t.goldText:t.textMuted}}>{lbl}</button>
   );
 
   return (
@@ -787,8 +1143,8 @@ export default function App() {
         {/* Row 1: wordmark + retailer + utilities */}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 16px",borderBottom:"1px solid "+t.border}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <span style={{fontSize:13,fontWeight:700,letterSpacing:"0.10em",color:t.gold,fontFamily:t.mono,whiteSpace:"nowrap"}}>GROWTH OS</span>
-            <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,letterSpacing:"0.04em",whiteSpace:"nowrap"}}>{settings.companyName}</span>
+            <span style={{fontSize:13,fontWeight:700,letterSpacing:"0.12em",color:t.gold,fontFamily:t.serif,whiteSpace:"nowrap"}}>GROWTH OS</span>
+            <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.04em",whiteSpace:"nowrap"}}>{settings.companyName}</span>
             {brands.length>1&&(
               <select value={activeBrand} onChange={e=>setActiveBrand(e.target.value)}
                 style={{fontSize:11,padding:"3px 8px",borderRadius:4,border:"1px solid "+t.gold,background:activeBrand==="all"?t.surface:t.goldBg,color:activeBrand==="all"?t.textMuted:t.gold,fontFamily:t.mono,cursor:"pointer",maxWidth:140}}>
@@ -798,6 +1154,14 @@ export default function App() {
             )}
           </div>
           <div style={{display:"flex",gap:5,alignItems:"center"}}>
+            <button onClick={()=>setShowCopilot(true)}
+              style={{fontSize:12,padding:"4px 11px",borderRadius:4,cursor:"pointer",
+                background:"linear-gradient(135deg,"+t.gold+" 0%,#e0a030 100%)",
+                border:"none",color:t.goldText,fontWeight:700,fontFamily:t.mono,
+                display:"flex",alignItems:"center",gap:5,
+                boxShadow:"0 1px 4px rgba(192,136,32,0.25)"}}>
+              ✦ Signal
+            </button>
             <button onClick={()=>setShowSet(true)} title="Settings"
               style={{fontSize:13,padding:"4px 7px",borderRadius:4,cursor:"pointer",background:"transparent",border:"1px solid "+t.border,color:t.textMuted,lineHeight:1}}>
               <span dangerouslySetInnerHTML={{__html:"&#9881;"}}/>
@@ -849,28 +1213,28 @@ export default function App() {
           <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
             <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
               {["All",...STATUSES].map(s=>(
-                <button key={s} onClick={()=>setFSt(s)} style={{fontSize:12,padding:"5px 12px",borderRadius:6,cursor:"pointer",fontFamily:t.serif,fontWeight:fSt===s?600:400,background:fSt===s?t.gold:"transparent",border:"1px solid "+(fSt===s?t.gold:t.border),color:fSt===s?t.goldText:t.textSub}}>{s}</button>
+                <button key={s} onClick={()=>setFSt(s)} style={{fontSize:12,padding:"4px 10px",borderRadius:4,cursor:"pointer",fontFamily:t.mono,background:fSt===s?t.gold:"transparent",border:"1px solid "+(fSt===s?t.gold:t.border),color:fSt===s?t.goldText:t.textMuted}}>{s}</button>
               ))}
             </div>
             <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
-                <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase",fontWeight:600}}>Category</label>
+                <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Category</label>
                 <select value={fCat} onChange={e=>setFCat(e.target.value)} style={{...gSl(t),minWidth:130}}>{["All",...cats].map(c=><option key={c}>{c}</option>)}</select>
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
-                <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase",fontWeight:600}}>Type</label>
+                <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Type</label>
                 <select value={fType} onChange={e=>setFType(e.target.value)} style={{...gSl(t),minWidth:120}}>{["All",...INIT_TYPES].map(tp=><option key={tp}>{tp}</option>)}</select>
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
-                <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase",fontWeight:600}}>Owner</label>
+                <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Owner</label>
                 <select value={fOwn} onChange={e=>setFOwn(e.target.value)} style={{...gSl(t),minWidth:120}}>{owners.map(o=><option key={o}>{o}</option>)}</select>
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
-                <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase",fontWeight:600}}>Sort by</label>
+                <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Sort by</label>
                 <select value={sort} onChange={e=>setSort(e.target.value)} style={{...gSl(t),minWidth:110}}>
-                  <option value="ice">ICE Score</option>
+                  <option value="ice">Highest ICE Score</option>
+                  <option value="revenue">Highest Rev at Risk</option>
                   <option value="endDate">End date</option>
-                  <option value="revenue">Revenue</option>
                   <option value="newest">Newest</option>
                 </select>
               </div>
@@ -879,7 +1243,7 @@ export default function App() {
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
             {filtered.length===0&&<div style={{padding:48,textAlign:"center",color:t.textMuted}}>No initiatives match your filters.</div>}
             {filtered.map(item=>(
-              <div key={item.id} onClick={()=>goDetail(item.id)} style={{...gCd(t,dk),cursor:"pointer"}}>
+              <div key={item.id} onClick={()=>goDetail(item.id)} style={{...gCd(t),cursor:"pointer"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:6}}>
                   <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
                     <CBdg cat={item.category} cats={cats} dk={dk}/>
@@ -888,21 +1252,22 @@ export default function App() {
                     <SBdg s={item.status} dk={dk}/>
                     {item.results&&<OBdg o={item.results.outcomeClassification} dk={dk}/>}
                     <EAlert endDate={item.endDate} status={item.status} t={t} dk={dk}/>
+                    <BlockerBadge blocker={item.blocker}/>
                   </div>
                   <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                    <ICEChip ice={item.ice} t={t} dk={dk}/>
-                    {item.revenueImpact!==0&&<span style={{fontSize:16,fontWeight:700,color:t.gold,fontFamily:t.mono,letterSpacing:"-0.01em"}}>{fmtCur(item.revenueImpact)}</span>}
-                    {item.results&&typeof item.results.actualRevenueImpact==="number"&&<span style={{fontSize:12,fontWeight:600,color:t.textSub,fontFamily:t.mono}}>actual: <span style={{color:t.gold}}>{fmtCur(item.results.actualRevenueImpact)}</span></span>}
-                    {item.owner&&<span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>{item.owner.split(" (")[0].split("+")[0].trim()}</span>}
+                    <ICEChip ice={item.ice} t={t}/>
+                    {item.revenueImpact!==0&&<span style={{fontSize:13,fontWeight:700,color:t.gold,fontFamily:t.serif}}>{fmtCur(item.revenueImpact)}</span>}
+                    {item.results&&typeof item.results.actualRevenueImpact==="number"&&<span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>actual: {fmtCur(item.results.actualRevenueImpact)}</span>}
+                    {item.owner&&<span style={{fontSize:12,color:t.textMuted,fontFamily:t.mono}}>{item.owner.split(" (")[0].split("+")[0].trim()}</span>}
                   </div>
                 </div>
-                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5,flexWrap:"wrap"}}>
-                  {item.initId&&<span style={{fontSize:10,fontWeight:700,color:t.gold,fontFamily:t.mono,background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:4,padding:"2px 7px",flexShrink:0,letterSpacing:"0.04em"}}>{item.initId}</span>}
-                  <div style={{fontSize:14,fontWeight:600,color:t.text,lineHeight:1.4,fontFamily:t.serif}}>{item.title}</div>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}>
+                  {item.initId&&<span style={{fontSize:10,fontWeight:700,color:t.gold,fontFamily:t.mono,background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:3,padding:"1px 6px",flexShrink:0}}>{item.initId}</span>}
+                  <div style={{fontSize:14,fontWeight:700,color:t.text,lineHeight:1.4,fontFamily:t.serif}}>{item.title}</div>
                 </div>
-                {item.hypothesis&&<div style={{fontSize:12,color:t.textSub,lineHeight:1.6,marginBottom:item.status!=="Draft"?6:0,fontFamily:t.serif}}>{item.hypothesis.slice(0,130)}{item.hypothesis.length>130?"…":""}</div>}
+                {item.hypothesis&&<div style={{fontSize:12,color:t.textMuted,lineHeight:1.5,marginBottom:item.status!=="Draft"?6:0,fontFamily:t.mono}}>{item.hypothesis.slice(0,130)}{item.hypothesis.length>130?"…":""}</div>}
                 {item.status!=="Draft"&&(
-                  <div style={{display:"flex",gap:14,alignItems:"center",fontSize:11,color:t.textMuted,fontFamily:t.mono,flexWrap:"wrap",marginTop:2}}>
+                  <div style={{display:"flex",gap:14,alignItems:"center",fontSize:12,color:t.textMuted,fontFamily:t.mono,flexWrap:"wrap"}}>
                     {item.primaryMetric&&<span>{item.primaryMetric.slice(0,48)}{item.primaryMetric.length>48?"…":""}</span>}
                     {item.endDate&&<span>End: {fmtDate(item.endDate)}</span>}
                     {item.linkedIds&&item.linkedIds.length>0&&<span>{item.linkedIds.length} linked</span>}
@@ -974,7 +1339,7 @@ export default function App() {
           <p style={{fontSize:13,color:t.textSub,marginBottom:16,fontFamily:t.mono}}>Pick a template to pre-fill the form, or start blank.</p>
           <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:16}}>
             {TEMPLATES.map(tpl=>(
-              <div key={tpl.id} onClick={()=>startFromTemplate(tpl)} style={{...gCd(t,dk),cursor:"pointer",display:"flex",alignItems:"flex-start",gap:12}}>
+              <div key={tpl.id} onClick={()=>startFromTemplate(tpl)} style={{...gCd(t),cursor:"pointer",display:"flex",alignItems:"flex-start",gap:12}}>
                 <div style={{fontSize:20,color:t.gold,marginTop:1}}><span style={{fontSize:18}}>&#9670;</span></div>
                 <div>
                   <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:2}}>
@@ -1099,6 +1464,538 @@ export default function App() {
           </div>
         </Modal>
       )}
+
+      {showCopilot&&(
+        <CopilotPanel
+          t={t} dk={dk}
+          settings={settings}
+          cats={cats}
+          brands={brands}
+          items={items}
+          activeBrand={activeBrand}
+          agents={agents}
+          debates={debates}
+          onSaveDebate={debate => saveDebates([debate, ...debates].slice(0,20))}
+          onAddToBacklog={(initiative) => {
+            const base = mkDefault(cats, activeBrand);
+            const newItem = {
+              ...base,
+              ...initiative,
+              _new: undefined,
+              id: "cop-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),
+              initId: generateInitId(base.brandId, brands, items),
+              status: "Draft",
+              createdAt: new Date().toISOString().slice(0,10),
+              blocker: "None",
+              results: null,
+              linkedIds: [],
+            };
+            saveItems([newItem, ...items]);
+          }}
+          onClose={() => setShowCopilot(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// -- Agentic Debate Panel v2 ---------------------------------------------------
+const MAX_TURNS = 8;
+const TOOL_LABEL = {
+  get_portfolio_summary:     "📋 reading portfolio summary",
+  get_running_initiatives:   "🏃 checking running initiatives",
+  get_category_coverage:     "🗺️ analysing category coverage",
+  get_win_rate_by_category:  "📈 pulling win rates by category",
+  get_top_draft_opportunities:"💡 scanning draft pipeline",
+  get_failure_patterns:      "❌ reviewing failure patterns",
+  get_blocked_initiatives:   "⚠️ checking blocked initiatives",
+  get_revenue_gap_analysis:  "💰 running revenue gap analysis",
+};
+
+function IdeaCard({idea, idx, results, setResults, added, onAdd, t, dk, cats, agents}) {
+  const [isEditing, setEditing] = useState(false);
+  const iceS = ice => ice ? Math.round(((ice.impact||0)*(ice.certainty||0)*(ice.ease||0)/1000)*100) : null;
+  const iceC = s => s===null?t.textMuted:s>=60?t.gold:s>=30?"#c08820":"#a03030";
+  const score = iceS(idea.ice);
+  const isAdded = added[idx];
+  const champAgent = agents.find(a => idea.championedBy?.toLowerCase().includes(a.label.toLowerCase()));
+  const dissentAgent = agents.find(a => idea.dissentVoice?.toLowerCase().includes(a.label.toLowerCase()));
+
+  return (
+    <div style={{background:t.surface,border:"1px solid "+(isAdded?t.gold:t.border),borderRadius:8,
+      overflow:"hidden",boxShadow:"0 2px 16px rgba(0,0,0,0.07)",opacity:isAdded?0.7:1,transition:"opacity 0.2s,border-color 0.2s"}}>
+      <div style={{height:3,background:champAgent?champAgent.color:t.gold}}/>
+      <div style={{padding:"14px 16px",display:"flex",flexDirection:"column",gap:10}}>
+
+        {/* Header */}
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+          <div style={{flex:1}}>
+            <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center",marginBottom:6}}>
+              <CBdg cat={idea.category||cats[0]} cats={cats} dk={dk}/>
+              <TBdg type={idea.initType||"A/B Test"} dk={dk}/>
+              <span style={{fontSize:10,fontWeight:600,color:t.textMuted,fontFamily:t.mono,
+                background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:3,padding:"1px 6px"}}>AI · Net New</span>
+            </div>
+            {isEditing
+              ? <input style={{...gI(t),fontSize:14,fontWeight:700}} value={idea.title} autoFocus
+                  onChange={e=>{const r=[...results];r[idx]={...r[idx],title:e.target.value};setResults(r);}}/>
+              : <div style={{fontSize:15,fontWeight:700,color:t.text,fontFamily:t.serif,lineHeight:1.35,cursor:"text"}}
+                  onClick={()=>setEditing(true)}>{idea.title}</div>}
+          </div>
+          {score!==null&&(
+            <div style={{textAlign:"center",flexShrink:0,paddingLeft:12,borderLeft:"1px solid "+t.border}}>
+              <div style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:2}}>ICE</div>
+              <div style={{fontSize:22,fontWeight:700,fontFamily:t.serif,color:iceC(score),lineHeight:1}}>{score}</div>
+              <div style={{fontSize:9,color:t.textMuted,fontFamily:t.mono}}>/100</div>
+            </div>
+          )}
+        </div>
+
+        {/* Champion + Dissent */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+          {idea.championedBy&&(
+            <div style={{padding:"7px 10px",background:champAgent?champAgent.color+"18":t.goldBg,
+              border:"1px solid "+(champAgent?champAgent.color+"50":t.goldBorder),borderRadius:5}}>
+              <div style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>{champAgent?.icon} Championed by</div>
+              <div style={{fontSize:11,color:t.textSub,fontFamily:t.mono,lineHeight:1.5}}>{idea.championedBy}</div>
+            </div>
+          )}
+          {idea.dissentVoice&&(
+            <div style={{padding:"7px 10px",background:dk?"#2a1a1a":"#fdf5f5",border:"1px solid "+(dk?"#6a3030":"#e0b0b0"),borderRadius:5}}>
+              <div style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>{dissentAgent?.icon} Risk / Dissent</div>
+              <div style={{fontSize:11,color:dk?"#e09090":"#a03030",fontFamily:t.mono,lineHeight:1.5}}>{idea.dissentVoice}</div>
+            </div>
+          )}
+        </div>
+
+        {idea.whyNotAlreadyRunning&&(
+          <div style={{padding:"7px 10px",background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:5,fontSize:11,color:t.textMuted,fontFamily:t.mono,lineHeight:1.5}}>
+            <strong style={{color:t.textSub}}>Gap reason: </strong>{idea.whyNotAlreadyRunning}
+          </div>
+        )}
+
+        {/* Hypothesis framework */}
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {idea.observation&&(
+            <div>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>📊 Observation</div>
+              {isEditing
+                ? <textarea style={{...gTA(t),fontSize:12}} rows={2} value={idea.observation}
+                    onChange={e=>{const r=[...results];r[idx]={...r[idx],observation:e.target.value};setResults(r);}}/>
+                : <p style={{margin:0,fontSize:12,color:t.textSub,lineHeight:1.6,cursor:"text"}} onClick={()=>setEditing(true)}>{idea.observation}</p>}
+            </div>
+          )}
+          {idea.hypothesis&&(
+            <div style={{borderLeft:"3px solid "+t.gold,paddingLeft:10}}>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>💡 Hypothesis</div>
+              {isEditing
+                ? <textarea style={{...gTA(t),fontSize:12}} rows={3} value={idea.hypothesis}
+                    onChange={e=>{const r=[...results];r[idx]={...r[idx],hypothesis:e.target.value};setResults(r);}}/>
+                : <p style={{margin:0,fontSize:12,color:t.textSub,lineHeight:1.6,fontWeight:600,cursor:"text"}} onClick={()=>setEditing(true)}>{idea.hypothesis}</p>}
+            </div>
+          )}
+          {idea.successMetric&&(
+            <div>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>🎯 Success metric</div>
+              {isEditing
+                ? <input style={{...gI(t),fontSize:12}} value={idea.successMetric}
+                    onChange={e=>{const r=[...results];r[idx]={...r[idx],successMetric:e.target.value};setResults(r);}}/>
+                : <p style={{margin:0,fontSize:12,color:t.textSub,lineHeight:1.6,cursor:"text"}} onClick={()=>setEditing(true)}>{idea.successMetric}</p>}
+            </div>
+          )}
+        </div>
+
+        {/* ICE breakdown */}
+        {idea.ice&&(
+          <div style={{display:"flex",gap:10,padding:"8px 10px",background:t.surfaceAlt,borderRadius:5,border:"1px solid "+t.border}}>
+            {[["Impact",idea.ice.impact],["Certainty",idea.ice.certainty],["Ease",idea.ice.ease]].map(([l,v])=>(
+              <div key={l} style={{flex:1,textAlign:"center"}}>
+                <div style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:2}}>{l}</div>
+                <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.serif}}>{v}<span style={{fontSize:9,color:t.textMuted}}>/10</span></div>
+              </div>
+            ))}
+            <div style={{flex:1,textAlign:"center",borderLeft:"1px solid "+t.border}}>
+              <div style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:2}}>Score</div>
+              <div style={{fontSize:16,fontWeight:700,fontFamily:t.serif,color:iceC(score)}}>{score||"—"}</div>
+            </div>
+          </div>
+        )}
+
+        {/* Actions */}
+        <div style={{display:"flex",gap:6}}>
+          {isAdded ? (
+            <div style={{flex:1,padding:"7px 12px",borderRadius:5,background:t.goldBg,border:"1px solid "+t.goldBorder,
+              fontSize:12,fontWeight:700,color:t.gold,fontFamily:t.mono,textAlign:"center"}}>✓ Added to Growth Backlog</div>
+          ) : (
+            <>
+              <button onClick={()=>onAdd(idea,idx)} style={{...gG(t),flex:1,justifyContent:"center",fontSize:12,padding:"8px 12px",
+                background:"linear-gradient(135deg,"+t.gold+" 0%,#e0a030 100%)",boxShadow:"0 1px 6px rgba(192,136,32,0.2)"}}>
+                + Add to Growth Backlog
+              </button>
+              <button onClick={()=>setEditing(!isEditing)} style={{...gGh(t),fontSize:11,padding:"8px 11px"}}>
+                {isEditing?"✓ Done":"✎ Edit"}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand, agents, debates, onSaveDebate, onAddToBacklog, onClose}) {
+  const [tab,        setTab]       = useState("debate"); // debate | history
+  const [context,    setContext]   = useState("");
+  const [running,    setRunning]   = useState(false);
+  const [transcript, setTranscript]= useState([]);
+  const [activeAgent,setActiveAgent]=useState(null); // {label, icon, color, toolsUsed}
+  const [modNote,    setModNote]   = useState("");   // moderator's reasoning shown briefly
+  const [results,    setResults]   = useState(null);
+  const [error,      setError]     = useState("");
+  const [added,      setAdded]     = useState({});
+  const [phase,      setPhase]     = useState("input");
+  const [turnCount,  setTurnCount] = useState(0);
+
+  const portfolioCtx = buildPortfolioContext(items, settings, brands, activeBrand);
+  const portfolioTools = buildPortfolioTools(items, settings, brands, activeBrand);
+
+  const runDebate = async () => {
+    const apiKey = getApiKey();
+    if (!apiKey) { setError("Add your Anthropic API key in ⚙ Settings to use AI features."); return; }
+
+    setRunning(true); setError(""); setTranscript([]); setResults(null);
+    setAdded({}); setPhase("debating"); setTurnCount(0); setModNote("");
+
+    const fullTranscript = [];
+    // Build shared message history so agents read each other's words
+    const messageHistory = [];
+    let currentTurn = 0;
+
+    // Pick opening agent
+    let nextAgent = agents[0];
+
+    try {
+      while (currentTurn < MAX_TURNS) {
+        setTurnCount(currentTurn + 1);
+        setActiveAgent({ ...nextAgent, toolsUsed:[] });
+
+        // Agent speaks (with tool use)
+        const { text, toolsUsed } = await callAgentTurn(
+          nextAgent, portfolioCtx, context, messageHistory, portfolioTools, currentTurn === 0
+        );
+
+        setActiveAgent(null);
+        const turn = { agent:nextAgent.id, icon:nextAgent.icon, label:nextAgent.label,
+          color:nextAgent.color, text, toolsUsed };
+        fullTranscript.push(turn);
+        setTranscript([...fullTranscript]);
+
+        // Add to shared history as alternating user/assistant
+        messageHistory.push({ role:"user", content: currentTurn===0
+          ? `Portfolio:\n${portfolioCtx}\n\nContext:\n${context||"None."}\n\nOpen the debate. Use your tools then give your take.`
+          : `${nextAgent.label}, your turn.` });
+        messageHistory.push({ role:"assistant", content: `${nextAgent.icon} ${nextAgent.label}: ${text}` });
+
+        currentTurn++;
+
+        // Moderator decides what's next
+        if (currentTurn >= 2) {
+          const modDecision = await callModerator(
+            portfolioCtx, context, fullTranscript, agents, currentTurn, MAX_TURNS
+          );
+          setModNote(modDecision.reason || "");
+
+          if (modDecision.decision === "synthesise" || currentTurn >= MAX_TURNS - 1) {
+            break;
+          }
+
+          const nextLabel = modDecision.next_agent;
+          const found = agents.find(a => a.label === nextLabel);
+          if (modDecision.decision === "followup" && found && modDecision.followup_prompt) {
+            // Inject the moderator's specific question as the next prompt
+            messageHistory.push({ role:"user", content: `Moderator to ${nextLabel}: ${modDecision.followup_prompt}` });
+            messageHistory.push({ role:"assistant", content: `Understood.` });
+          }
+          nextAgent = found || agents[currentTurn % agents.length];
+        } else {
+          nextAgent = agents[currentTurn % agents.length];
+        }
+      }
+
+      // Synthesis
+      setPhase("synthesising"); setActiveAgent(null);
+      const transcriptStr = fullTranscript.map(m=>`${m.icon} ${m.label}:\n${m.text}`).join("\n\n---\n\n");
+      const ideas = await callDebateSynthesis(portfolioCtx, context, fullTranscript, cats, settings, portfolioTools);
+
+      // Save debate to history
+      const saved = {
+        id: "dbt-"+Date.now(),
+        date: new Date().toISOString(),
+        context,
+        transcript: fullTranscript,
+        results: ideas,
+        turnCount: currentTurn,
+      };
+      onSaveDebate(saved);
+
+      setResults(ideas);
+      setPhase("done");
+    } catch(e) {
+      setError("Debate failed — " + (e.message||"check your API key in Settings."));
+      setPhase("input");
+    }
+    setRunning(false); setActiveAgent(null);
+  };
+
+  const handleAdd = (idea, idx) => {
+    onAddToBacklog(idea);
+    setAdded(prev => ({...prev, [idx]: true}));
+  };
+
+  const resetDebate = () => {
+    setPhase("input"); setTranscript([]); setResults(null);
+    setAdded({}); setTurnCount(0); setModNote(""); setError("");
+  };
+
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:400,display:"flex"}}>
+      <div style={{flex:1,background:"rgba(10,10,8,0.5)"}} onClick={!running?onClose:undefined}/>
+
+      <div style={{width:Math.min(600,window.innerWidth-16),background:t.surface,
+        borderLeft:"1px solid "+t.border,display:"flex",flexDirection:"column",
+        height:"100vh",boxShadow:"-8px 0 48px rgba(0,0,0,0.22)"}}>
+
+        {/* Header */}
+        <div style={{padding:"13px 20px",borderBottom:"1px solid "+t.border,background:t.goldBg,flexShrink:0}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div>
+              <div style={{fontSize:15,fontWeight:700,color:t.text,fontFamily:t.serif}}>✦ Signal AI</div>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginTop:2}}>
+                Agents query your live portfolio · Moderator routes the debate · 3 net-new initiatives
+              </div>
+            </div>
+            <div style={{display:"flex",gap:6,alignItems:"center"}}>
+              {agents.map(a=>(
+                <div key={a.id} title={a.label} style={{fontSize:13,width:26,height:26,borderRadius:"50%",
+                  display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.3s",
+                  background:activeAgent?.id===a.id?a.color+"25":t.surfaceAlt,
+                  border:"1px solid "+(activeAgent?.id===a.id?a.color:t.border),
+                  boxShadow:activeAgent?.id===a.id?"0 0 8px "+a.color+"60":"none"}}>
+                  {a.icon}
+                </div>
+              ))}
+              {!running&&<button onClick={onClose} style={{background:"transparent",border:"none",color:t.textMuted,cursor:"pointer",fontSize:18,padding:"2px 4px",lineHeight:1,marginLeft:4}}>✕</button>}
+            </div>
+          </div>
+
+          {/* Tabs */}
+          <div style={{display:"flex",gap:4,marginTop:10}}>
+            {[["debate","🧠 Debate"],["history","🗂️ Past Debates ("+debates.length+")"]].map(([v,l])=>(
+              <button key={v} onClick={()=>setTab(v)} style={{fontSize:11,padding:"4px 11px",borderRadius:4,cursor:"pointer",
+                fontFamily:t.mono,fontWeight:600,
+                background:tab===v?t.gold:"transparent",border:"1px solid "+(tab===v?t.gold:t.border),
+                color:tab===v?t.goldText:t.textMuted}}>{l}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* Body */}
+        <div style={{flex:1,overflowY:"auto",padding:"16px 20px",display:"flex",flexDirection:"column",gap:14}}>
+
+          {/* ── DEBATE TAB ── */}
+          {tab==="debate"&&<>
+
+            {/* Context input */}
+            <div>
+              <div style={{fontSize:10,letterSpacing:"0.10em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,marginBottom:5}}>
+                Situation context <span style={{fontWeight:400,textTransform:"none",letterSpacing:0}}>(optional — sharper with context)</span>
+              </div>
+              <textarea style={{...gTA(t),fontSize:12,minHeight:68,opacity:running?0.6:1}}
+                disabled={running} value={context} onChange={e=>setContext(e.target.value)}
+                placeholder={"What should the C-Suite know right now?\n• Black Friday is 8 weeks out and we're over-indexed on single-serve SKUs\n• Gross margin compressed 4pts this quarter\n• A competitor just launched a subscription tier"}/>
+            </div>
+
+            {/* Portfolio snapshot — collapsible */}
+            <details style={{...gSc(t),background:t.surfaceAlt}}>
+              <summary style={{fontSize:11,fontWeight:600,color:t.textSub,fontFamily:t.mono,cursor:"pointer",listStyle:"none",display:"flex",justifyContent:"space-between"}}>
+                <span>📋 Portfolio the agents will read</span>
+                <span style={{color:t.textMuted,fontWeight:400}}>▼</span>
+              </summary>
+              <div style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,lineHeight:1.7,whiteSpace:"pre-wrap",marginTop:10,maxHeight:200,overflowY:"auto"}}>
+                {portfolioCtx}
+              </div>
+              <div style={{marginTop:8,fontSize:10,color:t.textMuted,fontFamily:t.mono,padding:"6px 8px",background:t.surface,borderRadius:4,border:"1px solid "+t.border}}>
+                🔧 Agents also have 8 live tools to query deeper: win rates, blocked items, coverage gaps, failure patterns, revenue gaps…
+              </div>
+            </details>
+
+            {/* Launch */}
+            {phase==="input"&&(
+              <button onClick={runDebate} style={{...gG(t),fontSize:13,padding:"11px 16px",justifyContent:"center",
+                background:"linear-gradient(135deg,"+t.gold+" 0%,#e0a030 100%)",boxShadow:"0 2px 10px rgba(192,136,32,0.3)"}}>
+                🧠 Start C-Suite Debate
+              </button>
+            )}
+
+            {error&&(
+              <div style={{padding:"10px 14px",background:dk?"#2a1010":"#fdf0f0",border:"1px solid "+(dk?"#6a2828":"#e09090"),borderRadius:6,fontSize:12,fontFamily:t.mono,color:dk?"#e08080":"#a03030"}}>
+                {error}
+              </div>
+            )}
+
+            {/* Live transcript */}
+            {transcript.length>0&&(
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                <div style={{fontSize:10,letterSpacing:"0.10em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,display:"flex",justifyContent:"space-between"}}>
+                  <span>Debate transcript</span>
+                  <span>{turnCount}/{MAX_TURNS} turns</span>
+                </div>
+
+                {transcript.map((msg,i)=>(
+                  <div key={i} style={{borderLeft:"3px solid "+msg.color,paddingLeft:12,paddingTop:7,paddingBottom:7,
+                    background:t.surfaceAlt,borderRadius:"0 6px 6px 0",
+                    border:"1px solid "+t.border,borderLeft:"3px solid "+msg.color}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:5,flexWrap:"wrap"}}>
+                      <span style={{fontSize:13}}>{msg.icon}</span>
+                      <span style={{fontSize:11,fontWeight:700,color:msg.color,fontFamily:t.mono,letterSpacing:"0.04em"}}>{msg.label}</span>
+                      {msg.toolsUsed&&msg.toolsUsed.length>0&&(
+                        <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                          {msg.toolsUsed.map(tool=>(
+                            <span key={tool} style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,background:t.surface,
+                              border:"1px solid "+t.border,borderRadius:3,padding:"1px 5px"}}>
+                              🔧 {tool.replace("get_","").replace(/_/g," ")}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <p style={{margin:0,fontSize:12,color:t.textSub,lineHeight:1.7,fontFamily:t.mono}}>{msg.text}</p>
+                  </div>
+                ))}
+
+                {/* Moderator note */}
+                {modNote&&!running&&phase==="debating"&&(
+                  <div style={{padding:"6px 10px",background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:5,
+                    fontSize:11,color:dk?"#d4b060":"#7a5800",fontFamily:t.mono,display:"flex",gap:6,alignItems:"center"}}>
+                    <span style={{fontWeight:700}}>🎙 Moderator:</span> {modNote}
+                  </div>
+                )}
+
+                {/* Active agent typing */}
+                {running&&activeAgent&&phase==="debating"&&(
+                  <div style={{borderLeft:"3px solid "+activeAgent.color,paddingLeft:12,paddingTop:8,paddingBottom:8,
+                    background:t.surfaceAlt,borderRadius:"0 6px 6px 0",border:"1px solid "+t.border}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <span style={{fontSize:13}}>{activeAgent.icon}</span>
+                      <span style={{fontSize:11,fontWeight:700,color:activeAgent.color,fontFamily:t.mono}}>{activeAgent.label}</span>
+                      <span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>
+                        <span style={{display:"inline-block",animation:"spin 1.2s linear infinite"}}>⟳</span> querying portfolio data…
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {running&&phase==="synthesising"&&(
+                  <div style={{padding:"12px 16px",background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:6,
+                    display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{display:"inline-block",animation:"spin 1.2s linear infinite",fontSize:14}}>⟳</span>
+                    <span style={{fontSize:12,fontWeight:600,color:t.gold,fontFamily:t.mono}}>CSO synthesising debate → 3 net-new initiatives…</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Results */}
+            {results&&phase==="done"&&(
+              <div style={{display:"flex",flexDirection:"column",gap:14}}>
+                <div style={{padding:"11px 14px",background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:6}}>
+                  <div style={{fontSize:12,fontWeight:700,color:t.gold,fontFamily:t.mono,marginBottom:2}}>
+                    ✅ {results.length} net-new initiatives · {turnCount} agent turns · {transcript.reduce((s,m)=>s+(m.toolsUsed?.length||0),0)} tool calls
+                  </div>
+                  <div style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>
+                    Not currently running. Review, edit, then add to your Growth Backlog.
+                  </div>
+                </div>
+                {results.map((idea,idx)=>(
+                  <IdeaCard key={idx} idea={idea} idx={idx} results={results} setResults={setResults}
+                    added={added} onAdd={handleAdd} t={t} dk={dk} cats={cats} agents={agents}/>
+                ))}
+                <button onClick={resetDebate} style={{...gGh(t),justifyContent:"center",fontSize:12}}>
+                  ⟳ Run a new debate
+                </button>
+              </div>
+            )}
+
+            {/* Empty state */}
+            {phase==="input"&&transcript.length===0&&(
+              <div style={{padding:"28px 16px",textAlign:"center",border:"1px dashed "+t.border,borderRadius:8}}>
+                <div style={{fontSize:28,marginBottom:10}}>🧠</div>
+                <div style={{fontSize:13,fontWeight:600,color:t.text,fontFamily:t.serif,marginBottom:8}}>Autonomous C-Suite debate</div>
+                <div style={{display:"flex",justifyContent:"center",gap:6,flexWrap:"wrap",marginBottom:12}}>
+                  {agents.map(a=>(
+                    <span key={a.id} style={{fontSize:11,padding:"4px 10px",borderRadius:4,fontFamily:t.mono,fontWeight:600,
+                      color:a.color,background:a.color+"15",border:"1px solid "+a.color+"30"}}>
+                      {a.icon} {a.label}
+                    </span>
+                  ))}
+                </div>
+                <div style={{fontSize:12,color:t.textMuted,fontFamily:t.mono,lineHeight:1.8,maxWidth:380,margin:"0 auto"}}>
+                  Each exec has 8 live tools to query your portfolio data — win rates, blocked initiatives, coverage gaps, failure patterns, revenue gaps — before forming opinions.
+                  A Moderator routes the debate dynamically. The CSO synthesises into 3 net-new initiatives with champion and dissenting voice.
+                  <br/><br/>
+                  <strong style={{color:t.textSub}}>Add situation context above for sharper results.</strong>
+                  <br/>Requires Anthropic API key in ⚙ Settings.
+                </div>
+              </div>
+            )}
+          </>}
+
+          {/* ── HISTORY TAB ── */}
+          {tab==="history"&&(
+            <div style={{display:"flex",flexDirection:"column",gap:12}}>
+              {debates.length===0?(
+                <div style={{padding:"32px 16px",textAlign:"center",border:"1px dashed "+t.border,borderRadius:8,color:t.textMuted,fontFamily:t.mono,fontSize:12}}>
+                  No saved debates yet. Run your first debate and it will appear here.
+                </div>
+              ):debates.map((d,i)=>(
+                <div key={d.id} style={{...gSc(t)}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+                    <div>
+                      <div style={{fontSize:11,fontWeight:700,color:t.text,fontFamily:t.mono}}>
+                        {new Date(d.date).toLocaleDateString("en-CA",{month:"short",day:"numeric",year:"numeric",hour:"2-digit",minute:"2-digit"})}
+                      </div>
+                      <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginTop:2}}>
+                        {d.turnCount} turns · {d.results?.length||0} initiatives generated
+                        {d.context&&<span> · "{d.context.slice(0,50)}{d.context.length>50?"…":""}"</span>}
+                      </div>
+                    </div>
+                    <div style={{display:"flex",gap:4}}>
+                      {(d.results||[]).map((idea,idx)=>(
+                        <button key={idx} onClick={()=>{onAddToBacklog(idea);}}
+                          title={"Add: "+idea.title}
+                          style={{fontSize:9,padding:"2px 7px",borderRadius:3,fontFamily:t.mono,fontWeight:600,cursor:"pointer",
+                            background:t.goldBg,border:"1px solid "+t.goldBorder,color:t.gold}}>
+                          + {(idea.title||"").split(" ").slice(0,3).join(" ")}…
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <details>
+                    <summary style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,cursor:"pointer"}}>View transcript ({d.transcript?.length||0} turns)</summary>
+                    <div style={{marginTop:8,display:"flex",flexDirection:"column",gap:6,maxHeight:300,overflowY:"auto"}}>
+                      {(d.transcript||[]).map((msg,j)=>(
+                        <div key={j} style={{borderLeft:"3px solid "+msg.color,paddingLeft:10,paddingTop:4,paddingBottom:4}}>
+                          <div style={{fontSize:10,fontWeight:700,color:msg.color,fontFamily:t.mono,marginBottom:3}}>{msg.icon} {msg.label}</div>
+                          <p style={{margin:0,fontSize:11,color:t.textSub,fontFamily:t.mono,lineHeight:1.6}}>{msg.text}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -1110,17 +2007,17 @@ function DashView({t,dk,dash,cats,settings,brands,activeBrand,dRange,setDRange,c
   return (
     <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:14}}>
       {/* North star */}
-      <div style={{...gCd(t,dk),background:t.goldBg,border:"1px solid "+t.goldBorder,display:"flex",alignItems:"center",gap:24,flexWrap:"wrap"}}>
+      <div style={{...gCd(t),background:t.goldBg,border:"1px solid "+t.goldBorder,display:"flex",alignItems:"center",gap:24,flexWrap:"wrap"}}>
         <div>
-          <div style={{fontSize:9,letterSpacing:"0.12em",textTransform:"uppercase",color:t.gold,fontFamily:t.mono,marginBottom:5,fontWeight:700}}>North star</div>
-          <div style={{fontSize:15,fontWeight:600,color:t.text,fontFamily:t.serif}}>{settings.northStarMetric}</div>
+          <div style={{fontSize:10,letterSpacing:"0.10em",textTransform:"uppercase",color:t.gold,fontFamily:t.mono,marginBottom:4}}>North star</div>
+          <div style={{fontSize:15,fontWeight:700,color:t.text,fontFamily:t.serif}}>{settings.northStarMetric}</div>
         </div>
         <div style={{display:"flex",gap:20,flexWrap:"wrap"}}>
-          <div><div style={{fontSize:9,color:t.textSub,fontFamily:t.mono,marginBottom:4,fontWeight:600,letterSpacing:"0.06em",textTransform:"uppercase"}}>Current</div><div style={{fontSize:22,fontWeight:700,color:t.gold,fontFamily:t.mono,letterSpacing:"-0.02em"}}>{settings.northStarCurrent}</div></div>
-          <div style={{fontSize:18,color:t.textMuted,alignSelf:"center"}}>&#8594;</div>
-          <div><div style={{fontSize:9,color:t.textSub,fontFamily:t.mono,marginBottom:4,fontWeight:600,letterSpacing:"0.06em",textTransform:"uppercase"}}>Target</div><div style={{fontSize:22,fontWeight:700,color:t.text,fontFamily:t.mono,letterSpacing:"-0.02em"}}>{settings.northStarTarget}</div></div>
+          <div><div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Current</div><div style={{fontSize:20,fontWeight:700,color:t.gold,fontFamily:t.serif}}>{settings.northStarCurrent}</div></div>
+          <div style={{fontSize:20,color:t.textMuted,alignSelf:"center"}}>&#8594;</div>
+          <div><div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Target</div><div style={{fontSize:20,fontWeight:700,color:t.text,fontFamily:t.serif}}>{settings.northStarTarget}</div></div>
         </div>
-        <div style={{marginLeft:"auto",fontSize:11,color:t.textSub,fontFamily:t.mono,textAlign:"right"}}>
+        <div style={{marginLeft:"auto",fontSize:11,color:t.textMuted,fontFamily:t.mono,textAlign:"right"}}>
           {activeBrand!=="all"&&<div style={{fontSize:12,fontWeight:600,color:t.gold,marginBottom:2}}>{brandName(activeBrand,brands)}</div>}
           {settings.businessModel}
         </div>
@@ -1183,29 +2080,29 @@ function DashView({t,dk,dash,cats,settings,brands,activeBrand,dRange,setDRange,c
           {l:"Avg ICE",          v:dash.avgIce||"—",          s:"all initiatives"},
           {l:"Closed ROI",        v:dash.closedROI!==null?dash.closedROI+"x":"—", s:"actual rev / cost"},
         ].map(m=>(
-          <div key={m.l} style={{...gCd(t,dk),display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",textAlign:"center",padding:"18px 10px",minHeight:108}}>
-            <div style={{fontSize:9,letterSpacing:"0.12em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,marginBottom:10,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%",fontWeight:600}}>{m.l}</div>
-            <div style={{fontSize:30,fontWeight:700,color:t.gold,fontFamily:t.mono,lineHeight:1,letterSpacing:"-0.02em"}}>{m.v}</div>
-            {m.s&&m.s!==" "&&<div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginTop:6,whiteSpace:"nowrap"}}>{m.s}</div>}
+          <div key={m.l} style={{...gCd(t),display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",textAlign:"center",padding:"14px 10px",minHeight:100}}>
+            <div style={{fontSize:10,letterSpacing:"0.08em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,marginBottom:6,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>{m.l}</div>
+            <div style={{fontSize:28,fontWeight:700,color:t.gold,fontFamily:t.serif,lineHeight:1}}>{m.v}</div>
+            {m.s&&m.s!==" "&&<div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginTop:4,whiteSpace:"nowrap"}}>{m.s}</div>}
           </div>
         ))}
       </div>
 
       {/* Calibration card */}
-      <div style={{...gCd(t,dk),border:"1px solid "+(dash.calibration!==null?(dash.calibration>=80?t.goldBorder:dash.calibration>=50?"#c0a030":t.border):t.border)}}>
+      <div style={{...gCd(t),border:"1px solid "+(dash.calibration!==null?(dash.calibration>=80?t.goldBorder:dash.calibration>=50?"#c0a030":t.border):t.border)}}>
         <div style={gSL(t)}>Revenue estimate calibration</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16,alignItems:"center",marginBottom:dash.totalEstCost>0?12:0}}>
           <div>
-            <div style={{fontSize:10,color:t.textSub,fontFamily:t.mono,marginBottom:4,fontWeight:600,letterSpacing:"0.06em",textTransform:"uppercase"}}>Total estimated</div>
-            <div style={{fontSize:22,fontWeight:700,color:t.text,fontFamily:t.mono,letterSpacing:"-0.01em"}}>{fmtCur(dash.totalEstimated)}</div>
+            <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Total estimated</div>
+            <div style={{fontSize:20,fontWeight:700,color:t.text,fontFamily:t.serif}}>{fmtCur(dash.totalEstimated)}</div>
           </div>
           <div>
-            <div style={{fontSize:10,color:t.textSub,fontFamily:t.mono,marginBottom:4,fontWeight:600,letterSpacing:"0.06em",textTransform:"uppercase"}}>Total actual</div>
-            <div style={{fontSize:22,fontWeight:700,color:t.gold,fontFamily:t.mono,letterSpacing:"-0.01em"}}>{fmtCur(dash.totalActual)}</div>
+            <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Total actual</div>
+            <div style={{fontSize:20,fontWeight:700,color:t.gold,fontFamily:t.serif}}>{fmtCur(dash.totalActual)}</div>
           </div>
           <div>
-            <div style={{fontSize:10,color:t.textSub,fontFamily:t.mono,marginBottom:4,fontWeight:600,letterSpacing:"0.06em",textTransform:"uppercase"}}>Accuracy</div>
-            <div style={{fontSize:26,fontWeight:700,fontFamily:t.mono,letterSpacing:"-0.02em",color:dash.calibration===null?t.textMuted:dash.calibration>=80?t.gold:dash.calibration>=50?"#C49A2A":"#C04040"}}>
+            <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Accuracy</div>
+            <div style={{fontSize:24,fontWeight:700,fontFamily:t.serif,color:dash.calibration===null?t.textMuted:dash.calibration>=80?t.gold:dash.calibration>=50?"#c08820":"#c04040"}}>
               {dash.calibration!==null?dash.calibration+"%":"—"}
             </div>
             {dash.calibration!==null&&<div style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,marginTop:2}}>{dash.calibration>=80?"Well calibrated":dash.calibration>=50?"Moderate accuracy":"Overestimating"}</div>}
@@ -1214,16 +2111,16 @@ function DashView({t,dk,dash,cats,settings,brands,activeBrand,dRange,setDRange,c
         {dash.totalEstCost>0&&(
           <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid "+t.border,display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16}}>
             <div>
-              <div style={{fontSize:10,color:t.textSub,fontFamily:t.mono,marginBottom:4,fontWeight:600,letterSpacing:"0.06em",textTransform:"uppercase"}}>Total est. cost</div>
-              <div style={{fontSize:20,fontWeight:700,color:t.text,fontFamily:t.mono,letterSpacing:"-0.01em"}}>{fmtCur(dash.totalEstCost)}</div>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Total est. cost</div>
+              <div style={{fontSize:18,fontWeight:700,color:t.text,fontFamily:t.serif}}>{fmtCur(dash.totalEstCost)}</div>
             </div>
             <div>
-              <div style={{fontSize:10,color:t.textSub,fontFamily:t.mono,marginBottom:4,fontWeight:600,letterSpacing:"0.06em",textTransform:"uppercase"}}>Total actual cost</div>
-              <div style={{fontSize:20,fontWeight:700,color:t.text,fontFamily:t.mono,letterSpacing:"-0.01em"}}>{dash.totalActualCost>0?fmtCur(dash.totalActualCost):"—"}</div>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Total actual cost</div>
+              <div style={{fontSize:18,fontWeight:700,color:t.text,fontFamily:t.serif}}>{dash.totalActualCost>0?fmtCur(dash.totalActualCost):"—"}</div>
             </div>
             <div>
-              <div style={{fontSize:10,color:t.textSub,fontFamily:t.mono,marginBottom:4,fontWeight:600,letterSpacing:"0.06em",textTransform:"uppercase"}}>Closed ROI</div>
-              <div style={{fontSize:24,fontWeight:700,fontFamily:t.mono,letterSpacing:"-0.02em",color:dash.closedROI===null?t.textMuted:dash.closedROI>=2?t.gold:dash.closedROI>=1?"#C49A2A":"#C04040"}}>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Closed ROI</div>
+              <div style={{fontSize:22,fontWeight:700,fontFamily:t.serif,color:dash.closedROI===null?t.textMuted:dash.closedROI>=2?t.gold:dash.closedROI>=1?"#c08820":"#c04040"}}>
                 {dash.closedROI!==null?dash.closedROI+"x":"—"}
               </div>
               {dash.closedROI!==null&&<div style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,marginTop:2}}>{dash.closedROI>=3?"Strong return":dash.closedROI>=1?"Positive":"Negative"}</div>}
@@ -1234,12 +2131,12 @@ function DashView({t,dk,dash,cats,settings,brands,activeBrand,dRange,setDRange,c
 
       {/* Velocity + Category + Type */}
       <div style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) minmax(0,1fr)",gap:12}}>
-        <div style={gCd(t,dk)}>
+        <div style={gCd(t)}>
           <div style={gSL(t)}>Velocity — last 8 weeks</div>
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
             {[{label:"Started / week",vals:dash.vel.started,color:dk?"#5ad080":"#1a7a48"},{label:"Closed / week",vals:dash.vel.closed,color:dk?"#8080e0":"#4848b0"}].map(row=>(
               <div key={row.label}>
-                <div style={{fontSize:11,color:t.textSub,fontFamily:t.mono,marginBottom:4,fontWeight:600}}>{row.label}</div>
+                <div style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,marginBottom:4}}>{row.label}</div>
                 <div style={{display:"flex",alignItems:"center",gap:10}}>
                   <Spark vals={row.vals} color={row.color} w={120} h={26}/>
                   <span style={{fontSize:20,fontWeight:700,color:t.text,fontFamily:t.serif}}>{row.vals[row.vals.length-1]}</span>
@@ -1248,7 +2145,7 @@ function DashView({t,dk,dash,cats,settings,brands,activeBrand,dRange,setDRange,c
             ))}
           </div>
         </div>
-        <div style={gCd(t,dk)}>
+        <div style={gCd(t)}>
           <div style={gSL(t)}>By category</div>
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             {cats.map(cat=>{
@@ -1257,7 +2154,7 @@ function DashView({t,dk,dash,cats,settings,brands,activeBrand,dRange,setDRange,c
                 <div key={cat}>
                   <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
                     <span style={{fontSize:12,color:t.textSub,fontFamily:t.mono}}>{cat}</span>
-                    <span style={{fontSize:12,color:t.textSub,fontFamily:t.mono}}>{n}</span>
+                    <span style={{fontSize:12,color:t.textMuted,fontFamily:t.mono}}>{n}</span>
                   </div>
                   <div style={{height:5,background:t.border,borderRadius:3}}>
                     <div style={{width:pct+"%",height:"100%",borderRadius:3,background:catColor(cat,cats,dk)}}/>
@@ -1270,7 +2167,7 @@ function DashView({t,dk,dash,cats,settings,brands,activeBrand,dRange,setDRange,c
       </div>
 
       {/* Type breakdown */}
-      <div style={gCd(t,dk)}>
+      <div style={gCd(t)}>
         <div style={gSL(t)}>By initiative type</div>
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           {INIT_TYPES.map(tp=>{
@@ -1292,7 +2189,7 @@ function DashView({t,dk,dash,cats,settings,brands,activeBrand,dRange,setDRange,c
       </div>
 
       {/* Outcome breakdown */}
-      <div style={gCd(t,dk)}>
+      <div style={gCd(t)}>
         <div style={gSL(t)}>Outcome breakdown — all closed</div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
           {OUTCOMES.map(o=>{const c=(dk?OD:OL)[o]||{};return(
@@ -1322,8 +2219,9 @@ function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResults,onL
             <TBdg type={item.initType} dk={dk}/>
             <SBdg s={item.status} dk={dk}/>
             {item.results&&<OBdg o={item.results.outcomeClassification} dk={dk}/>}
-            <ICEChip ice={item.ice} t={t} dk={dk}/>
+            <ICEChip ice={item.ice} t={t}/>
             <EAlert endDate={item.endDate} status={item.status} t={t} dk={dk}/>
+            <BlockerBadge blocker={item.blocker}/>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:2}}>
             {item.initId&&<span style={{fontSize:11,fontWeight:700,color:t.gold,fontFamily:t.mono,background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:3,padding:"2px 8px",flexShrink:0}}>{item.initId}</span>}
@@ -1350,9 +2248,48 @@ function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResults,onL
         </div>
       </div>
 
+      {/* Blocker warning — full-width attention strip */}
+      {item.blocker&&item.blocker!=="None"&&(
+        <div style={{background:dk?"#1a1400":"#fffbe6",border:"2px solid #ffd700",borderRadius:6,padding:"10px 16px",display:"flex",alignItems:"center",gap:10,boxShadow:"0 0 0 1px #b8a000"}}>
+          <span style={{fontSize:20,flexShrink:0}}>⚠️</span>
+          <div>
+            <div style={{fontSize:12,fontWeight:800,color:dk?"#ffd700":"#7a5800",letterSpacing:"0.04em",fontFamily:t.mono,textTransform:"uppercase"}}>BLOCKED</div>
+            <div style={{fontSize:14,fontWeight:700,color:dk?"#ffd700":"#5a4000",fontFamily:t.serif}}>{item.blocker}</div>
+          </div>
+        </div>
+      )}
+
       <div style={gSc(t)}>
-        <div style={gSL(t)}>Hypothesis</div>
-        <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:14}}>{item.hypothesis||<span style={{color:t.textMuted,fontStyle:"italic"}}>No hypothesis yet.</span>}</p>
+        <div style={gSL(t)}>Hypothesis framework</div>
+        {/* Backwards compatibility: show legacy description if structured fields absent */}
+        {(item.observation||item.hypothesis||item.successMetric) ? (
+          <div style={{display:"flex",flexDirection:"column",gap:12}}>
+            {item.observation&&(
+              <div>
+                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>📊 Observation — what data prompted this?</div>
+                <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:13}}>{item.observation}</p>
+              </div>
+            )}
+            {item.hypothesis&&(
+              <div style={{borderLeft:"3px solid "+t.gold,paddingLeft:12}}>
+                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>💡 Hypothesis — if we do X, then Y…</div>
+                <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:14,fontWeight:600}}>{item.hypothesis}</p>
+              </div>
+            )}
+            {item.successMetric&&(
+              <div>
+                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>🎯 Success metric — what KPI determines a win?</div>
+                <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:13}}>{item.successMetric}</p>
+              </div>
+            )}
+            {/* Legacy fallback: show description if present and no new fields */}
+            {!item.observation&&!item.successMetric&&item.hypothesis&&(
+              <p style={{margin:0,color:t.textMuted,fontSize:12,fontFamily:t.mono,fontStyle:"italic"}}>Legacy entry — observation and success metric not yet captured.</p>
+            )}
+          </div>
+        ) : (
+          <p style={{margin:0,color:t.textMuted,fontStyle:"italic",fontSize:13}}>No hypothesis yet.</p>
+        )}
       </div>
 
       {item.ice&&(
@@ -1479,7 +2416,7 @@ function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResults,onL
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
             {linked.map(l=>(
               <div key={l.id} onClick={()=>onLink(l.id)} style={{background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:6,padding:"10px 14px",cursor:"pointer"}}>
-                <div style={{display:"flex",gap:5,marginBottom:4}}><CBdg cat={l.category} cats={cats} dk={dk}/><TBdg type={l.initType} dk={dk}/><SBdg s={l.status} dk={dk}/>{l.results&&<OBdg o={l.results.outcomeClassification} dk={dk}/>}<ICEChip ice={l.ice} t={t} dk={dk}/></div>
+                <div style={{display:"flex",gap:5,marginBottom:4}}><CBdg cat={l.category} cats={cats} dk={dk}/><TBdg type={l.initType} dk={dk}/><SBdg s={l.status} dk={dk}/>{l.results&&<OBdg o={l.results.outcomeClassification} dk={dk}/>}<ICEChip ice={l.ice} t={t}/></div>
                 <div style={{fontSize:13,color:t.text,fontWeight:600}}>{l.title}</div>
                 {l.results&&l.results.keyLearning&&<div style={{fontSize:12,color:t.textMuted,marginTop:3,fontStyle:"italic"}}>"{l.results.keyLearning}"</div>}
               </div>
@@ -1739,25 +2676,43 @@ function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hypReview,
 
       <FR label="Title *" t={t}><input style={gI(t)} value={form.title} onChange={e=>f("title",e.target.value)} placeholder="Clear, specific title"/></FR>
 
-      <div>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
-          <label style={{fontSize:12,color:t.textMuted,fontFamily:t.mono}}>Hypothesis</label>
-          <button style={{...gGh(t),fontSize:11,padding:"2px 9px",opacity:canAi?1:0.4}} onClick={onAi} disabled={!canAi||aiLoad} title={canAi?"Expand with AI — requires your confirmation":"Write at least 60 characters first"}>
-            {aiLoad?<><span style={{display:"inline-block",animation:"spin 1s linear infinite"}}>&#8635;</span> Expanding…</>:<><span style={{fontSize:12}}>&#10024;</span> Expand with AI</>}
-          </button>
+      <div style={gSc(t)}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+          <div style={gSL(t)}>Hypothesis framework</div>
         </div>
-        <textarea style={gTA(t)} rows={4} value={form.hypothesis} onChange={e=>f("hypothesis",e.target.value)} placeholder="Write a rough idea (60+ chars) and AI can expand it, or write the full hypothesis directly."/>
-        {!canAi&&form.hypothesis&&form.hypothesis.length>0&&form.hypothesis.length<60&&<div style={{fontSize:11,color:t.textMuted,marginTop:3,fontFamily:t.mono}}>{60-form.hypothesis.length} more chars to unlock AI expand</div>}
-        {hypReview&&(
-          <div style={{marginTop:10,padding:"12px 14px",borderRadius:6,background:dk?"#122a18":"#edfaf2",border:"1px solid "+(dk?"#2a7a40":"#7adca0")}}>
-            <div style={{fontSize:10,color:dk?"#60d080":"#1a7a48",letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:8}}>AI suggestion — review before accepting</div>
-            <p style={{margin:"0 0 12px",fontSize:13,color:t.text,lineHeight:1.7,fontStyle:"italic"}}>"{hypReview.proposed}"</p>
-            <div style={{display:"flex",gap:6}}>
-              <button onClick={onAcceptHyp} style={{...gG(t),fontSize:11,padding:"4px 11px"}}><span>&#10003;</span> Accept</button>
-              <button onClick={onRejectHyp} style={{...gGh(t),fontSize:11,padding:"4px 11px"}}><span>&#10005;</span> Discard</button>
+
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          <FR label="📊 Observation — What data or behaviour prompted this? *" t={t}>
+            <textarea style={gTA(t)} rows={2} value={form.observation||""} onChange={e=>f("observation",e.target.value)}
+              placeholder="e.g. New-visitor CVR dropped from 1.85% to 0.42% over 4 weeks following the March widget rollout. Paid social mobile traffic is the most affected segment."/>
+          </FR>
+
+          <div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+              <label style={{fontSize:12,color:t.textMuted,fontFamily:t.mono}}>💡 Hypothesis — If we do X, then Y… *</label>
+              <button style={{...gGh(t),fontSize:11,padding:"2px 9px",opacity:canAi?1:0.4}} onClick={onAi} disabled={!canAi||aiLoad} title={canAi?"Expand with AI — requires your confirmation":"Write 60+ chars in hypothesis first"}>
+                {aiLoad?<><span style={{display:"inline-block",animation:"spin 1s linear infinite"}}>&#8635;</span> Expanding…</>:<><span style={{fontSize:12}}>&#10024;</span> Expand with AI</>}
+              </button>
             </div>
+            <textarea style={gTA(t)} rows={3} value={form.hypothesis} onChange={e=>f("hypothesis",e.target.value)} placeholder="We believe that [specific change] will result in [measurable outcome] for [context], because [evidence-based reason]."/>
+            {!canAi&&form.hypothesis&&form.hypothesis.length>0&&form.hypothesis.length<60&&<div style={{fontSize:11,color:t.textMuted,marginTop:3,fontFamily:t.mono}}>{60-form.hypothesis.length} more chars to unlock AI expand</div>}
+            {hypReview&&(
+              <div style={{marginTop:10,padding:"12px 14px",borderRadius:6,background:dk?"#122a18":"#edfaf2",border:"1px solid "+(dk?"#2a7a40":"#7adca0")}}>
+                <div style={{fontSize:10,color:dk?"#60d080":"#1a7a48",letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:8}}>AI suggestion — review before accepting</div>
+                <p style={{margin:"0 0 12px",fontSize:13,color:t.text,lineHeight:1.7,fontStyle:"italic"}}>"{hypReview.proposed}"</p>
+                <div style={{display:"flex",gap:6}}>
+                  <button onClick={onAcceptHyp} style={{...gG(t),fontSize:11,padding:"4px 11px"}}><span>&#10003;</span> Accept</button>
+                  <button onClick={onRejectHyp} style={{...gGh(t),fontSize:11,padding:"4px 11px"}}><span>&#10005;</span> Discard</button>
+                </div>
+              </div>
+            )}
           </div>
-        )}
+
+          <FR label="🎯 Success metric — What KPI determines a win? *" t={t}>
+            <input style={gI(t)} value={form.successMetric||""} onChange={e=>f("successMetric",e.target.value)}
+              placeholder="e.g. New-visitor CVR recovers to ≥1.76% on paid-social mobile within 3 weeks of rollback."/>
+          </FR>
+        </div>
       </div>
 
       <div style={{display:"grid",gridTemplateColumns:brands&&brands.length>1?"1fr 1fr 1fr 1fr":"1fr 1fr 1fr",gap:10}}>
@@ -1771,6 +2726,18 @@ function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hypReview,
         <FR label="Status" t={t}><select style={gSl(t)} value={form.status} onChange={e=>f("status",e.target.value)}>{STATUSES.map(s=><option key={s}>{s}</option>)}</select></FR>
         <FR label="Primary metric" t={t}><input style={gI(t)} value={form.primaryMetric||""} onChange={e=>f("primaryMetric",e.target.value)}/></FR>
       </div>
+
+      <FR label="⚠️ Blocker" t={t}>
+        <select style={{...gSl(t), ...(form.blocker&&form.blocker!=="None"?{borderColor:"#ffd700",background:dk?"#1a1400":"#fffbe6",color:dk?"#ffd700":"#7a5800",fontWeight:700}:{})}}
+          value={form.blocker||"None"} onChange={e=>f("blocker",e.target.value)}>
+          {BLOCKERS.map(b=><option key={b}>{b}</option>)}
+        </select>
+        {form.blocker&&form.blocker!=="None"&&(
+          <div style={{marginTop:4,fontSize:11,color:dk?"#ffd700":"#8a6000",fontFamily:t.mono,fontWeight:600}}>
+            ⚠️ This initiative is flagged as blocked. It will display a warning badge in all views.
+          </div>
+        )}
+      </FR>
 
       <div style={gSc(t)}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
@@ -1899,6 +2866,44 @@ function SettingsModal({t,dk,settings,onSave,onClose}) {
             style={{...gGh(t),fontSize:11}}>+ Add retailer</button>
         </div>
         <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
+          <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:4,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>C-Suite Debate Agents</div>
+          <p style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,lineHeight:1.5,margin:"0 0 10px"}}>
+            Customise the agents that participate in the strategy debate. Edit lenses to match your industry (e.g. "Category Manager" for CPG, "Buyer Relations" for retail).
+          </p>
+          <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:8}}>
+            {(local.agents||DEFAULT_AGENTS).map((agent,i)=>(
+              <div key={agent.id} style={{padding:"10px 12px",background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:6,display:"flex",flexDirection:"column",gap:8}}>
+                <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                  <input style={{...gI(t),width:44,textAlign:"center",padding:"4px",fontSize:18,flexShrink:0}}
+                    value={agent.icon}
+                    onChange={e=>{const a=[...(local.agents||DEFAULT_AGENTS)];a[i]={...a[i],icon:e.target.value};setLocal(p=>({...p,agents:a}));}}/>
+                  <input style={{...gI(t),flex:"0 0 80px",fontWeight:700}}
+                    value={agent.label}
+                    onChange={e=>{const a=[...(local.agents||DEFAULT_AGENTS)];a[i]={...a[i],label:e.target.value};setLocal(p=>({...p,agents:a}));}}
+                    placeholder="Label"/>
+                  <div style={{width:20,height:20,borderRadius:"50%",background:agent.color,flexShrink:0,border:"2px solid "+t.border}}/>
+                  {(local.agents||DEFAULT_AGENTS).length>2&&(
+                    <button onClick={()=>setLocal(p=>({...p,agents:(p.agents||DEFAULT_AGENTS).filter((_,j)=>j!==i)}))}
+                      style={{background:"none",border:"none",color:t.textMuted,cursor:"pointer",fontSize:14,padding:"0 4px",marginLeft:"auto"}}>✕</button>
+                  )}
+                </div>
+                <input style={gI(t)} value={agent.lens}
+                  onChange={e=>{const a=[...(local.agents||DEFAULT_AGENTS)];a[i]={...a[i],lens:e.target.value};setLocal(p=>({...p,agents:a}));}}
+                  placeholder="Strategic lens (what this exec focuses on)"/>
+                <input style={{...gI(t),fontSize:11}} value={agent.blindspot}
+                  onChange={e=>{const a=[...(local.agents||DEFAULT_AGENTS)];a[i]={...a[i],blindspot:e.target.value};setLocal(p=>({...p,agents:a}));}}
+                  placeholder="Known blindspot (keeps the debate honest)"/>
+              </div>
+            ))}
+          </div>
+          <div style={{display:"flex",gap:6}}>
+            <button onClick={()=>{const newA={id:"agent-"+Date.now(),label:"New",icon:"💼",color:"#888888",lens:"",blindspot:""};setLocal(p=>({...p,agents:[...(p.agents||DEFAULT_AGENTS),newA]}));}}
+              style={{...gGh(t),fontSize:11}}>+ Add agent</button>
+            <button onClick={()=>setLocal(p=>({...p,agents:DEFAULT_AGENTS}))}
+              style={{...gGh(t),fontSize:11}}>Reset to defaults</button>
+          </div>
+        </div>
+        <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
             <div style={{fontSize:12,fontWeight:700,color:t.textSub,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Data sources</div>
             <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,background:t.border,padding:"2px 6px",borderRadius:3}}>Placeholder — coming soon</span>
@@ -1976,6 +2981,7 @@ function TriageView({items, t, dk, cats, brands, activeBrand, onDetail}) {
             {item.initId&&<span style={{fontSize:10,fontWeight:700,color:t.gold,fontFamily:t.mono,background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:3,padding:"1px 5px"}}>{item.initId}</span>}
             <SBdg2 s={item.status}/>
             {brands&&brands.length>1&&<span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono}}>{(brands.find(b=>b.id===(item.brandId||"default"))||brands[0]||{}).name}</span>}
+            <BlockerBadge blocker={item.blocker}/>
           </div>
           <div style={{fontSize:13,fontWeight:600,color:t.text,fontFamily:t.serif,marginBottom:2}}>{item.title}</div>
           {item.primaryMetric&&<div style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>{item.primaryMetric.slice(0,60)}{item.primaryMetric.length>60?"…":""}</div>}
@@ -1996,22 +3002,130 @@ function TriageView({items, t, dk, cats, brands, activeBrand, onDetail}) {
   return (
     <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:14}}>
 
-      {/* Header summary */}
-      <div style={{...gSc(t),background:t.goldBg,border:"1px solid "+t.goldBorder}}>
-        <div style={{fontSize:10,letterSpacing:"0.10em",textTransform:"uppercase",color:t.gold,fontFamily:t.mono,marginBottom:8}}>Weekly triage — {new Date().toLocaleDateString("en-CA",{weekday:"long",month:"long",day:"numeric"})}</div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(110px,1fr))",gap:12}}>
-          {[
-            {l:"Running",      v:running.length},
-            {l:"Ending this week", v:endingSoon.length+overdue.length},
-            {l:"Revenue at risk", v:fmtCur(totalAtRisk)},
-            {l:"Needs attention",  v:needsAction.length+overdue.length},
-          ].map(m=>(
-            <div key={m.l}>
-              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>{m.l}</div>
-              <div style={{fontSize:22,fontWeight:700,color:t.gold,fontFamily:t.serif}}>{m.v}</div>
+      {/* This week's focus — opinionated priority card */}
+      {(()=>{
+        // Compute the 4 signals
+        const urgentItem = [...overdue, ...endingSoon.filter(e=>{ const d=parseD(e.endDate); return d&&Math.ceil((d-today)/86400000)<=3; })]
+          .sort((a,b)=>Math.max(0,b.revenueImpact||0)-Math.max(0,a.revenueImpact||0))[0] || endingSoon[0] || null;
+
+        const longestBlocked = running
+          .filter(e=>e.blocker&&e.blocker!=="None")
+          .map(e=>{
+            // Estimate how long blocked: use startDate as proxy if no block date stored
+            const d = parseD(e.startDate);
+            const daysSince = d ? Math.floor((today-d)/86400000) : 0;
+            return {...e, daysSince};
+          })
+          .sort((a,b)=>b.daysSince-a.daysSince)[0] || null;
+
+        const bestDraft = draft
+          .filter(e=>e.ice&&e.ice.impact&&e.ice.certainty&&e.ice.ease)
+          .map(e=>({...e, iceS:Math.round(((e.ice.impact||0)*(e.ice.certainty||0)*(e.ice.ease||0)/1000)*100)}))
+          .sort((a,b)=>b.iceS-a.iceS)[0] || null;
+
+        // North star gap coverage
+        const nsGapCovered = (()=>{
+          const totalAtRisk = running.reduce((s,e)=>s+Math.max(0,e.revenueImpact||0),0);
+          const hasGap = totalAtRisk > 0;
+          return {totalAtRisk, hasGap};
+        })();
+
+        const signals = [
+          urgentItem && {
+            icon:"🔴", weight:3,
+            label: overdue.includes(urgentItem) ? "Overdue — needs a decision" : "Ending in ≤3 days",
+            text: urgentItem.title,
+            sub: urgentItem.revenueImpact>0 ? fmtCur(urgentItem.revenueImpact)+" at risk" : urgentItem.endDate ? "End: "+fmtDate(urgentItem.endDate) : null,
+            action: "Log results or extend",
+            id: urgentItem.id,
+            color: "#e07070",
+          },
+          longestBlocked && {
+            icon:"⚠️", weight:2,
+            label: "Blocked initiative",
+            text: longestBlocked.title,
+            sub: longestBlocked.blocker+(longestBlocked.revenueImpact>0?" · "+fmtCur(longestBlocked.revenueImpact)+" at risk":""),
+            action: "Resolve or escalate",
+            id: longestBlocked.id,
+            color: "#c09828",
+          },
+          bestDraft && bestDraft.iceS >= 40 && {
+            icon:"💡", weight:1,
+            label: "Highest-leverage uninitiated idea",
+            text: bestDraft.title,
+            sub: "ICE "+(bestDraft.iceS)+(bestDraft.revenueImpact>0?" · "+fmtCur(bestDraft.revenueImpact)+" potential":""),
+            action: "Consider activating",
+            id: bestDraft.id,
+            color: dk?"#3acca0":"#187860",
+          },
+        ].filter(Boolean);
+
+        // Revenue coverage signal — always show as a status line, not a card row
+        const revLine = nsGapCovered.totalAtRisk > 0
+          ? fmtCur(nsGapCovered.totalAtRisk)+" at risk across "+running.length+" running initiative"+(running.length!==1?"s":"")
+          : running.length > 0 ? running.length+" running, no revenue estimates set" : "No running initiatives";
+
+        const allClear = signals.length === 0;
+
+        return (
+          <div style={{...gSc(t), background: allClear?(dk?"#122a18":"#edfaf2"):t.surface,
+            border:"1px solid "+(allClear?(dk?"#2a7a40":"#7adca0"):t.border)}}>
+
+            {/* Header row */}
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:allClear?4:12}}>
+              <div style={{fontSize:10,letterSpacing:"0.10em",textTransform:"uppercase",
+                color:allClear?(dk?"#60d080":"#1a7a48"):t.textMuted,fontFamily:t.mono,fontWeight:700}}>
+                {new Date().toLocaleDateString("en-CA",{weekday:"long",month:"long",day:"numeric"})}
+              </div>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono}}>{revLine}</div>
             </div>
-          ))}
-        </div>
+
+            {allClear ? (
+              <div style={{fontSize:13,color:dk?"#60d080":"#1a7a48",fontFamily:t.mono}}>
+                ✓ Nothing urgent. Good week to activate a draft or run the Signal debate.
+              </div>
+            ) : (
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {signals.map((s,i)=>(
+                  <div key={i} onClick={()=>onDetail(s.id)}
+                    style={{display:"flex",alignItems:"center",gap:12,padding:"10px 13px",
+                      borderRadius:6,cursor:"pointer",
+                      background:t.surfaceAlt,border:"1px solid "+t.border,
+                      borderLeft:"3px solid "+s.color,
+                      transition:"background 0.12s"}}>
+                    <span style={{fontSize:16,flexShrink:0}}>{s.icon}</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:10,color:s.color,fontFamily:t.mono,fontWeight:700,
+                        textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:2}}>{s.label}</div>
+                      <div style={{fontSize:13,fontWeight:600,color:t.text,fontFamily:t.serif,
+                        whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{s.text}</div>
+                      {s.sub&&<div style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,marginTop:1}}>{s.sub}</div>}
+                    </div>
+                    <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,
+                      flexShrink:0,textAlign:"right",lineHeight:1.4}}>
+                      {s.action} →
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* Stats strip */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(110px,1fr))",gap:8}}>
+        {[
+          {l:"Running",          v:running.length},
+          {l:"Ending this week", v:endingSoon.length+overdue.length},
+          {l:"Revenue at risk",  v:fmtCur(totalAtRisk)},
+          {l:"Needs attention",  v:needsAction.length+overdue.length},
+        ].map(m=>(
+          <div key={m.l} style={{...gCd(t),padding:"10px 12px"}}>
+            <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:3}}>{m.l}</div>
+            <div style={{fontSize:20,fontWeight:700,color:t.gold,fontFamily:t.serif}}>{m.v}</div>
+          </div>
+        ))}
       </div>
 
       {/* Overdue */}

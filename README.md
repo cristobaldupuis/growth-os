@@ -1,82 +1,67 @@
 # Growth OS
 
-Growth OS is an experiment tracking and growth execution framework built for multi-brand ecommerce portfolios. It replaces fragmented marketing spreadsheets with a structured, system-driven operating engine — combining initiative lifecycle management, statistical rigor, AI-assisted prioritization, and an autonomous C-Suite strategy debate in a single interface.
+A growth execution framework for multi-brand ecommerce portfolios. Replaces fragmented marketing spreadsheets with a structured operating engine — combining initiative lifecycle management, statistical rigour, AI-assisted prioritisation, and an autonomous C-Suite strategy debate in a single interface.
 
 Built to demonstrate how a Director of Growth thinks about velocity, incrementality, and portfolio-level learning at scale.
 
----
-
-## 🔗 Live Environments
-
-**Launch Live Application:** https://cristobaldupuis.github.io/growth-os/
-
-**Open Interactive Code Sandbox:** StackBlitz
+**[→ Launch Live Application](https://growth-os-iota-seven.vercel.app/)**
 
 ---
 
-## 🏛 Core Features
+## What's new
 
-### Multi-Brand Portfolio Management
-- **Cross-tenant architecture** — filter the dashboard, pipeline, and learning library across multiple brands or retailers within a single workspace
-- **Knowledge cross-pollination** — the Learning Library surfaces insights from one brand and makes them replicable by other teams in the portfolio with one click
-- **Auto-generated initiative IDs** (e.g. NH-001, R2-003) scoped per brand
-
-### Performance Dashboard
-- **Capital risk and calibration engine** — tracks revenue impacted by completed tests alongside active revenue at risk, and computes a running accuracy score comparing estimated vs. actual revenue outcomes
-- **Executive update generator** — one-click synthesis of active pipeline metrics, velocity, and calibration accuracy into a formatted stakeholder update
-- **Velocity tracking** — sparkline charts and categorical breakdowns across Paid Media, Conversion, Retention, Merchandising, and more
-- **Financial hierarchy UI** — dollar amounts and financial metrics are rendered in monospaced type at a larger scale than supporting text, so executives can scan revenue impact at a glance without reading
-
-### Weekly Triage — "This Week's Focus"
-The Triage view opens with an opinionated priority card that runs silently on load and surfaces only what actually needs attention:
-
-- **Urgency signal** — the single highest-revenue-at-risk initiative that is overdue or ending within 3 days
-- **Blocker signal** — the initiative that has been blocked the longest, with the blocking dependency named
-- **Draft opportunity** — the highest-ICE uninitiated idea that's been sitting idle (only surfaces if ICE ≥ 40, to avoid noise)
-- **All-clear state** — when nothing is urgent, the card says so explicitly; the absence of urgency is also information
-- Each signal is a direct link into the initiative detail view
-
-### Structured Hypothesis Enforcer
-Every initiative is required to document its thinking in three distinct fields rather than a freeform description:
-
-- **Observation** — what data or behaviour prompted this initiative?
-- **Hypothesis** — structured as: *We believe that [X] will result in [Y] for [Z], because [W]*
-- **Success metric** — a single measurable KPI that defines a win
-
-Backwards compatible — initiatives created before this system display their legacy `description` field gracefully with a "legacy entry" label.
-
-### Resource Blocker Tagging
-- **Blocker dropdown** on every initiative: None, Waiting on Engineering, Waiting on Creative, Waiting on Merch/Inventory, Waiting on Legal, Waiting on Finance, Waiting on Leadership
-- **Visible warning badge** — blocked initiatives display a high-contrast amber `⚠️ BLOCKED: [dependency]` pill on the list card, detail view header, and triage view
-- **Full-width warning strip** in the detail view draws exec attention to operational friction immediately
-
-### ICE Scoring Engine
-- **Three-axis scoring** — Impact, Certainty, Ease on a 1–10 scale; composite score rendered as a single number (0–100)
-- **Sort by Highest ICE Score or Highest Revenue at Risk** — toggle at the top of the initiative list
-- **AI-assisted scoring** — suggest Impact and Certainty scores with written rationales based on the initiative context
-
-### Test Validity Panel
-Built directly into every Running, Completed, or Killed initiative:
-
-- **Sample size calculator** — given a baseline conversion rate and minimum detectable effect, calculates sessions needed per variant at 90% or 95% confidence using a two-proportion z-test with 80% power
-- **Statistical significance indicator** — takes live control vs. variant conversion data and shows confidence level, z-statistic, and observed uplift; warns explicitly against calling winners early
-- **Incrementality flag** — required field before marking a test Completed; forces documentation of the counterfactual so revenue claims are defensible
-
-### CSV Import / Export
-- **Export CSV** — exports the current filtered initiative view including all fields, for editing in Google Sheets or Excel
-- **Import CSV** — uploads a CSV and previews a row-by-row breakdown (new vs. update, warnings) before writing anything; matched on `initId` so updates are precise and non-destructive
-- **Google Sheets template** — [open the import template](https://docs.google.com/spreadsheets/d/1Oar4THeAKIGvvBzKUmqwfWersaUdLqqoq-FW_jBvS1E/edit) with three sheets: Template (clean input), Instructions (column reference and importer rules), and Example (five filled rows across all statuses)
-- Import handles date format normalisation (ISO, M/D/YYYY, MM/DD/YYYY), case-insensitive brand name matching, and ICE score clamping
+- **Brand briefs** — each retailer now carries a structured brief (ICP, categories, why they win, current constraint) that is injected into every AI call, making recommendations specific to your business rather than generic
+- **Two-voice learning synthesis** — the library synthesises closed initiatives across four sections: Patterns, Gaps (proven at one retailer, missing at another), Lessons, and Do Next with direct `[Retailer] → [Action] → [Why now]` recommendations
+- **Agent mandates** — C-Suite agents now have non-negotiable positions (CMO argues for investment, CFO challenges every spend assumption) creating genuine tension in the debate rather than coordinated agreement
+- **CSO rationale** — each generated initiative now includes a "Why we proceed" card resolving the champion/dissent tension with a decision, not just a note
+- **Onboarding flow** — first-run setup captures company, north star, and brand briefs before you see an empty canvas
+- **Dashboard attention nudge** — surfaces running initiatives ending within 7 days or running longer than 30 days with no close
+- **Signal AI pre-populated context** — opens with a live read of your portfolio so the first debate starts from something real
+- **Toast notifications** — all native browser alerts replaced with in-app slide-up toasts
+- **Restore backup modal** — destructive action now requires an in-app confirmation with full details of what will be overwritten
 
 ---
 
-## ✦ Signal AI — Autonomous C-Suite Strategy Debate
+## Core features
 
-Signal AI is a genuinely agentic feature: a multi-agent system where configurable C-Suite personas query your live portfolio data, debate what you're missing, and synthesise 3 net-new initiatives the team isn't currently running.
+### Multi-brand portfolio management
+Cross-tenant architecture — filter the dashboard, pipeline, and learning library across multiple retailers in a single workspace. Auto-generated initiative IDs scoped per brand (e.g. `NH-001`, `R2-003`).
+
+### Performance dashboard
+Tracks revenue impacted by completed tests, active revenue at risk, and a running calibration score comparing estimated vs. actual revenue outcomes. One-click executive summary generator for stakeholder updates.
+
+### Learning library
+Every closed initiative becomes searchable institutional memory. The AI synthesis scans across all closed initiatives and produces:
+
+- **Patterns** — recurring themes across retailers and initiative types
+- **Gaps** — tactics proven at one retailer not yet run at another, named explicitly
+- **Lessons** — what failed and why, with forward guidance
+- **Do Next** — three highest-confidence actions grounded in the evidence
+
+### Structured hypothesis enforcer
+Every initiative requires three distinct fields: **Observation** (what prompted this), **Hypothesis** (We believe that X will result in Y for Z, because W), and **Success metric** (single measurable KPI).
+
+### ICE scoring engine
+Impact, Certainty, Ease on a 1–10 scale. AI-assisted scoring suggests Impact and Certainty with written rationales. Sort by highest ICE or highest revenue at risk.
+
+### Test validity panel
+Built into every running or completed initiative: sample size calculator, statistical significance indicator with z-statistic and observed uplift, and a required incrementality/counterfactual field before marking a test complete.
+
+### CSV import / export
+Row-by-row preview before writing. Matched on `initId` for non-destructive updates. Handles date format normalisation, case-insensitive brand matching, and ICE clamping. Google Sheets template included.
+
+### Weekly pulse
+Log or import weekly metrics per brand and source (manual, Meta, GA4, Google Ads, Klaviyo). WoW delta calculated automatically. Feeds live metrics into every AI call.
+
+---
+
+## ✦ Signal AI — Autonomous C-Suite strategy debate
+
+A multi-agent system where configurable C-Suite personas query your live portfolio data, debate what you're missing, and synthesise 3 net-new initiatives the team isn't currently running.
 
 ### How it works
 
-**Tool use (agentic).** Each agent has access to 8 read-only tools that query live portfolio data mid-reasoning — not a pre-built snapshot:
+Each agent runs an agentic tool-calling loop — it decides what data it needs before forming an opinion, chaining multiple calls before responding.
 
 | Tool | What it returns |
 |---|---|
@@ -89,91 +74,89 @@ Signal AI is a genuinely agentic feature: a multi-agent system where configurabl
 | `get_blocked_initiatives` | All blocked initiatives with dependency named |
 | `get_revenue_gap_analysis` | Gap between north star current and target vs. running initiative coverage |
 
-Each agent runs an agentic loop — it can chain multiple tool calls before responding, deciding what data it needs before forming an opinion.
+**Dynamic moderator** — after each turn, a Moderator reads the transcript and decides: continue, fire a targeted follow-up to resolve a specific tension, or call synthesis. Actively looks for unresolved disagreements between agents before allowing consensus.
 
-**Dynamic Moderator.** After each turn, a Moderator agent reads the transcript and decides: continue to the next agent, fire a targeted follow-up question at a specific agent to resolve a tension, or call synthesis early when the debate has converged. Capped at 8 turns.
+**Agent mandates** — each agent has a non-negotiable position hardcoded into their system prompt. CMO argues for investment even against weak data. CFO challenges every spend assumption and asks for the downside. CGO anchors every argument to the north star gap.
 
-**Synthesis.** A Chief Strategy Officer persona reads the full debate plus a data appendix (win rates, failures, coverage) and produces 3 structured initiatives, each with: champion agent, dissenting voice and their specific objection, and an honest one-liner on why this gap exists in the portfolio.
+**Synthesis** — a Chief Strategy Officer reads the full debate and data appendix, resolves tensions rather than noting them, and produces 3 structured initiatives each with: championed by, dissenting voice with their specific objection, and a CSO rationale for why to proceed despite the dissent.
 
-**Output format.** Each generated initiative matches the full initiative data structure — observation, hypothesis, success metric, ICE scores, kill criteria, category, type, and estimated revenue — and can be injected directly into the Growth Backlog with one click.
-
-**Debate history.** Every completed debate is saved (up to 20) and accessible in the "Past Debates" tab, with the full transcript and quick-add buttons for each initiative.
+**Output** — each initiative matches the full data structure and can be added to the backlog with one click.
 
 ### Configurable agents
 
-The C-Suite composition is fully editable in ⚙ Settings — icon, label, strategic lens, and known blindspot. Default agents:
+Fully editable in Settings — icon, label, strategic lens, and known blindspot.
 
 | Agent | Lens | Blindspot |
 |---|---|---|
 | CMO 📣 | Brand, acquisition, channel mix, creative | Underweights unit economics |
-| CFO 📊 | Contribution margin, CAC payback, pricing | Underweights long-term LTV compounding |
+| CFO 📊 | Contribution margin, CAC payback, pricing | Underweights long-term LTV |
 | CGO 🚀 | LTV, retention, subscription, referral loops | Underweights operational complexity |
-| COO ⚙️ | Inventory, fulfilment, shelf-life, scalability | Underweights brand equity trade-offs |
+| COO ⚙️ | Inventory, fulfilment, shelf-life, scalability | Underweights brand equity |
 
-Custom agent configurations persist in settings — a CSC deployment might use "Category Manager" and "Buyer Relations" instead of CFO and CGO.
+Custom configurations persist in settings — a retail deployment might use "Category Manager" and "Buyer Relations" instead.
 
-### Situation context
-
-A free-text input at the top of the panel injects real-time context into every agent's system prompt before the debate begins. Examples:
-
-> "Black Friday is 8 weeks out and we're over-indexed on single-serve SKUs"
-> "Gross margin compressed 4pts this quarter"
-> "A key competitor just launched a subscription tier"
+### Approximate API cost
+$0.25–0.35 per debate (claude-sonnet-4-6, ~40,000 tokens across 8 agent turns, moderator calls, and synthesis).
 
 ---
 
-## 🤖 AI Optimization Toolkit (BYOK)
+## AI toolkit
 
-Built with a Bring-Your-Own-Key architecture — API key is stored in local browser memory only, never transmitted to any third party. Requires an Anthropic API key from [console.anthropic.com](https://console.anthropic.com).
+All AI features run through a server-side proxy — your API key is never exposed to the browser.
 
 | Feature | What it does |
 |---|---|
-| **Quick Capture** | Converts a rough plain-language idea into a fully structured initiative form |
-| **Hypothesis Expansion** | Takes a rough hypothesis (60+ chars) and rewrites it to the structured format with AI; requires user review before accepting |
-| **ICE Scoring Assist** | Evaluates initiative context and suggests Impact and Certainty scores with written rationales |
-| **Learning Synthesis** | Scans all closed initiatives in the filtered view and generates cross-retailer patterns, failure modes, and replication signals |
-| **✦ Signal AI** | Autonomous C-Suite debate — see above |
-
-Approximate API cost per Signal AI debate: **$0.25–0.35** (claude-sonnet-4, ~40,000 tokens across 8 agent turns, 6 moderator calls, 1 synthesis).
+| Quick Capture | Converts a rough plain-language idea into a fully structured initiative |
+| Hypothesis Expansion | Rewrites a draft hypothesis to the structured format; requires review before accepting |
+| ICE Scoring Assist | Suggests Impact and Certainty scores with written rationales |
+| Learning Synthesis | Scans all closed initiatives and produces Patterns, Gaps, Lessons, Do Next |
+| Signal AI | Autonomous C-Suite debate — see above |
 
 ---
 
-## 🛠 Technology Stack
+## Brand briefs
+
+Each retailer carries a structured brief injected into every AI call:
+
+- **What they sell** — category, price point, hero SKUs
+- **Categories** — comma-separated product categories
+- **ICP** — who buys, demographics, purchase behaviour
+- **Why they win** — actual differentiator vs. alternatives
+- **Relationship** — own brand, wholesale, marketplace
+- **Current constraint** — what's holding this retailer back
+
+This is what makes recommendations specific — instead of "test SMS cart recovery at Retailer 2," the agent reasons about their specific buyer's consideration window and adjusts the mechanic accordingly.
+
+---
+
+## Technology stack
 
 | Layer | Detail |
 |---|---|
 | Runtime | React 18 / Vite |
-| Design | Sand/charcoal enterprise palette; `system-ui` sans-serif body; `ui-monospace` for all financial figures, dates, and tags; shadow-based card depth; light and dark mode |
+| Hosting | Vercel (frontend + serverless API proxy) |
+| Design | Sand/charcoal enterprise palette; serif body; monospace for all financial figures, dates, and tags; light and dark mode |
 | State persistence | Environment-agnostic: `window.storage` (Claude artifacts), `localStorage` (browser/production), in-memory fallback |
-| AI | Anthropic Claude API via BYOK — `claude-sonnet-4-20250514` with tool use for agentic features |
-| Data I/O | CSV import/export with `data:` URI generation; Google Sheets template |
+| AI | Anthropic Claude API via server-side proxy — `claude-sonnet-4-6` with tool use for agentic features |
+| Data I/O | CSV import/export; JSON backup/restore; Google Sheets template |
 
 ---
 
-## 🚀 Local Development
+## Local development
 
 Requires Node.js.
 
 ```bash
-# Clone the repository
 git clone https://github.com/cristobaldupuis/growth-os.git
-
-# Navigate into the directory
 cd growth-os
-
-# Install dependencies
 npm install
-
-# Start the development server
 npm run dev
 ```
 
-Open http://localhost:5173/ in your browser. Click the ⚙ icon to configure your workspace and add your Anthropic API key to enable AI features.
+Open `http://localhost:5173/`. Click ⚙ Settings to configure your workspace, add your Anthropic API key, and fill in your brand briefs to activate context-aware AI recommendations.
 
 ---
 
-## 👤 Author
+## Author
 
-Designed and built by Cristobal Dupuis.
-
-Portfolio: [cristobaldupuis.com](https://cristobaldupuis.com)
+Designed and built by [Cristobal Dupuis](https://cristobaldupuis.com).

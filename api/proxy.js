@@ -2,7 +2,7 @@
 // Sits between Growth OS and Anthropic so the API key never touches the browser.
 // Protection: shared secret header + per-IP rate limiting.
 
-const ALLOWED_ORIGIN = "https://growth-os.vercel.app";
+const ALLOWED_ORIGIN = "https://growth-os-iota-seven.vercel.app";
 const ANTHROPIC_API  = "https://api.anthropic.com/v1/messages";
 
 // Rate limit: max requests per window per IP

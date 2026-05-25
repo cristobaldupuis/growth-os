@@ -2364,7 +2364,7 @@ function WeeklyPulseSection({t, dk, settings, brands, weeklyMetrics, onLog, onIm
   // Build a summary table: brands × latest week metrics (revenue, spend, roas)
   const summaryRows = brands.map(b => {
     const brandId = b.id;
-    const latestEntries = sorted.filter(m => (m.brand === brandId || (brandId==="default"&&(!m.brand||m.brand==="default"))));
+    const latestEntries = sorted.filter(m => m.brand === brandId || m.brand === b.name || (brandId==="default"&&(!m.brand||m.brand==="default")));
     const latestEntry = latestEntries[0];
     const prevEntry = latestEntries.find(m => m.date < (latestEntry?.date||""));
 

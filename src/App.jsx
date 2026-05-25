@@ -334,7 +334,7 @@ async function callExpandHypothesis(rough, title, settings, dataCtx) {
   ].join(" ");
   const resp = await fetch(PROXY_URL, {
     method:"POST", headers:AI_HEADERS(),
-    body:JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:300, system:sys,
+    body:JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:300, system:sys,
       messages:[{role:"user", content:"Title: "+(title||"none")+". Rough idea: "+rough}] }),
   });
   const data = await resp.json();
@@ -354,7 +354,7 @@ async function callSynthesiseLearnings(learnings, settings) {
   ].join(" ");
   const resp = await fetch(PROXY_URL, {
     method:"POST", headers:AI_HEADERS(),
-    body:JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:600, system:sys,
+    body:JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:600, system:sys,
       messages:[{role:"user", content:"Learnings to synthesise:\n"+lines}] }),
   });
   const data = await resp.json();
@@ -383,7 +383,7 @@ async function callSuggestICE(form, settings, dataCtx) {
   ].join(". ");
   const resp = await fetch(PROXY_URL, {
     method:"POST", headers:AI_HEADERS(),
-    body:JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:400, system:sys,
+    body:JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:400, system:sys,
       messages:[{role:"user", content:user}] }),
   });
   const data = await resp.json();
@@ -405,7 +405,7 @@ async function callQuickCapture(description, settings, cats, initTypes) {
   ].join(" ");
   const resp = await fetch(PROXY_URL, {
     method:"POST", headers:AI_HEADERS(),
-    body:JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:600, system:sys,
+    body:JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:600, system:sys,
       messages:[{role:"user", content:"Rough idea: "+description}] }),
   });
   const data = await resp.json();
@@ -669,7 +669,7 @@ Max 180 words per turn. No filler. Speak like a real board-room executive.`;
     const resp = await fetch(PROXY_URL, {
       method:"POST", headers:AI_HEADERS(),
       body: JSON.stringify({
-        model:"claude-sonnet-4-20250514", max_tokens:600, system:sys,
+        model:"claude-sonnet-4-6", max_tokens:600, system:sys,
         tools: portfolioTools.definitions,
         messages: currentMessages,
       }),
@@ -741,7 +741,7 @@ Rules:
   const resp = await fetch(PROXY_URL, {
     method:"POST", headers:AI_HEADERS(),
     body: JSON.stringify({
-      model:"claude-sonnet-4-20250514", max_tokens:300, system:sys,
+      model:"claude-sonnet-4-6", max_tokens:300, system:sys,
       messages:[{role:"user", content:`Portfolio:\n${portfolioCtx}\n\nContext:\n${userContext||"none"}\n\nTranscript so far:\n${transcriptStr}\n\nDecide what happens next.`}],
     }),
   });
@@ -792,7 +792,7 @@ Return ONLY a valid JSON array of exactly 3 objects. No markdown, no preamble:
   const resp = await fetch(PROXY_URL, {
     method:"POST", headers:AI_HEADERS(),
     body: JSON.stringify({
-      model:"claude-sonnet-4-20250514", max_tokens:3500, system:sys,
+      model:"claude-sonnet-4-6", max_tokens:3500, system:sys,
       messages:[{role:"user", content:
         `Portfolio:\n${portfolioCtx}${dataAppendix}\n\nContext:\n${userContext||"None."}\n\nDebate:\n${transcriptStr}\n\nSynthesize the 3 highest-impact net-new initiatives.`
       }],

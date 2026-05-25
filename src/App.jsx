@@ -35,6 +35,51 @@ const store = (() => {
 })();
 const DEFAULT_AGENTS = CONFIG_AGENTS;
 
+// Default brand briefs — injected into existing brands that don't yet have brief fields.
+// Keyed by lowercase brand name for fuzzy matching.
+const DEFAULT_BRAND_BRIEFS = {
+  "northcove home": {
+    whatTheySell:  "Premium home décor and lifestyle products, $80–$300 AOV",
+    categories:    "Home decor, Gifting, Candles, Textiles",
+    icp:           "Women 28–48, considered purchase, gifting occasions and self-treat, high design sensitivity",
+    whyTheyWin:    "Strong visual brand identity, high repeat LTV, emotional purchase driver — aspiration over utility",
+    relationship:  "Own DTC brand — full control over pricing, creative, and customer experience",
+    constraint:    "CAC rising on paid social, creative refresh cadence is the primary ROAS lever",
+  },
+  "retailer 1": {
+    whatTheySell:  "Mid-premium lifestyle and home accessories, $50–$200 AOV",
+    categories:    "Home accessories, Gifting, Candles, Seasonal",
+    icp:           "Women 25–45, deal-aware but brand-loyal, mix of gifting and self-purchase",
+    whyTheyWin:    "Strong loyalty base, broad SKU range, good replenishment behaviour on consumable SKUs",
+    relationship:  "Wholesale / retail partner — shared margin, limited creative control, strong buyer relationship",
+    constraint:    "Margin compression from freight and promo dependency, free shipping threshold sensitivity",
+  },
+  "retailer 2": {
+    whatTheySell:  "Accessible home and lifestyle range, $40–$150 AOV",
+    categories:    "Home decor, Accessories, Seasonal, Gifting",
+    icp:           "Broad female demographic 24–50, price-conscious, discovery-driven, impulse and gifting",
+    whyTheyWin:    "Wide reach, high traffic volume, good basket size when cross-sell is activated",
+    relationship:  "Wholesale / retail partner — high volume, lower margin, category manager relationship",
+    constraint:    "Low CVR vs category benchmark, PDP experience needs improvement, limited personalisation capability",
+  },
+};
+
+// Merge brief defaults into a brand object if fields are missing
+function applyBrandBriefDefaults(brand) {
+  const key = (brand.name||"").toLowerCase().trim();
+  const defaults = DEFAULT_BRAND_BRIEFS[key];
+  if (!defaults) return brand;
+  return {
+    ...brand,
+    whatTheySell:  brand.whatTheySell  || defaults.whatTheySell  || "",
+    categories:    brand.categories    || defaults.categories    || "",
+    icp:           brand.icp           || defaults.icp           || "",
+    whyTheyWin:    brand.whyTheyWin    || defaults.whyTheyWin    || "",
+    relationship:  brand.relationship  || defaults.relationship  || "",
+    constraint:    brand.constraint    || defaults.constraint    || "",
+  };
+}
+
 const DEFAULT_SETTINGS = {
   companyName:      COMPANY_NAME,
   businessModel:    BUSINESS_MODEL,
@@ -43,7 +88,7 @@ const DEFAULT_SETTINGS = {
   northStarTarget:  NORTH_STAR_TARGET,
   categories:       CATEGORIES,
   dataSources:      [],
-  brands:           CONFIG_BRANDS,
+  brands:           (CONFIG_BRANDS||[]).map(applyBrandBriefDefaults),
   agents:           DEFAULT_AGENTS,
 };
 
@@ -343,18 +388,29 @@ async function callExpandHypothesis(rough, title, settings, dataCtx) {
 
 async function callSynthesiseLearnings(learnings, settings) {
   const lines = learnings.map((l,i)=>String(i+1)+". ["+l.outcome+"]["+l.category+"]["+l.retailer+"] "+l.learning).join("\n");
+  const retailers = [...new Set(learnings.map(l=>l.retailer))].join(", ");
   const sys = [
-    "You are a growth strategist analysing learnings from "+settings.companyName+".",
-    "Given a list of initiative learnings (with outcome, category, and retailer labels), produce a concise synthesis.",
-    "Structure your response with these sections:",
-    "PATTERNS: 2-3 recurring themes across multiple learnings (what keeps working or failing).",
-    "CROSS-RETAILER SIGNALS: any learning from one retailer that should be tested at another.",
-    "WATCH OUT: 1-2 failure patterns or repeated mistakes the team should avoid.",
-    "Keep each section to 2-4 bullet points maximum. Be specific and direct. No generic advice.",
+    "You are synthesising completed initiative learnings for "+settings.companyName+", a "+settings.businessModel+" business. Active retailers: "+retailers+".",
+    "All initiatives are closed. Your job is to turn this evidence into a clear picture of what worked, what gaps exist, what not to repeat, and what to do next.",
+    "Respond in exactly four sections:",
+    "",
+    "PATTERNS",
+    "2-3 recurring themes across the closed initiatives. Look across retailers and initiative types — if a mechanic appears at multiple retailers or in multiple categories, call it out explicitly. Name the mechanism, not just the outcome.",
+    "",
+    "GAPS",
+    "Where is a result proven at one retailer but not yet run at another? Format each gap as: [Tactic] is proven at [Retailer A] — not yet tested at [Retailer B/C]. Only include gaps with real evidence behind them.",
+    "",
+    "LESSONS",
+    "1-2 things that failed and why, framed as forward guidance: what specifically to avoid next time and what to do instead. Write in past tense — these are closed initiatives.",
+    "",
+    "DO NEXT",
+    "The 3 highest-confidence actions to run now, based strictly on the evidence in these learnings. Format each as: [Retailer] → [Specific action] → [Why the evidence supports this]. No hedging. Gaps from the GAPS section are automatic candidates.",
+    "",
+    "Keep bullets tight. No generic advice. Be specific about retailers, mechanics, and expected outcomes where the data supports it.",
   ].join(" ");
   const resp = await fetch(PROXY_URL, {
     method:"POST", headers:AI_HEADERS(),
-    body:JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:600, system:sys,
+    body:JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:1200, system:sys,
       messages:[{role:"user", content:"Learnings to synthesise:\n"+lines}] }),
   });
   const data = await resp.json();
@@ -627,10 +683,27 @@ function buildPortfolioContext(items, settings, brands, activeBrand, weeklyMetri
     metricsBlock = "\nLIVE METRICS: Not yet logged — agents should note data is manually estimated only.";
   }
 
+  // Build brand briefs block
+  const briefedBrands = (brands||[]).filter(b =>
+    b.whatTheySell || b.categories || b.icp || b.whyTheyWin || b.relationship || b.constraint
+  );
+  const brandBriefsBlock = briefedBrands.length > 0
+    ? "\nBRAND BRIEFS:\n" + briefedBrands.map(b => {
+        const lines = [`  [${b.name}]`];
+        if (b.whatTheySell)  lines.push(`    What they sell: ${b.whatTheySell}`);
+        if (b.categories)    lines.push(`    Categories: ${b.categories}`);
+        if (b.icp)           lines.push(`    ICP: ${b.icp}`);
+        if (b.whyTheyWin)    lines.push(`    Why they win: ${b.whyTheyWin}`);
+        if (b.relationship)  lines.push(`    Relationship: ${b.relationship}`);
+        if (b.constraint)    lines.push(`    Current constraint: ${b.constraint}`);
+        return lines.join("\n");
+      }).join("\n")
+    : "";
+
   return `COMPANY: ${settings.companyName} | ${settings.businessModel}
 NORTH STAR: ${settings.northStarMetric} | Now: ${settings.northStarCurrent} → Target: ${settings.northStarTarget}
 PORTFOLIO: ${summary.running} running | ${summary.draft} draft | ${summary.blocked_count} blocked | Win rate: ${summary.win_rate} | Avg ICE: ${summary.avg_ice}
-REVENUE AT RISK: ${summary.revenue_at_risk}
+REVENUE AT RISK: ${summary.revenue_at_risk}${brandBriefsBlock}
 
 RUNNING:
 ${runStr}
@@ -644,15 +717,26 @@ UNCOVERED CATEGORIES (zero initiatives): ${gapCats||"none"}${metricsBlock}`.trim
 // Single agent turn with tool use — agentic: agent decides what data to fetch
 async function callAgentTurn(agent, portfolioCtx, userContext, messageHistory, portfolioTools, isFirstTurn) {
 
+  const mandates = {
+    "CMO":  "Your mandate: argue for investment in growth and acquisition even when the data is early or mixed. You believe underinvestment is a bigger risk than overspend. Push back hard on anyone who says 'wait for more data' or 'protect margin first'.",
+    "CFO":  "Your mandate: protect margin and challenge every spend assumption. You do not accept revenue projections at face value. Ask who is accountable for the number, what the downside looks like, and whether the same capital has a better home elsewhere.",
+    "CGO":  "Your mandate: the north star gap is your only scorecard. Every proposal must be evaluated on whether it closes that gap within the horizon. You will kill debates about tactics that don't move the number, and accelerate anything that does.",
+    "CRO":  "Your mandate: pipeline and retention are the only levers that matter. You are sceptical of brand and awareness plays. You want to know the conversion path from any proposed initiative before you'll support it.",
+    "CPO":  "Your mandate: product and experience are the moat. You push back on quick-win tactics that erode the customer experience or create technical debt. You champion initiatives that compound over time, not one-off lifts.",
+  };
+  const agentMandate = mandates[agent.label] || "Your mandate: represent your strategic lens forcefully and push back on anything that conflicts with it.";
+
   const sys = `You are the ${agent.label} (${agent.icon}) in a C-Suite strategy debate about what this company should be doing that it currently isn't.
 
 Your strategic lens: ${agent.lens}.
-Your known blindspot (acknowledge it when honest to do so): ${agent.blindspot}.
+Your known blindspot (acknowledge it if relevant): ${agent.blindspot}.
+${agentMandate}
 
 You have access to tools that query the live portfolio data. Use them before forming opinions — don't guess at data you can look up.
-Be direct, commercially specific, and reference actual initiatives by name. Push back on other executives when their proposals conflict with your lens.
-Your goal: surface HIGH-IMPACT net-new opportunities the team is NOT currently running.
-Max 180 words per turn. No filler. Speak like a real board-room executive.`;
+Be direct, commercially specific, and reference actual initiatives by name.
+When you disagree with another executive, state exactly what they got wrong and why — don't soften it.
+Your goal: surface HIGH-IMPACT net-new opportunities the team is NOT currently running, and defend your position under challenge.
+Max 180 words per turn. No filler. Speak like a real boardroom executive who has a point of view and will fight for it.`;
 
   const firstUserMsg = `Portfolio snapshot:\n${portfolioCtx}\n\nSituation context:\n${userContext||"None provided."}\n\nOpen the debate. Use your tools to look deeper at anything in the portfolio that concerns you, then make your case for what's being overlooked.`;
 
@@ -733,10 +817,12 @@ Return ONLY a JSON object (no markdown) with this structure:
 }
 
 Rules:
-- "continue": normal next turn, rotate to an agent who hasn't spoken recently
-- "followup": a specific unresolved tension or challenge needs addressing before moving on — direct a question at one agent
-- "synthesise": the debate has surfaced enough distinct perspectives and is ready to close (use after turn 4 minimum, or when all agents have spoken and consensus is emerging)
-- Force "synthesise" if turnCount >= ${maxTurns - 1}`;
+- "continue": normal next turn, rotate to an agent who hasn't spoken recently or who has a mandate-driven reason to weigh in
+- "followup": USE THIS when two agents have taken opposing positions — force the challenged agent to respond directly. The followup_prompt must name the specific claim being contested, e.g. "The CFO said your revenue projection is unsupported — respond to that specific objection." Use followup aggressively in turns 2-5 to generate real tension before synthesising.
+- "synthesise": the debate has surfaced genuine opposing positions, key tensions have been directly contested, and you have enough signal to produce differentiated initiatives. Do not synthesise if agents have only agreed with each other.
+- Force "synthesise" if turnCount >= ${maxTurns - 1}
+
+Priority: favour "followup" over "continue" whenever there is an unresolved disagreement in the transcript. Consensus too early produces generic output.`;
 
   const resp = await fetch(PROXY_URL, {
     method:"POST", headers:AI_HEADERS(),
@@ -765,28 +851,32 @@ async function callDebateSynthesis(portfolioCtx, userContext, transcript, cats, 
   const transcriptStr = transcript.map(m=>`${m.icon} ${m.label}:\n${m.text}`).join("\n\n---\n\n");
 
   const sys = `You are a Chief Strategy Officer synthesising a C-Suite debate into net-new growth initiatives.
+
+Your job is not to summarise the debate — it is to resolve it. Where executives disagreed, you must take a position and explain why you're proceeding despite the objection. Where they agreed, scrutinise whether consensus was earned or just convenient.
+
 Rules:
-- These must be NET NEW — not already in the active or draft pipeline.
-- Ground each in specific signals from the debate and data.
-- Rank by expected impact, highest first.
-- Capture who championed it and who dissented so the exec team sees the risk surface.
-- Be brutally specific — no generic advice.
+- NET NEW only — not already in the active or draft pipeline.
+- Each initiative must be grounded in specific data from the portfolio tools, not just debate rhetoric.
+- The championedBy and dissentVoice fields are not decorative — they are the executive summary. A CGO reading this card should immediately understand who is accountable, who is skeptical, and why you're proceeding anyway.
+- Rank by expected impact on the north star metric, highest first.
+- Be brutally specific. Dollar estimates must be grounded in actual portfolio win rates and revenue figures from the data.
 
 Return ONLY a valid JSON array of exactly 3 objects. No markdown, no preamble:
 {
   "title": "concise specific title (max 12 words)",
-  "observation": "2-3 sentences grounded in the portfolio data that justify this",
+  "observation": "2-3 sentences grounded in the portfolio data and debate that justify this — cite specific numbers where available",
   "hypothesis": "We believe that [specific change] will result in [measurable outcome] for [context], because [evidence from debate/data].",
   "successMetric": "single measurable KPI that defines a win",
   "primaryMetric": "short label",
-  "killCriteria": "specific stop/pivot condition",
+  "killCriteria": "specific stop/pivot condition with a number",
   "category": "one of: ${cats.join(", ")}",
   "initType": "one of: ${INIT_TYPES.join(", ")}",
   "ice": { "impact": <1-10>, "certainty": <1-10>, "ease": <1-10> },
-  "revenueImpact": <integer dollar estimate>,
-  "championedBy": "<agent label> — <one sentence why they pushed for this>",
-  "dissentVoice": "<agent label who pushed back> — <their specific objection>",
-  "whyNotAlreadyRunning": "honest one-sentence on why this gap exists in the portfolio"
+  "revenueImpact": <integer dollar estimate grounded in portfolio data>,
+  "championedBy": "<agent label> — <specifically what data or argument drove them to push for this>",
+  "dissentVoice": "<agent label> — <their specific objection and the number or risk they cited>",
+  "whyNotAlreadyRunning": "honest one-sentence on why this gap exists — be specific, not generic",
+  "csoRationale": "one sentence: why you're proceeding despite the dissent — this is your call as CSO"
 }`;
 
   const resp = await fetch(PROXY_URL, {
@@ -936,6 +1026,205 @@ function Modal({t,dk,onClose,children,title,wide}) {
 }
 
 // -- App -----------------------------------------------------------------------
+// ── Onboarding Modal ────────────────────────────────────────────────────────
+function OnboardingModal({ t, dk, settings, onSave, onSkip }) {
+  const [step, setStep]   = useState(0);
+  const [data, setData]   = useState({
+    companyName:      settings.companyName      || "",
+    businessModel:    settings.businessModel    || "",
+    northStarMetric:  settings.northStarMetric  || "",
+    northStarCurrent: settings.northStarCurrent || "",
+    northStarTarget:  settings.northStarTarget  || "",
+  });
+  const [brands, setBrands] = useState(
+    (settings.brands||[]).map(b=>({...b,
+      whatTheySell: b.whatTheySell||"",
+      categories:   b.categories||"",
+      icp:          b.icp||"",
+      whyTheyWin:   b.whyTheyWin||"",
+      relationship: b.relationship||"",
+      constraint:   b.constraint||"",
+    }))
+  );
+  const f = (k,v) => setData(p=>({...p,[k]:v}));
+  const fb = (i,k,v) => setBrands(bs => { const n=[...bs]; n[i]={...n[i],[k]:v}; return n; });
+
+  const STEPS = [
+    {
+      id: "company",
+      title: "Your company",
+      subtitle: "This personalises every AI output — hypotheses, debates, synthesis.",
+      fields: (
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          <div>
+            <label style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:4}}>Company name</label>
+            <input style={gI(t)} value={data.companyName} onChange={e=>f("companyName",e.target.value)}
+              placeholder="e.g. Northcove Home" autoFocus/>
+          </div>
+          <div>
+            <label style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:4}}>Business model</label>
+            <input style={gI(t)} value={data.businessModel} onChange={e=>f("businessModel",e.target.value)}
+              placeholder="e.g. Multi-retailer DTC, eCommerce brand, SaaS, Marketplace"/>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "northstar",
+      title: "Your north star",
+      subtitle: "The single metric everything should move. Agents will anchor every debate to the gap.",
+      fields: (
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          <div>
+            <label style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:4}}>Metric name</label>
+            <input style={gI(t)} value={data.northStarMetric} onChange={e=>f("northStarMetric",e.target.value)}
+              placeholder="e.g. Portfolio Revenue, Monthly Recurring Revenue, GMV"/>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            <div>
+              <label style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:4}}>Current value</label>
+              <input style={gI(t)} value={data.northStarCurrent} onChange={e=>f("northStarCurrent",e.target.value)}
+                placeholder="e.g. $1.1M/mo"/>
+            </div>
+            <div>
+              <label style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:4}}>Target value</label>
+              <input style={gI(t)} value={data.northStarTarget} onChange={e=>f("northStarTarget",e.target.value)}
+                placeholder="e.g. $1.4M/mo"/>
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "brands",
+      title: "Your brands & retailers",
+      subtitle: "This is what makes AI recommendations specific to your business — not generic advice.",
+      fields: (
+        <div style={{display:"flex",flexDirection:"column",gap:10,maxHeight:320,overflowY:"auto",paddingRight:4}}>
+          {brands.map((b,i)=>(
+            <div key={b.id} style={{padding:"10px 12px",background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:6,display:"flex",flexDirection:"column",gap:8}}>
+              <div style={{fontSize:12,fontWeight:700,color:t.text,fontFamily:t.serif}}>{b.name}</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+                <div>
+                  <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:2}}>WHAT THEY SELL</label>
+                  <input style={{...gI(t),fontSize:11}} value={b.whatTheySell} onChange={e=>fb(i,"whatTheySell",e.target.value)} placeholder="e.g. Premium home décor, $80–$300 AOV"/>
+                </div>
+                <div>
+                  <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:2}}>CATEGORIES</label>
+                  <input style={{...gI(t),fontSize:11}} value={b.categories} onChange={e=>fb(i,"categories",e.target.value)} placeholder="e.g. Home decor, Gifting, Candles"/>
+                </div>
+                <div>
+                  <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:2}}>ICP</label>
+                  <input style={{...gI(t),fontSize:11}} value={b.icp} onChange={e=>fb(i,"icp",e.target.value)} placeholder="e.g. Women 28–45, gifting buyers"/>
+                </div>
+                <div>
+                  <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:2}}>WHY THEY WIN</label>
+                  <input style={{...gI(t),fontSize:11}} value={b.whyTheyWin} onChange={e=>fb(i,"whyTheyWin",e.target.value)} placeholder="e.g. Visual brand, strong LTV"/>
+                </div>
+                <div>
+                  <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:2}}>RELATIONSHIP</label>
+                  <input style={{...gI(t),fontSize:11}} value={b.relationship} onChange={e=>fb(i,"relationship",e.target.value)} placeholder="e.g. Own DTC, wholesale, marketplace"/>
+                </div>
+                <div>
+                  <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:2}}>CURRENT CONSTRAINT</label>
+                  <input style={{...gI(t),fontSize:11}} value={b.constraint} onChange={e=>fb(i,"constraint",e.target.value)} placeholder="e.g. Rising CAC, thin margin"/>
+                </div>
+              </div>
+            </div>
+          ))}
+          {brands.length===0&&<div style={{fontSize:12,color:t.textMuted,fontFamily:t.mono,padding:"12px 0"}}>No brands configured — add them in Settings after setup.</div>}
+        </div>
+      ),
+    },
+    {
+      id: "done",
+      title: "You're set up",
+      subtitle: "Your portfolio is ready. Add your first initiative, import a CSV, or let Signal AI analyse your current state.",
+      fields: (
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {[
+            { icon:"⚡", label:"Quick capture", desc:"Paste any idea — AI structures it into an initiative" },
+            { icon:"✦",  label:"Signal AI",     desc:"C-Suite debate that queries your live portfolio and recommends what to run next" },
+            { icon:"📚", label:"Library",        desc:"Every completed initiative becomes searchable institutional memory" },
+          ].map(({icon,label,desc})=>(
+            <div key={label} style={{display:"flex",gap:12,alignItems:"flex-start",padding:"10px 12px",
+              background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:6}}>
+              <span style={{fontSize:18,flexShrink:0,marginTop:1}}>{icon}</span>
+              <div>
+                <div style={{fontSize:13,fontWeight:700,color:t.text,fontFamily:t.serif,marginBottom:2}}>{label}</div>
+                <div style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,lineHeight:1.5}}>{desc}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ),
+    },
+  ];
+
+  const currentStep = STEPS[step];
+  const isLast = step === STEPS.length - 1;
+  const progress = ((step) / (STEPS.length - 1)) * 100;
+
+  const handleNext = () => {
+    if (isLast) {
+      onSave(data, brands);
+    } else {
+      setStep(s => s + 1);
+    }
+  };
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+      <div style={{background:t.surface,border:"1px solid "+t.border,borderRadius:12,width:"100%",maxWidth:480,
+        boxShadow:"0 20px 60px rgba(0,0,0,0.25)",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+
+        {/* Header */}
+        <div style={{padding:"20px 24px 0",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+          <div>
+            <div style={{fontSize:10,fontFamily:t.mono,color:t.gold,letterSpacing:"0.10em",textTransform:"uppercase",marginBottom:6}}>
+              Growth OS {step < STEPS.length - 1 ? `· Step ${step+1} of ${STEPS.length - 1}` : "· Ready"}
+            </div>
+            <div style={{fontSize:20,fontWeight:700,color:t.text,fontFamily:t.serif,lineHeight:1.2}}>{currentStep.title}</div>
+          </div>
+          <button onClick={onSkip} style={{background:"transparent",border:"none",color:t.textMuted,cursor:"pointer",
+            fontSize:11,fontFamily:t.mono,padding:"2px 6px",borderRadius:3,flexShrink:0,marginTop:2,
+            textDecoration:"underline",textUnderlineOffset:3}}>
+            Skip all
+          </button>
+        </div>
+
+        {/* Progress bar */}
+        {step < STEPS.length - 1 && (
+          <div style={{margin:"14px 24px 0",height:2,background:t.border,borderRadius:1}}>
+            <div style={{height:"100%",background:t.gold,borderRadius:1,width:progress+"%",transition:"width 0.3s ease"}}/>
+          </div>
+        )}
+
+        {/* Subtitle */}
+        <div style={{padding:"8px 24px 0",fontSize:12,color:t.textMuted,fontFamily:t.mono,lineHeight:1.6}}>
+          {currentStep.subtitle}
+        </div>
+
+        {/* Fields */}
+        <div style={{padding:"16px 24px 20px"}}>
+          {currentStep.fields}
+        </div>
+
+        {/* Footer */}
+        <div style={{padding:"14px 24px",borderTop:"1px solid "+t.border,display:"flex",justifyContent:"space-between",alignItems:"center",background:t.surfaceAlt}}>
+          {step > 0 && step < STEPS.length - 1
+            ? <button style={gGh(t)} onClick={()=>setStep(s=>s-1)}>← Back</button>
+            : <div/>
+          }
+          <button style={{...gG(t),fontSize:13,padding:"8px 20px"}} onClick={handleNext}>
+            {isLast ? "Start using Growth OS →" : "Next →"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [items,     setItems]     = useState([]);
   const [settings,  setSettings]  = useState(DEFAULT_SETTINGS);
@@ -955,6 +1244,7 @@ export default function App() {
   const [confC,     setConfC]     = useState(75);
   const [showTpl,   setShowTpl]   = useState(false);
   const [showSet,   setShowSet]   = useState(false);
+  const [onboarding, setOnboarding] = useState(false);
   const [showMenu,  setShowMenu]  = useState(false);
   const [showCapture, setShowCapture] = useState(false);
   const [captureText, setCaptureText] = useState("");
@@ -995,7 +1285,15 @@ export default function App() {
         const [ir,sr,dr,mr] = await Promise.all([store.get(KEY_ITEMS),store.get(KEY_SETTINGS),store.get(KEY_DEBATES),store.get(KEY_METRICS)]);
         setItems(ir&&ir.value?JSON.parse(ir.value):SEED);
         if(!ir||!ir.value) store.set(KEY_ITEMS,JSON.stringify(SEED));
-        if(sr&&sr.value) setSettings(JSON.parse(sr.value));
+        if(sr&&sr.value) {
+          const saved = JSON.parse(sr.value);
+          // Backfill brand brief defaults for any brand that's missing them
+          if (Array.isArray(saved.brands)) {
+            saved.brands = saved.brands.map(applyBrandBriefDefaults);
+          }
+          setSettings(saved);
+        }
+        else { setOnboarding(true); }
         if(dr&&dr.value) setDebates(JSON.parse(dr.value));
         if(mr&&mr.value) setWeeklyMetrics(JSON.parse(mr.value));
       } catch { setItems(SEED); }
@@ -1164,7 +1462,7 @@ export default function App() {
       pipeline: acc.pipeline + r.pipeline,
     }),{realised:0,inflight:0,pipeline:0});
 
-    return {completed:completed.length,killed:killed.length,pipeline:pipeline.length,running:running.length,revImpacted,revAtRisk,totalEstimated,totalActual,calibration,totalEstCost,totalActualCost,closedROI,winRate,wins:wins.length,closed:closed.length,avgDays,catCounts,typeCounts,outCounts,vel,avgIce,contribution,contributionTotals};
+    return {completed:completed.length,killed:killed.length,pipeline:pipeline.length,running:running.length,revImpacted,revAtRisk,totalEstimated,totalActual,calibration,totalEstCost,totalActualCost,closedROI,winRate,wins:wins.length,closed:closed.length,avgDays,catCounts,typeCounts,outCounts,vel,avgIce,contribution,contributionTotals,_runningItems:running};
   },[items,bounds,cats,activeBrand,brands]);
 
   const filtered = useMemo(()=>{
@@ -1449,6 +1747,25 @@ export default function App() {
   return (
     <div style={{background:t.bg,minHeight:"100vh",fontFamily:t.serif,color:t.text}}>
       <style>{"@import url('https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css');*{box-sizing:border-box}@keyframes spin{to{transform:rotate(360deg)}}input[type=range]{accent-color:"+t.gold+"}@keyframes slideIn{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}"}</style>
+
+      {/* Onboarding — first run only */}
+      {onboarding&&(
+        <OnboardingModal
+          t={t} dk={dk} settings={settings}
+          onSave={(data,obBrands)=>{
+            const mergedBrands = (settings.brands||[]).map(b=>{
+              const ob = (obBrands||[]).find(ob=>ob.id===b.id);
+              return ob ? {...b,...ob} : b;
+            });
+            saveSettings({...settings,...data,brands:mergedBrands});
+            setOnboarding(false);
+          }}
+          onSkip={()=>{
+            saveSettings(settings);
+            setOnboarding(false);
+          }}
+        />
+      )}
 
       {/* Toast notifications */}
       {toast&&(
@@ -1944,6 +2261,13 @@ function IdeaCard({idea, idx, results, setResults, added, onAdd, t, dk, cats, ag
           )}
         </div>
 
+        {idea.csoRationale&&(
+          <div style={{padding:"8px 12px",background:dk?"#1a1a2a":"#f4f4ff",border:"1px solid "+(dk?"#3a3a6a":"#c0c0e8"),borderRadius:5}}>
+            <div style={{fontSize:9,color:dk?"#8888cc":"#5555aa",fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>✦ CSO — Why we proceed</div>
+            <div style={{fontSize:11,color:dk?"#b0b0e0":"#333366",fontFamily:t.mono,lineHeight:1.5,fontWeight:600}}>{idea.csoRationale}</div>
+          </div>
+        )}
+
         {idea.whyNotAlreadyRunning&&(
           <div style={{padding:"7px 10px",background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:5,fontSize:11,color:t.textMuted,fontFamily:t.mono,lineHeight:1.5}}>
             <strong style={{color:t.textSub}}>Gap reason: </strong>{idea.whyNotAlreadyRunning}
@@ -2033,7 +2357,26 @@ function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand, agents
   const [turnCount,  setTurnCount] = useState(0);
 
   const portfolioCtx = buildPortfolioContext(items, settings, brands, activeBrand, weeklyMetrics);
-  const portfolioTools = buildPortfolioTools(items, settings, brands, activeBrand);
+  const portfolioTools = buildPortfolioTools(items, settings, brands, activeBrand, weeklyMetrics);
+
+  // Build a smart default context from live portfolio data when panel opens
+  const smartDefaultContext = useMemo(() => {
+    const tools = buildPortfolioTools(items, settings, brands, activeBrand);
+    const summary = tools.execute("get_portfolio_summary");
+    const blocked = tools.execute("get_blocked_initiatives");
+    const coverage = tools.execute("get_category_coverage");
+    const gapCats = coverage.filter(c=>c.running===0&&c.draft===0).map(c=>c.category);
+
+    const parts = [];
+    if(summary.running>0) parts.push(`${summary.running} initiatives running, ${summary.draft} in draft`);
+    if(summary.revenue_at_risk&&summary.revenue_at_risk!=="$0") parts.push(`${summary.revenue_at_risk} revenue at risk`);
+    if(summary.north_star?.current&&summary.north_star?.target) parts.push(`north star: ${summary.north_star.current} → ${summary.north_star.target}`);
+    if(blocked.length>0) parts.push(`${blocked.length} blocked initiative${blocked.length!==1?"s":""}`);
+    if(gapCats.length>0) parts.push(`no coverage in: ${gapCats.slice(0,3).join(", ")}`);
+
+    if(parts.length===0) return "";
+    return "Portfolio snapshot: "+parts.join(" · ")+". What should we prioritise next?";
+  }, [items, settings, brands, activeBrand]);
 
   const runDebate = async () => {
     const apiKey = getApiKey();
@@ -2187,8 +2530,10 @@ function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand, agents
                 Situation context <span style={{fontWeight:400,textTransform:"none",letterSpacing:0}}>(optional — sharper with context)</span>
               </div>
               <textarea style={{...gTA(t),fontSize:12,minHeight:68,opacity:running?0.6:1}}
-                disabled={running} value={context} onChange={e=>setContext(e.target.value)}
-                placeholder={"What should the C-Suite know right now?\n• Black Friday is 8 weeks out and we're over-indexed on single-serve SKUs\n• Gross margin compressed 4pts this quarter\n• A competitor just launched a subscription tier"}/>
+                disabled={running} value={context}
+                onChange={e=>setContext(e.target.value)}
+                onFocus={e=>{ if(!context && smartDefaultContext) setContext(smartDefaultContext); }}
+                placeholder={smartDefaultContext || "What should the C-Suite know right now?\n• Black Friday is 8 weeks out\n• Gross margin compressed 4pts this quarter\n• A competitor just launched a subscription tier"}/>
             </div>
 
             {/* Portfolio snapshot — collapsible */}
@@ -2893,6 +3238,53 @@ function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetrics,onLo
         </div>
       </div>
 
+      {/* Attention nudge — overdue and expiring initiatives */}
+      {(()=>{
+        const today = new Date();
+        const expiring = (dash._runningItems||[]).filter(e => {
+          if(!e.endDate) return false;
+          const days = Math.ceil((new Date(e.endDate+"T12:00:00") - today) / 86400000);
+          return days >= 0 && days <= 7;
+        });
+        const overdue = (dash._runningItems||[]).filter(e => {
+          if(!e.startDate) return false;
+          const days = Math.ceil((today - new Date(e.startDate+"T12:00:00")) / 86400000);
+          return days > 30;
+        });
+        const nudges = [
+          ...expiring.map(e => ({ type:"expiring", item:e })),
+          ...overdue.filter(e => !expiring.find(x=>x.id===e.id)).map(e => ({ type:"overdue", item:e })),
+        ].slice(0,3);
+        if(nudges.length===0) return null;
+        return (
+          <div style={{padding:"10px 14px",background:dk?"#2a2010":"#fffbf0",border:"1px solid "+(dk?"#6a5010":"#e0c060"),borderRadius:6}}>
+            <div style={{fontSize:10,fontWeight:700,color:dk?"#d4a830":"#8a6000",fontFamily:t.mono,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:8}}>
+              ⚡ {nudges.length} initiative{nudges.length!==1?"s":""} need attention
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:6}}>
+              {nudges.map(({type,item},i)=>{
+                const days = type==="expiring"
+                  ? Math.ceil((new Date(item.endDate+"T12:00:00") - today) / 86400000)
+                  : Math.ceil((today - new Date(item.startDate+"T12:00:00")) / 86400000);
+                return (
+                  <div key={i} style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                    <span style={{fontSize:10,fontWeight:700,fontFamily:t.mono,
+                      color:type==="expiring"?(dk?"#e09040":"#a04000"):(dk?"#e08080":"#a03030"),
+                      background:type==="expiring"?(dk?"#3a2010":"#fff0e0"):(dk?"#3a1010":"#fff0f0"),
+                      border:"1px solid "+(type==="expiring"?(dk?"#7a4010":"#e09060"):(dk?"#7a2020":"#e09090")),
+                      borderRadius:3,padding:"1px 6px",flexShrink:0}}>
+                      {type==="expiring" ? `ends in ${days}d` : `running ${days}d`}
+                    </span>
+                    <span style={{fontSize:12,color:t.textSub,fontFamily:t.mono,flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.title}</span>
+                    {item.owner&&<span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,flexShrink:0}}>{item.owner}</span>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Weekly Pulse */}
       <WeeklyPulseSection
         t={t} dk={dk}
@@ -3569,7 +3961,7 @@ function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hypReview,
     <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:14}}>
       <div style={{fontSize:18,fontWeight:700,color:t.text,fontFamily:t.serif}}>{form._new?"New initiative":"Edit initiative"}</div>
 
-      <FR label="Title *" t={t}><input style={gI(t)} value={form.title} onChange={e=>f("title",e.target.value)} placeholder="Clear, specific title"/></FR>
+      <FR label="Title *" t={t}><input style={gI(t)} value={form.title} onChange={e=>f("title",e.target.value)} placeholder="e.g. Homepage hero A/B — lifestyle vs product-first creative"/></FR>
 
       <div style={gSc(t,dk)}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
@@ -3619,7 +4011,7 @@ function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hypReview,
 
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
         <FR label="Status" t={t}><select style={gSl(t)} value={form.status} onChange={e=>f("status",e.target.value)}>{STATUSES.map(s=><option key={s}>{s}</option>)}</select></FR>
-        <FR label="Primary metric" t={t}><input style={gI(t)} value={form.primaryMetric||""} onChange={e=>f("primaryMetric",e.target.value)}/></FR>
+        <FR label="Primary metric" t={t}><input style={gI(t)} value={form.primaryMetric||""} onChange={e=>f("primaryMetric",e.target.value)} placeholder="e.g. CVR, ROAS, AOV, CAC"/></FR>
       </div>
 
       <FR label="⚠️ Blocker" t={t}>
@@ -3664,7 +4056,7 @@ function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hypReview,
         <ICESliders ice={form.ice||{impact:5,certainty:5,ease:5}} onChange={v=>f("ice",v)} t={t}/>
       </div>
 
-      <FR label="Kill criteria" t={t}><textarea style={gTA(t)} rows={2} value={form.killCriteria||""} onChange={e=>f("killCriteria",e.target.value)}/></FR>
+      <FR label="Kill criteria" t={t}><textarea style={gTA(t)} rows={2} value={form.killCriteria||""} onChange={e=>f("killCriteria",e.target.value)} placeholder="e.g. If CVR doesn't improve by ≥0.5pp after 2 weeks on 500+ sessions, kill it. If CAC exceeds $55, pause and review spend allocation."/></FR>
 
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
         <FR label="Start date" t={t}><input style={gI(t)} type="date" value={form.startDate||""} onChange={e=>f("startDate",e.target.value)}/></FR>
@@ -3745,16 +4137,54 @@ function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onRestoreB
         </div>
         <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
           <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:10,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Retailers / Partners</div>
-          <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:10}}>
-            {(local.brands||[]).map((b,i)=>(
-              <div key={b.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",background:t.surfaceAlt,borderRadius:4}}>
-                <div style={{width:8,height:8,borderRadius:"50%",background:brandColor(b.id,local.brands||[],dk),flexShrink:0}}/>
-                <input style={{...gI(t),flex:1,padding:"4px 8px"}} value={b.name}
-                  onChange={e=>{const bs=[...(local.brands||[])];bs[i]={...bs[i],name:e.target.value};setLocal(p=>({...p,brands:bs}));}}/>
-                {(local.brands||[]).length>1&&<button onClick={()=>setLocal(p=>({...p,brands:(p.brands||[]).filter((_,j)=>j!==i)}))}
-                  style={{background:"none",border:"none",color:t.textMuted,cursor:"pointer",fontSize:14,padding:"0 4px"}}>&#10005;</button>}
+          <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:10}}>
+            {(local.brands||[]).map((b,i)=>{
+              const upd = (k,v) => { const bs=[...(local.brands||[])]; bs[i]={...bs[i],[k]:v}; setLocal(p=>({...p,brands:bs})); };
+              return (
+              <div key={b.id} style={{padding:"12px 14px",background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:6,display:"flex",flexDirection:"column",gap:8}}>
+                {/* Name row */}
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <div style={{width:8,height:8,borderRadius:"50%",background:brandColor(b.id,local.brands||[],dk),flexShrink:0}}/>
+                  <input style={{...gI(t),flex:1,padding:"4px 8px",fontWeight:700}} value={b.name}
+                    onChange={e=>upd("name",e.target.value)} placeholder="Retailer / brand name"/>
+                  {(local.brands||[]).length>1&&<button onClick={()=>setLocal(p=>({...p,brands:(p.brands||[]).filter((_,j)=>j!==i)}))}
+                    style={{background:"none",border:"none",color:t.textMuted,cursor:"pointer",fontSize:14,padding:"0 4px"}}>&#10005;</button>}
+                </div>
+                {/* Brief fields */}
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+                  <div>
+                    <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>WHAT THEY SELL</label>
+                    <input style={{...gI(t),fontSize:11}} value={b.whatTheySell||""} onChange={e=>upd("whatTheySell",e.target.value)}
+                      placeholder="e.g. Premium home décor, $80–$300 AOV"/>
+                  </div>
+                  <div>
+                    <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>CATEGORIES (comma-separated)</label>
+                    <input style={{...gI(t),fontSize:11}} value={b.categories||""} onChange={e=>upd("categories",e.target.value)}
+                      placeholder="e.g. Home decor, Gifting, Candles"/>
+                  </div>
+                  <div>
+                    <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>ICP (comma-separated)</label>
+                    <input style={{...gI(t),fontSize:11}} value={b.icp||""} onChange={e=>upd("icp",e.target.value)}
+                      placeholder="e.g. Women 28–45, gifting buyers, high-intent decorators"/>
+                  </div>
+                  <div>
+                    <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>WHY THEY WIN</label>
+                    <input style={{...gI(t),fontSize:11}} value={b.whyTheyWin||""} onChange={e=>upd("whyTheyWin",e.target.value)}
+                      placeholder="e.g. Visual brand, strong repeat buyer LTV"/>
+                  </div>
+                  <div>
+                    <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>RELATIONSHIP</label>
+                    <input style={{...gI(t),fontSize:11}} value={b.relationship||""} onChange={e=>upd("relationship",e.target.value)}
+                      placeholder="e.g. Own DTC brand, wholesale account, marketplace"/>
+                  </div>
+                  <div>
+                    <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>CURRENT CONSTRAINT</label>
+                    <input style={{...gI(t),fontSize:11}} value={b.constraint||""} onChange={e=>upd("constraint",e.target.value)}
+                      placeholder="e.g. CAC rising, thin margin on hero SKU"/>
+                  </div>
+                </div>
               </div>
-            ))}
+            );})}
           </div>
           <button onClick={()=>{const newId="brand-"+Date.now();setLocal(p=>({...p,brands:[...(p.brands||[]),{id:newId,name:"New retailer"}]}));}}
             style={{...gGh(t),fontSize:11}}>+ Add retailer</button>

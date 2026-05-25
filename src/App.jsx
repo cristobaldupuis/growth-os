@@ -299,6 +299,30 @@ const AI_HEADERS = () => ({
 // Legacy — kept so existing call sites that check for a key still work during transition
 const getApiKey = () => GOS_SECRET ? "proxied" : "";
 
+// Defensive JSON extraction for LLM responses. Tries direct parse, then largest
+// balanced bracket substring, then (for arrays) wraps a single object. Returns
+// null on total failure so callers can show a useful error.
+function safeParseJSON(raw, expectArray) {
+  if (!raw || typeof raw !== "string") return null;
+  const cleaned = raw.replace(/```json|```/g, "").trim();
+  try { return JSON.parse(cleaned); } catch {}
+  const open  = expectArray ? "[" : "{";
+  const close = expectArray ? "]" : "}";
+  const start = cleaned.indexOf(open);
+  const end   = cleaned.lastIndexOf(close);
+  if (start !== -1 && end !== -1 && end > start) {
+    const slice = cleaned.slice(start, end + 1);
+    try { return JSON.parse(slice); } catch {}
+  }
+  if (expectArray) {
+    try {
+      const obj = JSON.parse(cleaned);
+      if (obj && typeof obj === "object") return [obj];
+    } catch {}
+  }
+  return null;
+}
+
 async function callExpandHypothesis(rough, title, settings, dataCtx) {
   const sys = [
     "You help growth teams write structured initiative hypotheses for "+settings.companyName+",",
@@ -310,7 +334,7 @@ async function callExpandHypothesis(rough, title, settings, dataCtx) {
   ].join(" ");
   const resp = await fetch(PROXY_URL, {
     method:"POST", headers:AI_HEADERS(),
-    body:JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:300, system:sys,
+    body:JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:300, system:sys,
       messages:[{role:"user", content:"Title: "+(title||"none")+". Rough idea: "+rough}] }),
   });
   const data = await resp.json();
@@ -330,7 +354,7 @@ async function callSynthesiseLearnings(learnings, settings) {
   ].join(" ");
   const resp = await fetch(PROXY_URL, {
     method:"POST", headers:AI_HEADERS(),
-    body:JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:600, system:sys,
+    body:JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:600, system:sys,
       messages:[{role:"user", content:"Learnings to synthesise:\n"+lines}] }),
   });
   const data = await resp.json();
@@ -359,13 +383,12 @@ async function callSuggestICE(form, settings, dataCtx) {
   ].join(". ");
   const resp = await fetch(PROXY_URL, {
     method:"POST", headers:AI_HEADERS(),
-    body:JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:400, system:sys,
+    body:JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:400, system:sys,
       messages:[{role:"user", content:user}] }),
   });
   const data = await resp.json();
   const raw   = data.content && data.content[0] ? data.content[0].text.trim() : "{}";
-  const clean = raw.replace(/```json|```/g,"").trim();
-  return JSON.parse(clean);
+  return safeParseJSON(raw, false) || null;
 }
 
 async function callQuickCapture(description, settings, cats, initTypes) {
@@ -382,12 +405,14 @@ async function callQuickCapture(description, settings, cats, initTypes) {
   ].join(" ");
   const resp = await fetch(PROXY_URL, {
     method:"POST", headers:AI_HEADERS(),
-    body:JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:600, system:sys,
+    body:JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:600, system:sys,
       messages:[{role:"user", content:"Rough idea: "+description}] }),
   });
   const data = await resp.json();
   const raw = data.content && data.content[0] ? data.content[0].text.trim() : "{}";
-  return JSON.parse(raw.replace(/```json|```/g,"").trim());
+  const parsed = safeParseJSON(raw, false);
+  if (!parsed) throw new Error("Quick capture: couldn't parse AI response. Try again.");
+  return parsed;
 }
 
 // -- Agentic C-Suite Debate System v2 -----------------------------------------
@@ -644,7 +669,7 @@ Max 180 words per turn. No filler. Speak like a real board-room executive.`;
     const resp = await fetch(PROXY_URL, {
       method:"POST", headers:AI_HEADERS(),
       body: JSON.stringify({
-        model:"claude-sonnet-4-6", max_tokens:600, system:sys,
+        model:"claude-sonnet-4-20250514", max_tokens:600, system:sys,
         tools: portfolioTools.definitions,
         messages: currentMessages,
       }),
@@ -716,14 +741,16 @@ Rules:
   const resp = await fetch(PROXY_URL, {
     method:"POST", headers:AI_HEADERS(),
     body: JSON.stringify({
-      model:"claude-sonnet-4-6", max_tokens:300, system:sys,
+      model:"claude-sonnet-4-20250514", max_tokens:300, system:sys,
       messages:[{role:"user", content:`Portfolio:\n${portfolioCtx}\n\nContext:\n${userContext||"none"}\n\nTranscript so far:\n${transcriptStr}\n\nDecide what happens next.`}],
     }),
   });
   const data = await resp.json();
   if (data.error) throw new Error(data.error.message);
   const raw = data.content?.[0]?.text?.trim()||"{}";
-  return JSON.parse(raw.replace(/```json|```/g,"").trim());
+  const parsed = safeParseJSON(raw, false);
+  // Moderator failure is non-fatal — fall back to "continue with next agent"
+  return parsed || { decision: "continue", next_agent: null, followup_prompt: null, reason: "Moderator response unparseable; continuing." };
 }
 
 // Final synthesis — reads full debate + tool outputs, returns 3 structured initiatives
@@ -765,7 +792,7 @@ Return ONLY a valid JSON array of exactly 3 objects. No markdown, no preamble:
   const resp = await fetch(PROXY_URL, {
     method:"POST", headers:AI_HEADERS(),
     body: JSON.stringify({
-      model:"claude-sonnet-4-6", max_tokens:3500, system:sys,
+      model:"claude-sonnet-4-20250514", max_tokens:3500, system:sys,
       messages:[{role:"user", content:
         `Portfolio:\n${portfolioCtx}${dataAppendix}\n\nContext:\n${userContext||"None."}\n\nDebate:\n${transcriptStr}\n\nSynthesize the 3 highest-impact net-new initiatives.`
       }],
@@ -774,7 +801,11 @@ Return ONLY a valid JSON array of exactly 3 objects. No markdown, no preamble:
   const data = await resp.json();
   if (data.error) throw new Error(data.error.message);
   const raw = data.content?.[0]?.text?.trim()||"[]";
-  return JSON.parse(raw.replace(/```json|```/g,"").trim());
+  const parsed = safeParseJSON(raw, true);
+  if (!Array.isArray(parsed) || parsed.length === 0) {
+    throw new Error("The debate produced ideas but the final synthesis came back malformed. Open this debate in History to keep the transcript, then re-run.");
+  }
+  return parsed;
 }
 
 // -- Style helpers -------------------------------------------------------------
@@ -974,6 +1005,71 @@ export default function App() {
   const saveMetrics  = m => { setWeeklyMetrics(m); try{store.set(KEY_METRICS,JSON.stringify(m));}catch{} };
   const toggleDk     = ()=> { setDk(n => !n); };
 
+  // -- JSON backup / restore ---------------------------------------------------
+  const handleDownloadBackup = () => {
+    const payload = {
+      _meta: {
+        format: "growth-os-backup",
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        company: settings.companyName || "Growth OS",
+      },
+      items,
+      settings,
+      debates,
+      weeklyMetrics,
+    };
+    const json = JSON.stringify(payload, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    const stamp = new Date().toISOString().slice(0,10);
+    const slug  = (settings.companyName || "GrowthOS").replace(/\s+/g,"_");
+    a.href = url;
+    a.download = slug+"_backup_"+stamp+".json";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleRestoreBackup = (file) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const parsed = JSON.parse(ev.target.result);
+        if (!parsed || parsed._meta?.format !== "growth-os-backup") {
+          alert("This file doesn't look like a Growth OS backup. Restore cancelled.");
+          return;
+        }
+        const counts = {
+          items: Array.isArray(parsed.items) ? parsed.items.length : 0,
+          debates: Array.isArray(parsed.debates) ? parsed.debates.length : 0,
+          metrics: Array.isArray(parsed.weeklyMetrics) ? parsed.weeklyMetrics.length : 0,
+        };
+        const stamp = parsed._meta?.exportedAt
+          ? new Date(parsed._meta.exportedAt).toLocaleString()
+          : "unknown date";
+        const ok = window.confirm(
+          "Restore from backup?\n\n" +
+          "Exported: "+stamp+"\n" +
+          "Initiatives: "+counts.items+"\n" +
+          "Debates: "+counts.debates+"\n" +
+          "Weekly metrics entries: "+counts.metrics+"\n\n" +
+          "This will OVERWRITE your current data. You can't undo this."
+        );
+        if (!ok) return;
+        if (Array.isArray(parsed.items))         saveItems(parsed.items);
+        if (parsed.settings)                     saveSettings(parsed.settings);
+        if (Array.isArray(parsed.debates))       saveDebates(parsed.debates);
+        if (Array.isArray(parsed.weeklyMetrics)) saveMetrics(parsed.weeklyMetrics);
+        alert("Backup restored.");
+      } catch (err) {
+        alert("Couldn't read that backup file. It may be corrupted or in an unexpected format.");
+        console.error("Restore error:", err);
+      }
+    };
+    reader.readAsText(file);
+  };
+
   const agents = (settings.agents && settings.agents.length > 0) ? settings.agents : DEFAULT_AGENTS;
 
   const sel    = useMemo(()=>items.find(e=>e.id===selId),[items,selId]);
@@ -1035,7 +1131,48 @@ export default function App() {
       started:weeks.map(w=>items.filter(e=>{const d=parseD(e.startDate);return d&&d>=w.wS&&d<=w.wE;}).length),
       closed: weeks.map(w=>items.filter(e=>{const d=parseD(e.endDate);return d&&d>=w.wS&&d<=w.wE&&(e.status==="Completed"||e.status==="Killed");}).length),
     };
-    return {completed:completed.length,killed:killed.length,pipeline:pipeline.length,running:running.length,revImpacted,revAtRisk,totalEstimated,totalActual,calibration,totalEstCost,totalActualCost,closedROI,winRate,wins:wins.length,closed:closed.length,avgDays,catCounts,typeCounts,outCounts,vel,avgIce};
+
+    // Contribution to revenue — by category, three layers:
+    //   realised  = sum of actualRevenueImpact on Completed items in range (positives only).
+    //   inflight  = sum of revenueImpact on Running items × category win rate (probability-adjusted).
+    //   pipeline  = sum of revenueImpact on Draft items × category win rate (probability-adjusted).
+    // Win rate per category falls back to the portfolio win rate, then to 50% if neither exists.
+    // We use the *unscoped* closed history for the win-rate baseline so a narrow date filter doesn't
+    // spike the multiplier on a single recent win/loss.
+    const allClosedForRate = items.filter(e=>brandFilter(e)&&(e.status==="Completed"||e.status==="Killed"));
+    const overallWinRate = allClosedForRate.length>0
+      ? allClosedForRate.filter(e=>e.results&&(e.results.outcomeClassification==="Jackpot"||e.results.outcomeClassification==="Success")).length / allClosedForRate.length
+      : 0.5;
+    const catWinRate = {};
+    cats.forEach(c=>{
+      const catClosed = allClosedForRate.filter(e=>e.category===c);
+      catWinRate[c] = catClosed.length>=3
+        ? catClosed.filter(e=>e.results&&(e.results.outcomeClassification==="Jackpot"||e.results.outcomeClassification==="Success")).length / catClosed.length
+        : overallWinRate;
+    });
+    const contribution = cats.map(c=>{
+      const realised = completed
+        .filter(e=>e.category===c&&e.results&&typeof e.results.actualRevenueImpact==="number")
+        .reduce((s,e)=>s+Math.max(0,e.results.actualRevenueImpact),0);
+      const inflightRaw = running.filter(e=>e.category===c).reduce((s,e)=>s+Math.max(0,e.revenueImpact||0),0);
+      const pipelineRaw = pipeline.filter(e=>e.category===c).reduce((s,e)=>s+Math.max(0,e.revenueImpact||0),0);
+      const rate = catWinRate[c];
+      return {
+        category: c,
+        realised,
+        inflight: Math.round(inflightRaw * rate),
+        pipeline: Math.round(pipelineRaw * rate),
+        winRate: Math.round(rate * 100),
+        usesFallback: allClosedForRate.filter(e=>e.category===c).length < 3,
+      };
+    }).filter(r=>r.realised>0||r.inflight>0||r.pipeline>0);
+    const contributionTotals = contribution.reduce((acc,r)=>({
+      realised: acc.realised + r.realised,
+      inflight: acc.inflight + r.inflight,
+      pipeline: acc.pipeline + r.pipeline,
+    }),{realised:0,inflight:0,pipeline:0});
+
+    return {completed:completed.length,killed:killed.length,pipeline:pipeline.length,running:running.length,revImpacted,revAtRisk,totalEstimated,totalActual,calibration,totalEstCost,totalActualCost,closedROI,winRate,wins:wins.length,closed:closed.length,avgDays,catCounts,typeCounts,outCounts,vel,avgIce,contribution,contributionTotals};
   },[items,bounds,cats,activeBrand,brands]);
 
   const filtered = useMemo(()=>{
@@ -1324,61 +1461,62 @@ export default function App() {
       {/* Header — two rows */}
       <div style={{background:t.headerBg,borderBottom:"1px solid "+t.border,position:"sticky",top:0,zIndex:100}}>
         {/* Row 1: wordmark + retailer + utilities */}
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",borderBottom:"1px solid "+t.border,minWidth:0}}>
-          <div style={{display:"flex",alignItems:"center",gap:6,minWidth:0,flex:1,overflow:"hidden"}}>
-            <span style={{fontSize:13,fontWeight:700,letterSpacing:"0.12em",color:t.gold,fontFamily:t.serif,whiteSpace:"nowrap",flexShrink:0}}>GROWTH OS</span>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 16px",borderBottom:"1px solid "+t.border}}>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <span style={{fontSize:13,fontWeight:700,letterSpacing:"0.12em",color:t.gold,fontFamily:t.serif,whiteSpace:"nowrap"}}>GROWTH OS</span>
+            <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.04em",whiteSpace:"nowrap"}}>{settings.companyName}</span>
             {brands.length>1&&(
               <select value={activeBrand} onChange={e=>setActiveBrand(e.target.value)}
-                style={{fontSize:11,padding:"3px 6px",borderRadius:4,border:"1px solid "+t.gold,background:activeBrand==="all"?t.surface:t.goldBg,color:activeBrand==="all"?t.textMuted:t.gold,fontFamily:t.mono,cursor:"pointer",maxWidth:120,minWidth:0,flexShrink:1}}>
-                <option value="all">All</option>
+                style={{fontSize:11,padding:"3px 8px",borderRadius:4,border:"1px solid "+t.gold,background:activeBrand==="all"?t.surface:t.goldBg,color:activeBrand==="all"?t.textMuted:t.gold,fontFamily:t.mono,cursor:"pointer",maxWidth:140}}>
+                <option value="all">All retailers</option>
                 {brands.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
             )}
           </div>
-          <div style={{display:"flex",gap:4,alignItems:"center",flexShrink:0}}>
+          <div style={{display:"flex",gap:5,alignItems:"center"}}>
             <button onClick={()=>setShowCopilot(true)}
-              style={{fontSize:11,padding:"4px 9px",borderRadius:4,cursor:"pointer",
+              style={{fontSize:12,padding:"4px 11px",borderRadius:4,cursor:"pointer",
                 background:"linear-gradient(135deg,"+t.gold+" 0%,#e0a030 100%)",
                 border:"none",color:t.goldText,fontWeight:700,fontFamily:t.mono,
-                display:"flex",alignItems:"center",gap:4,whiteSpace:"nowrap",
+                display:"flex",alignItems:"center",gap:5,
                 boxShadow:"0 1px 4px rgba(192,136,32,0.25)"}}>
               ✦ Signal
             </button>
             <button onClick={()=>setShowSet(true)} title="Settings"
-              style={{fontSize:13,padding:"4px 7px",borderRadius:4,cursor:"pointer",background:"transparent",border:"1px solid "+t.border,color:t.textMuted,lineHeight:1,flexShrink:0}}>
+              style={{fontSize:13,padding:"4px 7px",borderRadius:4,cursor:"pointer",background:"transparent",border:"1px solid "+t.border,color:t.textMuted,lineHeight:1}}>
               <span dangerouslySetInnerHTML={{__html:"&#9881;"}}/>
             </button>
             <button onClick={toggleDk} title={dk?"Light mode":"Dark mode"}
-              style={{fontSize:13,padding:"4px 7px",borderRadius:4,cursor:"pointer",background:"transparent",border:"1px solid "+t.border,color:t.textMuted,lineHeight:1,flexShrink:0}}>
+              style={{fontSize:13,padding:"4px 7px",borderRadius:4,cursor:"pointer",background:"transparent",border:"1px solid "+t.border,color:t.textMuted,lineHeight:1}}>
               <span dangerouslySetInnerHTML={{__html:dk?"&#9728;":"&#9790;"}}/>
             </button>
           </div>
         </div>
-        {/* Row 2: nav — horizontal scroll on mobile, no wrap */}
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"0 12px",overflowX:"auto",WebkitOverflowScrolling:"touch",scrollbarWidth:"none"}}>
-          <div style={{display:"flex",gap:2,alignItems:"center",flexShrink:0}}>
+        {/* Row 2: nav + contextual actions */}
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 16px",flexWrap:"wrap",gap:4}}>
+          <div style={{display:"flex",gap:3,alignItems:"center",flexWrap:"wrap"}}>
             {navBtn("dashboard","Dashboard")}
             {navBtn("initiatives","Initiatives")}
             {navBtn("library","Library")}
             {navBtn("triage","Triage")}
             {(nav==="detail"||nav==="form")&&(
-              <button onClick={()=>setNav("initiatives")} style={{...gGh(t),padding:"4px 10px",fontSize:12,whiteSpace:"nowrap"}}>
+              <button onClick={()=>setNav("initiatives")} style={{...gGh(t),padding:"4px 10px",fontSize:12}}>
                 <span style={{fontSize:12}}>&#8592;</span> Back
               </button>
             )}
           </div>
           {nav==="initiatives"&&(
-            <div style={{display:"flex",gap:4,alignItems:"center",flexShrink:0,paddingLeft:8}}>
-              <button onClick={()=>setShowCapture(true)} style={{...gGh(t),padding:"4px 8px",fontSize:13,whiteSpace:"nowrap"}} title="Quick capture">
-                &#9889;
+            <div style={{display:"flex",gap:5,alignItems:"center"}}>
+              <button onClick={()=>setShowCapture(true)} style={{...gGh(t),padding:"4px 10px",fontSize:11}}>
+                &#9889; Quick capture
               </button>
-              <button onClick={()=>{setImportRows([]);setImportErrs([]);setImportDone(false);setShowImport(true);}} style={{...gGh(t),padding:"4px 8px",fontSize:13,whiteSpace:"nowrap"}} title="Import CSV">
-                &#8645;
+              <button onClick={()=>{setImportRows([]);setImportErrs([]);setImportDone(false);setShowImport(true);}} style={{...gGh(t),padding:"4px 10px",fontSize:11}}>
+                &#8645; Import CSV
               </button>
-              <button onClick={()=>handleExportCSV(filtered,"GrowthOS_export_"+new Date().toISOString().slice(0,10)+".csv")} style={{...gGh(t),padding:"4px 8px",fontSize:13,whiteSpace:"nowrap"}} title="Export CSV">
-                &#8659;
+              <button onClick={()=>handleExportCSV(filtered,"GrowthOS_export_"+new Date().toISOString().slice(0,10)+".csv")} style={{...gGh(t),padding:"4px 10px",fontSize:11}} title="Export current filtered view as CSV">
+                &#8659; Export CSV
               </button>
-              <button onClick={goNew} style={{...gG(t),padding:"4px 10px",fontSize:12,whiteSpace:"nowrap"}}>
+              <button onClick={goNew} style={{...gG(t),padding:"4px 10px",fontSize:12}}>
                 + New
               </button>
             </div>
@@ -1443,11 +1581,11 @@ export default function App() {
                     {item.owner&&<span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>{item.owner.split(" (")[0].split("+")[0].trim()}</span>}
                   </div>
                 </div>
-                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}>
-                  {item.initId&&<span style={{fontSize:10,fontWeight:700,color:t.gold,fontFamily:t.mono,background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:3,padding:"1px 6px",flexShrink:0}}>{item.initId}</span>}
-                  <div style={{fontSize:14,fontWeight:700,color:t.text,lineHeight:1.4,fontFamily:t.serif}}>{item.title}</div>
+                <div style={{display:"flex",alignItems:"flex-start",gap:8,marginBottom:4,flexWrap:"wrap"}}>
+                  {item.initId&&<span style={{fontSize:10,fontWeight:700,color:t.gold,fontFamily:t.mono,background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:3,padding:"1px 6px",flexShrink:0,marginTop:2}}>{item.initId}</span>}
+                  <div style={{flex:"1 1 auto",minWidth:0,fontSize:14,fontWeight:700,color:t.text,lineHeight:1.35,fontFamily:t.serif,textAlign:"left"}}>{item.title}</div>
                 </div>
-                {item.hypothesis&&<div style={{fontSize:12,color:t.textMuted,lineHeight:1.5,marginBottom:item.status!=="Draft"?6:0,fontFamily:t.mono}}>{item.hypothesis.slice(0,130)}{item.hypothesis.length>130?"…":""}</div>}
+                {item.hypothesis&&<div style={{fontSize:13,color:t.textMuted,lineHeight:1.55,marginBottom:item.status!=="Draft"?6:0,fontFamily:t.serif,textAlign:"left"}}>{item.hypothesis.slice(0,130)}{item.hypothesis.length>130?"…":""}</div>}
                 {item.status!=="Draft"&&(
                   <div style={{display:"flex",gap:14,alignItems:"center",fontSize:12,color:t.textMuted,fontFamily:t.mono,flexWrap:"wrap"}}>
                     {item.primaryMetric&&<span>{item.primaryMetric.slice(0,48)}{item.primaryMetric.length>48?"…":""}</span>}
@@ -1537,7 +1675,7 @@ export default function App() {
         </Modal>
       )}
 
-      {showSet&&<SettingsModal t={t} dk={dk} settings={settings} onSave={s=>{saveSettings(s);setShowSet(false);}} onClose={()=>setShowSet(false)}/>}
+      {showSet&&<SettingsModal t={t} dk={dk} settings={settings} onSave={s=>{saveSettings(s);setShowSet(false);}} onClose={()=>setShowSet(false)} onDownloadBackup={handleDownloadBackup} onRestoreBackup={handleRestoreBackup}/>}
 
       {showImport&&(
         <Modal t={t} dk={dk} onClose={()=>{setShowImport(false);setImportRows([]);setImportErrs([]);setImportDone(false);}} wide title="Import CSV">
@@ -2581,6 +2719,122 @@ function MetricsImportModal({t, dk, weeklyMetrics, onSave, onClose}) {
 }
 
 // -- Dashboard -----------------------------------------------------------------
+// -- Contribution to Revenue View ---------------------------------------------
+// Three-layer breakdown of how the portfolio contributes to revenue, scoped to
+// the active date range and active retailer. Built to be the artifact the
+// operator forwards to a client to justify a retainer.
+function ContributionView({t, dk, contribution, totals, dRange, activeBrand, brands}) {
+  const rangeLabel = dRange==="thisMonth"?"this month":dRange==="lastMonth"?"last month":"selected range";
+  const retailerLabel = activeBrand==="all" ? "All retailers" : brandName(activeBrand, brands);
+  const grand = totals.realised + totals.inflight + totals.pipeline;
+
+  // Empty state — no data at all
+  if (grand === 0) {
+    return (
+      <div style={{...gCd(t,dk)}}>
+        <div style={gSL(t)}>Contribution to revenue</div>
+        <div style={{padding:"24px 12px",textAlign:"center",color:t.textMuted,fontFamily:t.mono,fontSize:12,lineHeight:1.7}}>
+          No revenue contribution recorded for {rangeLabel}.<br/>
+          Complete an initiative with actual revenue impact or add running / draft items to see this view.
+        </div>
+      </div>
+    );
+  }
+
+  const maxRow = Math.max(...contribution.map(r=>r.realised+r.inflight+r.pipeline), 1);
+  const fmt = (n) => n===0 ? "—" : "$"+(n>=1000?Math.round(n/100)/10+"k":n.toLocaleString());
+  const fmtBig = (n) => "$"+(n>=1000?(Math.round(n/100)/10).toLocaleString()+"k":n.toLocaleString());
+
+  // Tones: realised = gold (the defensible number), inflight = mid amber, pipeline = muted
+  const colorRealised = t.gold;
+  const colorInflight = dk ? "#c08820" : "#c08820";
+  const colorPipeline = dk ? "#7a6438" : "#a89060";
+
+  const copyText = () => {
+    const date = new Date().toLocaleDateString("en-CA",{month:"long",day:"numeric",year:"numeric"});
+    const lines = [
+      "Contribution to Revenue — "+date,
+      "Retailer: "+retailerLabel+" | Range: "+rangeLabel,
+      "",
+      "TOTALS",
+      "Realised (completed, measured): "+fmtBig(totals.realised),
+      "In-flight (running, probability-weighted): "+fmtBig(totals.inflight),
+      "Pipeline (draft, probability-weighted): "+fmtBig(totals.pipeline),
+      "",
+      "BY CATEGORY",
+      ...contribution.map(r=>"  "+r.category+": realised "+fmt(r.realised)+" | in-flight "+fmt(r.inflight)+" | pipeline "+fmt(r.pipeline)+" (win rate "+r.winRate+"%)"),
+      "",
+      "Note: In-flight and pipeline figures are probability-weighted by historical category win rate. Realised is sum of measured actual revenue impact on completed initiatives.",
+    ].join("\n");
+    try { navigator.clipboard.writeText(lines); } catch {}
+    alert("Contribution summary copied to clipboard.");
+  };
+
+  return (
+    <div style={{...gCd(t,dk)}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8,flexWrap:"wrap",marginBottom:14}}>
+        <div>
+          <div style={gSL(t)}>Contribution to revenue</div>
+          <div style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,lineHeight:1.5}}>
+            {retailerLabel} &middot; {rangeLabel} &middot; in-flight and pipeline are probability-weighted by category win rate
+          </div>
+        </div>
+        <button onClick={copyText} style={{...gGh(t),fontSize:11,padding:"3px 10px"}}>&#128203; Copy</button>
+      </div>
+
+      {/* Totals row — three big numbers */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:18}}>
+        <div style={{padding:"12px 14px",borderRadius:6,background:t.goldBg,border:"1px solid "+t.goldBorder}}>
+          <div style={{fontSize:10,color:t.gold,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:4}}>Realised</div>
+          <div style={{fontSize:26,fontWeight:700,fontFamily:t.mono,color:colorRealised,letterSpacing:"-0.02em",lineHeight:1}}>{fmtBig(totals.realised)}</div>
+          <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginTop:4}}>measured on completed</div>
+        </div>
+        <div style={{padding:"12px 14px",borderRadius:6,background:t.surface,border:"1px solid "+t.border}}>
+          <div style={{fontSize:10,color:colorInflight,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:4}}>In-flight</div>
+          <div style={{fontSize:26,fontWeight:700,fontFamily:t.mono,color:colorInflight,letterSpacing:"-0.02em",lineHeight:1}}>{fmtBig(totals.inflight)}</div>
+          <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginTop:4}}>running, probability-weighted</div>
+        </div>
+        <div style={{padding:"12px 14px",borderRadius:6,background:t.surface,border:"1px solid "+t.border}}>
+          <div style={{fontSize:10,color:colorPipeline,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:4}}>Pipeline</div>
+          <div style={{fontSize:26,fontWeight:700,fontFamily:t.mono,color:colorPipeline,letterSpacing:"-0.02em",lineHeight:1}}>{fmtBig(totals.pipeline)}</div>
+          <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginTop:4}}>draft, probability-weighted</div>
+        </div>
+      </div>
+
+      {/* By category — stacked bars */}
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {contribution.map(row => {
+          const rowTotal = row.realised + row.inflight + row.pipeline;
+          const pct = (v) => (v/maxRow)*100;
+          return (
+            <div key={row.category}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:5,gap:8,flexWrap:"wrap"}}>
+                <div style={{display:"flex",alignItems:"baseline",gap:8,flexWrap:"wrap",minWidth:0}}>
+                  <span style={{fontSize:12,fontWeight:700,color:t.text,fontFamily:t.serif}}>{row.category}</span>
+                  <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono}}>
+                    win rate {row.winRate}%{row.usesFallback?" (portfolio avg)":""}
+                  </span>
+                </div>
+                <span style={{fontSize:13,fontWeight:700,color:t.text,fontFamily:t.mono,letterSpacing:"-0.01em"}}>{fmtBig(rowTotal)}</span>
+              </div>
+              <div style={{display:"flex",height:10,borderRadius:3,overflow:"hidden",background:t.border}}>
+                {row.realised>0 && <div title={"Realised: "+fmt(row.realised)} style={{width:pct(row.realised)+"%",background:colorRealised}}/>}
+                {row.inflight>0 && <div title={"In-flight: "+fmt(row.inflight)} style={{width:pct(row.inflight)+"%",background:colorInflight}}/>}
+                {row.pipeline>0 && <div title={"Pipeline: "+fmt(row.pipeline)} style={{width:pct(row.pipeline)+"%",background:colorPipeline}}/>}
+              </div>
+              <div style={{display:"flex",gap:12,marginTop:4,fontSize:10,color:t.textMuted,fontFamily:t.mono,flexWrap:"wrap"}}>
+                {row.realised>0 && <span><span style={{display:"inline-block",width:7,height:7,background:colorRealised,marginRight:4,borderRadius:1,verticalAlign:"middle"}}/>Realised {fmt(row.realised)}</span>}
+                {row.inflight>0 && <span><span style={{display:"inline-block",width:7,height:7,background:colorInflight,marginRight:4,borderRadius:1,verticalAlign:"middle"}}/>In-flight {fmt(row.inflight)}</span>}
+                {row.pipeline>0 && <span><span style={{display:"inline-block",width:7,height:7,background:colorPipeline,marginRight:4,borderRadius:1,verticalAlign:"middle"}}/>Pipeline {fmt(row.pipeline)}</span>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetrics,onLog,onImport,dRange,setDRange,cFrom,cTo,setCFrom,setCTo,onGo}) {
   const maxCat  = Math.max(...Object.values(dash.catCounts),1);
   const maxType = Math.max(...Object.values(dash.typeCounts),1);
@@ -2683,6 +2937,16 @@ function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetrics,onLo
           );
         })}
       </div>
+
+      {/* Contribution to revenue — three-layer breakdown by category */}
+      <ContributionView
+        t={t} dk={dk}
+        contribution={dash.contribution}
+        totals={dash.contributionTotals}
+        dRange={dRange}
+        activeBrand={activeBrand}
+        brands={brands}
+      />
 
       {/* Calibration card */}
       <div style={{...gCd(t,dk),border:"1px solid "+(dash.calibration!==null?(dash.calibration>=80?t.goldBorder:dash.calibration>=50?"#c0a030":t.border):t.border)}}>
@@ -3412,7 +3676,7 @@ function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hypReview,
 }
 
 // -- Settings ------------------------------------------------------------------
-function SettingsModal({t,dk,settings,onSave,onClose}) {
+function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onRestoreBackup}) {
   const [local,setLocal]=useState({...settings});
   const [newCat,setNewCat]=useState("");
   const f=(k,v)=>setLocal(p=>({...p,[k]:v}));
@@ -3496,6 +3760,18 @@ function SettingsModal({t,dk,settings,onSave,onClose}) {
               style={{...gGh(t),fontSize:11}}>+ Add agent</button>
             <button onClick={()=>setLocal(p=>({...p,agents:DEFAULT_AGENTS}))}
               style={{...gGh(t),fontSize:11}}>Reset to defaults</button>
+          </div>
+        </div>
+        <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
+          <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:10,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Backup &amp; restore</div>
+          <p style={{fontSize:12,color:t.textMuted,fontFamily:t.mono,lineHeight:1.6,margin:"0 0 10px"}}>Download a full snapshot of your data (initiatives, settings, debates, weekly metrics) as a JSON file. Keep a copy somewhere safe — this is the only off-device record until cloud sync ships.</p>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            <button onClick={onDownloadBackup} style={{...gG(t),fontSize:12}}>&#8659; Download backup</button>
+            <label style={{...gGh(t),fontSize:12,cursor:"pointer"}}>
+              &#8645; Restore from backup
+              <input type="file" accept="application/json,.json" style={{display:"none"}}
+                onChange={e=>{ const f=e.target.files?.[0]; if(f){onRestoreBackup(f); e.target.value="";} }}/>
+            </label>
           </div>
         </div>
         <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
@@ -3657,10 +3933,10 @@ function TriageView({items, t, dk, cats, brands, activeBrand, onDetail}) {
             border:"1px solid "+(allClear?(dk?"#2a7a40":"#7adca0"):t.border)}}>
 
             {/* Header row */}
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:allClear?4:12}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:allClear?4:12}}>
               <div style={{fontSize:10,letterSpacing:"0.10em",textTransform:"uppercase",
-                color:allClear?(dk?"#60d080":"#1a7a48"):t.textMuted,fontFamily:t.mono,fontWeight:700,whiteSpace:"nowrap"}}>
-                {new Date().toLocaleDateString("en-CA",{month:"short",day:"numeric"})}
+                color:allClear?(dk?"#60d080":"#1a7a48"):t.textMuted,fontFamily:t.mono,fontWeight:700}}>
+                {new Date().toLocaleDateString("en-CA",{weekday:"long",month:"long",day:"numeric"})}
               </div>
               <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono}}>{revLine}</div>
             </div>

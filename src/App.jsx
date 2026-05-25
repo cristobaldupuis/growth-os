@@ -978,6 +978,11 @@ export default function App() {
   const [weeklyMetrics, setWeeklyMetrics] = useState([]);
   const [showPulse, setShowPulse] = useState(false);
   const [showMetricsImport, setShowMetricsImport] = useState(false);
+  const [toast, setToast] = useState(null); // {msg, type:"info"|"error"|"success"}
+  const showToast = (msg, type="info") => { setToast({msg,type}); setTimeout(()=>setToast(null), 3500); };
+
+  // Restore confirm modal state
+  const [restorePayload, setRestorePayload] = useState(null);
 
   const t    = dk ? TD : TL;
   const cats   = settings.categories || DEFAULT_SETTINGS.categories;
@@ -1037,7 +1042,7 @@ export default function App() {
       try {
         const parsed = JSON.parse(ev.target.result);
         if (!parsed || parsed._meta?.format !== "growth-os-backup") {
-          alert("This file doesn't look like a Growth OS backup. Restore cancelled.");
+          showToast("This file doesn't look like a Growth OS backup. Restore cancelled.", "error");
           return;
         }
         const counts = {
@@ -1048,22 +1053,9 @@ export default function App() {
         const stamp = parsed._meta?.exportedAt
           ? new Date(parsed._meta.exportedAt).toLocaleString()
           : "unknown date";
-        const ok = window.confirm(
-          "Restore from backup?\n\n" +
-          "Exported: "+stamp+"\n" +
-          "Initiatives: "+counts.items+"\n" +
-          "Debates: "+counts.debates+"\n" +
-          "Weekly metrics entries: "+counts.metrics+"\n\n" +
-          "This will OVERWRITE your current data. You can't undo this."
-        );
-        if (!ok) return;
-        if (Array.isArray(parsed.items))         saveItems(parsed.items);
-        if (parsed.settings)                     saveSettings(parsed.settings);
-        if (Array.isArray(parsed.debates))       saveDebates(parsed.debates);
-        if (Array.isArray(parsed.weeklyMetrics)) saveMetrics(parsed.weeklyMetrics);
-        alert("Backup restored.");
+        setRestorePayload({ parsed, counts, stamp });
       } catch (err) {
-        alert("Couldn't read that backup file. It may be corrupted or in an unexpected format.");
+        showToast("Couldn't read that backup file — it may be corrupted.", "error");
         console.error("Restore error:", err);
       }
     };
@@ -1456,7 +1448,50 @@ export default function App() {
 
   return (
     <div style={{background:t.bg,minHeight:"100vh",fontFamily:t.serif,color:t.text}}>
-      <style>{"@import url('https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css');*{box-sizing:border-box}@keyframes spin{to{transform:rotate(360deg)}}input[type=range]{accent-color:"+t.gold+"}"}</style>
+      <style>{"@import url('https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css');*{box-sizing:border-box}@keyframes spin{to{transform:rotate(360deg)}}input[type=range]{accent-color:"+t.gold+"}@keyframes slideIn{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}"}</style>
+
+      {/* Toast notifications */}
+      {toast&&(
+        <div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",zIndex:9999,
+          background:toast.type==="error"?(dk?"#3a1a1a":"#fff0f0"):toast.type==="success"?(dk?"#1a2a1a":"#f0faf2"):(dk?"#1a1a2a":"#f0f4ff"),
+          border:"1px solid "+(toast.type==="error"?(dk?"#7a3030":"#e09090"):toast.type==="success"?(dk?"#2a6a40":"#7adca0"):(dk?"#3a4a7a":"#a0b4e0")),
+          color:toast.type==="error"?(dk?"#f08080":"#a03030"):toast.type==="success"?(dk?"#60d080":"#1a7a48"):(dk?"#a0b4f0":"#2a3a8a"),
+          borderRadius:8,padding:"10px 18px",fontSize:13,fontFamily:t.mono,fontWeight:600,
+          boxShadow:"0 4px 20px rgba(0,0,0,0.15)",animation:"slideIn 0.2s ease",whiteSpace:"nowrap",
+          maxWidth:"90vw",textOverflow:"ellipsis",overflow:"hidden"}}>
+          {toast.type==="error"?"⚠ ":toast.type==="success"?"✓ ":"ℹ "}{toast.msg}
+        </div>
+      )}
+
+      {/* Restore backup confirm modal */}
+      {restorePayload&&(
+        <Modal t={t} dk={dk} onClose={()=>setRestorePayload(null)} title="Restore from backup?">
+          <div style={{display:"flex",flexDirection:"column",gap:14}}>
+            <div style={{padding:"10px 14px",background:dk?"#2a1a1a":"#fff8f0",border:"1px solid "+(dk?"#7a3030":"#e0a060"),borderRadius:6}}>
+              <div style={{fontSize:12,fontWeight:700,color:dk?"#e08060":"#a04010",fontFamily:t.mono,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.06em"}}>⚠ This will overwrite your current data</div>
+              <div style={{fontSize:12,color:t.textSub,fontFamily:t.mono,lineHeight:1.8}}>
+                <div>Exported: <strong style={{color:t.text}}>{restorePayload.stamp}</strong></div>
+                <div>Initiatives: <strong style={{color:t.text}}>{restorePayload.counts.items}</strong></div>
+                <div>Debates: <strong style={{color:t.text}}>{restorePayload.counts.debates}</strong></div>
+                <div>Weekly metrics: <strong style={{color:t.text}}>{restorePayload.counts.metrics}</strong></div>
+              </div>
+            </div>
+            <div style={{fontSize:12,color:t.textMuted,fontFamily:t.mono}}>Your current initiatives, settings, and metrics will be replaced. This cannot be undone.</div>
+            <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+              <button style={gGh(t)} onClick={()=>setRestorePayload(null)}>Cancel</button>
+              <button style={{...gG(t),background:"#c03030",border:"none"}} onClick={()=>{
+                const {parsed} = restorePayload;
+                if (Array.isArray(parsed.items))         saveItems(parsed.items);
+                if (parsed.settings)                     saveSettings(parsed.settings);
+                if (Array.isArray(parsed.debates))       saveDebates(parsed.debates);
+                if (Array.isArray(parsed.weeklyMetrics)) saveMetrics(parsed.weeklyMetrics);
+                setRestorePayload(null);
+                showToast("Backup restored successfully.", "success");
+              }}>Restore backup</button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {/* Header — two rows */}
       <div style={{background:t.headerBg,borderBottom:"1px solid "+t.border,position:"sticky",top:0,zIndex:100}}>
@@ -1646,7 +1681,7 @@ export default function App() {
                     setCaptureText("");
                     setNav("form");
                   }
-                } catch(e){ alert("AI extraction failed — try adding more detail."); }
+                } catch(e){ showToast("AI extraction failed — try adding more detail.", "error"); }
                 setCaptureLoad(false);
               }}>
               {captureLoad?<><span style={{display:"inline-block",animation:"spin 1s linear infinite"}}>&#8635;</span> Extracting…</>:<><span>&#9889;</span> Extract with AI</>}
@@ -1691,7 +1726,9 @@ export default function App() {
                 <p style={{fontSize:13,color:t.textSub,fontFamily:t.mono,lineHeight:1.6,marginBottom:4}}>
                   Upload a CSV exported from the Growth OS Import Template. Column headers must match the template exactly.
                 </p>
-                <label style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:10,padding:"28px 20px",border:"2px dashed "+t.border,borderRadius:8,cursor:"pointer",background:t.surfaceAlt}}>
+                <label style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:10,padding:"28px 20px",border:"2px dashed "+t.border,borderRadius:8,cursor:"pointer",background:t.surfaceAlt}}
+                  onDragOver={e=>{e.preventDefault();e.stopPropagation();}}
+                  onDrop={e=>{e.preventDefault();e.stopPropagation();const f=e.dataTransfer.files[0];if(f)handleCSVFile(f);}}>
                   <span style={{fontSize:28}}>&#128196;</span>
                   <span style={{fontSize:13,fontWeight:700,color:t.text,fontFamily:t.mono}}>Click to choose a CSV file</span>
                   <span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>or drag and drop here</span>
@@ -2766,8 +2803,7 @@ function ContributionView({t, dk, contribution, totals, dRange, activeBrand, bra
       "",
       "Note: In-flight and pipeline figures are probability-weighted by historical category win rate. Realised is sum of measured actual revenue impact on completed initiatives.",
     ].join("\n");
-    try { navigator.clipboard.writeText(lines); } catch {}
-    alert("Contribution summary copied to clipboard.");
+    try { navigator.clipboard.writeText(lines); showToast("Contribution summary copied to clipboard.", "success"); } catch { showToast("Couldn't copy to clipboard.", "error"); }
   };
 
   return (
@@ -2891,8 +2927,7 @@ function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetrics,onLo
               "ROI on closed initiatives: "+(dash.closedROI!==null?dash.closedROI+"x":"not yet measurable"),
               "Estimate accuracy: "+(dash.calibration!==null?dash.calibration+"%":"not yet measurable"),
             ].join("\n");
-            try { navigator.clipboard.writeText(text); } catch {}
-            alert("Executive summary copied to clipboard.");
+            try { navigator.clipboard.writeText(text); showToast("Executive summary copied to clipboard.", "success"); } catch { showToast("Couldn't copy to clipboard.", "error"); }
           }}>
           &#128203; Copy executive summary
         </button>
@@ -4226,8 +4261,12 @@ function LearningLibrary({items, t, dk, cats, brands, activeBrand, onReplicate, 
             <div style={{fontSize:11,fontWeight:700,color:dk?"#60d080":"#1a7a48",fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>AI Synthesis — {filtered.length} learnings</div>
             <button onClick={()=>setSynthVisible(false)} style={{background:"none",border:"none",color:t.textMuted,cursor:"pointer",fontSize:14}}>&#10005;</button>
           </div>
-          {synthLoad?<div style={{fontSize:13,color:t.textMuted,fontFamily:t.mono}}>Analysing learnings…</div>
-            :<div style={{fontSize:13,color:t.textSub,lineHeight:1.8,whiteSpace:"pre-wrap",fontFamily:t.mono}}>{synthesis}</div>}
+          {synthLoad
+            ?<div style={{fontSize:13,color:t.textMuted,fontFamily:t.mono}}>Analysing learnings…</div>
+            :synthesis
+              ?<div style={{fontSize:13,color:t.textSub,lineHeight:1.8,whiteSpace:"pre-wrap",fontFamily:t.mono}}>{synthesis}</div>
+              :<div style={{fontSize:12,color:dk?"#e08080":"#a03030",fontFamily:t.mono}}>Synthesis failed — check that your API proxy is deployed and the API key is configured.</div>
+          }
         </div>
       )}
 

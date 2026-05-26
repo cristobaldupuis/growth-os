@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { Analytics } from "@vercel/analytics/react";
 import {
   COMPANY_NAME, BUSINESS_MODEL,
   NORTH_STAR_METRIC, NORTH_STAR_CURRENT, NORTH_STAR_TARGET,
@@ -5312,6 +5313,7 @@ function LearningLibrary({items, t, dk, cats, brands, activeBrand, onReplicate, 
           );
         })}
       </div>
+      <Analytics />
     </div>
   );
 }

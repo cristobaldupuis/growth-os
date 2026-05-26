@@ -14,6 +14,7 @@ const KEY_SETTINGS = "gos_settings_v2";
 const KEY_THEME    = "gos_theme_v1";
 const KEY_DEBATES  = "gos_debates_v1";
 const KEY_METRICS  = "gos_metrics_v1";
+const KEY_RECS     = "gos_recs_v1";
 
 // Storage helper — works in Claude artifacts (window.storage), StackBlitz (localStorage), or memory
 const store = (() => {
@@ -471,7 +472,127 @@ async function callQuickCapture(description, settings, cats, initTypes) {
   return parsed;
 }
 
-// -- Agentic C-Suite Debate System v2 -----------------------------------------
+// -- Next Plays (Recommendation Engine) ---------------------------------------
+// Two-step pattern: (1) cheap candidate generation across portfolio state and
+// learnings, (2) per-candidate expansion with full hypothesis + ICE + reasoning.
+// Single-step prompts produced shallow output because the model rationed tokens
+// across too many tasks at once.
+
+// Compact, grounded view of the user's actual learning history. Used both for
+// candidate generation and to validate sourceLearningIds during expansion.
+function buildLearningsIndex(items, brands) {
+  const closed = (items||[]).filter(e =>
+    (e.status==="Completed"||e.status==="Killed") && e.results && e.results.keyLearning
+  );
+  return closed.map(e => ({
+    id: e.id,
+    initId: e.initId || e.id,
+    title: e.title,
+    category: e.category,
+    initType: e.initType,
+    retailer: brandName(e.brandId, brands),
+    outcome: e.results.outcomeClassification || "Inconclusive",
+    learning: e.results.keyLearning,
+    actualRev: e.results.actualRevenueImpact != null ? e.results.actualRevenueImpact : null,
+  }));
+}
+
+// Step 1: cheap pass. Generate 5-7 candidate ideas with one-line reasoning so
+// the model casts a wide net before we spend tokens expanding.
+async function callGenerateCandidates(portfolioCtx, learningsIndex, settings, cats) {
+  const learningsBlock = learningsIndex.length === 0
+    ? "  (no completed initiatives yet — recommendations must rely on portfolio state and brand briefs only)"
+    : learningsIndex.slice(0, 30).map(l =>
+        `  [${l.id}] (${l.outcome}|${l.retailer}|${l.category}) ${l.learning}`
+      ).join("\n");
+
+  const sys = [
+    "You are a growth strategist generating next-experiment recommendations for "+settings.companyName+",",
+    "a "+settings.businessModel+" business.",
+    "North star: "+settings.northStarMetric+" (current: "+settings.northStarCurrent+", target: "+settings.northStarTarget+").",
+    "Your job: propose 5-7 high-quality candidate experiments grounded in (a) the current portfolio state, (b) the learnings library, and (c) any live metrics movements.",
+    "Each candidate must be specific to this business — no generic playbook items. If a candidate is essentially a replay or close cousin of something already running or already in drafts, do NOT propose it.",
+    "Prefer candidates that exploit gaps: tactics proven at one retailer but not yet tested at another, uncovered categories with revenue potential, or metrics moving the wrong way that no current initiative addresses.",
+    "Return ONLY a JSON array of 5-7 objects. Each object must have these keys exactly:",
+    "title (string, concise, specific), category (one of: "+cats.join(", ")+"),",
+    "brandTarget (string — retailer name if the candidate is brand-specific, or 'Portfolio' if cross-brand),",
+    "rationale (string, one sentence — why this, why now, anchored in what you saw in the context),",
+    "sourceLearningIds (array of strings — item ids from the LEARNINGS block that informed this candidate; empty array if none).",
+    "No markdown, no preamble, just the JSON array.",
+  ].join(" ");
+
+  const user = "PORTFOLIO CONTEXT:\n"+portfolioCtx+"\n\nLEARNINGS (id | outcome|retailer|category | one-line learning):\n"+learningsBlock;
+
+  const resp = await fetch(PROXY_URL, {
+    method:"POST", headers:AI_HEADERS(),
+    body:JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:1600, system:sys,
+      messages:[{role:"user", content:user}] }),
+  });
+  const data = await resp.json();
+  const raw = data.content && data.content[0] ? data.content[0].text.trim() : "[]";
+  const parsed = safeParseJSON(raw, true);
+  if (!Array.isArray(parsed)) throw new Error("Next Plays: candidate generation returned malformed response.");
+  return parsed;
+}
+
+// Step 2: expand one selected candidate into a full recommendation. Run in
+// parallel for the top 3 so a single failure doesn't sink the whole batch.
+async function callExpandRecommendation(candidate, portfolioCtx, learningsIndex, settings) {
+  // Filter learnings to just the ones the candidate cited, so the expander
+  // grounds its reasoning trace in real history rather than re-inventing context.
+  const citedLearnings = (candidate.sourceLearningIds || [])
+    .map(id => learningsIndex.find(l => l.id === id))
+    .filter(Boolean);
+  const citedBlock = citedLearnings.length === 0
+    ? "  (this candidate did not cite specific past learnings)"
+    : citedLearnings.map(l =>
+        `  [${l.id}] (${l.outcome}|${l.retailer}|${l.category}) ${l.title} — ${l.learning}`
+      ).join("\n");
+
+  const sys = [
+    "You are expanding a growth experiment candidate into a fully-specified recommendation for "+settings.companyName+",",
+    "a "+settings.businessModel+" business.",
+    "North star: "+settings.northStarMetric+" (current: "+settings.northStarCurrent+", target: "+settings.northStarTarget+").",
+    "Return ONLY a JSON object with these keys exactly:",
+    "observation (string — what specifically in the portfolio context or learnings prompted this — 1-2 sentences, cite numbers if present),",
+    "hypothesis (string — format: We believe that [specific change] will result in [measurable outcome] for [context], because [evidence-based reason]),",
+    "successMetric (string — the one metric that would prove or disprove this, plus a concrete threshold if you can defend one),",
+    "primaryMetric (string — short label, e.g. 'CVR', 'ROAS', 'CAC'),",
+    "killCriteria (string — concrete stop conditions),",
+    "initType (one of: A/B Test, Campaign, Process, Research, Infrastructure),",
+    "impact (int 1-10), impactRationale (string, one sentence),",
+    "certainty (int 1-10), certaintyRationale (string, one sentence — explicitly reference cited learnings if any),",
+    "reasoningTrace (string — 2-3 sentences explaining the full logic: why this, why now, what specific evidence supports it. Reference the cited learnings by what they showed, not by id.).",
+    "Be specific. No hedging. No generic advice. If certainty is high, the cited learnings should justify it.",
+  ].join(" ");
+
+  const user = [
+    "CANDIDATE:",
+    "  Title: "+candidate.title,
+    "  Category: "+candidate.category,
+    "  Brand target: "+(candidate.brandTarget||"Portfolio"),
+    "  Initial rationale: "+candidate.rationale,
+    "",
+    "CITED LEARNINGS:",
+    citedBlock,
+    "",
+    "PORTFOLIO CONTEXT:",
+    portfolioCtx,
+  ].join("\n");
+
+  const resp = await fetch(PROXY_URL, {
+    method:"POST", headers:AI_HEADERS(),
+    body:JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:1000, system:sys,
+      messages:[{role:"user", content:user}] }),
+  });
+  const data = await resp.json();
+  const raw = data.content && data.content[0] ? data.content[0].text.trim() : "{}";
+  const parsed = safeParseJSON(raw, false);
+  if (!parsed) throw new Error("Next Plays: expansion returned malformed response for '"+candidate.title+"'.");
+  return parsed;
+}
+
+
 // Tools the agents can call against the live portfolio
 
 function buildPortfolioTools(items, settings, brands, activeBrand) {
@@ -1265,6 +1386,10 @@ export default function App() {
   const [importDone,setImportDone]= useState(false);
   const [showCopilot,setShowCopilot]=useState(false);
   const [debates,   setDebates]   = useState([]);
+  const [recs,      setRecs]      = useState([]); // [{id, generatedAt, recommendations:[...]}]
+  const [recsLoad,  setRecsLoad]  = useState(false);
+  const [recsErr,   setRecsErr]   = useState("");
+  const [showRecModal, setShowRecModal] = useState(null); // {batchId, recId} or null
   const [weeklyMetrics, setWeeklyMetrics] = useState([]);
   const [showPulse, setShowPulse] = useState(false);
   const [showMetricsImport, setShowMetricsImport] = useState(false);
@@ -1282,7 +1407,7 @@ export default function App() {
     // Theme persisted in memory only (localStorage not available in all environments)
     const load = async ()=>{
       try {
-        const [ir,sr,dr,mr] = await Promise.all([store.get(KEY_ITEMS),store.get(KEY_SETTINGS),store.get(KEY_DEBATES),store.get(KEY_METRICS)]);
+        const [ir,sr,dr,mr,rr] = await Promise.all([store.get(KEY_ITEMS),store.get(KEY_SETTINGS),store.get(KEY_DEBATES),store.get(KEY_METRICS),store.get(KEY_RECS)]);
         setItems(ir&&ir.value?JSON.parse(ir.value):SEED);
         if(!ir||!ir.value) store.set(KEY_ITEMS,JSON.stringify(SEED));
         if(sr&&sr.value) {
@@ -1296,6 +1421,7 @@ export default function App() {
         else { setOnboarding(true); }
         if(dr&&dr.value) setDebates(JSON.parse(dr.value));
         if(mr&&mr.value) setWeeklyMetrics(JSON.parse(mr.value));
+        if(rr&&rr.value) setRecs(JSON.parse(rr.value));
       } catch { setItems(SEED); }
       setLoaded(true);
     };
@@ -1306,7 +1432,144 @@ export default function App() {
   const saveSettings = s => { setSettings(s); try{store.set(KEY_SETTINGS,JSON.stringify(s));}catch{} };
   const saveDebates  = d => { setDebates(d); try{store.set(KEY_DEBATES,JSON.stringify(d));}catch{} };
   const saveMetrics  = m => { setWeeklyMetrics(m); try{store.set(KEY_METRICS,JSON.stringify(m));}catch{} };
+  const saveRecs     = r => { setRecs(r);          try{store.set(KEY_RECS,JSON.stringify(r));}catch{} };
   const toggleDk     = ()=> { setDk(n => !n); };
+
+  // -- Next Plays orchestrator -------------------------------------------------
+  // Two-step: candidate generation then parallel expansion of the top 3. Keeps
+  // the last 10 batches so the user can see history. Partial failures are
+  // tolerated — if 1 of 3 expansions fails, ship the 2 that worked.
+  const generateRecommendations = async () => {
+    setRecsErr("");
+    setRecsLoad(true);
+    try {
+      const portfolioCtx   = buildPortfolioContext(items, settings, brands, activeBrand, weeklyMetrics);
+      const learningsIndex = buildLearningsIndex(items, brands);
+
+      const candidates = await callGenerateCandidates(portfolioCtx, learningsIndex, settings, cats);
+      if (!candidates || candidates.length === 0) {
+        throw new Error("No candidates were generated. Add more learnings or running initiatives for grounding.");
+      }
+
+      // Take the first 3 (the generator orders them by quality)
+      const top3 = candidates.slice(0, 3);
+
+      // Parallel expansion — tolerate per-item failure
+      const settled = await Promise.allSettled(
+        top3.map(c => callExpandRecommendation(c, portfolioCtx, learningsIndex, settings))
+      );
+
+      const recommendations = settled
+        .map((res, i) => {
+          if (res.status !== "fulfilled" || !res.value) return null;
+          const exp = res.value;
+          const cand = top3[i];
+          // Validate sourceLearningIds against the actual index — drop hallucinated ones
+          const validIds = new Set(learningsIndex.map(l => l.id));
+          const cleanIds = (cand.sourceLearningIds || []).filter(id => validIds.has(id));
+          return {
+            id: "rec-"+Date.now()+"-"+i,
+            title: cand.title,
+            category: cand.category,
+            brandTarget: cand.brandTarget || "Portfolio",
+            observation: exp.observation || "",
+            hypothesis: exp.hypothesis || "",
+            successMetric: exp.successMetric || "",
+            primaryMetric: exp.primaryMetric || "",
+            killCriteria: exp.killCriteria || "",
+            initType: exp.initType || "A/B Test",
+            ice: {
+              impact:    Math.min(10, Math.max(1, parseInt(exp.impact) || 5)),
+              certainty: Math.min(10, Math.max(1, parseInt(exp.certainty) || 5)),
+              ease:      5,  // user adjusts; expander doesn't score ease (matches existing ICE Assist behaviour)
+            },
+            impactRationale:    exp.impactRationale || "",
+            certaintyRationale: exp.certaintyRationale || "",
+            reasoningTrace:     exp.reasoningTrace || "",
+            sourceLearningIds:  cleanIds,
+            status: "pending",
+            acceptedAsInitId: null,
+          };
+        })
+        .filter(Boolean);
+
+      if (recommendations.length === 0) {
+        throw new Error("All candidate expansions failed. Try regenerating.");
+      }
+
+      const batch = {
+        id: "recbatch-"+Date.now(),
+        generatedAt: new Date().toISOString(),
+        recommendations,
+      };
+
+      // Keep the last 10 batches
+      const next = [batch, ...(recs||[])].slice(0, 10);
+      saveRecs(next);
+      showToast("Generated "+recommendations.length+" next plays.", "success");
+    } catch (err) {
+      console.error("Next Plays error:", err);
+      setRecsErr(err.message || "Generation failed. Try again.");
+      showToast("Next Plays generation failed.", "error");
+    } finally {
+      setRecsLoad(false);
+    }
+  };
+
+  // Mark a recommendation as accepted and pre-populate a new initiative form.
+  // Reuses the same form/nav flow as the Learning Library replicate action.
+  const acceptRecommendation = (batchId, recId) => {
+    const batch = recs.find(b => b.id === batchId);
+    if (!batch) return;
+    const rec = batch.recommendations.find(r => r.id === recId);
+    if (!rec) return;
+
+    const base = mkDefault(cats, activeBrand);
+    // Resolve brand target → brandId if it matches a known brand name
+    const matchedBrand = brands.find(b => b.name === rec.brandTarget);
+    const brandId = matchedBrand ? matchedBrand.id : base.brandId;
+
+    setForm({
+      ...base,
+      title: rec.title,
+      observation: rec.observation,
+      hypothesis: rec.hypothesis,
+      successMetric: rec.successMetric,
+      primaryMetric: rec.primaryMetric,
+      killCriteria: rec.killCriteria,
+      category: rec.category || base.category,
+      initType: rec.initType || base.initType,
+      brandId,
+      ice: { ...rec.ice },
+      linkedIds: rec.sourceLearningIds || [],
+      notes: rec.reasoningTrace
+        ? "From Next Plays — reasoning: "+rec.reasoningTrace
+        : "From Next Plays",
+    });
+
+    // Mark accepted in the rec store
+    const updated = recs.map(b => b.id !== batchId ? b : {
+      ...b,
+      recommendations: b.recommendations.map(r =>
+        r.id === recId ? { ...r, status: "accepted", acceptedAsInitId: base.id } : r
+      ),
+    });
+    saveRecs(updated);
+    setShowRecModal(null);
+    setNav("form");
+  };
+
+  const dismissRecommendation = (batchId, recId) => {
+    const updated = recs.map(b => b.id !== batchId ? b : {
+      ...b,
+      recommendations: b.recommendations.map(r =>
+        r.id === recId ? { ...r, status: "dismissed" } : r
+      ),
+    });
+    saveRecs(updated);
+    setShowRecModal(null);
+  };
+
 
   // -- JSON backup / restore ---------------------------------------------------
   const handleDownloadBackup = () => {
@@ -1876,7 +2139,7 @@ export default function App() {
         </div>
       </div>
 
-      {nav==="dashboard"&&<DashView t={t} dk={dk} dash={dash} cats={cats} settings={settings} brands={brands} activeBrand={activeBrand} weeklyMetrics={weeklyMetrics} onLog={()=>setShowPulse(true)} onImport={()=>setShowMetricsImport(true)} dRange={dRange} setDRange={setDRange} cFrom={cFrom} cTo={cTo} setCFrom={setCFrom} setCTo={setCTo} onGo={()=>setNav("initiatives")}/>}
+      {nav==="dashboard"&&<DashView t={t} dk={dk} dash={dash} cats={cats} settings={settings} brands={brands} activeBrand={activeBrand} weeklyMetrics={weeklyMetrics} onLog={()=>setShowPulse(true)} onImport={()=>setShowMetricsImport(true)} dRange={dRange} setDRange={setDRange} cFrom={cFrom} cTo={cTo} setCFrom={setCFrom} setCTo={setCTo} onGo={()=>setNav("initiatives")} recs={recs} recsLoad={recsLoad} recsErr={recsErr} items={items} onGenerateRecs={generateRecommendations} onOpenRec={(batchId,recId)=>setShowRecModal({batchId,recId})}/>}
       {nav==="triage"&&<TriageView items={items} t={t} dk={dk} cats={cats} brands={brands} activeBrand={activeBrand} onDetail={goDetail}/>}
       {nav==="library"&&<LearningLibrary items={items} t={t} dk={dk} cats={cats} brands={brands} activeBrand={activeBrand} settings={settings} onReplicate={(item)=>{const base=mkDefault(cats,activeBrand);setForm({...base,title:"[Replicate] "+item.title,hypothesis:"Based on learning from: "+item.title+". Original: "+item.hypothesis,category:item.category,initType:item.initType,ice:{...item.ice},revenueImpact:item.revenueImpact,notes:"Replicated from initiative "+item.id+". Original learning: "+item.results.keyLearning});setNav("form");}}/>}
 
@@ -2168,6 +2431,19 @@ export default function App() {
             saveItems([newItem, ...items]);
           }}
           onClose={() => setShowCopilot(false)}
+        />
+      )}
+      {showRecModal && (
+        <NextPlaysModal
+          t={t} dk={dk}
+          batchId={showRecModal.batchId}
+          recId={showRecModal.recId}
+          recs={recs}
+          items={items}
+          brands={brands}
+          onAccept={acceptRecommendation}
+          onDismiss={dismissRecommendation}
+          onClose={()=>setShowRecModal(null)}
         />
       )}
       {showPulse&&(
@@ -3216,7 +3492,260 @@ function ContributionView({t, dk, contribution, totals, dRange, activeBrand, bra
   );
 }
 
-function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetrics,onLog,onImport,dRange,setDRange,cFrom,cTo,setCFrom,setCTo,onGo}) {
+// -- Next Plays UI -----------------------------------------------------------
+// Card that lives on the Dashboard. Shows the latest batch of recommendations
+// or a generate CTA if none exist yet. Clicking a rec opens the detail modal.
+function NextPlaysCard({ t, dk, recs, recsLoad, recsErr, brands, items, onGenerate, onOpenRec }) {
+  const latest = recs && recs.length > 0 ? recs[0] : null;
+  const pending = latest ? latest.recommendations.filter(r => r.status === "pending") : [];
+  const accepted = latest ? latest.recommendations.filter(r => r.status === "accepted") : [];
+  const dismissed = latest ? latest.recommendations.filter(r => r.status === "dismissed") : [];
+
+  const closedCount = (items||[]).filter(e =>
+    (e.status==="Completed"||e.status==="Killed") && e.results && e.results.keyLearning
+  ).length;
+
+  return (
+    <div style={{...gCd(t,dk),display:"flex",flexDirection:"column",gap:12,border:"1px solid "+t.goldBorder}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:18,color:t.gold}}>◆</span>
+          <span style={{fontSize:13,fontWeight:700,fontFamily:t.serif,color:t.text,letterSpacing:"0.02em"}}>Next Plays</span>
+          <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.04em",textTransform:"uppercase"}}>
+            AI-recommended experiments
+          </span>
+        </div>
+        <button onClick={onGenerate} disabled={recsLoad}
+          style={{...gG(t),fontSize:11,padding:"5px 11px",opacity:recsLoad?0.6:1}}>
+          {recsLoad
+            ? <><span style={{display:"inline-block",animation:"spin 1s linear infinite"}}>⟳</span> Generating…</>
+            : <>{latest ? "↻ Regenerate" : "✦ Generate"}</>}
+        </button>
+      </div>
+
+      {/* Empty state */}
+      {!latest && !recsLoad && (
+        <div style={{padding:"14px 16px",background:dk?"#1a1a14":"#fafaf5",border:"1px dashed "+t.border,borderRadius:6,fontSize:12,color:t.textSub,fontFamily:t.mono,lineHeight:1.6}}>
+          {closedCount === 0
+            ? "No experiments closed yet. Recommendations will be sharpest once you have a few logged learnings — but you can still generate from your current portfolio state."
+            : "Generate to see 3 grounded experiment recommendations, with hypothesis, ICE, and reasoning trace pre-filled. Based on your "+closedCount+" closed initiative"+(closedCount===1?"":"s")+" and current portfolio state."}
+        </div>
+      )}
+
+      {/* Error state */}
+      {recsErr && !recsLoad && (
+        <div style={{padding:"10px 14px",background:dk?"#3a1010":"#fff0f0",border:"1px solid "+(dk?"#6a2020":"#e09090"),borderRadius:6,fontSize:12,color:dk?"#e08080":"#a03030",fontFamily:t.mono}}>
+          {recsErr}
+        </div>
+      )}
+
+      {/* Loading skeleton */}
+      {recsLoad && (
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {[0,1,2].map(i => (
+            <div key={i} style={{padding:"12px 14px",background:dk?"#1a1a14":"#fafaf5",border:"1px solid "+t.border,borderRadius:6,opacity:0.6}}>
+              <div style={{height:12,width:"60%",background:t.border,borderRadius:3,marginBottom:8}}/>
+              <div style={{height:10,width:"90%",background:t.border,borderRadius:3,opacity:0.5}}/>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Pending recommendations */}
+      {pending.length > 0 && (
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {pending.map(rec => {
+            const iceTotal = iceScore(rec.ice.impact, rec.ice.certainty, rec.ice.ease);
+            return (
+              <button key={rec.id} onClick={()=>onOpenRec(latest.id, rec.id)}
+                style={{textAlign:"left",padding:"12px 14px",background:t.surface,border:"1px solid "+t.border,borderRadius:6,cursor:"pointer",display:"flex",flexDirection:"column",gap:8,fontFamily:t.mono,transition:"border-color 0.15s"}}
+                onMouseEnter={e=>e.currentTarget.style.borderColor=t.gold}
+                onMouseLeave={e=>e.currentTarget.style.borderColor=t.border}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
+                  <div style={{fontSize:13,fontWeight:700,color:t.text,fontFamily:t.serif,lineHeight:1.35,flex:1}}>{rec.title}</div>
+                  <div style={{display:"flex",gap:4,alignItems:"center",flexShrink:0}}>
+                    <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono}}>ICE</span>
+                    <span style={{fontSize:14,fontWeight:700,color:iceColor(iceTotal,t),fontFamily:t.serif}}>{iceTotal!==null?iceTotal:"—"}</span>
+                  </div>
+                </div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+                  <span style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,padding:"1px 6px",border:"1px solid "+t.border,borderRadius:3,textTransform:"uppercase",letterSpacing:"0.04em"}}>{rec.category}</span>
+                  <span style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,padding:"1px 6px",border:"1px solid "+t.border,borderRadius:3}}>{rec.brandTarget}</span>
+                  {rec.sourceLearningIds && rec.sourceLearningIds.length > 0 && (
+                    <span style={{fontSize:9,color:t.gold,fontFamily:t.mono,padding:"1px 6px",background:t.goldBg,borderRadius:3}}>
+                      {rec.sourceLearningIds.length} cited learning{rec.sourceLearningIds.length===1?"":"s"}
+                    </span>
+                  )}
+                </div>
+                {rec.hypothesis && (
+                  <div style={{fontSize:12,color:t.textSub,lineHeight:1.5,fontFamily:t.mono,fontStyle:"italic"}}>
+                    {rec.hypothesis.length > 180 ? rec.hypothesis.slice(0,180)+"…" : rec.hypothesis}
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Resolved status footer */}
+      {(accepted.length > 0 || dismissed.length > 0) && (
+        <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,paddingTop:6,borderTop:"1px solid "+t.border,display:"flex",gap:12}}>
+          {accepted.length > 0 && <span>✓ {accepted.length} added to backlog</span>}
+          {dismissed.length > 0 && <span>✕ {dismissed.length} dismissed</span>}
+          {latest && <span style={{marginLeft:"auto"}}>Generated {fmtDate(latest.generatedAt.slice(0,10))}</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Modal — full recommendation detail with hypothesis, ICE rationale, reasoning
+// trace, and cited learnings. Actions: Add to backlog | Dismiss.
+function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, onAccept, onDismiss, onClose }) {
+  const batch = recs.find(b => b.id === batchId);
+  const rec = batch ? batch.recommendations.find(r => r.id === recId) : null;
+  if (!rec) return null;
+
+  const iceTotal = iceScore(rec.ice.impact, rec.ice.certainty, rec.ice.ease);
+  const citedLearnings = (rec.sourceLearningIds || [])
+    .map(id => items.find(e => e.id === id))
+    .filter(Boolean);
+
+  const isResolved = rec.status !== "pending";
+
+  return (
+    <Modal t={t} dk={dk} onClose={onClose} title="Next Play" wide>
+      <div style={{display:"flex",flexDirection:"column",gap:16}}>
+        {/* Title + meta */}
+        <div>
+          <div style={{fontSize:20,fontWeight:700,color:t.text,fontFamily:t.serif,lineHeight:1.3,marginBottom:8}}>{rec.title}</div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,padding:"2px 8px",border:"1px solid "+t.border,borderRadius:3,textTransform:"uppercase",letterSpacing:"0.04em"}}>{rec.category}</span>
+            <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,padding:"2px 8px",border:"1px solid "+t.border,borderRadius:3}}>{rec.brandTarget}</span>
+            <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,padding:"2px 8px",border:"1px solid "+t.border,borderRadius:3}}>{rec.initType}</span>
+            {isResolved && (
+              <span style={{fontSize:10,fontFamily:t.mono,padding:"2px 8px",borderRadius:3,fontWeight:700,
+                background: rec.status==="accepted"?(dk?"#1a3a1a":"#e8f5e8"):(dk?"#2a2a2a":"#f0f0f0"),
+                color: rec.status==="accepted"?(dk?"#8ad08a":"#2a7a2a"):t.textMuted,
+                border:"1px solid "+(rec.status==="accepted"?(dk?"#3a6a3a":"#a0d0a0"):t.border)}}>
+                {rec.status==="accepted" ? "✓ Added to backlog" : "✕ Dismissed"}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Reasoning trace — the trust-builder */}
+        {rec.reasoningTrace && (
+          <div style={gSc(t,dk)}>
+            <div style={gSL(t)}>Why this, why now</div>
+            <p style={{margin:0,color:t.textSub,lineHeight:1.6,fontSize:14,fontFamily:t.serif}}>{rec.reasoningTrace}</p>
+          </div>
+        )}
+
+        {/* Hypothesis structure */}
+        <div style={gSc(t,dk)}>
+          <div style={gSL(t)}>Hypothesis framework</div>
+          <div style={{display:"flex",flexDirection:"column",gap:12}}>
+            {rec.observation && (
+              <div>
+                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>📊 Observation</div>
+                <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:13}}>{rec.observation}</p>
+              </div>
+            )}
+            {rec.hypothesis && (
+              <div style={{borderLeft:"3px solid "+t.gold,paddingLeft:12}}>
+                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>💡 Hypothesis</div>
+                <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:14,fontWeight:600}}>{rec.hypothesis}</p>
+              </div>
+            )}
+            {rec.successMetric && (
+              <div>
+                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>🎯 Success metric</div>
+                <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:13}}>{rec.successMetric}</p>
+              </div>
+            )}
+            {rec.killCriteria && (
+              <div>
+                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>⏹ Kill criteria</div>
+                <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:13}}>{rec.killCriteria}</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ICE with rationale */}
+        <div style={gSc(t,dk)}>
+          <div style={gSL(t)}>ICE scoring — AI suggested</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:14,alignItems:"center"}}>
+            <div>
+              <div style={{display:"flex",alignItems:"baseline",gap:6,marginBottom:4}}>
+                <span style={{fontSize:22,fontWeight:700,color:t.gold,fontFamily:t.serif}}>{rec.ice.impact}</span>
+                <span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>/10 Impact</span>
+              </div>
+              {rec.impactRationale && <div style={{fontSize:12,color:t.textSub,lineHeight:1.5,fontFamily:t.mono}}>{rec.impactRationale}</div>}
+            </div>
+            <div>
+              <div style={{display:"flex",alignItems:"baseline",gap:6,marginBottom:4}}>
+                <span style={{fontSize:22,fontWeight:700,color:t.gold,fontFamily:t.serif}}>{rec.ice.certainty}</span>
+                <span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>/10 Certainty</span>
+              </div>
+              {rec.certaintyRationale && <div style={{fontSize:12,color:t.textSub,lineHeight:1.5,fontFamily:t.mono}}>{rec.certaintyRationale}</div>}
+            </div>
+            <div style={{textAlign:"center",borderLeft:"1px solid "+t.border,paddingLeft:16}}>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:3,textTransform:"uppercase",letterSpacing:"0.06em"}}>Total</div>
+              <div style={{fontSize:24,fontWeight:700,fontFamily:t.serif,color:iceTotal!==null?iceColor(iceTotal,t):t.textMuted}}>{iceTotal!==null?iceTotal:"—"}</div>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono}}>/100</div>
+            </div>
+          </div>
+          <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginTop:8,fontStyle:"italic"}}>
+            Ease is left at 5 — adjust when you add to backlog based on your team's capacity.
+          </div>
+        </div>
+
+        {/* Cited source learnings — the grounding */}
+        {citedLearnings.length > 0 && (
+          <div style={gSc(t,dk)}>
+            <div style={gSL(t)}>Source learnings — what this is grounded in</div>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {citedLearnings.map(item => (
+                <div key={item.id} style={{padding:"10px 12px",background:dk?"#1a1a14":"#fafaf5",borderLeft:"3px solid "+t.gold,borderRadius:"0 4px 4px 0"}}>
+                  <div style={{fontSize:12,fontWeight:700,color:t.text,fontFamily:t.serif,marginBottom:4}}>{item.title}</div>
+                  <div style={{display:"flex",gap:6,marginBottom:6,flexWrap:"wrap"}}>
+                    <span style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,padding:"1px 6px",border:"1px solid "+t.border,borderRadius:3}}>
+                      {item.results?.outcomeClassification || "Inconclusive"}
+                    </span>
+                    <span style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,padding:"1px 6px",border:"1px solid "+t.border,borderRadius:3}}>
+                      {brandName(item.brandId, brands)}
+                    </span>
+                  </div>
+                  {item.results?.keyLearning && (
+                    <div style={{fontSize:12,color:t.textSub,fontFamily:t.mono,lineHeight:1.5,fontStyle:"italic"}}>"{item.results.keyLearning}"</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Actions — only if pending */}
+        {!isResolved && (
+          <div style={{display:"flex",gap:8,justifyContent:"flex-end",borderTop:"1px solid "+t.border,paddingTop:14}}>
+            <button onClick={()=>onDismiss(batchId, recId)} style={{...gGh(t),fontSize:12,padding:"7px 14px"}}>
+              ✕ Dismiss
+            </button>
+            <button onClick={()=>onAccept(batchId, recId)} style={{...gG(t),fontSize:12,padding:"7px 14px"}}>
+              ✓ Add to backlog
+            </button>
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+
+function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetrics,onLog,onImport,dRange,setDRange,cFrom,cTo,setCFrom,setCTo,onGo,recs,recsLoad,recsErr,items,onGenerateRecs,onOpenRec}) {
   const maxCat  = Math.max(...Object.values(dash.catCounts),1);
   const maxType = Math.max(...Object.values(dash.typeCounts),1);
   return (
@@ -3284,6 +3813,18 @@ function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetrics,onLo
           </div>
         );
       })()}
+
+      {/* Next Plays — AI-recommended experiments */}
+      <NextPlaysCard
+        t={t} dk={dk}
+        recs={recs}
+        recsLoad={recsLoad}
+        recsErr={recsErr}
+        brands={brands}
+        items={items}
+        onGenerate={onGenerateRecs}
+        onOpenRec={onOpenRec}
+      />
 
       {/* Weekly Pulse */}
       <WeeklyPulseSection

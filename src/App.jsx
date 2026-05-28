@@ -3505,6 +3505,91 @@ function NextPlaysCard({ t, dk, recs, recsLoad, recsErr, brands, items, onGenera
     (e.status==="Completed"||e.status==="Killed") && e.results && e.results.keyLearning
   ).length;
 
+  // -- COMPACT MODE — recs exist and not currently loading -------------------
+  // One header strip + one row per pending recommendation. Clicking any row
+  // opens the detail modal directly (Option 2 — skip the intermediate list).
+  if (latest && !recsLoad) {
+    return (
+      <div style={{...gCd(t,dk),display:"flex",flexDirection:"column",gap:8,border:"1px solid "+t.goldBorder,padding:"10px 14px"}}>
+        {/* Header strip */}
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <span style={{fontSize:14,color:t.gold}}>◆</span>
+            <span style={{fontSize:12,fontWeight:700,fontFamily:t.serif,color:t.text,letterSpacing:"0.02em"}}>Next Plays</span>
+            <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono}}>
+              {pending.length > 0
+                ? pending.length+" ready"
+                : "all resolved"}
+            </span>
+            {latest && (
+              <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,opacity:0.7}}>
+                · {fmtDate(latest.generatedAt.slice(0,10))}
+              </span>
+            )}
+          </div>
+          <div style={{display:"flex",gap:6,alignItems:"center"}}>
+            {(accepted.length > 0 || dismissed.length > 0) && (
+              <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginRight:4}}>
+                {accepted.length > 0 && <span>✓ {accepted.length}</span>}
+                {accepted.length > 0 && dismissed.length > 0 && <span> · </span>}
+                {dismissed.length > 0 && <span>✕ {dismissed.length}</span>}
+              </span>
+            )}
+            <button onClick={onGenerate} style={{...gGh(t),fontSize:10,padding:"3px 8px"}} title="Regenerate from current portfolio state">
+              ↻ Regenerate
+            </button>
+          </div>
+        </div>
+
+        {/* Error inline (rare — usually cleared by next successful gen) */}
+        {recsErr && (
+          <div style={{padding:"6px 10px",background:dk?"#3a1010":"#fff0f0",border:"1px solid "+(dk?"#6a2020":"#e09090"),borderRadius:4,fontSize:11,color:dk?"#e08080":"#a03030",fontFamily:t.mono}}>
+            {recsErr}
+          </div>
+        )}
+
+        {/* Pending rows — tight one-line entries */}
+        {pending.length > 0 && (
+          <div style={{display:"flex",flexDirection:"column",gap:4}}>
+            {pending.map(rec => {
+              const iceTotal = iceScore(rec.ice.impact, rec.ice.certainty, rec.ice.ease);
+              return (
+                <button key={rec.id} onClick={()=>onOpenRec(latest.id, rec.id)}
+                  style={{textAlign:"left",padding:"7px 10px",background:t.surface,border:"1px solid "+t.border,borderRadius:4,cursor:"pointer",display:"flex",alignItems:"center",gap:10,fontFamily:t.mono,transition:"border-color 0.15s, background 0.15s"}}
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor=t.gold;e.currentTarget.style.background=t.goldBg;}}
+                  onMouseLeave={e=>{e.currentTarget.style.borderColor=t.border;e.currentTarget.style.background=t.surface;}}>
+                  {/* Title — flexes to fill, truncates if needed */}
+                  <span style={{fontSize:12,fontWeight:600,color:t.text,fontFamily:t.serif,flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                    {rec.title}
+                  </span>
+                  {/* Meta chips — hide on narrow screens via flexShrink */}
+                  <span style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,padding:"1px 5px",border:"1px solid "+t.border,borderRadius:3,textTransform:"uppercase",letterSpacing:"0.04em",flexShrink:0}}>{rec.category}</span>
+                  <span style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,flexShrink:0,display:"none"}} className="np-brand">{rec.brandTarget}</span>
+                  {/* ICE — always visible, the most important signal at a glance */}
+                  <span style={{display:"flex",gap:3,alignItems:"baseline",flexShrink:0}}>
+                    <span style={{fontSize:9,color:t.textMuted,fontFamily:t.mono}}>ICE</span>
+                    <span style={{fontSize:13,fontWeight:700,color:iceColor(iceTotal,t),fontFamily:t.serif,minWidth:18,textAlign:"right"}}>
+                      {iceTotal!==null?iceTotal:"—"}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* All-resolved nudge — encourages a regenerate when the slate is exhausted */}
+        {pending.length === 0 && (accepted.length > 0 || dismissed.length > 0) && (
+          <div style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,fontStyle:"italic",padding:"4px 2px"}}>
+            All recommendations from this batch have been resolved. Regenerate when you're ready for the next slate.
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // -- FULL MODE — empty state or loading. Earns the click; once recs exist, --
+  // -- this collapses to the compact strip above. -----------------------------
   return (
     <div style={{...gCd(t,dk),display:"flex",flexDirection:"column",gap:12,border:"1px solid "+t.goldBorder}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
@@ -3519,12 +3604,12 @@ function NextPlaysCard({ t, dk, recs, recsLoad, recsErr, brands, items, onGenera
           style={{...gG(t),fontSize:11,padding:"5px 11px",opacity:recsLoad?0.6:1}}>
           {recsLoad
             ? <><span style={{display:"inline-block",animation:"spin 1s linear infinite"}}>⟳</span> Generating…</>
-            : <>{latest ? "↻ Regenerate" : "✦ Generate"}</>}
+            : <>✦ Generate</>}
         </button>
       </div>
 
-      {/* Empty state */}
-      {!latest && !recsLoad && (
+      {/* Empty state — first run */}
+      {!recsLoad && !recsErr && (
         <div style={{padding:"14px 16px",background:dk?"#1a1a14":"#fafaf5",border:"1px dashed "+t.border,borderRadius:6,fontSize:12,color:t.textSub,fontFamily:t.mono,lineHeight:1.6}}>
           {closedCount === 0
             ? "No experiments closed yet. Recommendations will be sharpest once you have a few logged learnings — but you can still generate from your current portfolio state."
@@ -3539,61 +3624,15 @@ function NextPlaysCard({ t, dk, recs, recsLoad, recsErr, brands, items, onGenera
         </div>
       )}
 
-      {/* Loading skeleton */}
+      {/* Loading skeleton — three tight rows so it previews the compact state */}
       {recsLoad && (
-        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        <div style={{display:"flex",flexDirection:"column",gap:4}}>
           {[0,1,2].map(i => (
-            <div key={i} style={{padding:"12px 14px",background:dk?"#1a1a14":"#fafaf5",border:"1px solid "+t.border,borderRadius:6,opacity:0.6}}>
-              <div style={{height:12,width:"60%",background:t.border,borderRadius:3,marginBottom:8}}/>
-              <div style={{height:10,width:"90%",background:t.border,borderRadius:3,opacity:0.5}}/>
+            <div key={i} style={{padding:"8px 10px",background:dk?"#1a1a14":"#fafaf5",border:"1px solid "+t.border,borderRadius:4,opacity:0.6,display:"flex",alignItems:"center",gap:10}}>
+              <div style={{height:10,flex:1,background:t.border,borderRadius:3}}/>
+              <div style={{height:10,width:50,background:t.border,borderRadius:3,opacity:0.5}}/>
             </div>
           ))}
-        </div>
-      )}
-
-      {/* Pending recommendations */}
-      {pending.length > 0 && (
-        <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {pending.map(rec => {
-            const iceTotal = iceScore(rec.ice.impact, rec.ice.certainty, rec.ice.ease);
-            return (
-              <button key={rec.id} onClick={()=>onOpenRec(latest.id, rec.id)}
-                style={{textAlign:"left",padding:"12px 14px",background:t.surface,border:"1px solid "+t.border,borderRadius:6,cursor:"pointer",display:"flex",flexDirection:"column",gap:8,fontFamily:t.mono,transition:"border-color 0.15s"}}
-                onMouseEnter={e=>e.currentTarget.style.borderColor=t.gold}
-                onMouseLeave={e=>e.currentTarget.style.borderColor=t.border}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
-                  <div style={{fontSize:13,fontWeight:700,color:t.text,fontFamily:t.serif,lineHeight:1.35,flex:1}}>{rec.title}</div>
-                  <div style={{display:"flex",gap:4,alignItems:"center",flexShrink:0}}>
-                    <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono}}>ICE</span>
-                    <span style={{fontSize:14,fontWeight:700,color:iceColor(iceTotal,t),fontFamily:t.serif}}>{iceTotal!==null?iceTotal:"—"}</span>
-                  </div>
-                </div>
-                <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
-                  <span style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,padding:"1px 6px",border:"1px solid "+t.border,borderRadius:3,textTransform:"uppercase",letterSpacing:"0.04em"}}>{rec.category}</span>
-                  <span style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,padding:"1px 6px",border:"1px solid "+t.border,borderRadius:3}}>{rec.brandTarget}</span>
-                  {rec.sourceLearningIds && rec.sourceLearningIds.length > 0 && (
-                    <span style={{fontSize:9,color:t.gold,fontFamily:t.mono,padding:"1px 6px",background:t.goldBg,borderRadius:3}}>
-                      {rec.sourceLearningIds.length} cited learning{rec.sourceLearningIds.length===1?"":"s"}
-                    </span>
-                  )}
-                </div>
-                {rec.hypothesis && (
-                  <div style={{fontSize:12,color:t.textSub,lineHeight:1.5,fontFamily:t.mono,fontStyle:"italic"}}>
-                    {rec.hypothesis.length > 180 ? rec.hypothesis.slice(0,180)+"…" : rec.hypothesis}
-                  </div>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Resolved status footer */}
-      {(accepted.length > 0 || dismissed.length > 0) && (
-        <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,paddingTop:6,borderTop:"1px solid "+t.border,display:"flex",gap:12}}>
-          {accepted.length > 0 && <span>✓ {accepted.length} added to backlog</span>}
-          {dismissed.length > 0 && <span>✕ {dismissed.length} dismissed</span>}
-          {latest && <span style={{marginLeft:"auto"}}>Generated {fmtDate(latest.generatedAt.slice(0,10))}</span>}
         </div>
       )}
     </div>

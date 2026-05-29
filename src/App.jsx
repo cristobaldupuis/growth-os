@@ -199,21 +199,30 @@ const METRIC_CSV_ALIASES = {
   "notes":"notes","note":"notes","comment":"notes","comments":"notes",
 };
 
+const FONT_SANS = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, system-ui, sans-serif";
+const FONT_MONO = "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, 'Liberation Mono', monospace";
+
 const TL = {
-  bg:"#EBE8E1", surface:"#FFFFFF", surfaceAlt:"#F7F6F2",
-  border:"#DCD9D2", text:"#1A1A1A", textSub:"#595959", textMuted:"#8C8C8C",
-  gold:"#DDBD61", goldText:"#1A1A1A", goldBg:"#FDFBF5", goldBorder:"#E8D9AB",
+  bg:"#EBE8E1", surface:"#FFFFFF", surfaceAlt:"#F6F4EE",
+  border:"#E2DFD6", borderSoft:"#ECEAE3",
+  text:"#1A1815", textSub:"#5C5A52", textMuted:"#979488",
+  gold:"#C9A227", goldSoft:"#D8B94E", goldText:"#1A1815", goldBg:"#FBF7EA", goldBorder:"#EBDCA8",
+  teal:"#1D8F6E", tealBg:"#E4F4EE", red:"#C0492F", redBg:"#FBEDE9",
   headerBg:"#FFFFFF", inputBg:"#FFFFFF", inputBorder:"#DCD9D2",
-  mono:"ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-  serif:"system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+  shadow:"0 1px 2px rgba(40,38,30,0.04), 0 4px 14px rgba(40,38,30,0.06)",
+  shadowHi:"0 2px 6px rgba(40,38,30,0.06), 0 12px 30px rgba(40,38,30,0.10)",
+  mono:FONT_MONO, sans:FONT_SANS, serif:FONT_SANS,
 };
 const TD = {
-  bg:"#0F0F0F", surface:"#1A1A1A", surfaceAlt:"#262626",
-  border:"#333333", text:"#F5F5F5", textSub:"#A3A3A3", textMuted:"#737373",
-  gold:"#DDBD61", goldText:"#0F0F0F", goldBg:"#2A2410", goldBorder:"#6A5820",
-  headerBg:"#0F0F0F", inputBg:"#1A1A1A", inputBorder:"#333333",
-  mono:"ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-  serif:"system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+  bg:"#100F0D", surface:"#1A1916", surfaceAlt:"#232118",
+  border:"#322F26", borderSoft:"#262420",
+  text:"#F3F1EA", textSub:"#ABA89C", textMuted:"#807D72",
+  gold:"#E1C261", goldSoft:"#EBD588", goldText:"#100F0D", goldBg:"#241F12", goldBorder:"#5A4D24",
+  teal:"#4FC79A", tealBg:"#14271F", red:"#E27A63", redBg:"#2A1813",
+  headerBg:"#100F0D", inputBg:"#1A1916", inputBorder:"#322F26",
+  shadow:"0 1px 2px rgba(0,0,0,0.4), 0 4px 16px rgba(0,0,0,0.35)",
+  shadowHi:"0 2px 8px rgba(0,0,0,0.5), 0 14px 36px rgba(0,0,0,0.5)",
+  mono:FONT_MONO, sans:FONT_SANS, serif:FONT_SANS,
 };
 
 const SL = { Draft:{bg:"#f4f4ee",border:"#c8c4a8",text:"#666440"}, Running:{bg:"#edfaf2",border:"#7adca0",text:"#1a7a48"}, Completed:{bg:"#eef0fd",border:"#9090e0",text:"#3a3aa0"}, Killed:{bg:"#fdf0f0",border:"#e09090",text:"#a03030"} };
@@ -1020,15 +1029,15 @@ Return ONLY a valid JSON array of exactly 3 objects. No markdown, no preamble:
 }
 
 // -- Style helpers -------------------------------------------------------------
-const menuItem = (t) => ({fontSize:14,padding:"10px 12px",background:"transparent",border:"none",color:t.text,cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:8,fontFamily:t.mono,width:"100%"});
-const gG  = (t) => ({fontSize:12,padding:"6px 13px",borderRadius:4,background:t.gold,border:"1px solid "+t.gold,color:t.goldText,cursor:"pointer",fontWeight:700,display:"flex",alignItems:"center",gap:4,fontFamily:t.mono});
-const gGh = (t) => ({fontSize:12,padding:"6px 12px",borderRadius:4,background:"transparent",border:"1px solid "+t.border,color:t.textMuted,cursor:"pointer",display:"flex",alignItems:"center",gap:4,fontFamily:t.mono});
-const gI  = (t) => ({width:"100%",padding:"7px 10px",fontSize:13,fontFamily:t.mono,background:t.inputBg,border:"1px solid "+t.inputBorder,borderRadius:4,color:t.text,boxSizing:"border-box"});
+const menuItem = (t) => ({fontSize:14,padding:"10px 12px",background:"transparent",border:"none",color:t.text,cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:8,fontFamily:t.sans,width:"100%"});
+const gG  = (t) => ({fontSize:12.5,padding:"7px 14px",borderRadius:9,background:t.gold,border:"1px solid "+t.gold,color:t.goldText,cursor:"pointer",fontWeight:600,display:"flex",alignItems:"center",gap:5,fontFamily:t.sans});
+const gGh = (t) => ({fontSize:12.5,padding:"7px 13px",borderRadius:9,background:t.surfaceAlt,border:"1px solid "+t.border,color:t.textSub,cursor:"pointer",display:"flex",alignItems:"center",gap:5,fontFamily:t.sans,fontWeight:500});
+const gI  = (t) => ({width:"100%",padding:"8px 11px",fontSize:13,fontFamily:t.sans,background:t.inputBg,border:"1px solid "+t.inputBorder,borderRadius:9,color:t.text,boxSizing:"border-box"});
 const gTA = (t) => ({...gI(t),resize:"vertical"});
 const gSl = (t) => ({...gI(t),cursor:"pointer"});
-const gSc = (t,dk) => ({background:t.surface,border:"1px solid "+t.border,borderRadius:10,padding:"14px 17px",boxShadow:dk?"0 2px 8px rgba(0,0,0,0.28)":"0 2px 8px rgba(0,0,0,0.05)"});
-const gSL = (t) => ({fontSize:10,letterSpacing:"0.10em",textTransform:"uppercase",color:t.textMuted,marginBottom:8,fontFamily:t.mono,fontWeight:600});
-const gCd = (t,dk) => ({background:t.surface,borderRadius:10,padding:"14px 16px",boxShadow:dk?"0 4px 16px rgba(0,0,0,0.32)":"0 4px 12px rgba(0,0,0,0.06)"});
+const gSc = (t,dk) => ({background:t.surface,border:"1px solid "+t.border,borderRadius:14,padding:"15px 18px",boxShadow:t.shadow});
+const gSL = (t) => ({fontSize:10,letterSpacing:"0.11em",textTransform:"uppercase",color:t.textMuted,marginBottom:8,fontFamily:t.mono,fontWeight:600});
+const gCd = (t,dk) => ({background:t.surface,border:"1px solid "+t.border,borderRadius:14,padding:"15px 18px",boxShadow:t.shadow});
 // Financial metric style — large, high-contrast, instantly scannable
 const gFin = (t) => ({fontFamily:t.mono,fontWeight:700,fontSize:28,letterSpacing:"-0.02em",color:t.gold,lineHeight:1});
 
@@ -2004,7 +2013,7 @@ export default function App() {
   if(!loaded) return <div style={{background:t.bg,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{color:t.textMuted,fontFamily:t.mono}}>Loading Growth OS…</span></div>;
 
   const navBtn=(v,lbl)=>(
-    <button key={v} onClick={()=>setNav(v)} style={{fontSize:12,padding:"5px 12px",borderRadius:4,cursor:"pointer",fontFamily:t.mono,background:nav===v?t.gold:"transparent",border:"1px solid "+(nav===v?t.gold:t.border),color:nav===v?t.goldText:t.textMuted}}>{lbl}</button>
+    <button key={v} onClick={()=>setNav(v)} style={{fontSize:13,fontWeight:nav===v?600:500,padding:"6px 14px",borderRadius:8,cursor:"pointer",fontFamily:t.sans,background:nav===v?t.surface:"transparent",border:"none",color:nav===v?t.text:t.textSub,boxShadow:nav===v?t.shadow:"none",transition:"all .15s"}}>{lbl}</button>
   );
 
   return (
@@ -2073,69 +2082,74 @@ export default function App() {
         </Modal>
       )}
 
-      {/* Header — two rows */}
+      {/* Header — single bar */}
       <div style={{background:t.headerBg,borderBottom:"1px solid "+t.border,position:"sticky",top:0,zIndex:100}}>
-        {/* Row 1: wordmark + retailer + utilities */}
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 16px",borderBottom:"1px solid "+t.border}}>
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <span style={{fontSize:13,fontWeight:700,letterSpacing:"0.12em",color:t.gold,fontFamily:t.serif,whiteSpace:"nowrap"}}>GROWTH OS</span>
-            <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.04em",whiteSpace:"nowrap"}}>{settings.companyName}</span>
-            {brands.length>1&&(
-              <select value={activeBrand} onChange={e=>setActiveBrand(e.target.value)}
-                style={{fontSize:11,padding:"3px 8px",borderRadius:4,border:"1px solid "+t.gold,background:activeBrand==="all"?t.surface:t.goldBg,color:activeBrand==="all"?t.textMuted:t.gold,fontFamily:t.mono,cursor:"pointer",maxWidth:140}}>
-                <option value="all">All retailers</option>
-                {brands.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
-            )}
-          </div>
-          <div style={{display:"flex",gap:5,alignItems:"center"}}>
-            <button onClick={()=>setShowCopilot(true)}
-              style={{fontSize:12,padding:"4px 11px",borderRadius:4,cursor:"pointer",
-                background:"linear-gradient(135deg,"+t.gold+" 0%,#e0a030 100%)",
-                border:"none",color:t.goldText,fontWeight:700,fontFamily:t.mono,
-                display:"flex",alignItems:"center",gap:5,
-                boxShadow:"0 1px 4px rgba(192,136,32,0.25)"}}>
-              ✦ Signal
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:14,padding:"10px 16px",flexWrap:"wrap"}}>
+          {/* Left: logo lockup (home) + tabs */}
+          <div style={{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
+            <button onClick={()=>setNav("dashboard")} title="Back to Dashboard"
+              style={{display:"flex",alignItems:"center",gap:9,padding:"5px 9px",borderRadius:10,cursor:"pointer",
+                background:"transparent",border:"1px solid transparent",transition:"background .15s, border-color .15s"}}
+              onMouseEnter={e=>{e.currentTarget.style.background=t.goldBg;e.currentTarget.style.borderColor=t.goldBorder;}}
+              onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.borderColor="transparent";}}>
+              <span style={{width:26,height:26,borderRadius:8,background:t.gold,color:t.goldText,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:12,fontFamily:t.mono,letterSpacing:"-0.02em",flexShrink:0}}>GO</span>
+              <span style={{display:"flex",flexDirection:"column",alignItems:"flex-start",lineHeight:1.15}}>
+                <span style={{fontSize:14,fontWeight:700,letterSpacing:"0.06em",color:t.text,fontFamily:t.sans,whiteSpace:"nowrap"}}>GROWTH OS</span>
+                <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.02em",whiteSpace:"nowrap"}}>{settings.companyName}</span>
+              </span>
             </button>
-            <button onClick={()=>setShowSet(true)} title="Settings"
-              style={{fontSize:13,padding:"4px 7px",borderRadius:4,cursor:"pointer",background:"transparent",border:"1px solid "+t.border,color:t.textMuted,lineHeight:1}}>
-              <span dangerouslySetInnerHTML={{__html:"&#9881;"}}/>
-            </button>
-            <button onClick={toggleDk} title={dk?"Light mode":"Dark mode"}
-              style={{fontSize:13,padding:"4px 7px",borderRadius:4,cursor:"pointer",background:"transparent",border:"1px solid "+t.border,color:t.textMuted,lineHeight:1}}>
-              <span dangerouslySetInnerHTML={{__html:dk?"&#9728;":"&#9790;"}}/>
-            </button>
-          </div>
-        </div>
-        {/* Row 2: nav + contextual actions */}
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 16px",flexWrap:"wrap",gap:4}}>
-          <div style={{display:"flex",gap:3,alignItems:"center",flexWrap:"wrap"}}>
-            {navBtn("dashboard","Dashboard")}
-            {navBtn("initiatives","Initiatives")}
-            {navBtn("library","Library")}
-            {navBtn("triage","Triage")}
+            <div style={{width:1,height:24,background:t.border}}/>
+            <div style={{display:"flex",gap:2,background:t.surfaceAlt,padding:3,borderRadius:10,border:"1px solid "+t.border}}>
+              {navBtn("dashboard","Dashboard")}
+              {navBtn("initiatives","Initiatives")}
+              {navBtn("library","Library")}
+              {navBtn("triage","Triage")}
+            </div>
             {(nav==="detail"||nav==="form")&&(
-              <button onClick={()=>setNav("initiatives")} style={{...gGh(t),padding:"4px 10px",fontSize:12}}>
+              <button onClick={()=>setNav("initiatives")} style={{...gGh(t),padding:"6px 12px",fontSize:12}}>
                 <span style={{fontSize:12}}>&#8592;</span> Back
               </button>
             )}
           </div>
-          {nav==="initiatives"&&(
-            <div style={{display:"flex",gap:5,alignItems:"center"}}>
-              <button onClick={()=>setShowCapture(true)} style={{...gGh(t),padding:"4px 10px",fontSize:11}}>
+
+          {/* Right: retailer + contextual actions + utilities */}
+          <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+            {brands.length>1&&(
+              <select value={activeBrand} onChange={e=>setActiveBrand(e.target.value)}
+                style={{fontSize:12,padding:"6px 11px",borderRadius:9,border:"1px solid "+(activeBrand==="all"?t.border:t.goldBorder),background:activeBrand==="all"?t.surfaceAlt:t.goldBg,color:activeBrand==="all"?t.textSub:t.gold,fontFamily:t.mono,cursor:"pointer",maxWidth:150}}>
+                <option value="all">All retailers</option>
+                {brands.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            )}
+            {nav==="initiatives"&&(<>
+              <button onClick={()=>setShowCapture(true)} style={{...gGh(t),padding:"6px 11px",fontSize:11.5}}>
                 &#9889; Quick capture
               </button>
-              <button onClick={()=>{setImportRows([]);setImportErrs([]);setImportDone(false);setShowImport(true);}} style={{...gGh(t),padding:"4px 10px",fontSize:11}}>
+              <button onClick={()=>{setImportRows([]);setImportErrs([]);setImportDone(false);setShowImport(true);}} style={{...gGh(t),padding:"6px 11px",fontSize:11.5}}>
                 &#8645; Import CSV
               </button>
-              <button onClick={()=>handleExportCSV(filtered,"GrowthOS_export_"+new Date().toISOString().slice(0,10)+".csv")} style={{...gGh(t),padding:"4px 10px",fontSize:11}} title="Export current filtered view as CSV">
+              <button onClick={()=>handleExportCSV(filtered,"GrowthOS_export_"+new Date().toISOString().slice(0,10)+".csv")} style={{...gGh(t),padding:"6px 11px",fontSize:11.5}} title="Export current filtered view as CSV">
                 &#8659; Export CSV
               </button>
-              <button onClick={goNew} style={{...gG(t),padding:"4px 10px",fontSize:12}}>
+              <button onClick={goNew} style={{...gG(t),padding:"6px 12px",fontSize:12.5}}>
                 + New
               </button>
-            </div>
-          )}
+            </>)}
+            <button onClick={()=>setShowCopilot(true)}
+              style={{fontSize:12.5,padding:"7px 14px",borderRadius:9,cursor:"pointer",
+                background:t.gold,border:"1px solid "+t.gold,color:t.goldText,fontWeight:600,fontFamily:t.sans,
+                display:"flex",alignItems:"center",gap:5,boxShadow:t.shadow}}>
+              ✦ Signal
+            </button>
+            <button onClick={()=>setShowSet(true)} title="Settings"
+              style={{width:32,height:32,borderRadius:9,cursor:"pointer",background:t.surfaceAlt,border:"1px solid "+t.border,color:t.textSub,lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>
+              <span dangerouslySetInnerHTML={{__html:"&#9881;"}}/>
+            </button>
+            <button onClick={toggleDk} title={dk?"Light mode":"Dark mode"}
+              style={{width:32,height:32,borderRadius:9,cursor:"pointer",background:t.surfaceAlt,border:"1px solid "+t.border,color:t.textSub,lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>
+              <span dangerouslySetInnerHTML={{__html:dk?"&#9728;":"&#9790;"}}/>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -2176,38 +2190,59 @@ export default function App() {
             </div>
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
-            {filtered.length===0&&<div style={{padding:48,textAlign:"center",color:t.textMuted}}>No initiatives match your filters.</div>}
+            {filtered.length===0&&(
+              items.filter(e=>activeBrand==="all"||normBrandId(e.brandId)===normBrandId(activeBrand)).length===0 ? (
+                <div style={{...gCd(t,dk),padding:"44px 24px",textAlign:"center"}}>
+                  <div style={{fontSize:28,marginBottom:10,opacity:.5}}>&#9670;</div>
+                  <div style={{fontSize:15,fontWeight:600,color:t.text,fontFamily:t.sans,marginBottom:6}}>No initiatives yet</div>
+                  <div style={{fontSize:13,color:t.textSub,fontFamily:t.sans,lineHeight:1.55,maxWidth:380,margin:"0 auto 16px"}}>Start your growth portfolio — add an initiative, capture a quick idea, or generate a slate from Signal.</div>
+                  <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
+                    <button onClick={goNew} style={{...gG(t),fontSize:12.5,padding:"8px 16px"}}>+ New initiative</button>
+                    <button onClick={()=>setShowCapture(true)} style={{...gGh(t),fontSize:12.5,padding:"8px 14px"}}>&#9889; Quick capture</button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{...gCd(t,dk),padding:"40px 24px",textAlign:"center"}}>
+                  <div style={{fontSize:14,fontWeight:600,color:t.text,fontFamily:t.sans,marginBottom:5}}>No initiatives match your filters</div>
+                  <div style={{fontSize:12.5,color:t.textSub,fontFamily:t.sans,marginBottom:14}}>Try widening the status, category, type, or owner filters.</div>
+                  <button onClick={()=>{setFSt("All");setFCat("All");setFType("All");setFOwn("All");}} style={{...gGh(t),fontSize:12.5,padding:"7px 14px",margin:"0 auto",display:"inline-flex"}}>Clear all filters</button>
+                </div>
+              )
+            )}
             {filtered.map(item=>(
-              <div key={item.id} onClick={()=>goDetail(item.id)} style={{...gCd(t,dk),cursor:"pointer"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:6}}>
-                  <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
-                    <CBdg cat={item.category} cats={cats} dk={dk}/>
-                    <TBdg type={item.initType} dk={dk}/>
-                    {brands&&brands.length>1&&activeBrand==="all"&&<Bdg label={brandName(item.brandId||"default",brands)} color={brandColor(item.brandId||"default",brands,dk)} bg={dk?"#1e1e14":"#f8f7f2"} border={dk?"#2a2820":"#ddd8c8"} small/>}
-                    <SBdg s={item.status} dk={dk}/>
-                    {item.results&&<OBdg o={item.results.outcomeClassification} dk={dk}/>}
-                    <EAlert endDate={item.endDate} status={item.status} t={t} dk={dk}/>
-                    <BlockerBadge blocker={item.blocker}/>
+              <div key={item.id} onClick={()=>goDetail(item.id)} style={{...gCd(t,dk),cursor:"pointer",padding:"14px 16px",transition:"border-color .15s, box-shadow .15s"}}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor=t.goldBorder;e.currentTarget.style.boxShadow=t.shadowHi;}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor=t.border;e.currentTarget.style.boxShadow=t.shadow;}}>
+                {/* Row 1: title (lead) + ICE/revenue anchors */}
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
+                  <div style={{flex:"1 1 auto",minWidth:0}}>
+                    <div style={{display:"flex",alignItems:"baseline",gap:7,marginBottom:item.hypothesis?3:0}}>
+                      {item.initId&&<span style={{fontSize:10,fontWeight:600,color:t.textMuted,fontFamily:t.mono,flexShrink:0}}>{item.initId}</span>}
+                      <span style={{fontSize:14.5,fontWeight:600,color:t.text,lineHeight:1.3,fontFamily:t.sans,textAlign:"left"}}>{item.title}</span>
+                      <SBdg s={item.status} dk={dk}/>
+                    </div>
+                    {item.hypothesis&&<div style={{fontSize:12.5,color:t.textSub,lineHeight:1.5,fontFamily:t.sans,textAlign:"left"}}>{item.hypothesis.slice(0,128)}{item.hypothesis.length>128?"…":""}</div>}
                   </div>
-                  <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                  <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4,flexShrink:0}}>
+                    {item.revenueImpact!==0&&<span style={{fontSize:18,fontWeight:700,color:t.gold,fontFamily:t.mono,letterSpacing:"-0.02em",lineHeight:1}}>{fmtCur(item.revenueImpact)}</span>}
                     <ICEChip ice={item.ice} t={t}/>
-                    {item.revenueImpact!==0&&<span style={{fontSize:17,fontWeight:700,color:t.gold,fontFamily:t.mono,letterSpacing:"-0.02em"}}>{fmtCur(item.revenueImpact)}</span>}
-                    {item.results&&typeof item.results.actualRevenueImpact==="number"&&<span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>actual: {fmtCur(item.results.actualRevenueImpact)}</span>}
-                    {item.owner&&<span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>{item.owner.split(" (")[0].split("+")[0].trim()}</span>}
                   </div>
                 </div>
-                <div style={{display:"flex",alignItems:"flex-start",gap:8,marginBottom:4,flexWrap:"wrap"}}>
-                  {item.initId&&<span style={{fontSize:10,fontWeight:700,color:t.gold,fontFamily:t.mono,background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:3,padding:"1px 6px",flexShrink:0,marginTop:2}}>{item.initId}</span>}
-                  <div style={{flex:"1 1 auto",minWidth:0,fontSize:14,fontWeight:700,color:t.text,lineHeight:1.35,fontFamily:t.serif,textAlign:"left"}}>{item.title}</div>
-                </div>
-                {item.hypothesis&&<div style={{fontSize:13,color:t.textMuted,lineHeight:1.55,marginBottom:item.status!=="Draft"?6:0,fontFamily:t.serif,textAlign:"left"}}>{item.hypothesis.slice(0,130)}{item.hypothesis.length>130?"…":""}</div>}
-                {item.status!=="Draft"&&(
-                  <div style={{display:"flex",gap:14,alignItems:"center",fontSize:12,color:t.textMuted,fontFamily:t.mono,flexWrap:"wrap"}}>
-                    {item.primaryMetric&&<span>{item.primaryMetric.slice(0,48)}{item.primaryMetric.length>48?"…":""}</span>}
-                    {item.endDate&&<span>End: {fmtDate(item.endDate)}</span>}
+                {/* Row 2: quiet metadata strip */}
+                <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap",marginTop:10,paddingTop:9,borderTop:"1px solid "+t.borderSoft}}>
+                  <CBdg cat={item.category} cats={cats} dk={dk}/>
+                  <TBdg type={item.initType} dk={dk}/>
+                  {brands&&brands.length>1&&activeBrand==="all"&&<Bdg label={brandName(item.brandId||"default",brands)} color={brandColor(item.brandId||"default",brands,dk)} bg={t.surfaceAlt} border={t.border} small/>}
+                  {item.results&&<OBdg o={item.results.outcomeClassification} dk={dk}/>}
+                  <EAlert endDate={item.endDate} status={item.status} t={t} dk={dk}/>
+                  <BlockerBadge blocker={item.blocker}/>
+                  <span style={{marginLeft:"auto",display:"flex",gap:13,alignItems:"center",fontSize:11,color:t.textMuted,fontFamily:t.mono,flexWrap:"wrap"}}>
+                    {item.results&&typeof item.results.actualRevenueImpact==="number"&&<span>actual {fmtCur(item.results.actualRevenueImpact)}</span>}
+                    {item.status!=="Draft"&&item.endDate&&<span>end {fmtDate(item.endDate)}</span>}
                     {item.linkedIds&&item.linkedIds.length>0&&<span>{item.linkedIds.length} linked</span>}
-                  </div>
-                )}
+                    {item.owner&&<span>{item.owner.split(" (")[0].split("+")[0].trim()}</span>}
+                  </span>
+                </div>
               </div>
             ))}
           </div>
@@ -2604,8 +2639,7 @@ function IdeaCard({idea, idx, results, setResults, added, onAdd, t, dk, cats, ag
               fontSize:12,fontWeight:700,color:t.gold,fontFamily:t.mono,textAlign:"center"}}>✓ Added to Growth Backlog</div>
           ) : (
             <>
-              <button onClick={()=>onAdd(idea,idx)} style={{...gG(t),flex:1,justifyContent:"center",fontSize:12,padding:"8px 12px",
-                background:"linear-gradient(135deg,"+t.gold+" 0%,#e0a030 100%)",boxShadow:"0 1px 6px rgba(192,136,32,0.2)"}}>
+              <button onClick={()=>onAdd(idea,idx)} style={{...gG(t),flex:1,justifyContent:"center",fontSize:12,padding:"8px 12px",}}>
                 + Add to Growth Backlog
               </button>
               <button onClick={()=>setEditing(!isEditing)} style={{...gGh(t),fontSize:11,padding:"8px 11px"}}>
@@ -2828,8 +2862,7 @@ function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand, agents
 
             {/* Launch */}
             {phase==="input"&&(
-              <button onClick={runDebate} style={{...gG(t),fontSize:13,padding:"11px 16px",justifyContent:"center",
-                background:"linear-gradient(135deg,"+t.gold+" 0%,#e0a030 100%)",boxShadow:"0 2px 10px rgba(192,136,32,0.3)"}}>
+              <button onClick={runDebate} style={{...gG(t),fontSize:13,padding:"11px 16px",justifyContent:"center",}}>
                 🧠 Start C-Suite Debate
               </button>
             )}
@@ -3081,9 +3114,14 @@ function WeeklyPulseSection({t, dk, settings, brands, weeklyMetrics, onLog, onIm
       {expanded && (
         <div style={{marginTop:12}}>
           {isEmpty ? (
-            <div style={{padding:"18px 0",textAlign:"center",color:t.textMuted,fontFamily:t.mono,fontSize:12,border:"1px dashed "+t.border,borderRadius:6}}>
-              <div style={{fontSize:22,marginBottom:6}}>📊</div>
-              No metrics logged yet. Click "Log this week" or import a CSV to start tracking.
+            <div style={{padding:"26px 20px",textAlign:"center",border:"1px dashed "+t.border,borderRadius:10}}>
+              <div style={{fontSize:24,marginBottom:8,opacity:.5}}>&#128202;</div>
+              <div style={{fontSize:13.5,fontWeight:600,color:t.text,fontFamily:t.sans,marginBottom:4}}>No metrics logged yet</div>
+              <div style={{fontSize:12.5,color:t.textSub,fontFamily:t.sans,lineHeight:1.5,maxWidth:340,margin:"0 auto 14px"}}>Track revenue, spend, ROAS and CVR week over week to power the pulse and contribution views.</div>
+              <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
+                <button onClick={onLog} style={{...gG(t),fontSize:12.5,padding:"7px 15px"}}>+ Log this week</button>
+                <button onClick={onImport} style={{...gGh(t),fontSize:12.5,padding:"7px 13px"}}>&#8645; Import CSV</button>
+              </div>
             </div>
           ) : (
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
@@ -3381,6 +3419,91 @@ function MetricsImportModal({t, dk, weeklyMetrics, onSave, onClose}) {
 // Three-layer breakdown of how the portfolio contributes to revenue, scoped to
 // the active date range and active retailer. Built to be the artifact the
 // operator forwards to a client to justify a retainer.
+// -- Funnel coverage map -----------------------------------------------------
+// Treats categories as funnel stages and shows, per stage: how many initiatives,
+// average ICE quality, and revenue in play (running + draft estimate). Surfaces
+// thin/empty stages as coverage gaps — the diagnostic artifact for onboarding calls.
+function FunnelCoverageMap({t, dk, items, cats, brands, activeBrand}) {
+  const normB = id => (!id||id==="default") ? ((brands[0]&&brands[0].id)||"default") : id;
+  const scoped = items.filter(e=>activeBrand==="all"||normB(e.brandId)===normB(activeBrand));
+  const fmtK = (n) => n===0 ? "$0" : "$"+(n>=1000?Math.round(n/100)/10+"k":Math.round(n).toLocaleString());
+
+  const stages = cats.map(cat=>{
+    const inCat   = scoped.filter(e=>e.category===cat);
+    const active  = inCat.filter(e=>e.status==="Running"||e.status==="Draft");
+    const running = inCat.filter(e=>e.status==="Running").length;
+    const draft   = inCat.filter(e=>e.status==="Draft").length;
+    const done    = inCat.filter(e=>e.status==="Completed").length;
+    const revInPlay = active.reduce((s,e)=>s+Math.max(0,e.revenueImpact||0),0);
+    const iceVals = inCat.map(e=>e.ice&&iceScore(e.ice.impact,e.ice.certainty,e.ice.ease)).filter(s=>s!=null&&s>0);
+    const avgIce  = iceVals.length?Math.round(iceVals.reduce((a,b)=>a+b,0)/iceVals.length):null;
+    return {cat,count:inCat.length,active:active.length,running,draft,done,revInPlay,avgIce};
+  });
+
+  const maxCount = Math.max(...stages.map(s=>s.count),1);
+  const maxRev   = Math.max(...stages.map(s=>s.revInPlay),1);
+  const gaps     = stages.filter(s=>s.active===0);
+  const totalRevInPlay = stages.reduce((s,r)=>s+r.revInPlay,0);
+
+  return (
+    <div style={{...gCd(t,dk)}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8,flexWrap:"wrap",marginBottom:6}}>
+        <div>
+          <div style={gSL(t)}>Funnel coverage</div>
+          <div style={{fontSize:11.5,color:t.textSub,fontFamily:t.sans,lineHeight:1.5}}>
+            Where active work and revenue are concentrated across the funnel — and which stages are uncovered.
+          </div>
+        </div>
+        <span style={{fontSize:12,fontWeight:600,color:t.gold,fontFamily:t.mono}}>{fmtK(totalRevInPlay)} in play</span>
+      </div>
+
+      {gaps.length>0 && (
+        <div style={{display:"flex",alignItems:"flex-start",gap:8,padding:"9px 12px",borderRadius:9,background:t.redBg,border:"1px solid "+(dk?"#5a2a1e":"#f0cabf"),margin:"10px 0 14px"}}>
+          <span style={{color:t.red,fontSize:13,lineHeight:1.4,flexShrink:0}}>&#9888;</span>
+          <span style={{fontSize:12,color:t.red,fontFamily:t.sans,lineHeight:1.45}}>
+            <strong style={{fontWeight:600}}>{gaps.length} stage{gaps.length>1?"s":""} with no active work:</strong> {gaps.map(g=>g.cat).join(", ")}. These are coverage gaps worth a hypothesis.
+          </span>
+        </div>
+      )}
+
+      <div style={{display:"flex",flexDirection:"column",gap:2,marginTop:gaps.length>0?0:12}}>
+        {stages.map((s,i)=>{
+          const isGap = s.active===0;
+          const barPct = Math.max(4,(s.count/maxCount)*100);
+          const accent = catColor(s.cat,cats,dk);
+          return (
+            <div key={s.cat} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:i<stages.length-1?"1px solid "+t.borderSoft:"none"}}>
+              {/* Stage label + count bar */}
+              <div style={{flex:"1 1 auto",minWidth:0}}>
+                <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:5}}>
+                  <span style={{fontSize:13,fontWeight:600,color:isGap?t.textMuted:t.text,fontFamily:t.sans}}>{s.cat}</span>
+                  {isGap
+                    ? <span style={{fontSize:10,fontWeight:600,color:t.red,fontFamily:t.mono,letterSpacing:"0.04em"}}>UNCOVERED</span>
+                    : <span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>{s.running} running · {s.draft} draft · {s.done} done</span>}
+                </div>
+                <div style={{height:7,borderRadius:4,background:t.surfaceAlt,overflow:"hidden"}}>
+                  <div style={{width:barPct+"%",height:"100%",background:isGap?t.border:accent,borderRadius:4,transition:"width .3s"}}/>
+                </div>
+              </div>
+              {/* Quality */}
+              <div style={{width:62,textAlign:"right",flexShrink:0}}>
+                <div style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>ICE</div>
+                <div style={{fontSize:14,fontWeight:600,color:s.avgIce!=null?(s.avgIce>=60?t.teal:s.avgIce>=35?t.text:t.textSub):t.textMuted,fontFamily:t.mono,lineHeight:1.2}}>{s.avgIce!=null?s.avgIce:"—"}</div>
+              </div>
+              {/* Revenue in play */}
+              <div style={{width:74,textAlign:"right",flexShrink:0}}>
+                <div style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>In play</div>
+                <div style={{fontSize:14,fontWeight:600,color:s.revInPlay>0?t.gold:t.textMuted,fontFamily:t.mono,lineHeight:1.2,letterSpacing:"-0.02em"}}>{fmtK(s.revInPlay)}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+
 function ContributionView({t, dk, contribution, totals, dRange, activeBrand, brands}) {
   const rangeLabel = dRange==="thisMonth"?"this month":dRange==="lastMonth"?"last month":"selected range";
   const retailerLabel = activeBrand==="all" ? "All retailers" : brandName(activeBrand, brands);
@@ -3881,25 +4004,35 @@ function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetrics,onLo
           onClick={()=>{
             const retailerLabel = activeBrand==="all"?"All retailers":brandName(activeBrand,brands);
             const date = new Date().toLocaleDateString("en-CA",{month:"long",day:"numeric",year:"numeric"});
+            const ns = settings.northStarMetric ? settings.northStarMetric : "North Star";
+            const headline = dash.revImpacted>0
+              ? fmtCur(dash.revImpacted)+" in measured revenue impact from completed work this period."
+              : (dash.running+dash.pipeline)+" initiatives in motion; "+fmtCur(dash.revAtRisk)+" of revenue in play.";
             const text = [
-              "Growth OS — Weekly Update ("+date+")",
-              "Retailer: "+retailerLabel,
+              "WEEKLY GROWTH UPDATE — "+retailerLabel,
+              date,
               "",
-              "PIPELINE",
-              "Active initiatives: "+dash.running+" running, "+dash.pipeline+" in draft",
-              "Revenue at risk: "+fmtCur(dash.revAtRisk),
+              headline,
               "",
-              "PERFORMANCE",
-              "Win rate: "+(dash.winRate!==null?dash.winRate+"%":"no closed initiatives yet")+" ("+dash.wins+" wins from "+dash.closed+" closed)",
-              "Avg days to close: "+(dash.avgDays||"n/a"),
-              "Avg ICE score: "+(dash.avgIce||"n/a"),
+              "— PORTFOLIO —",
+              "• "+dash.running+" running · "+dash.pipeline+" in draft · "+dash.completed+" completed this period",
+              "• Revenue in play (running): "+fmtCur(dash.revAtRisk),
+              "• Avg initiative quality (ICE): "+(dash.avgIce||"n/a"),
               "",
-              "FINANCIALS",
-              "Revenue impacted (completed): "+fmtCur(dash.revImpacted),
-              "ROI on closed initiatives: "+(dash.closedROI!==null?dash.closedROI+"x":"not yet measurable"),
-              "Estimate accuracy: "+(dash.calibration!==null?dash.calibration+"%":"not yet measurable"),
+              "— RESULTS —",
+              "• Win rate: "+(dash.winRate!==null?dash.winRate+"% ("+dash.wins+" of "+dash.closed+" closed)":"no closed initiatives yet"),
+              "• Revenue impacted (completed): "+fmtCur(dash.revImpacted),
+              "• ROI on closed work: "+(dash.closedROI!==null?dash.closedROI+"x return":"not yet measurable"),
+              "• Avg time to close: "+(dash.avgDays?dash.avgDays+" days":"n/a"),
+              "",
+              "— FORECAST —",
+              "• Probability-weighted revenue in-flight: "+fmtCur(dash.contributionTotals.inflight),
+              "• Probability-weighted pipeline: "+fmtCur(dash.contributionTotals.pipeline),
+              "• Estimate accuracy to date: "+(dash.calibration!==null?dash.calibration+"%":"not yet measurable"),
+              "",
+              "Tracked in Growth OS · "+date,
             ].join("\n");
-            try { navigator.clipboard.writeText(text); showToast("Executive summary copied to clipboard.", "success"); } catch { showToast("Couldn't copy to clipboard.", "error"); }
+            try { navigator.clipboard.writeText(text); showToast("Executive summary copied — ready to paste.", "success"); } catch { showToast("Couldn't copy to clipboard.", "error"); }
           }}>
           &#128203; Copy executive summary
         </button>
@@ -3907,20 +4040,22 @@ function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetrics,onLo
 
       {/* Range */}
       <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-        {[["thisMonth","This month"],["lastMonth","Last month"],["custom","Custom"]].map(([v,l])=>(
-          <button key={v} onClick={()=>setDRange(v)} style={{fontSize:12,padding:"4px 11px",borderRadius:4,cursor:"pointer",fontFamily:t.mono,background:dRange===v?t.gold:"transparent",border:"1px solid "+(dRange===v?t.gold:t.border),color:dRange===v?t.goldText:t.textMuted}}>{l}</button>
-        ))}
+        <div style={{display:"flex",gap:2,background:t.surfaceAlt,padding:3,borderRadius:9,border:"1px solid "+t.border}}>
+          {[["thisMonth","This month"],["lastMonth","Last month"],["custom","Custom"]].map(([v,l])=>(
+            <button key={v} onClick={()=>setDRange(v)} style={{fontSize:12,padding:"5px 12px",borderRadius:6,cursor:"pointer",fontFamily:t.sans,fontWeight:dRange===v?600:500,background:dRange===v?t.gold:"transparent",border:"none",color:dRange===v?t.goldText:t.textSub}}>{l}</button>
+          ))}
+        </div>
         {dRange==="custom"&&<>
-          <input type="date" value={cFrom} onChange={e=>setCFrom(e.target.value)} style={{fontSize:12,padding:"4px 8px",borderRadius:4,border:"1px solid "+t.border,background:t.inputBg,color:t.text,fontFamily:t.mono}}/>
+          <input type="date" value={cFrom} onChange={e=>setCFrom(e.target.value)} style={{fontSize:12,padding:"6px 9px",borderRadius:9,border:"1px solid "+t.border,background:t.inputBg,color:t.text,fontFamily:t.mono}}/>
           <span style={{color:t.textMuted,fontSize:12}}>to</span>
-          <input type="date" value={cTo} onChange={e=>setCTo(e.target.value)} style={{fontSize:12,padding:"4px 8px",borderRadius:4,border:"1px solid "+t.border,background:t.inputBg,color:t.text,fontFamily:t.mono}}/>
+          <input type="date" value={cTo} onChange={e=>setCTo(e.target.value)} style={{fontSize:12,padding:"6px 9px",borderRadius:9,border:"1px solid "+t.border,background:t.inputBg,color:t.text,fontFamily:t.mono}}/>
         </>}
       </div>
 
       {/* KPIs */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:8}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:10}}>
         {[
-          {l:"Revenue impacted", v:fmtCur(dash.revImpacted), s:"from completed"},
+          {l:"Revenue impacted", v:fmtCur(dash.revImpacted), s:"from completed", hero:true},
           {l:"Revenue at risk",  v:fmtCur(dash.revAtRisk),   s:"running now"},
           {l:"Completed",        v:dash.completed,            s:" "},
           {l:"Killed",           v:dash.killed,               s:" "},
@@ -3936,14 +4071,17 @@ function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetrics,onLo
           const isMulti = typeof m.v === "string" && m.v.endsWith("x");
           const isFinancial = isMoney || isPct || isMulti;
           return (
-          <div key={m.l} style={{...gCd(t,dk),display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",textAlign:"center",padding:"16px 10px",minHeight:100}}>
-            <div style={{fontSize:10,letterSpacing:"0.08em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,marginBottom:6,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>{m.l}</div>
-            <div style={{fontSize:isFinancial?30:28,fontWeight:700,color:t.gold,fontFamily:isFinancial?t.mono:t.serif,lineHeight:1,letterSpacing:isFinancial?"-0.02em":"normal"}}>{m.v}</div>
-            {m.s&&m.s!==" "&&<div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginTop:4,whiteSpace:"nowrap"}}>{m.s}</div>}
+          <div key={m.l} style={{background:m.hero?t.goldBg:t.surface,border:"1px solid "+(m.hero?t.goldBorder:t.border),borderRadius:12,padding:"14px 16px",boxShadow:t.shadow,minHeight:96,display:"flex",flexDirection:"column"}}>
+            <div style={{fontSize:9.5,letterSpacing:"0.1em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,fontWeight:600,marginBottom:"auto",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>{m.l}</div>
+            <div style={{fontSize:26,fontWeight:700,color:isFinancial?t.gold:t.text,fontFamily:t.mono,lineHeight:1,letterSpacing:"-0.03em",marginTop:9}}>{m.v}</div>
+            {m.s&&m.s!==" "&&<div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginTop:7,whiteSpace:"nowrap",letterSpacing:"0.02em"}}>{m.s}</div>}
           </div>
           );
         })}
       </div>
+
+      {/* Funnel coverage map — diagnostic: where work & revenue sit across the funnel */}
+      <FunnelCoverageMap t={t} dk={dk} items={items} cats={cats} brands={brands} activeBrand={activeBrand}/>
 
       {/* Contribution to revenue — three-layer breakdown by category */}
       <ContributionView

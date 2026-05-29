@@ -1366,6 +1366,7 @@ export default function App() {
   const [settings,  setSettings]  = useState(DEFAULT_SETTINGS);
   const [dk,        setDk]        = useState(false);
   const [nav,       setNav]       = useState("dashboard");
+  const [detailOrigin, setDetailOrigin] = useState("initiatives");
   const [selId,     setSelId]     = useState(null);
   const [fSt,       setFSt]       = useState("All");
   const [fCat,      setFCat]      = useState("All");
@@ -1758,7 +1759,7 @@ export default function App() {
     return list;
   },[items,fSt,fCat,fType,fOwn,sort,activeBrand,brands]);
 
-  const goDetail = id=>{setSelId(id);setNav("detail");};
+  const goDetail = (id, origin)=>{ if(origin) setDetailOrigin(origin); setSelId(id); setNav("detail"); };
   const goNew    = ()=>{ setShowTpl(true); };
   const goEdit   = item=>{setForm({...item});setNav("form");};
 
@@ -2119,8 +2120,8 @@ export default function App() {
               {navBtn("triage","Triage")}
             </div>
             {(nav==="detail"||nav==="form")&&(
-              <button onClick={()=>setNav("initiatives")} style={{...gGh(t),padding:"6px 12px",fontSize:12}}>
-                <span style={{fontSize:12}}>&#8592;</span> Back
+              <button onClick={()=>setNav(nav==="detail"?detailOrigin:"initiatives")} style={{...gGh(t),padding:"6px 12px",fontSize:12}}>
+                <span style={{fontSize:12}}>&#8592;</span> Back to {nav==="detail"?(detailOrigin==="triage"?"Triage":detailOrigin==="library"?"Library":"Initiatives"):"Initiatives"}
               </button>
             )}
           </div>
@@ -2167,7 +2168,7 @@ export default function App() {
       </div>
 
       {nav==="dashboard"&&<DashView t={t} dk={dk} dash={dash} cats={cats} settings={settings} brands={brands} activeBrand={activeBrand} weeklyMetrics={weeklyMetrics} onLog={()=>setShowPulse(true)} onImport={()=>setShowMetricsImport(true)} dRange={dRange} setDRange={setDRange} cFrom={cFrom} cTo={cTo} setCFrom={setCFrom} setCTo={setCTo} onGo={()=>setNav("initiatives")} recs={recs} recsLoad={recsLoad} recsErr={recsErr} items={items} onGenerateRecs={generateRecommendations} onOpenRec={(batchId,recId)=>setShowRecModal({batchId,recId})}/>}
-      {nav==="triage"&&<TriageView items={items} t={t} dk={dk} cats={cats} brands={brands} activeBrand={activeBrand} onDetail={goDetail}
+      {nav==="triage"&&<TriageView items={items} t={t} dk={dk} cats={cats} brands={brands} activeBrand={activeBrand} onDetail={(id)=>goDetail(id,"triage")}
         onStatus={(id,status)=>{const it=items.find(e=>e.id===id); if(it){setSelId(id); reqStatus(status);}}}
         onLogResults={(id)=>{const it=items.find(e=>e.id===id); if(it){setSelId(id); setRForm(it.results?{...it.results,actualRevenueImpact:it.results.actualRevenueImpact!=null?it.results.actualRevenueImpact:"",actualSpendCost:it.results.actualSpendCost!=null?it.results.actualSpendCost:"",actualResourceCost:it.results.actualResourceCost!=null?it.results.actualResourceCost:""}:{actualOutcome:"",keyLearning:"",outcomeClassification:"Success",decisionMade:"",outcomeCertainty:75,actualRevenueImpact:"",actualSpendCost:"",actualResourceCost:""}); setShowR(true);}}}
         onExtend={(id,days)=>{saveItems(items.map(e=>{if(e.id!==id)return e; const base=e.endDate?new Date(e.endDate+"T12:00:00"):new Date(); base.setDate(base.getDate()+days); return {...e,endDate:base.toISOString().slice(0,10)};})); showToast("Extended "+days+" days.","success");}}
@@ -2228,7 +2229,7 @@ export default function App() {
               )
             )}
             {filtered.map(item=>(
-              <div key={item.id} onClick={()=>goDetail(item.id)} style={{...gCd(t,dk),cursor:"pointer",padding:"14px 16px",transition:"border-color .15s, box-shadow .15s"}}
+              <div key={item.id} onClick={()=>goDetail(item.id,"initiatives")} style={{...gCd(t,dk),cursor:"pointer",padding:"14px 16px",transition:"border-color .15s, box-shadow .15s"}}
                 onMouseEnter={e=>{e.currentTarget.style.borderColor=t.goldBorder;e.currentTarget.style.boxShadow=t.shadowHi;}}
                 onMouseLeave={e=>{e.currentTarget.style.borderColor=t.border;e.currentTarget.style.boxShadow=t.shadow;}}>
                 {/* Row 1: title (lead) + ICE/revenue anchors */}
@@ -2435,6 +2436,26 @@ export default function App() {
       {showR&&rForm&&(
         <Modal t={t} dk={dk} onClose={()=>setShowR(false)} wide title="Log results">
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
+            {sel&&(
+              <div style={{padding:"12px 14px",borderRadius:10,background:t.goldBg,border:"1px solid "+t.goldBorder}}>
+                <div style={{display:"flex",alignItems:"baseline",gap:8,flexWrap:"wrap",marginBottom:sel.hypothesis?7:0}}>
+                  {sel.initId&&<span style={{fontSize:10,fontWeight:600,color:t.gold,fontFamily:t.mono}}>{sel.initId}</span>}
+                  <span style={{fontSize:14,fontWeight:600,color:t.text,fontFamily:t.sans,lineHeight:1.3}}>{sel.title}</span>
+                </div>
+                {sel.hypothesis&&(
+                  <div style={{fontSize:12.5,color:t.textSub,fontFamily:t.sans,lineHeight:1.5,marginBottom:8}}>
+                    <span style={{fontFamily:t.mono,fontSize:10,letterSpacing:"0.06em",textTransform:"uppercase",color:t.textMuted,marginRight:6}}>Hypothesis</span>
+                    {sel.hypothesis}
+                  </div>
+                )}
+                <div style={{display:"flex",gap:18,flexWrap:"wrap",fontSize:11.5,fontFamily:t.mono,color:t.textSub}}>
+                  {sel.primaryMetric&&<span><span style={{color:t.textMuted}}>Metric:</span> {sel.primaryMetric}</span>}
+                  {sel.measurementScope&&<span><span style={{color:t.textMuted}}>Scope:</span> {sel.measurementScope}</span>}
+                  {sel.revenueImpact>0&&<span><span style={{color:t.textMuted}}>Est. impact:</span> <span style={{color:t.gold,fontWeight:600}}>{fmtCur(sel.revenueImpact)}</span></span>}
+                  {sel.killCriteria&&<span style={{flexBasis:"100%",color:t.textMuted,marginTop:2}}>Kill criteria: <span style={{color:t.textSub}}>{sel.killCriteria.slice(0,120)}{sel.killCriteria.length>120?"…":""}</span></span>}
+                </div>
+              </div>
+            )}
             <FR label="Actual outcome vs hypothesis" t={t}><textarea style={gTA(t)} rows={3} value={rForm.actualOutcome} onChange={e=>setRForm({...rForm,actualOutcome:e.target.value})}/></FR>
             <FR label="Key learning — one sentence (required)" t={t}><input style={gI(t)} value={rForm.keyLearning} onChange={e=>setRForm({...rForm,keyLearning:e.target.value})}/></FR>
             <FR label="Outcome classification" t={t}>
@@ -5084,9 +5105,7 @@ function TriageView({items, t, dk, cats, brands, activeBrand, onDetail, onStatus
         accent:dk?"#e08080":"#a03030", tag:"BLOCKED", title:e.title, brand:brandLabel(e),
         reason:e.blocker+". Resolve the dependency or escalate — it's holding up "+(money>0?fmtCur(money)+" of impact.":"a live initiative."),
         metric:e.primaryMetric, money,
-        actions:[
-          {label:"Open to resolve", primary:true, fn:()=>onDetail(e.id)},
-        ],
+        actions:[],
       });
       return;
     }
@@ -5101,9 +5120,7 @@ function TriageView({items, t, dk, cats, brands, activeBrand, onDetail, onStatus
         accent:t.textMuted, tag:"NEEDS SETUP", title:e.title, brand:brandLabel(e),
         reason:"Running without "+missing.join(", ")+". Without these it can't be cleanly judged or stopped.",
         metric:e.primaryMetric, money,
-        actions:[
-          {label:"Complete setup", primary:true, fn:()=>onDetail(e.id)},
-        ],
+        actions:[],
       });
       return;
     }
@@ -5114,7 +5131,7 @@ function TriageView({items, t, dk, cats, brands, activeBrand, onDetail, onStatus
         accent:dk?"#8080e0":"#4848b0", tag:"HIGH STAKES", title:e.title, brand:brandLabel(e),
         reason:fmtCur(money)+" of revenue riding on this. On track"+(e.endDate?" — ends "+fmtDate(e.endDate)+".":"."),
         metric:e.primaryMetric, money,
-        actions:[{label:"Review", fn:()=>onDetail(e.id)}],
+        actions:[],
       });
     }
   });
@@ -5130,7 +5147,6 @@ function TriageView({items, t, dk, cats, brands, activeBrand, onDetail, onStatus
       metric:e.primaryMetric, money,
       actions:[
         {label:"Activate now", primary:true, fn:()=>onActivate(e.id)},
-        {label:"Open", fn:()=>onDetail(e.id)},
       ],
     });
   }
@@ -5228,6 +5244,7 @@ function TriageView({items, t, dk, cats, brands, activeBrand, onDetail, onStatus
                 {q.actions.map((a,i)=>(
                   <button key={i} onClick={a.fn} style={a.primary?{...gG(t),fontSize:12,padding:"6px 13px"}:{...gGh(t),fontSize:12,padding:"6px 12px"}}>{a.label}</button>
                 ))}
+                <button onClick={()=>onDetail(q.id)} style={{...gGh(t),fontSize:12,padding:"6px 12px",border:"none",background:"transparent",color:t.textSub}}>View detail →</button>
                 {q.metric&&<span style={{marginLeft:"auto",fontSize:11,color:t.textMuted,fontFamily:t.mono}}>{q.metric.slice(0,42)}{q.metric.length>42?"…":""}</span>}
               </div>
             </div>

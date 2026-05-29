@@ -1184,6 +1184,120 @@ function ICESliders({ice,onChange,t}) {
   );
 }
 
+// ── Guide drawer ─────────────────────────────────────────────────────────────
+// Feature discovery, organized by job-to-be-done rather than by feature name.
+// Doubles as the onboarding walkthrough artifact on first client calls.
+// Each entry: what it does, why it matters, and a deep-link into the live view.
+// `openSection` is a section id to auto-scroll to (set when opened from an
+// inline hint); null-but-open shows the full guide from the top.
+const GUIDE_SECTIONS = [
+  {
+    id: "signal",
+    label: "Generate net-new strategy",
+    feature: "Signal AI — C-suite debate engine",
+    what: "A panel of C-suite AI personas debates your current portfolio and constraints, then synthesizes net-new initiatives you haven't thought of — each one grounded in your real brand brief and learnings.",
+    why: "This is the part no spreadsheet or tracker can do. It turns your portfolio state into fresh, defensible strategy on demand — the thinking partner in the room.",
+    cta: "Open Signal",
+    action: "signal",
+  },
+  {
+    id: "recs",
+    label: "Get this week's experiments",
+    feature: "Next Plays — weekly recommendations",
+    what: "Proactive experiment suggestions with the hypothesis pre-written and ICE pre-scored, drawn from your portfolio, learnings library, brand briefs, and latest metrics.",
+    why: "Removes the blank-page problem every week. You walk into the standup with three grounded plays already framed and prioritized.",
+    cta: "Go to Dashboard",
+    action: "dashboard",
+  },
+  {
+    id: "contribution",
+    label: "Prove ROI to justify the retainer",
+    feature: "Contribution-to-revenue view",
+    what: "A three-layer revenue picture — realised, probability-weighted in-flight, and probability-weighted pipeline — broken down by category, with one-click copy for client emails.",
+    why: "This is the answer to \"what did this engagement actually drive?\" It's the artifact that justifies renewals.",
+    cta: "Go to Dashboard",
+    action: "dashboard",
+  },
+  {
+    id: "library",
+    label: "Never re-run a dead experiment",
+    feature: "Learnings library",
+    what: "Every closed initiative becomes a searchable learning, tagged by outcome, category, and type. Filter, synthesize across them with AI, or replicate a winner in one click.",
+    why: "Institutional memory that compounds. The longer the engagement runs, the smarter every recommendation gets.",
+    cta: "Open Library",
+    action: "library",
+  },
+  {
+    id: "initiatives",
+    label: "Track & prioritize the portfolio",
+    feature: "Initiatives + ICE scoring",
+    what: "The full initiative pipeline with ICE scoring, status tracking, blockers, owners, multi-retailer support, CSV import/export, and quick capture for half-formed ideas.",
+    why: "One ranked, shared source of truth for what's running, what's queued, and what it's worth.",
+    cta: "Open Initiatives",
+    action: "initiatives",
+  },
+  {
+    id: "triage",
+    label: "Run the weekly review",
+    feature: "Triage",
+    what: "Surfaces initiatives that need a decision this week — overdue, awaiting results, or blocked — so nothing stalls silently.",
+    why: "Keeps the portfolio moving and gives the standup its agenda.",
+    cta: "Open Triage",
+    action: "triage",
+  },
+  {
+    id: "data",
+    label: "Keep your data safe & portable",
+    feature: "Backup, restore & metrics import",
+    what: "Download a full JSON backup any time, restore from one, log weekly metrics manually, or import from Meta / GA4. Brand briefs and settings live in one place.",
+    why: "Your portfolio is portable and recoverable — no lock-in, no silent data loss.",
+    cta: "Open Settings",
+    action: "settings",
+  },
+];
+
+function GuideDrawer({ t, dk, openSection, onClose, onNavigate }) {
+  useEffect(() => {
+    if (openSection && openSection !== true) {
+      const el = document.getElementById("guide-sec-" + openSection);
+      if (el) setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+    }
+  }, [openSection]);
+  return (
+    <div style={{position:"fixed",inset:0,background:dk?"rgba(0,0,0,0.6)":"rgba(20,18,10,0.35)",zIndex:320,display:"flex",justifyContent:"flex-end"}}
+      onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div style={{background:t.surface,borderLeft:"1px solid "+t.border,width:"100%",maxWidth:460,height:"100%",overflowY:"auto",boxShadow:"-8px 0 32px rgba(0,0,0,0.18)",animation:"slideIn 0.2s ease"}}>
+        {/* Header */}
+        <div style={{position:"sticky",top:0,background:t.surface,borderBottom:"1px solid "+t.border,padding:"18px 22px",zIndex:2}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
+            <div>
+              <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.serif}}>What can Growth OS do?</div>
+              <div style={{fontSize:12,color:t.textMuted,fontFamily:t.mono,marginTop:3}}>Every capability, grouped by what you're trying to accomplish.</div>
+            </div>
+            <button onClick={onClose} style={{background:"transparent",border:"none",color:t.textMuted,cursor:"pointer",fontSize:18,lineHeight:1,flexShrink:0}}><span>&#10005;</span></button>
+          </div>
+        </div>
+        {/* Sections */}
+        <div style={{padding:"16px 22px 40px",display:"flex",flexDirection:"column",gap:14}}>
+          {GUIDE_SECTIONS.map(s=>(
+            <div key={s.id} id={"guide-sec-"+s.id}
+              style={{background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:12,padding:"16px 18px"}}>
+              <div style={{fontSize:10,letterSpacing:"0.09em",textTransform:"uppercase",color:t.gold,fontFamily:t.mono,fontWeight:700,marginBottom:6}}>{s.label}</div>
+              <div style={{fontSize:14.5,fontWeight:700,color:t.text,fontFamily:t.serif,marginBottom:8}}>{s.feature}</div>
+              <p style={{margin:"0 0 8px",fontSize:13,color:t.textSub,lineHeight:1.6,fontFamily:t.sans}}>{s.what}</p>
+              <p style={{margin:"0 0 12px",fontSize:12.5,color:t.textMuted,lineHeight:1.6,fontFamily:t.sans,fontStyle:"italic"}}>{s.why}</p>
+              <button onClick={()=>onNavigate(s.action)} style={{...gG(t),fontSize:11.5,padding:"5px 12px"}}>{s.cta} &#8594;</button>
+            </div>
+          ))}
+          <div style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,textAlign:"center",lineHeight:1.7,paddingTop:6}}>
+            Tip: open this any time from the <strong style={{color:t.textSub}}>?</strong> in the top bar.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Modal({t,dk,onClose,children,title,wide}) {
   return (
     <div style={{position:"fixed",inset:0,background:dk?"rgba(0,0,0,0.7)":"rgba(20,18,10,0.4)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:300,padding:20}}
@@ -1531,6 +1645,7 @@ export default function App() {
   const [importErrs,setImportErrs]= useState([]);
   const [importDone,setImportDone]= useState(false);
   const [showCopilot,setShowCopilot]=useState(false);
+  const [guideSection, setGuideSection] = useState(null); // null=closed; string=open & scroll to section id
   const [debates,   setDebates]   = useState([]);
   const [recs,      setRecs]      = useState([]); // [{id, generatedAt, recommendations:[...]}]
   const [recsLoad,  setRecsLoad]  = useState(false);
@@ -2286,6 +2401,14 @@ export default function App() {
                 display:"flex",alignItems:"center",gap:5,boxShadow:t.shadow}}>
               ✦ Signal
             </button>
+            <button onClick={()=>setGuideSection("signal")} title="What is Signal?"
+              style={{width:20,height:20,marginLeft:-4,borderRadius:"50%",cursor:"pointer",background:"transparent",border:"1px solid "+t.border,color:t.textMuted,fontSize:11,fontWeight:700,fontFamily:t.serif,lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              ?
+            </button>
+            <button onClick={()=>setGuideSection(true)} title="What can Growth OS do?"
+              style={{width:32,height:32,borderRadius:9,cursor:"pointer",background:t.surfaceAlt,border:"1px solid "+t.border,color:t.textSub,lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,fontWeight:700,fontFamily:t.serif}}>
+              ?
+            </button>
             <button onClick={()=>setShowSet(true)} title="Settings"
               style={{width:32,height:32,borderRadius:9,cursor:"pointer",background:t.surfaceAlt,border:"1px solid "+t.border,color:t.textSub,lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>
               <span dangerouslySetInnerHTML={{__html:"&#9881;"}}/>
@@ -2350,6 +2473,7 @@ export default function App() {
                     <button onClick={goNew} style={{...gG(t),fontSize:12.5,padding:"8px 16px"}}>+ New initiative</button>
                     <button onClick={()=>setShowCapture(true)} style={{...gGh(t),fontSize:12.5,padding:"8px 14px"}}>&#9889; Quick capture</button>
                   </div>
+                  <button onClick={()=>setGuideSection(true)} style={{background:"none",border:"none",color:t.textMuted,fontSize:12,fontFamily:t.mono,cursor:"pointer",marginTop:14,textDecoration:"underline",textUnderlineOffset:3}}>New here? See everything Growth OS can do &#8594;</button>
                 </div>
               ) : (
                 <div style={{...gCd(t,dk),padding:"40px 24px",textAlign:"center"}}>
@@ -2476,6 +2600,16 @@ export default function App() {
       )}
 
       {showSet&&<SettingsModal t={t} dk={dk} settings={settings} onSave={s=>{saveSettings(s);setShowSet(false);}} onClose={()=>setShowSet(false)} onDownloadBackup={handleDownloadBackup} onRestoreBackup={handleRestoreBackup}/>}
+
+      {guideSection&&(
+        <GuideDrawer t={t} dk={dk} openSection={guideSection} onClose={()=>setGuideSection(null)}
+          onNavigate={(action)=>{
+            setGuideSection(null);
+            if(action==="signal")        setShowCopilot(true);
+            else if(action==="settings") setShowSet(true);
+            else                         setNav(action); // dashboard | library | initiatives | triage
+          }}/>
+      )}
 
       {showImport&&(
         <Modal t={t} dk={dk} onClose={()=>{setShowImport(false);setImportRows([]);setImportErrs([]);setImportDone(false);}} wide title="Import CSV">

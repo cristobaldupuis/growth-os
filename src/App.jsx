@@ -339,6 +339,12 @@ const mkDefault = (cats, activeBrand) => ({
   createdAt:new Date().toISOString().slice(0,10), notes:"",
   brandId: activeBrand && activeBrand!=="all" ? activeBrand : "default",
   blocker:"None",
+  // Attribution socket — lets imported data map to this initiative later.
+  // measurementMetric: the canonical metric column this initiative is judged on (maps to a CSV/feed column).
+  // measurementScope: optional segment/filter (e.g. "new visitors", "top 20 SKUs").
+  // trackingTag: optional hard identifier (UTM campaign, discount code, GA4 event) for precise auto-match.
+  // The measurement window is startDate→endDate, already above.
+  measurementMetric:"", measurementScope:"", trackingTag:"",
 });
 
 // -- AI ------------------------------------------------------------------------
@@ -1817,6 +1823,7 @@ export default function App() {
   const CSV_COLS = [
     "initId","title","initType","category","status","brandId","owner",
     "hypothesis","primaryMetric","killCriteria","startDate","endDate",
+    "measurementMetric","measurementScope","trackingTag",
     "sampleSize","duration","ice_impact","ice_certainty","ice_ease",
     "revenueImpact","spendCost","resourceCost","notes",
     "results_actualOutcome","results_keyLearning","results_outcomeClassification",
@@ -1837,6 +1844,9 @@ export default function App() {
     killCriteria:     item.killCriteria || "",
     startDate:        item.startDate || "",
     endDate:          item.endDate || "",
+    measurementMetric: item.measurementMetric || "",
+    measurementScope:  item.measurementScope || "",
+    trackingTag:       item.trackingTag || "",
     sampleSize:       item.sampleSize || "",
     duration:         item.duration || "",
     ice_impact:       item.ice?.impact ?? "",
@@ -1957,6 +1967,9 @@ export default function App() {
           hypothesis:    r.hypothesis    || existingById?.hypothesis    || "",
           primaryMetric: r.primaryMetric || existingById?.primaryMetric || "",
           killCriteria:  r.killCriteria  || existingById?.killCriteria  || "",
+          measurementMetric: r.measurementMetric || existingById?.measurementMetric || "",
+          measurementScope:  r.measurementScope  || existingById?.measurementScope  || "",
+          trackingTag:       r.trackingTag       || existingById?.trackingTag       || "",
           startDate: sd || existingById?.startDate || "",
           endDate:   ed || existingById?.endDate   || "",
           sampleSize: r.sampleSize || existingById?.sampleSize || "",
@@ -2154,7 +2167,12 @@ export default function App() {
       </div>
 
       {nav==="dashboard"&&<DashView t={t} dk={dk} dash={dash} cats={cats} settings={settings} brands={brands} activeBrand={activeBrand} weeklyMetrics={weeklyMetrics} onLog={()=>setShowPulse(true)} onImport={()=>setShowMetricsImport(true)} dRange={dRange} setDRange={setDRange} cFrom={cFrom} cTo={cTo} setCFrom={setCFrom} setCTo={setCTo} onGo={()=>setNav("initiatives")} recs={recs} recsLoad={recsLoad} recsErr={recsErr} items={items} onGenerateRecs={generateRecommendations} onOpenRec={(batchId,recId)=>setShowRecModal({batchId,recId})}/>}
-      {nav==="triage"&&<TriageView items={items} t={t} dk={dk} cats={cats} brands={brands} activeBrand={activeBrand} onDetail={goDetail}/>}
+      {nav==="triage"&&<TriageView items={items} t={t} dk={dk} cats={cats} brands={brands} activeBrand={activeBrand} onDetail={goDetail}
+        onStatus={(id,status)=>{const it=items.find(e=>e.id===id); if(it){setSelId(id); reqStatus(status);}}}
+        onLogResults={(id)=>{const it=items.find(e=>e.id===id); if(it){setSelId(id); setRForm(it.results?{...it.results,actualRevenueImpact:it.results.actualRevenueImpact!=null?it.results.actualRevenueImpact:"",actualSpendCost:it.results.actualSpendCost!=null?it.results.actualSpendCost:"",actualResourceCost:it.results.actualResourceCost!=null?it.results.actualResourceCost:""}:{actualOutcome:"",keyLearning:"",outcomeClassification:"Success",decisionMade:"",outcomeCertainty:75,actualRevenueImpact:"",actualSpendCost:"",actualResourceCost:""}); setShowR(true);}}}
+        onExtend={(id,days)=>{saveItems(items.map(e=>{if(e.id!==id)return e; const base=e.endDate?new Date(e.endDate+"T12:00:00"):new Date(); base.setDate(base.getDate()+days); return {...e,endDate:base.toISOString().slice(0,10)};})); showToast("Extended "+days+" days.","success");}}
+        onActivate={(id)=>{saveItems(items.map(e=>e.id===id?{...e,status:"Running",startDate:e.startDate||new Date().toISOString().slice(0,10)}:e)); showToast("Initiative activated — now running.","success");}}
+      />}
       {nav==="library"&&<LearningLibrary items={items} t={t} dk={dk} cats={cats} brands={brands} activeBrand={activeBrand} settings={settings} onReplicate={(item)=>{const base=mkDefault(cats,activeBrand);setForm({...base,title:"[Replicate] "+item.title,hypothesis:"Based on learning from: "+item.title+". Original: "+item.hypothesis,category:item.category,initType:item.initType,ice:{...item.ice},revenueImpact:item.revenueImpact,notes:"Replicated from initiative "+item.id+". Original learning: "+item.results.keyLearning});setNav("form");}}/>}
 
       {nav==="initiatives"&&(
@@ -4732,6 +4750,36 @@ function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hypReview,
         <FR label="Primary metric" t={t}><input style={gI(t)} value={form.primaryMetric||""} onChange={e=>f("primaryMetric",e.target.value)} placeholder="e.g. CVR, ROAS, AOV, CAC"/></FR>
       </div>
 
+      {/* Measurement & attribution — how imported data maps back to this initiative */}
+      <div style={gSc(t,dk)}>
+        <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:4}}>
+          <div style={gSL(t)}>Measurement &amp; attribution</div>
+          <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono}}>optional · powers data matching</span>
+        </div>
+        <p style={{fontSize:11.5,color:t.textSub,fontFamily:t.sans,lineHeight:1.5,margin:"0 0 12px"}}>
+          Tells Growth OS which metric, segment, and date window this initiative is judged on — so an imported CSV or feed can be matched to it. The window is the start/end dates below.
+        </p>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <FR label="Metric measured" t={t}>
+            <input style={gI(t)} list="measure-metrics" value={form.measurementMetric||""} onChange={e=>f("measurementMetric",e.target.value)} placeholder="e.g. CVR, Revenue, ROAS, AOV"/>
+            <datalist id="measure-metrics">
+              {["CVR","Revenue","ROAS","AOV","CAC","Sessions / Traffic","Conversions","Add-to-cart rate","Email CTR","Repeat rate","LTV","Bounce rate"].map(m=><option key={m} value={m}/>)}
+            </datalist>
+          </FR>
+          <FR label="Scope / segment" t={t}>
+            <input style={gI(t)} value={form.measurementScope||""} onChange={e=>f("measurementScope",e.target.value)} placeholder="e.g. new visitors, top 20 SKUs"/>
+          </FR>
+        </div>
+        <div style={{marginTop:10}}>
+          <FR label="Tracking tag" t={t}>
+            <input style={{...gI(t),fontFamily:t.mono}} value={form.trackingTag||""} onChange={e=>f("trackingTag",e.target.value)} placeholder="optional — UTM campaign, discount code, or GA4 event for precise auto-match"/>
+          </FR>
+          <div style={{fontSize:11,color:t.textMuted,fontFamily:t.sans,marginTop:5,lineHeight:1.5}}>
+            Use this only when the test has a clean identifier (mostly paid campaigns). Most initiatives match on metric + window + scope alone.
+          </div>
+        </div>
+      </div>
+
       <FR label="⚠️ Blocker" t={t}>
         <select style={{...gSl(t), ...(form.blocker&&form.blocker!=="None"?{borderColor:"#ffd700",background:dk?"#1a1400":"#fffbe6",color:dk?"#ffd700":"#7a5800",fontWeight:700}:{})}}
           value={form.blocker||"None"} onChange={e=>f("blocker",e.target.value)}>
@@ -4977,256 +5025,215 @@ function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onRestoreB
 
 
 // -- Triage View --------------------------------------------------------------
-function TriageView({items, t, dk, cats, brands, activeBrand, onDetail}) {
+function TriageView({items, t, dk, cats, brands, activeBrand, onDetail, onStatus, onLogResults, onExtend, onActivate}) {
   const today = new Date();
-  const in7  = new Date(today); in7.setDate(today.getDate()+7);
   const parseD = d => d ? new Date(d+"T12:00:00") : null;
   const fmtDate = d => d ? new Date(d+"T12:00:00").toLocaleDateString("en-CA",{month:"short",day:"numeric"}) : "—";
-
+  const fmtCur = n => { if(!n||n===0)return"—"; const abs=Math.abs(n); return(abs>=1000?"$"+Math.round(abs/1000)+"k":"$"+abs); };
   const brandFilter = e => activeBrand==="all" || (e.brandId||"default")===activeBrand;
+  const brandLabel = e => (brands.find(b=>b.id===(e.brandId||"default"))||brands[0]||{}).name||"";
+  const iceOf = e => e.ice ? Math.round(((e.ice.impact||0)*(e.ice.certainty||0)*(e.ice.ease||0)/1000)*100) : 0;
+  const daysFrom = d => { const p=parseD(d); return p?Math.ceil((p-today)/86400000):null; };
 
   const running = items.filter(e=>e.status==="Running"&&brandFilter(e));
   const draft   = items.filter(e=>e.status==="Draft"&&brandFilter(e));
+  const totalAtRisk = running.reduce((s,e)=>s+Math.max(0,e.revenueImpact||0),0);
 
-  // Buckets
-  const endingSoon  = running.filter(e=>{ const d=parseD(e.endDate); return d&&d<=in7&&d>=today; });
-  const overdue     = running.filter(e=>{ const d=parseD(e.endDate); return d&&d<today; });
-  const needsAction = running.filter(e=>!e.killCriteria||!e.primaryMetric||!e.owner);
-  const highStake   = running.filter(e=>e.revenueImpact>=50000);
-  const topDrafts   = draft.filter(e=>{ const s=e.ice?(e.ice.impact||0)*(e.ice.certainty||0)*(e.ice.ease||0):0; return s>0; })
-    .sort((a,b)=>(b.ice.impact*b.ice.certainty*b.ice.ease)-(a.ice.impact*a.ice.certainty*a.ice.ease))
-    .slice(0,3);
+  // --- Build a single ranked action queue --------------------------------------
+  // Each entry: {id, kind, urgency(0-100), title, brand, reason, metric, money, actions[]}
+  // urgency drives ordering; higher = more pressing. Money and time both feed it.
+  const queue = [];
 
-  const totalAtRisk = running.reduce((s,e)=>s+Math.max(0,e.revenueImpact),0);
-  const fmtCur = n => { if(n===0)return"—"; const abs=Math.abs(n); return(abs>=1000?"$"+Math.round(abs/1000)+"k":"$"+abs); };
+  running.forEach(e=>{
+    const dleft = daysFrom(e.endDate);
+    const money = Math.max(0,e.revenueImpact||0);
+    const moneyW = Math.min(40, money/2500); // up to 40 pts from revenue at risk
 
-  const SBdg2 = ({s}) => { const c=(dk?SD:SL)[s]||SL.Draft; return <span style={{fontSize:10,fontWeight:600,color:c.text,background:c.bg,border:"1px solid "+c.border,borderRadius:3,padding:"1px 5px"}}>{s}</span>; };
+    // Overdue — past end date, still running: must decide
+    if (dleft!==null && dleft<0) {
+      queue.push({
+        id:e.id, kind:"overdue", urgency:90+moneyW,
+        accent:t.red, tag:"OVERDUE", title:e.title, brand:brandLabel(e),
+        reason:"Ended "+fmtDate(e.endDate)+" ("+Math.abs(dleft)+"d ago) and is still marked running. Decide the outcome or extend the window.",
+        metric:e.primaryMetric, money,
+        actions:[
+          {label:"Log results", primary:true, fn:()=>onLogResults(e.id)},
+          {label:"Extend 2 wks", fn:()=>onExtend(e.id,14)},
+        ],
+      });
+      return;
+    }
+    // Ending within 3 days: decide now
+    if (dleft!==null && dleft<=3) {
+      queue.push({
+        id:e.id, kind:"ending", urgency:70+moneyW,
+        accent:dk?"#d0a838":"#b07d10", tag:dleft===0?"DUE TODAY":"ENDS IN "+dleft+"D", title:e.title, brand:brandLabel(e),
+        reason:"Window closes "+fmtDate(e.endDate)+". Prepare to read results, or extend if the test needs more data.",
+        metric:e.primaryMetric, money,
+        actions:[
+          {label:"Log results", primary:true, fn:()=>onLogResults(e.id)},
+          {label:"Extend 1 wk", fn:()=>onExtend(e.id,7)},
+        ],
+      });
+      return;
+    }
+    // Blocked: resolve or escalate
+    if (e.blocker && e.blocker!=="None") {
+      queue.push({
+        id:e.id, kind:"blocked", urgency:55+moneyW,
+        accent:dk?"#e08080":"#a03030", tag:"BLOCKED", title:e.title, brand:brandLabel(e),
+        reason:e.blocker+". Resolve the dependency or escalate — it's holding up "+(money>0?fmtCur(money)+" of impact.":"a live initiative."),
+        metric:e.primaryMetric, money,
+        actions:[
+          {label:"Open to resolve", primary:true, fn:()=>onDetail(e.id)},
+        ],
+      });
+      return;
+    }
+    // Incomplete setup: missing the things needed to judge it
+    const missing = [];
+    if (!e.owner) missing.push("owner");
+    if (!e.primaryMetric) missing.push("metric");
+    if (!e.killCriteria) missing.push("kill criteria");
+    if (missing.length) {
+      queue.push({
+        id:e.id, kind:"incomplete", urgency:40+moneyW,
+        accent:t.textMuted, tag:"NEEDS SETUP", title:e.title, brand:brandLabel(e),
+        reason:"Running without "+missing.join(", ")+". Without these it can't be cleanly judged or stopped.",
+        metric:e.primaryMetric, money,
+        actions:[
+          {label:"Complete setup", primary:true, fn:()=>onDetail(e.id)},
+        ],
+      });
+      return;
+    }
+    // High-stakes healthy runner — keep visible but low urgency
+    if (money>=50000) {
+      queue.push({
+        id:e.id, kind:"highstake", urgency:20+moneyW/4,
+        accent:dk?"#8080e0":"#4848b0", tag:"HIGH STAKES", title:e.title, brand:brandLabel(e),
+        reason:fmtCur(money)+" of revenue riding on this. On track"+(e.endDate?" — ends "+fmtDate(e.endDate)+".":"."),
+        metric:e.primaryMetric, money,
+        actions:[{label:"Review", fn:()=>onDetail(e.id)}],
+      });
+    }
+  });
 
-  const Section = ({title, color, items: list, emptyMsg, children}) => (
-    <div style={{...gSc(t,dk),borderLeft:"3px solid "+color}}>
-      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:list.length?12:0}}>
-        <div style={{fontSize:11,fontWeight:700,color,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>{title}</div>
-        <span style={{fontSize:12,fontWeight:700,color,fontFamily:t.mono}}>{list.length}</span>
-      </div>
-      {list.length===0
-        ? <div style={{fontSize:12,color:t.textMuted,fontFamily:t.mono}}>{emptyMsg}</div>
-        : <div style={{display:"flex",flexDirection:"column",gap:8}}>{children}</div>}
-    </div>
-  );
+  // Best uninitiated idea — one slot, only if genuinely strong
+  const bestDraft = draft.map(e=>({e,ice:iceOf(e)})).filter(x=>x.ice>=40).sort((a,b)=>b.ice-a.ice)[0];
+  if (bestDraft) {
+    const e=bestDraft.e, money=Math.max(0,e.revenueImpact||0);
+    queue.push({
+      id:e.id, kind:"activate", urgency:30+(bestDraft.ice/10),
+      accent:t.teal, tag:"READY TO ACTIVATE", title:e.title, brand:brandLabel(e),
+      reason:"Highest-leverage idea sitting in draft (ICE "+bestDraft.ice+(money>0?", "+fmtCur(money)+" potential":"")+"). Nothing's blocking it from starting.",
+      metric:e.primaryMetric, money,
+      actions:[
+        {label:"Activate now", primary:true, fn:()=>onActivate(e.id)},
+        {label:"Open", fn:()=>onDetail(e.id)},
+      ],
+    });
+  }
 
-  const InitRow = ({item, showEndDate, showRevenue, urgentDate}) => {
-    const daysLeft = item.endDate ? Math.ceil((parseD(item.endDate)-today)/86400000) : null;
-    return (
-      <div onClick={()=>onDetail(item.id)}
-        style={{display:"flex",alignItems:"flex-start",gap:10,padding:"10px 12px",borderRadius:6,
-          background:t.surfaceAlt,cursor:"pointer",border:"1px solid "+t.border}}>
-        <div style={{flex:1,minWidth:0}}>
-          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4,flexWrap:"wrap"}}>
-            {item.initId&&<span style={{fontSize:10,fontWeight:700,color:t.gold,fontFamily:t.mono,background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:3,padding:"1px 5px"}}>{item.initId}</span>}
-            <SBdg2 s={item.status}/>
-            {brands&&brands.length>1&&<span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono}}>{(brands.find(b=>b.id===(item.brandId||"default"))||brands[0]||{}).name}</span>}
-            <BlockerBadge blocker={item.blocker}/>
-          </div>
-          <div style={{fontSize:13,fontWeight:600,color:t.text,fontFamily:t.serif,marginBottom:2}}>{item.title}</div>
-          {item.primaryMetric&&<div style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>{item.primaryMetric.slice(0,60)}{item.primaryMetric.length>60?"…":""}</div>}
-        </div>
-        <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4,flexShrink:0}}>
-          {showRevenue&&item.revenueImpact>0&&<span style={{fontSize:12,fontWeight:700,color:t.gold,fontFamily:t.serif}}>{fmtCur(item.revenueImpact)}</span>}
-          {showEndDate&&item.endDate&&(
-            <span style={{fontSize:11,fontWeight:600,fontFamily:t.mono,
-              color:daysLeft!==null&&daysLeft<=3?"#e07070":daysLeft!==null&&daysLeft<=7?"#c09828":t.textMuted}}>
-              {daysLeft!==null&&daysLeft<0?"Overdue":daysLeft!==null&&daysLeft===0?"Due today":"Ends "+fmtDate(item.endDate)}
-            </span>
-          )}
-        </div>
-      </div>
-    );
-  };
+  queue.sort((a,b)=>b.urgency-a.urgency);
+  const topItem = queue[0]||null;
+
+  // Stat strip
+  const overdueCount = queue.filter(q=>q.kind==="overdue").length;
+  const endingCount  = queue.filter(q=>q.kind==="ending").length;
+  const attentionCount = queue.filter(q=>["overdue","ending","blocked","incomplete"].includes(q.kind)).length;
 
   return (
     <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:14}}>
 
-      {/* This week's focus — opinionated priority card */}
-      {(()=>{
-        // Compute the 4 signals
-        const urgentItem = [...overdue, ...endingSoon.filter(e=>{ const d=parseD(e.endDate); return d&&Math.ceil((d-today)/86400000)<=3; })]
-          .sort((a,b)=>Math.max(0,b.revenueImpact||0)-Math.max(0,a.revenueImpact||0))[0] || endingSoon[0] || null;
-
-        const longestBlocked = running
-          .filter(e=>e.blocker&&e.blocker!=="None")
-          .map(e=>{
-            // Estimate how long blocked: use startDate as proxy if no block date stored
-            const d = parseD(e.startDate);
-            const daysSince = d ? Math.floor((today-d)/86400000) : 0;
-            return {...e, daysSince};
-          })
-          .sort((a,b)=>b.daysSince-a.daysSince)[0] || null;
-
-        const bestDraft = draft
-          .filter(e=>e.ice&&e.ice.impact&&e.ice.certainty&&e.ice.ease)
-          .map(e=>({...e, iceS:Math.round(((e.ice.impact||0)*(e.ice.certainty||0)*(e.ice.ease||0)/1000)*100)}))
-          .sort((a,b)=>b.iceS-a.iceS)[0] || null;
-
-        // North star gap coverage
-        const nsGapCovered = (()=>{
-          const totalAtRisk = running.reduce((s,e)=>s+Math.max(0,e.revenueImpact||0),0);
-          const hasGap = totalAtRisk > 0;
-          return {totalAtRisk, hasGap};
-        })();
-
-        const signals = [
-          urgentItem && {
-            icon:"🔴", weight:3,
-            label: overdue.includes(urgentItem) ? "Overdue — needs a decision" : "Ending in ≤3 days",
-            text: urgentItem.title,
-            sub: urgentItem.revenueImpact>0 ? fmtCur(urgentItem.revenueImpact)+" at risk" : urgentItem.endDate ? "End: "+fmtDate(urgentItem.endDate) : null,
-            action: "Log results or extend",
-            id: urgentItem.id,
-            color: "#e07070",
-          },
-          longestBlocked && {
-            icon:"⚠️", weight:2,
-            label: "Blocked initiative",
-            text: longestBlocked.title,
-            sub: longestBlocked.blocker+(longestBlocked.revenueImpact>0?" · "+fmtCur(longestBlocked.revenueImpact)+" at risk":""),
-            action: "Resolve or escalate",
-            id: longestBlocked.id,
-            color: "#c09828",
-          },
-          bestDraft && bestDraft.iceS >= 40 && {
-            icon:"💡", weight:1,
-            label: "Highest-leverage uninitiated idea",
-            text: bestDraft.title,
-            sub: "ICE "+(bestDraft.iceS)+(bestDraft.revenueImpact>0?" · "+fmtCur(bestDraft.revenueImpact)+" potential":""),
-            action: "Consider activating",
-            id: bestDraft.id,
-            color: dk?"#3acca0":"#187860",
-          },
-        ].filter(Boolean);
-
-        // Revenue coverage signal — always show as a status line, not a card row
-        const revLine = nsGapCovered.totalAtRisk > 0
-          ? fmtCur(nsGapCovered.totalAtRisk)+" at risk across "+running.length+" running initiative"+(running.length!==1?"s":"")
-          : running.length > 0 ? running.length+" running, no revenue estimates set" : "No running initiatives";
-
-        const allClear = signals.length === 0;
-
-        return (
-          <div style={{...gSc(t,dk), background: allClear?(dk?"#122a18":"#edfaf2"):t.surface,
-            border:"1px solid "+(allClear?(dk?"#2a7a40":"#7adca0"):t.border)}}>
-
-            {/* Header row */}
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:allClear?4:12}}>
-              <div style={{fontSize:10,letterSpacing:"0.10em",textTransform:"uppercase",
-                color:allClear?(dk?"#60d080":"#1a7a48"):t.textMuted,fontFamily:t.mono,fontWeight:700}}>
-                {new Date().toLocaleDateString("en-CA",{weekday:"long",month:"long",day:"numeric"})}
-              </div>
-              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono}}>{revLine}</div>
-            </div>
-
-            {allClear ? (
-              <div style={{fontSize:13,color:dk?"#60d080":"#1a7a48",fontFamily:t.mono}}>
-                ✓ Nothing urgent. Good week to activate a draft or run the Signal debate.
-              </div>
-            ) : (
-              <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                {signals.map((s,i)=>(
-                  <div key={i} onClick={()=>onDetail(s.id)}
-                    style={{display:"flex",alignItems:"center",gap:12,padding:"10px 13px",
-                      borderRadius:6,cursor:"pointer",
-                      background:t.surfaceAlt,border:"1px solid "+t.border,
-                      borderLeft:"3px solid "+s.color,
-                      transition:"background 0.12s"}}>
-                    <span style={{fontSize:16,flexShrink:0}}>{s.icon}</span>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:10,color:s.color,fontFamily:t.mono,fontWeight:700,
-                        textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:2}}>{s.label}</div>
-                      <div style={{fontSize:13,fontWeight:600,color:t.text,fontFamily:t.serif,
-                        whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{s.text}</div>
-                      {s.sub&&<div style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,marginTop:1}}>{s.sub}</div>}
-                    </div>
-                    <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,
-                      flexShrink:0,textAlign:"right",lineHeight:1.4}}>
-                      {s.action} →
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+      {/* Lead banner — the single most pressing call, framed as a decision */}
+      <div style={{...gCd(t,dk), borderLeft:"3px solid "+(topItem?topItem.accent:t.teal),
+        background: topItem?t.surface:(dk?"#122a18":"#edfaf2"),
+        border:"1px solid "+(topItem?t.border:(dk?"#2a7a40":"#7adca0"))}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8,flexWrap:"wrap",marginBottom:topItem?12:4}}>
+          <div style={{fontSize:10,letterSpacing:"0.11em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,fontWeight:600}}>
+            {today.toLocaleDateString("en-CA",{weekday:"long",month:"long",day:"numeric"})}
           </div>
-        );
-      })()}
+          <div style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>
+            {totalAtRisk>0?fmtCur(totalAtRisk)+" at risk across "+running.length+" running":running.length+" running · "+draft.length+" in draft"}
+          </div>
+        </div>
+        {topItem ? (
+          <div>
+            <div style={{fontSize:10,fontWeight:600,color:topItem.accent,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:4}}>
+              Do this first · {topItem.tag}
+            </div>
+            <div style={{fontSize:16,fontWeight:600,color:t.text,fontFamily:t.sans,lineHeight:1.3,marginBottom:4}}>{topItem.title}</div>
+            <div style={{fontSize:12.5,color:t.textSub,fontFamily:t.sans,lineHeight:1.5,marginBottom:12}}>{topItem.reason}</div>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              {topItem.actions.map((a,i)=>(
+                <button key={i} onClick={a.fn} style={a.primary?{...gG(t),fontSize:12.5,padding:"8px 15px"}:{...gGh(t),fontSize:12.5,padding:"8px 14px"}}>{a.label}</button>
+              ))}
+              <button onClick={()=>onDetail(topItem.id)} style={{...gGh(t),fontSize:12.5,padding:"8px 14px",border:"none",background:"transparent"}}>View detail →</button>
+            </div>
+          </div>
+        ) : (
+          <div style={{fontSize:13.5,color:dk?"#60d080":"#1a7a48",fontFamily:t.sans,fontWeight:500}}>
+            ✓ Queue clear — nothing needs a decision today. Good week to activate a draft or run the Signal debate.
+          </div>
+        )}
+      </div>
 
-      {/* Stats strip */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(110px,1fr))",gap:8}}>
+      {/* Stat strip */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:10}}>
         {[
-          {l:"Running",          v:running.length},
-          {l:"Ending this week", v:endingSoon.length+overdue.length},
-          {l:"Revenue at risk",  v:fmtCur(totalAtRisk)},
-          {l:"Needs attention",  v:needsAction.length+overdue.length},
+          {l:"In the queue", v:queue.length, gold:false},
+          {l:"Overdue", v:overdueCount, gold:overdueCount>0},
+          {l:"Ending soon", v:endingCount, gold:false},
+          {l:"Revenue at risk", v:fmtCur(totalAtRisk), gold:true},
         ].map(m=>(
-          <div key={m.l} style={{...gCd(t,dk),padding:"10px 12px"}}>
-            <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:3}}>{m.l}</div>
-            <div style={{fontSize:20,fontWeight:700,color:t.gold,fontFamily:t.serif}}>{m.v}</div>
+          <div key={m.l} style={{background:t.surface,border:"1px solid "+t.border,borderRadius:12,padding:"13px 15px",boxShadow:t.shadow}}>
+            <div style={{fontSize:9.5,letterSpacing:"0.1em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,fontWeight:600,marginBottom:8}}>{m.l}</div>
+            <div style={{fontSize:24,fontWeight:700,color:m.gold?t.gold:t.text,fontFamily:t.mono,letterSpacing:"-0.03em",lineHeight:1}}>{m.v}</div>
           </div>
         ))}
       </div>
 
-      {/* Overdue */}
-      <Section title="Overdue — end date passed" color="#e07070" items={overdue} emptyMsg="Nothing overdue.">
-        {overdue.map(e=><InitRow key={e.id} item={e} showEndDate showRevenue/>)}
-      </Section>
+      {/* The action queue */}
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        <div style={{display:"flex",alignItems:"baseline",gap:8}}>
+          <span style={gSL(t)}>Action queue</span>
+          <span style={{fontSize:11,color:t.textMuted,fontFamily:t.sans}}>ranked by urgency · clear each item with a decision</span>
+        </div>
 
-      {/* Ending this week */}
-      <Section title="Ending this week — decide now" color="#c09828" items={endingSoon} emptyMsg="Nothing ending this week.">
-        {endingSoon.map(e=><InitRow key={e.id} item={e} showEndDate showRevenue/>)}
-      </Section>
-
-      {/* High stakes */}
-      <Section title="High stakes — $50k+ revenue at risk" color={dk?"#8080e0":"#4848b0"} items={highStake} emptyMsg="No high-stakes initiatives running.">
-        {highStake.map(e=><InitRow key={e.id} item={e} showEndDate showRevenue/>)}
-      </Section>
-
-      {/* Incomplete — missing owner / metric / kill criteria */}
-      <Section title="Incomplete setup — missing owner, metric, or kill criteria" color={dk?"#e08080":"#a03030"} items={needsAction} emptyMsg="All running initiatives are properly configured.">
-        {needsAction.map(e=>(
-          <div key={e.id} onClick={()=>onDetail(e.id)}
-            style={{...gSc(t,dk),cursor:"pointer",padding:"10px 12px"}}>
-            <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:4,flexWrap:"wrap"}}>
-              {e.initId&&<span style={{fontSize:10,fontWeight:700,color:t.gold,fontFamily:t.mono,background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:3,padding:"1px 5px"}}>{e.initId}</span>}
-            </div>
-            <div style={{fontSize:13,fontWeight:600,color:t.text,marginBottom:6,fontFamily:t.serif}}>{e.title}</div>
-            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-              {!e.owner&&<span style={{fontSize:11,fontFamily:t.mono,color:"#e07070",background:dk?"#2a1010":"#fdf0f0",border:"1px solid #e09090",borderRadius:3,padding:"1px 6px"}}>No owner</span>}
-              {!e.primaryMetric&&<span style={{fontSize:11,fontFamily:t.mono,color:"#e07070",background:dk?"#2a1010":"#fdf0f0",border:"1px solid #e09090",borderRadius:3,padding:"1px 6px"}}>No metric</span>}
-              {!e.killCriteria&&<span style={{fontSize:11,fontFamily:t.mono,color:"#e07070",background:dk?"#2a1010":"#fdf0f0",border:"1px solid #e09090",borderRadius:3,padding:"1px 6px"}}>No kill criteria</span>}
-            </div>
+        {queue.length===0 && (
+          <div style={{...gCd(t,dk),padding:"40px 24px",textAlign:"center"}}>
+            <div style={{fontSize:24,marginBottom:8,opacity:.5}}>✓</div>
+            <div style={{fontSize:14,fontWeight:600,color:t.text,fontFamily:t.sans,marginBottom:5}}>Nothing in the queue</div>
+            <div style={{fontSize:12.5,color:t.textSub,fontFamily:t.sans,maxWidth:360,margin:"0 auto"}}>No running initiatives need a decision and no strong drafts are waiting. Log new metrics or generate a Signal slate to fill the pipeline.</div>
           </div>
-        ))}
-      </Section>
+        )}
 
-      {/* Top drafts ready to start */}
-      <Section title="Top drafts by ICE — ready to prioritise" color={dk?"#3acca0":"#187860"} items={topDrafts} emptyMsg="No scored drafts in the pipeline.">
-        {topDrafts.map(e=>(
-          <div key={e.id} onClick={()=>onDetail(e.id)}
-            style={{...gSc(t,dk),cursor:"pointer",padding:"10px 12px"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
-              <div>
-                <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:4}}>
-                  {e.initId&&<span style={{fontSize:10,fontWeight:700,color:t.gold,fontFamily:t.mono,background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:3,padding:"1px 5px"}}>{e.initId}</span>}
-                  {brands&&brands.length>1&&<span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono}}>{(brands.find(b=>b.id===(e.brandId||"default"))||brands[0]||{}).name}</span>}
+        {queue.map((q,idx)=>(
+          <div key={q.id+"-"+q.kind} style={{...gCd(t,dk),padding:0,overflow:"hidden",display:"flex"}}>
+            <div style={{width:3,background:q.accent,flexShrink:0}}/>
+            <div style={{flex:1,minWidth:0,padding:"13px 16px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,marginBottom:6}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3,flexWrap:"wrap"}}>
+                    <span style={{fontSize:10,fontWeight:600,color:q.accent,fontFamily:t.mono,letterSpacing:"0.05em"}}>{q.tag}</span>
+                    {q.brand&&brands.length>1&&<span style={{fontSize:10.5,color:t.textMuted,fontFamily:t.mono}}>{q.brand}</span>}
+                  </div>
+                  <div onClick={()=>onDetail(q.id)} style={{fontSize:14.5,fontWeight:600,color:t.text,fontFamily:t.sans,lineHeight:1.3,cursor:"pointer"}}>{q.title}</div>
                 </div>
-                <div style={{fontSize:13,fontWeight:600,color:t.text,fontFamily:t.serif}}>{e.title}</div>
-                {e.revenueImpact>0&&<div style={{fontSize:12,color:t.textMuted,fontFamily:t.mono,marginTop:2}}>{fmtCur(e.revenueImpact)} estimated impact</div>}
+                {q.money>0 && <span style={{fontSize:16,fontWeight:700,color:t.gold,fontFamily:t.mono,letterSpacing:"-0.02em",flexShrink:0}}>{fmtCur(q.money)}</span>}
               </div>
-              <span style={{fontSize:11,fontWeight:700,color:t.gold,fontFamily:t.mono,background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:4,padding:"3px 8px",flexShrink:0}}>
-                ICE {Math.round(((e.ice.impact||0)*(e.ice.certainty||0)*(e.ice.ease||0)/1000)*100)}
-              </span>
+              <div style={{fontSize:12.5,color:t.textSub,fontFamily:t.sans,lineHeight:1.5,marginBottom:11}}>{q.reason}</div>
+              <div style={{display:"flex",gap:7,flexWrap:"wrap",alignItems:"center"}}>
+                {q.actions.map((a,i)=>(
+                  <button key={i} onClick={a.fn} style={a.primary?{...gG(t),fontSize:12,padding:"6px 13px"}:{...gGh(t),fontSize:12,padding:"6px 12px"}}>{a.label}</button>
+                ))}
+                {q.metric&&<span style={{marginLeft:"auto",fontSize:11,color:t.textMuted,fontFamily:t.mono}}>{q.metric.slice(0,42)}{q.metric.length>42?"…":""}</span>}
+              </div>
             </div>
           </div>
         ))}
-      </Section>
-
+      </div>
     </div>
   );
 }

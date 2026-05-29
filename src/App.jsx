@@ -402,11 +402,11 @@ async function callExpandHypothesis(rough, title, settings, dataCtx) {
   return data.content && data.content[0] ? data.content[0].text.trim() : "";
 }
 
-async function callSynthesiseLearnings(learnings, settings) {
+async function callSynthesizeLearnings(learnings, settings) {
   const lines = learnings.map((l,i)=>String(i+1)+". ["+l.outcome+"]["+l.category+"]["+l.retailer+"] "+l.learning).join("\n");
   const retailers = [...new Set(learnings.map(l=>l.retailer))].join(", ");
   const sys = [
-    "You are synthesising completed initiative learnings for "+settings.companyName+", a "+settings.businessModel+" business. Active retailers: "+retailers+".",
+    "You are synthesizing completed initiative learnings for "+settings.companyName+", a "+settings.businessModel+" business. Active retailers: "+retailers+".",
     "All initiatives are closed. Your job is to turn this evidence into a clear picture of what worked, what gaps exist, what not to repeat, and what to do next.",
     "Respond in exactly four sections:",
     "",
@@ -427,13 +427,44 @@ async function callSynthesiseLearnings(learnings, settings) {
   const resp = await fetch(PROXY_URL, {
     method:"POST", headers:AI_HEADERS(),
     body:JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:1200, system:sys,
-      messages:[{role:"user", content:"Learnings to synthesise:\n"+lines}] }),
+      messages:[{role:"user", content:"Learnings to synthesize:\n"+lines}] }),
+  });
+  const data = await resp.json();
+  return data.content && data.content[0] ? data.content[0].text.trim() : "";
+}
+// Natural-language query over the learnings library. The query IS the hypothesis:
+// "have we tried creative angles for subscription retention?" returns whether the
+// team explored it, what happened, and the verdict — pulling from learnings, not titles.
+// Relevance is semantic-first; recency is weighed only WITHIN a relevance tier, so a
+// 4-year-old BFCM learning still beats a recent non-seasonal one for a BFCM question.
+async function callAskLibrary(question, corpus, settings) {
+  const todayStr = new Date().toISOString().slice(0,10);
+  const lines = corpus.map(l => {
+    let s = "["+l.initId+"] ("+l.outcome+"|"+l.retailer+"|"+l.category+"|"+l.durability+"|closed "+(l.closedDate||"unknown")+")";
+    s += "\n    learning: "+l.learning;
+    if (l.decision)   s += "\n    decision: "+l.decision;
+    if (l.hypothesis) s += "\n    hypothesis: "+l.hypothesis;
+    return s;
+  }).join("\n\n");
+  const sys = [
+    "You are the institutional memory of "+settings.companyName+", a "+settings.businessModel+" business. Today is "+todayStr+".",
+    "Someone is asking whether the team has already explored something. Answer from the closed-initiative record below — not generic best practice.",
+    "RELEVANCE FIRST: find initiatives semantically relevant to the question, including near-misses and adjacent attempts. Match on meaning, not keywords.",
+    "RECENCY SECOND: weigh recency only WITHIN a relevance tier. A highly relevant older learning outranks a marginally relevant recent one. For seasonal questions, a same-context learning from years ago beats recent off-context work.",
+    "DURABILITY: structural learnings stay reliable with age; tactical learnings older than ~12 months may reflect shifted conditions — surface but flag the caveat.",
+    "Answer in three parts: VERDICT, WHAT WE FOUND, READ. Cite ids in [BRACKETS] exactly as given. Be honest about gaps. No generic advice.",
+  ].join(" ");
+  const resp = await fetch(PROXY_URL, {
+    method:"POST", headers:AI_HEADERS(),
+    body:JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:1100, system:sys,
+      messages:[{role:"user", content:"QUESTION: "+question+"\n\nCLOSED-INITIATIVE RECORD:\n"+lines}] }),
   });
   const data = await resp.json();
   return data.content && data.content[0] ? data.content[0].text.trim() : "";
 }
 
 async function callSuggestICE(form, settings, dataCtx) {
+
   const sys = [
     "You help growth teams score initiatives using ICE for "+settings.companyName+",",
     "a "+settings.businessModel+" business.",
@@ -509,6 +540,8 @@ function buildLearningsIndex(items, brands) {
     outcome: e.results.outcomeClassification || "Inconclusive",
     learning: e.results.keyLearning,
     actualRev: e.results.actualRevenueImpact != null ? e.results.actualRevenueImpact : null,
+    closedDate: e.endDate || e.createdAt || null,
+    durability: e.results.durability === "structural" ? "structural" : "tactical",
   }));
 }
 
@@ -518,8 +551,11 @@ async function callGenerateCandidates(portfolioCtx, learningsIndex, settings, ca
   const learningsBlock = learningsIndex.length === 0
     ? "  (no completed initiatives yet — recommendations must rely on portfolio state and brand briefs only)"
     : learningsIndex.slice(0, 30).map(l =>
-        `  [${l.id}] (${l.outcome}|${l.retailer}|${l.category}) ${l.learning}`
+        `  [${l.id}] (${l.outcome}|${l.retailer}|${l.category}|${l.durability}|closed ${l.closedDate||"unknown"}) ${l.learning}`
       ).join("\n");
+
+  const candTodayStr = new Date().toISOString().slice(0,10);
+  const weightingPolicy = "EVIDENCE WEIGHTING: Each learning carries a closed date and a durability tag (structural | tactical). Today is "+candTodayStr+". Weight evidence by recency AND durability, not recency alone. Tactical learnings lose evidentiary weight as they age; a tactical result older than ~12 months reflects conditions that may have shifted, so it should not by itself veto a fresh idea. Structural learnings describe enduring truths and stay binding regardless of age. A recent learning generally outweighs a stale tactical one, but never discard a learning purely for being old — note the staleness in your reasoning instead.";
 
   const sys = [
     "You are a growth strategist generating next-experiment recommendations for "+settings.companyName+",",
@@ -528,6 +564,7 @@ async function callGenerateCandidates(portfolioCtx, learningsIndex, settings, ca
     "Your job: propose 5-7 high-quality candidate experiments grounded in (a) the current portfolio state, (b) the learnings library, and (c) any live metrics movements.",
     "Each candidate must be specific to this business — no generic playbook items. If a candidate is essentially a replay or close cousin of something already running or already in drafts, do NOT propose it.",
     "Prefer candidates that exploit gaps: tactics proven at one retailer but not yet tested at another, uncovered categories with revenue potential, or metrics moving the wrong way that no current initiative addresses.",
+    weightingPolicy,
     "Return ONLY a JSON array of 5-7 objects. Each object must have these keys exactly:",
     "title (string, concise, specific), category (one of: "+cats.join(", ")+"),",
     "brandTarget (string — retailer name if the candidate is brand-specific, or 'Portfolio' if cross-brand),",
@@ -561,7 +598,7 @@ async function callExpandRecommendation(candidate, portfolioCtx, learningsIndex,
   const citedBlock = citedLearnings.length === 0
     ? "  (this candidate did not cite specific past learnings)"
     : citedLearnings.map(l =>
-        `  [${l.id}] (${l.outcome}|${l.retailer}|${l.category}) ${l.title} — ${l.learning}`
+        `  [${l.id}] (${l.outcome}|${l.retailer}|${l.category}|${l.durability}|closed ${l.closedDate||"unknown"}) ${l.title} — ${l.learning}`
       ).join("\n");
 
   const sys = [
@@ -577,6 +614,7 @@ async function callExpandRecommendation(candidate, portfolioCtx, learningsIndex,
     "initType (one of: A/B Test, Campaign, Process, Research, Infrastructure),",
     "impact (int 1-10), impactRationale (string, one sentence),",
     "certainty (int 1-10), certaintyRationale (string, one sentence — explicitly reference cited learnings if any),",
+    "When setting certainty, weight cited learnings by recency and durability: a stale tactical learning (closed >~12mo ago, tagged tactical) supports lower certainty than a recent or structural one. If high certainty rests on an old tactical learning, say so in the rationale.",
     "reasoningTrace (string — 2-3 sentences explaining the full logic: why this, why now, what specific evidence supports it. Reference the cited learnings by what they showed, not by id.).",
     "Be specific. No hedging. No generic advice. If certainty is high, the cited learnings should justify it.",
   ].join(" ");
@@ -954,8 +992,8 @@ Return ONLY a JSON object (no markdown) with this structure:
 
 Rules:
 - "continue": normal next turn, rotate to an agent who hasn't spoken recently or who has a mandate-driven reason to weigh in
-- "followup": USE THIS when two agents have taken opposing positions — force the challenged agent to respond directly. The followup_prompt must name the specific claim being contested, e.g. "The CFO said your revenue projection is unsupported — respond to that specific objection." Use followup aggressively in turns 2-5 to generate real tension before synthesising.
-- "synthesise": the debate has surfaced genuine opposing positions, key tensions have been directly contested, and you have enough signal to produce differentiated initiatives. Do not synthesise if agents have only agreed with each other.
+- "followup": USE THIS when two agents have taken opposing positions — force the challenged agent to respond directly. The followup_prompt must name the specific claim being contested, e.g. "The CFO said your revenue projection is unsupported — respond to that specific objection." Use followup aggressively in turns 2-5 to generate real tension before synthesizing.
+- "synthesise": the debate has surfaced genuine opposing positions, key tensions have been directly contested, and you have enough signal to produce differentiated initiatives. Do not synthesize if agents have only agreed with each other.
 - Force "synthesise" if turnCount >= ${maxTurns - 1}
 
 Priority: favour "followup" over "continue" whenever there is an unresolved disagreement in the transcript. Consensus too early produces generic output.`;
@@ -986,7 +1024,7 @@ async function callDebateSynthesis(portfolioCtx, userContext, transcript, cats, 
 
   const transcriptStr = transcript.map(m=>`${m.icon} ${m.label}:\n${m.text}`).join("\n\n---\n\n");
 
-  const sys = `You are a Chief Strategy Officer synthesising a C-Suite debate into net-new growth initiatives.
+  const sys = `You are a Chief Strategy Officer synthesizing a C-Suite debate into net-new growth initiatives.
 
 Your job is not to summarise the debate — it is to resolve it. Where executives disagreed, you must take a position and explain why you're proceeding despite the objection. Where they agreed, scrutinise whether consensus was earned or just convenient.
 
@@ -1160,6 +1198,98 @@ function Modal({t,dk,onClose,children,title,wide}) {
     </div>
   );
 }
+
+// ── Citation system ─────────────────────────────────────────────────────────
+// Reusable across any AI surface that references past initiatives. A surface
+// either (a) emits [INIT-ID] tokens in prose (Ask the library) and uses
+// renderCitedText, or (b) carries structured sourceLearningIds and uses
+// footnote superscripts (Signal). Both open the same focused CitationModal.
+
+// Focused, read-only view of one initiative — title, outcome, learning,
+// decision, hypothesis. Deliberately lighter than the full DetailView so it
+// can open as an overlay without leaving the current surface.
+function CitationModal({ item, t, dk, cats, brands, onClose }) {
+  if (!item) return null;
+  const r = item.results || {};
+  const c = (dk?OD:OL)[r.outcomeClassification] || {};
+  return (
+    <Modal t={t} dk={dk} onClose={onClose} title="Referenced initiative" wide>
+      <div style={{display:"flex",flexDirection:"column",gap:14}}>
+        <div>
+          <div style={{display:"flex",alignItems:"baseline",gap:8,flexWrap:"wrap",marginBottom:8}}>
+            {item.initId && <span style={{fontSize:11,fontWeight:600,color:t.gold,fontFamily:t.mono}}>{item.initId}</span>}
+            <span style={{fontSize:18,fontWeight:700,color:t.text,fontFamily:t.serif,lineHeight:1.3}}>{item.title}</span>
+          </div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            {r.outcomeClassification && <OBdg o={r.outcomeClassification} dk={dk}/>}
+            {item.category && <CBdg cat={item.category} cats={cats||[]} dk={dk}/>}
+            {item.initType && <TBdg type={item.initType} dk={dk}/>}
+            {brands && brands.length>1 && <Bdg label={brandName(item.brandId||"default",brands)} color={brandColor(item.brandId||"default",brands,dk)} bg={dk?"#1e1e14":"#f8f7f2"} border={dk?"#2a2820":"#ddd8c8"}/>}
+            {(r.durability==="structural")
+              ? <Bdg label="Structural" color={dk?"#7fb8ff":"#1a5fb4"} bg={dk?"#16243a":"#eaf2ff"} border={dk?"#27425f":"#b8d4f0"}/>
+              : (r.keyLearning ? <Bdg label="Tactical" color={t.textMuted} bg={dk?"#1e1e14":"#f4f3ee"} border={t.border}/> : null)}
+            {item.endDate && <span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,marginLeft:"auto"}}>closed {fmtDate(item.endDate)}</span>}
+          </div>
+        </div>
+
+        {r.keyLearning && (
+          <div style={{borderLeft:"3px solid "+(c.border||t.gold),paddingLeft:14}}>
+            <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:6}}>Key learning</div>
+            <p style={{margin:0,fontSize:15,fontWeight:600,color:t.text,lineHeight:1.6,fontFamily:t.serif,fontStyle:"italic"}}>"{r.keyLearning}"</p>
+          </div>
+        )}
+
+        {item.hypothesis && (
+          <div>
+            <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>Original hypothesis</div>
+            <p style={{margin:0,fontSize:13,color:t.textSub,lineHeight:1.6,fontFamily:t.sans}}>{item.hypothesis}</p>
+          </div>
+        )}
+
+        {r.decisionMade && (
+          <div style={{fontSize:12.5,color:t.textSub,fontFamily:t.mono,lineHeight:1.6,padding:"10px 12px",background:t.surfaceAlt,borderRadius:6}}>
+            <span style={{color:t.textMuted,fontSize:10,textTransform:"uppercase",letterSpacing:"0.06em"}}>Decision: </span>
+            {r.decisionMade}
+          </div>
+        )}
+
+        {(item.revenueImpact!==0 || r.actualRevenueImpact!=null) && (
+          <div style={{display:"flex",gap:18,fontSize:12,fontFamily:t.mono,color:t.textMuted}}>
+            {item.revenueImpact!==0 && <span>Est: <strong style={{color:t.text}}>{fmtCur(item.revenueImpact)}</strong></span>}
+            {r.actualRevenueImpact!=null && <span>Actual: <strong style={{color:t.gold}}>{fmtCur(r.actualRevenueImpact)}</strong></span>}
+          </div>
+        )}
+
+        {!r.keyLearning && (
+          <div style={{fontSize:12,color:t.textMuted,fontFamily:t.mono,fontStyle:"italic"}}>No logged results for this initiative yet.</div>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+// Parse a text block, turning [INIT-ID] tokens into clickable citation chips.
+// idResolver maps an id string -> item (or null). Unknown ids render as plain
+// text so a hallucinated/stale id never produces a dead link. onCite(item) opens
+// the modal. Returns an array of React nodes safe to splice into a <p>.
+function renderCitedText(text, idResolver, onCite, t) {
+  if (!text) return null;
+  const parts = String(text).split(/(\[[^\]]+\])/g);
+  return parts.map((part, i) => {
+    const m = part.match(/^\[([^\]]+)\]$/);
+    if (!m) return <span key={i}>{part}</span>;
+    const item = idResolver(m[1].trim());
+    if (!item) return <span key={i}>{part}</span>;
+    return (
+      <button key={i} onClick={()=>onCite(item)} title={item.title}
+        style={{display:"inline",padding:"0 4px",margin:"0 1px",fontSize:"0.82em",fontWeight:700,fontFamily:t.mono,
+          color:t.gold,background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:4,cursor:"pointer",lineHeight:1.4,verticalAlign:"baseline"}}>
+        {item.initId || m[1].trim()}
+      </button>
+    );
+  });
+}
+
 
 // -- App -----------------------------------------------------------------------
 // ── Onboarding Modal ────────────────────────────────────────────────────────
@@ -1795,6 +1925,7 @@ export default function App() {
   const saveResults = ()=>{
     if(!rForm||!rForm.keyLearning) return;
     const r={...rForm,
+      durability: rForm.durability==="structural" ? "structural" : "tactical",
       actualRevenueImpact:rForm.actualRevenueImpact!==""?parseInt(rForm.actualRevenueImpact)||0:null,
       actualSpendCost:rForm.actualSpendCost!==""&&rForm.actualSpendCost!==undefined?parseInt(rForm.actualSpendCost)||0:null,
       actualResourceCost:rForm.actualResourceCost!==""&&rForm.actualResourceCost!==undefined?parseInt(rForm.actualResourceCost)||0:null,
@@ -2466,6 +2597,25 @@ export default function App() {
               </div>
             </FR>
             <FR label="Decision made" t={t}><textarea style={gTA(t)} rows={2} value={rForm.decisionMade} onChange={e=>setRForm({...rForm,decisionMade:e.target.value})}/></FR>
+            <FR label="Durability — how long does this learning stay relevant?" t={t}>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                {[
+                  {k:"tactical",   label:"Tactical",   hint:"Context-bound — decays as platforms, creative, or market shift"},
+                  {k:"structural", label:"Structural", hint:"Durable truth about the business — stays relevant for years"},
+                ].map(d=>{
+                  const act=(rForm.durability||"tactical")===d.k;
+                  return (
+                    <button key={d.k} title={d.hint} onClick={()=>setRForm({...rForm,durability:d.k})}
+                      style={{fontSize:12,padding:"5px 11px",borderRadius:4,cursor:"pointer",fontWeight:600,background:act?t.goldBg:(dk?"#1a1a14":"#f5f5f0"),border:"1px solid "+(act?t.goldBorder:t.border),color:act?t.gold:t.textMuted}}>{d.label}</button>
+                  );
+                })}
+              </div>
+              <div style={{fontSize:10.5,color:t.textMuted,fontFamily:t.mono,marginTop:6,lineHeight:1.5}}>
+                {(rForm.durability||"tactical")==="structural"
+                  ? "Structural — Signal treats this as enduring evidence; not discounted by age."
+                  : "Tactical — Signal down-weights this as it ages; library search still surfaces it, flagged by recency."}
+              </div>
+            </FR>
             <FR label="Actual revenue impact ($) — leave blank if not measurable" t={t}><input style={gI(t)} type="number" value={rForm.actualRevenueImpact} placeholder="e.g. 42000 or -15000" onChange={e=>setRForm({...rForm,actualRevenueImpact:e.target.value})}/></FR>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
               <FR label="Actual media / spend cost ($)" t={t}><input style={gI(t)} type="number" value={rForm.actualSpendCost||""} placeholder="leave blank if unchanged" onChange={e=>setRForm({...rForm,actualSpendCost:e.target.value})}/></FR>
@@ -2515,6 +2665,7 @@ export default function App() {
           recs={recs}
           items={items}
           brands={brands}
+          cats={cats}
           onAccept={acceptRecommendation}
           onDismiss={dismissRecommendation}
           onClose={()=>setShowRecModal(null)}
@@ -2967,7 +3118,7 @@ function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand, agents
                   <div style={{padding:"12px 16px",background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:6,
                     display:"flex",alignItems:"center",gap:8}}>
                     <span style={{display:"inline-block",animation:"spin 1.2s linear infinite",fontSize:14}}>⟳</span>
-                    <span style={{fontSize:12,fontWeight:600,color:t.gold,fontFamily:t.mono}}>CSO synthesising debate → 3 net-new initiatives…</span>
+                    <span style={{fontSize:12,fontWeight:600,color:t.gold,fontFamily:t.mono}}>CSO synthesizing debate → 3 net-new initiatives…</span>
                   </div>
                 )}
               </div>
@@ -3009,7 +3160,7 @@ function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand, agents
                 </div>
                 <div style={{fontSize:12,color:t.textMuted,fontFamily:t.mono,lineHeight:1.8,maxWidth:380,margin:"0 auto"}}>
                   Each exec has 8 live tools to query your portfolio data — win rates, blocked initiatives, coverage gaps, failure patterns, revenue gaps — before forming opinions.
-                  A Moderator routes the debate dynamically. The CSO synthesises into 3 net-new initiatives with champion and dissenting voice.
+                  A Moderator routes the debate dynamically. The CSO synthesizes into 3 net-new initiatives with champion and dissenting voice.
                   <br/><br/>
                   <strong style={{color:t.textSub}}>Add situation context above for sharper results.</strong>
                   <br/>Use Signal AI to analyse your portfolio.
@@ -3803,7 +3954,7 @@ function NextPlaysCard({ t, dk, recs, recsLoad, recsErr, brands, items, onGenera
 
 // Modal — full recommendation detail with hypothesis, ICE rationale, reasoning
 // trace, and cited learnings. Actions: Add to backlog | Dismiss.
-function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, onAccept, onDismiss, onClose }) {
+function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, cats, onAccept, onDismiss, onClose }) {
   const batch = recs.find(b => b.id === batchId);
   const rec = batch ? batch.recommendations.find(r => r.id === recId) : null;
   if (!rec) return null;
@@ -3812,6 +3963,12 @@ function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, onAccept, 
   const citedLearnings = (rec.sourceLearningIds || [])
     .map(id => items.find(e => e.id === id))
     .filter(Boolean);
+
+  // Footnote map: each cited learning gets a stable superscript number, appended
+  // to the reasoning trace as end-of-trace references. The prose stays clean; the
+  // numbers tell you what fed the reasoning, and each is clickable.
+  const [citeItem, setCiteItem] = useState(null);
+  const footnotes = citedLearnings.map((it, i) => ({ n: i+1, item: it }));
 
   const isResolved = rec.status !== "pending";
 
@@ -3836,11 +3993,34 @@ function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, onAccept, 
           </div>
         </div>
 
-        {/* Reasoning trace — the trust-builder */}
+        {/* Reasoning trace — the trust-builder. Footnote superscripts map to the
+            cited learnings below; prose stays clean, references are clickable. */}
         {rec.reasoningTrace && (
           <div style={gSc(t,dk)}>
             <div style={gSL(t)}>Why this, why now</div>
-            <p style={{margin:0,color:t.textSub,lineHeight:1.6,fontSize:14,fontFamily:t.serif}}>{rec.reasoningTrace}</p>
+            <p style={{margin:0,color:t.textSub,lineHeight:1.6,fontSize:14,fontFamily:t.serif}}>
+              {rec.reasoningTrace}
+              {footnotes.map(f => (
+                <button key={f.n} onClick={()=>setCiteItem(f.item)} title={f.item.title}
+                  style={{verticalAlign:"super",fontSize:"0.7em",fontWeight:700,fontFamily:t.mono,color:t.gold,
+                    background:"none",border:"none",cursor:"pointer",padding:"0 1px",lineHeight:1}}>
+                  {f.n}
+                </button>
+              ))}
+            </p>
+            {footnotes.length>0 && (
+              <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid "+t.border,display:"flex",flexDirection:"column",gap:4}}>
+                {footnotes.map(f => (
+                  <button key={f.n} onClick={()=>setCiteItem(f.item)}
+                    style={{display:"flex",gap:6,alignItems:"baseline",background:"none",border:"none",cursor:"pointer",textAlign:"left",padding:0,fontFamily:t.mono}}>
+                    <span style={{fontSize:10,fontWeight:700,color:t.gold}}>{f.n}</span>
+                    <span style={{fontSize:11,color:t.textMuted}}>
+                      {f.item.initId ? f.item.initId+" — " : ""}{f.item.title}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -3910,7 +4090,7 @@ function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, onAccept, 
             <div style={gSL(t)}>Source learnings — what this is grounded in</div>
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
               {citedLearnings.map(item => (
-                <div key={item.id} style={{padding:"10px 12px",background:dk?"#1a1a14":"#fafaf5",borderLeft:"3px solid "+t.gold,borderRadius:"0 4px 4px 0"}}>
+                <div key={item.id} onClick={()=>setCiteItem(item)} style={{padding:"10px 12px",background:dk?"#1a1a14":"#fafaf5",borderLeft:"3px solid "+t.gold,borderRadius:"0 4px 4px 0",cursor:"pointer"}}>
                   <div style={{fontSize:12,fontWeight:700,color:t.text,fontFamily:t.serif,marginBottom:4}}>{item.title}</div>
                   <div style={{display:"flex",gap:6,marginBottom:6,flexWrap:"wrap"}}>
                     <span style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,padding:"1px 6px",border:"1px solid "+t.border,borderRadius:3}}>
@@ -3941,6 +4121,7 @@ function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, onAccept, 
           </div>
         )}
       </div>
+      {citeItem && <CitationModal item={citeItem} t={t} dk={dk} cats={cats} brands={brands} onClose={()=>setCiteItem(null)}/>}
     </Modal>
   );
 }
@@ -5334,6 +5515,11 @@ function LearningLibrary({items, t, dk, cats, brands, activeBrand, onReplicate, 
   const [synthesis,    setSynthesis]    = useState("");
   const [synthLoad,    setSynthLoad]    = useState(false);
   const [synthVisible, setSynthVisible] = useState(false);
+  const [ask,        setAsk]        = useState("");
+  const [askAnswer,  setAskAnswer]  = useState("");
+  const [askLoad,    setAskLoad]    = useState(false);
+  const [askVisible, setAskVisible] = useState(false);
+  const [citeItem,   setCiteItem]   = useState(null);
 
   const normB = id => (!id||id==="default") ? (brands&&brands[0]&&brands[0].id||"default") : id;
   const closed = useMemo(()=>items.filter(e=>(e.status==="Completed"||e.status==="Killed")&&e.results&&e.results.keyLearning&&(activeBrand==="all"||normB(e.brandId)===normB(activeBrand))),[items,activeBrand,brands]);
@@ -5361,10 +5547,55 @@ function LearningLibrary({items, t, dk, cats, brands, activeBrand, onReplicate, 
     setActiveOutcomes(prev=>prev.includes(o)?prev.filter(x=>x!==o):[...prev,o]);
   };
 
+  const runAsk = async()=>{
+    const q = ask.trim();
+    if(!q || askLoad) return;
+    setAskLoad(true); setAskVisible(true); setAskAnswer("");
+    try {
+      const corpus = closed.map(e=>({
+        initId: e.initId || e.id,
+        outcome: e.results.outcomeClassification || "Inconclusive",
+        category: e.category,
+        retailer: brandName(e.brandId||"default", brands),
+        durability: e.results.durability==="structural" ? "structural" : "tactical",
+        closedDate: e.endDate || e.createdAt || null,
+        learning: e.results.keyLearning,
+        decision: e.results.decisionMade || "",
+        hypothesis: e.hypothesis || "",
+      }));
+      const result = await callAskLibrary(q, corpus, settings||{companyName:COMPANY_NAME,businessModel:BUSINESS_MODEL});
+      setAskAnswer(result || "No answer returned — try rephrasing.");
+    } catch { setAskAnswer("Query failed — check that your API proxy is deployed and the secret is configured."); }
+    setAskLoad(false);
+  };
+
   const gI2 = (t)=>({...gI(t),width:"auto",flex:1,minWidth:160});
 
   return (
     <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:16}}>
+
+      {/* Ask the library — natural-language retrieval over the full closed record */}
+      <div style={{...gSc(t,dk),background:t.goldBg,border:"1px solid "+t.goldBorder}}>
+        <div style={{fontSize:11,fontWeight:700,color:t.gold,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:8}}>Ask the library</div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"flex-start"}}>
+          <input style={{...gI(t),flex:1,minWidth:200}} value={ask} onChange={e=>setAsk(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")runAsk();}} placeholder={String.fromCharCode(34)+"Have we tried creative angles for retention?"+String.fromCharCode(34)+"  ·  "+String.fromCharCode(34)+"What worked for us at BFCM?"+String.fromCharCode(34)}/>
+          <button style={{...gG(t),whiteSpace:"nowrap"}} disabled={askLoad||!ask.trim()||closed.length===0} onClick={runAsk}>
+            {askLoad ? <><span style={{display:"inline-block",animation:"spin 1s linear infinite"}}>&#8635;</span> Searching…</> : <>&#128269; Ask</>}
+          </button>
+        </div>
+        <div style={{fontSize:10.5,color:t.textMuted,fontFamily:t.mono,marginTop:6}}>Searches every closed initiative — wins and failures — weighing relevance first, recency second.</div>
+        {askVisible&&(
+          <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid "+t.goldBorder}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+              <div style={{fontSize:10,fontWeight:700,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Answer from {closed.length} closed initiative{closed.length!==1?"s":""}</div>
+              <button onClick={()=>{setAskVisible(false);setAskAnswer("");}} style={{background:"none",border:"none",color:t.textMuted,cursor:"pointer",fontSize:14}}>&#10005;</button>
+            </div>
+            {askLoad
+              ? <div style={{fontSize:13,color:t.textMuted,fontFamily:t.mono}}>Reading the record…</div>
+              : <div style={{fontSize:13,color:t.textSub,lineHeight:1.75,whiteSpace:"pre-wrap",fontFamily:t.mono}}>{renderCitedText(askAnswer, (id)=>closed.find(e=>(e.initId||e.id)===id)||null, setCiteItem, t)}</div>}
+          </div>
+        )}
+      </div>
 
       {/* Outcome summary tiles */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
@@ -5399,7 +5630,7 @@ function LearningLibrary({items, t, dk, cats, brands, activeBrand, onReplicate, 
         </div>
       </div>
 
-      {/* Count + Synthesise */}
+      {/* Count + Synthesize */}
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
         <div style={{fontSize:12,color:t.textMuted,fontFamily:t.mono}}>
           {filtered.length} learning{filtered.length!==1?"s":""} {query?"matching":""}
@@ -5416,12 +5647,12 @@ function LearningLibrary({items, t, dk, cats, brands, activeBrand, onReplicate, 
                   retailer: brandName(e.brandId||"default", brands),
                   learning: e.results.keyLearning,
                 }));
-                const result = await callSynthesiseLearnings(payload, settings||{companyName:COMPANY_NAME,businessModel:BUSINESS_MODEL,northStarMetric:NORTH_STAR_METRIC,northStarCurrent:"—",northStarTarget:"—"});
+                const result = await callSynthesizeLearnings(payload, settings||{companyName:COMPANY_NAME,businessModel:BUSINESS_MODEL,northStarMetric:NORTH_STAR_METRIC,northStarCurrent:"—",northStarTarget:"—"});
                 setSynthesis(result);
               } catch { setSynthesis("Synthesis failed — check your API key in Settings."); }
               setSynthLoad(false);
             }}>
-            {synthLoad?<><span style={{display:"inline-block",animation:"spin 1s linear infinite"}}>&#8635;</span> Synthesising…</>:<><span>&#10024;</span> Synthesise learnings</>}
+            {synthLoad?<><span style={{display:"inline-block",animation:"spin 1s linear infinite"}}>&#8635;</span> Synthesizing…</>:<><span>&#10024;</span> Synthesize learnings</>}
           </button>
         )}
       </div>
@@ -5466,6 +5697,9 @@ function LearningLibrary({items, t, dk, cats, brands, activeBrand, onReplicate, 
                   <OBdg o={item.results.outcomeClassification} dk={dk}/>
                   <CBdg cat={item.category} cats={cats} dk={dk}/>
                   <TBdg type={item.initType} dk={dk}/>
+                  {(item.results.durability==="structural")
+                    ? <Bdg label="Structural" color={dk?"#7fb8ff":"#1a5fb4"} bg={dk?"#16243a":"#eaf2ff"} border={dk?"#27425f":"#b8d4f0"}/>
+                    : <Bdg label="Tactical" color={t.textMuted} bg={dk?"#1e1e14":"#f4f3ee"} border={t.border}/>}
                   {brands&&brands.length>1&&<Bdg label={brandName(item.brandId||"default",brands)} color={brandColor(item.brandId||"default",brands,dk)} bg={dk?"#1e1e14":"#f8f7f2"} border={dk?"#2a2820":"#ddd8c8"}/>}
                   {item.endDate&&<span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,marginLeft:"auto"}}>{fmtDate(item.endDate)}</span>}
                 </div>
@@ -5513,6 +5747,8 @@ function LearningLibrary({items, t, dk, cats, brands, activeBrand, onReplicate, 
           );
         })}
       </div>
+
+      {citeItem && <CitationModal item={citeItem} t={t} dk={dk} cats={cats} brands={brands} onClose={()=>setCiteItem(null)}/>}
     </div>
   );
 }

@@ -347,6 +347,167 @@ const mkDefault = (cats, activeBrand) => ({
   measurementMetric:"", measurementScope:"", trackingTag:"",
 });
 
+// -- Prediction ledger ---------------------------------------------------------
+// When an initiative goes Draft -> Running, we freeze the prediction the team is
+// committing to: ICE, the revenue estimate, and the date. This snapshot is what
+// every later calibration claim ("did our predictions get better?") compares
+// against. It MUST be immutable once set — editing ICE afterwards must not touch
+// it — so the stamp is idempotent: if a snapshot already exists, it's left alone.
+//
+// Stored under `predictionSnapshot` on the initiative. Deliberately undisplayed
+// in the main editor (it's plumbing, not a field the user fills in), but it is
+// plain data — visible in JSON backup/restore and recoverable if needed.
+function stampPredictionSnapshot(e) {
+  if (!e || e.predictionSnapshot) return e;          // never overwrite
+  return {
+    ...e,
+    predictionSnapshot: {
+      ice: { ...(e.ice || {impact:5,certainty:5,ease:5}) },
+      revenueImpact: e.revenueImpact || 0,
+      snapshotDate: new Date().toISOString().slice(0,10),
+    },
+  };
+}
+
+// Apply the stamp only on a Draft/none -> Running transition. Called from every
+// path that can move an initiative into Running (status dropdown, one-click
+// activate, CSV import). Safe to call when status isn't Running — it's a no-op.
+function withRunningSnapshot(e, nextStatus) {
+  if (nextStatus !== "Running") return e;
+  return stampPredictionSnapshot(e);
+}
+
+// Compute the signed prediction error at close. Frozen into results so the
+// delta is recorded at the moment of truth, not recomputed later from mutable
+// fields. revenueDelta = actual - predicted (positive = beat the estimate).
+// outcomeVsCertainty pairs the team's confidence-at-close with the classified
+// outcome, which is the raw material for a calibration curve.
+function computePredictionError(item, results) {
+  const snap = item && item.predictionSnapshot;
+  const predictedRev = snap ? (snap.revenueImpact || 0) : (item.revenueImpact || 0);
+  const actualRev = (results && typeof results.actualRevenueImpact === "number")
+    ? results.actualRevenueImpact : null;
+  return {
+    predictedRevenue: predictedRev,
+    actualRevenue: actualRev,
+    revenueDelta: actualRev != null ? actualRev - predictedRev : null,
+    predictedIce: snap ? { ...snap.ice } : (item.ice ? { ...item.ice } : null),
+    snapshotDate: snap ? snap.snapshotDate : null,
+    // confidence the team held when CLOSING vs. how it actually landed
+    closeCertainty: results ? (results.outcomeCertainty ?? null) : null,
+    // certainty the team PREDICTED at launch (ICE certainty, 1-10 -> %)
+    predictedCertainty: snap && snap.ice && snap.ice.certainty != null
+      ? snap.ice.certainty * 10 : null,
+    outcomeClassification: results ? results.outcomeClassification : null,
+  };
+}
+
+// -- Ingestion contract --------------------------------------------------------
+// THE SEAM between data sources and the app's internal initiative shape.
+//
+// Every data producer — CSV import today, a Shopify/GA4 API adapter tomorrow —
+// converts its raw input into a NEUTRAL RECORD (`rec`) using the field names
+// below, then calls normalizeInitiativeRecord() to get a valid initiative.
+// This means adding an API integration later is a thin adapter (raw feed -> rec),
+// NOT a rewrite of the merge/validation/snapshot logic, which lives here once.
+//
+// THE CONTRACT — field names a producer must emit on `rec` (all optional except
+// when noted; missing fields fall back to an existing record or sensible default):
+//   Identity:    initId, title, initType, category, status, brandId (brand NAME), owner
+//   Spec:        hypothesis, primaryMetric, killCriteria, startDate, endDate,
+//                sampleSize, duration, notes
+//   Attribution: measurementMetric, measurementScope, trackingTag
+//   ICE:         ice_impact, ice_certainty, ice_ease   (1-10)
+//   Economics:   revenueImpact, spendCost, resourceCost
+//   Results:     results_keyLearning (presence = closed with results),
+//                results_actualOutcome, results_outcomeClassification,
+//                results_decisionMade, results_outcomeCertainty,
+//                results_actualRevenueImpact, results_actualSpendCost,
+//                results_actualResourceCost
+//   Ledger:      snapshot_ice_impact, snapshot_ice_certainty, snapshot_ice_ease,
+//                snapshot_revenueImpact, snapshot_date
+//
+// ctx = { items, brands, cats, idPrefix, idx, sd, ed }
+//   sd/ed are pre-normalised dates (producers own date parsing for their format);
+//   idPrefix tags the generated id by source (e.g. "csv", "shopify").
+function normalizeInitiativeRecord(rec, ctx) {
+  const { items, brands, cats, idPrefix = "imp", idx = 0, sd = "", ed = "" } = ctx;
+  const r = rec || {};
+  const clamp = (v, lo, hi) => { const n = parseInt(v); return isNaN(n) ? lo : Math.min(hi, Math.max(lo, n)); };
+  const numOrNull = (v) => (v !== "" && v !== undefined && v !== null) ? (parseInt(v) || 0) : null;
+
+  const existingById = r.initId ? items.find(e => e.initId === r.initId.trim()) : null;
+  const isUpdate = !!existingById;
+  const matchedBrand = brands.find(b => b.name.trim().toLowerCase() === (r.brandId||"").trim().toLowerCase());
+  const resolvedBrandId = matchedBrand ? matchedBrand.id : (existingById?.brandId || "default");
+
+  const hasSnapshotCols = (
+    r.snapshot_date || r.snapshot_revenueImpact !== "" && r.snapshot_revenueImpact !== undefined ||
+    (r.snapshot_ice_impact !== "" && r.snapshot_ice_impact !== undefined) ||
+    (r.snapshot_ice_certainty !== "" && r.snapshot_ice_certainty !== undefined) ||
+    (r.snapshot_ice_ease !== "" && r.snapshot_ice_ease !== undefined)
+  );
+
+  const item = {
+    id:     existingById ? existingById.id     : idPrefix + "-" + Date.now() + "-" + idx,
+    initId: existingById ? existingById.initId : (r.initId?.trim() || generateInitId(resolvedBrandId, brands, items)),
+    title:  r.title || existingById?.title || "",
+    initType: INIT_TYPES.includes(r.initType) ? r.initType : (existingById?.initType || "A/B Test"),
+    category: r.category || existingById?.category || cats[0] || "",
+    status:   STATUSES.includes(r.status)   ? r.status   : (existingById?.status   || "Draft"),
+    brandId:  resolvedBrandId,
+    owner:    r.owner    !== undefined ? r.owner    : (existingById?.owner    || ""),
+    hypothesis:    r.hypothesis    || existingById?.hypothesis    || "",
+    primaryMetric: r.primaryMetric || existingById?.primaryMetric || "",
+    killCriteria:  r.killCriteria  || existingById?.killCriteria  || "",
+    measurementMetric: r.measurementMetric || existingById?.measurementMetric || "",
+    measurementScope:  r.measurementScope  || existingById?.measurementScope  || "",
+    trackingTag:       r.trackingTag       || existingById?.trackingTag       || "",
+    startDate: sd || existingById?.startDate || "",
+    endDate:   ed || existingById?.endDate   || "",
+    sampleSize: r.sampleSize || existingById?.sampleSize || "",
+    duration:   r.duration   || existingById?.duration   || "",
+    ice: {
+      impact:    clamp(r.ice_impact,    1, 10) || existingById?.ice?.impact    || 5,
+      certainty: clamp(r.ice_certainty, 1, 10) || existingById?.ice?.certainty || 5,
+      ease:      clamp(r.ice_ease,      1, 10) || existingById?.ice?.ease      || 5,
+    },
+    revenueImpact: r.revenueImpact !== "" && r.revenueImpact !== undefined ? (parseInt(r.revenueImpact) || 0) : (existingById?.revenueImpact || 0),
+    spendCost:     r.spendCost     !== "" && r.spendCost     !== undefined ? (parseInt(r.spendCost)     || 0) : (existingById?.spendCost     || 0),
+    resourceCost:  r.resourceCost  !== "" && r.resourceCost  !== undefined ? (parseInt(r.resourceCost)  || 0) : (existingById?.resourceCost  || 0),
+    notes: r.notes || existingById?.notes || "",
+    linkedIds: existingById?.linkedIds || [],
+    createdAt: existingById?.createdAt || new Date().toISOString().slice(0, 10),
+    testValidity: existingById?.testValidity || null,
+    results: r.results_keyLearning ? {
+      actualOutcome: r.results_actualOutcome || "",
+      keyLearning:   r.results_keyLearning,
+      outcomeClassification: ["Jackpot","Success","Failed","Inconclusive"].includes(r.results_outcomeClassification)
+        ? r.results_outcomeClassification : "Inconclusive",
+      decisionMade: r.results_decisionMade || "",
+      outcomeCertainty: parseInt(r.results_outcomeCertainty) || 75,
+      actualRevenueImpact: numOrNull(r.results_actualRevenueImpact),
+      actualSpendCost:     numOrNull(r.results_actualSpendCost),
+      actualResourceCost:  numOrNull(r.results_actualResourceCost),
+    } : (existingById?.results || null),
+    _isUpdate: isUpdate,
+    _source: idPrefix,
+    // Restore frozen snapshot from explicit cols, else carry existing, else none.
+    predictionSnapshot: hasSnapshotCols ? {
+      ice: {
+        impact:    clamp(r.snapshot_ice_impact,    1, 10) || existingById?.predictionSnapshot?.ice?.impact    || 5,
+        certainty: clamp(r.snapshot_ice_certainty, 1, 10) || existingById?.predictionSnapshot?.ice?.certainty || 5,
+        ease:      clamp(r.snapshot_ice_ease,      1, 10) || existingById?.predictionSnapshot?.ice?.ease      || 5,
+      },
+      revenueImpact: r.snapshot_revenueImpact !== "" && r.snapshot_revenueImpact !== undefined ? (parseInt(r.snapshot_revenueImpact) || 0)
+                      : (existingById?.predictionSnapshot?.revenueImpact || 0),
+      snapshotDate: r.snapshot_date || existingById?.predictionSnapshot?.snapshotDate || new Date().toISOString().slice(0,10),
+    } : (existingById?.predictionSnapshot || undefined),
+  };
+  // If this record lands as Running and still has no snapshot, freeze one now.
+  return withRunningSnapshot(item, item.status);
+}
+
 // -- AI ------------------------------------------------------------------------
 // All AI calls route through the Vercel proxy — API key never touches the browser.
 const PROXY_URL    = "/api/proxy";
@@ -440,7 +601,7 @@ async function callSynthesizeLearnings(learnings, settings) {
 async function callAskLibrary(question, corpus, settings) {
   const todayStr = new Date().toISOString().slice(0,10);
   const lines = corpus.map(l => {
-    let s = "["+l.initId+"] ("+l.outcome+"|"+l.retailer+"|"+l.category+"|"+l.durability+"|closed "+(l.closedDate||"unknown")+")";
+    let s = "["+l.initId+"] ("+l.outcome+"|"+l.retailer+"|"+l.category+"|"+l.durability+(l.provenance?"|"+l.provenance:"")+"|closed "+(l.closedDate||"unknown")+")";
     s += "\n    learning: "+l.learning;
     if (l.decision)   s += "\n    decision: "+l.decision;
     if (l.hypothesis) s += "\n    hypothesis: "+l.hypothesis;
@@ -452,6 +613,7 @@ async function callAskLibrary(question, corpus, settings) {
     "RELEVANCE FIRST: find initiatives semantically relevant to the question, including near-misses and adjacent attempts. Match on meaning, not keywords.",
     "RECENCY SECOND: weigh recency only WITHIN a relevance tier. A highly relevant older learning outranks a marginally relevant recent one. For seasonal questions, a same-context learning from years ago beats recent off-context work.",
     "DURABILITY: structural learnings stay reliable with age; tactical learnings older than ~12 months may reflect shifted conditions — surface but flag the caveat.",
+    "PROVENANCE: a 'backfilled' learning's outcome is a remembered estimate, not a tracked result — surface it but flag the lower confidence; a 'tracked' learning is firmer evidence.",
     "Answer in three parts: VERDICT, WHAT WE FOUND, READ. Cite ids in [BRACKETS] exactly as given. Be honest about gaps. No generic advice.",
   ].join(" ");
   const resp = await fetch(PROXY_URL, {
@@ -542,6 +704,13 @@ function buildLearningsIndex(items, brands) {
     actualRev: e.results.actualRevenueImpact != null ? e.results.actualRevenueImpact : null,
     closedDate: e.endDate || e.createdAt || null,
     durability: e.results.durability === "structural" ? "structural" : "tactical",
+    // Provenance — how trustworthy is this learning's evidence?
+    //   tracked    = ran through the system with a frozen launch prediction
+    //                (predictionSnapshot exists), so prediction-vs-actual is real.
+    //   backfilled = imported as history with no frozen prediction; the actual is
+    //                a remembered estimate. Still useful, but lower-confidence.
+    // Derived automatically from the snapshot, never user-set, so it can't be faked.
+    provenance: e.predictionSnapshot ? "tracked" : "backfilled",
   }));
 }
 
@@ -551,11 +720,11 @@ async function callGenerateCandidates(portfolioCtx, learningsIndex, settings, ca
   const learningsBlock = learningsIndex.length === 0
     ? "  (no completed initiatives yet — recommendations must rely on portfolio state and brand briefs only)"
     : learningsIndex.slice(0, 30).map(l =>
-        `  [${l.id}] (${l.outcome}|${l.retailer}|${l.category}|${l.durability}|closed ${l.closedDate||"unknown"}) ${l.learning}`
+        `  [${l.id}] (${l.outcome}|${l.retailer}|${l.category}|${l.durability}|${l.provenance}|closed ${l.closedDate||"unknown"}) ${l.learning}`
       ).join("\n");
 
   const candTodayStr = new Date().toISOString().slice(0,10);
-  const weightingPolicy = "EVIDENCE WEIGHTING: Each learning carries a closed date and a durability tag (structural | tactical). Today is "+candTodayStr+". Weight evidence by recency AND durability, not recency alone. Tactical learnings lose evidentiary weight as they age; a tactical result older than ~12 months reflects conditions that may have shifted, so it should not by itself veto a fresh idea. Structural learnings describe enduring truths and stay binding regardless of age. A recent learning generally outweighs a stale tactical one, but never discard a learning purely for being old — note the staleness in your reasoning instead.";
+  const weightingPolicy = "EVIDENCE WEIGHTING: Each learning carries a closed date, a durability tag (structural | tactical), and a provenance tag (tracked | backfilled). Today is "+candTodayStr+". Weight evidence by recency AND durability AND provenance, not recency alone. Tactical learnings lose evidentiary weight as they age; a tactical result older than ~12 months reflects conditions that may have shifted, so it should not by itself veto a fresh idea. Structural learnings describe enduring truths and stay binding regardless of age. PROVENANCE: 'tracked' learnings ran through the system with a frozen launch prediction, so their prediction-vs-actual is real evidence; 'backfilled' learnings are imported history whose outcome is a remembered estimate, so treat them as directional only — they can inform and suggest, but should not by themselves justify high confidence. Down-weight backfilled provenance the same way you down-weight stale tactical results; never discard a learning purely for being backfilled — a reconstructed truth about seasonality or audience is still true, just note the lower confidence in your reasoning. As tracked learnings accumulate they naturally outweigh backfilled ones; lean on tracked evidence first when both point in the same direction, and surface the tension when they conflict.";
 
   const sys = [
     "You are a growth strategist generating next-experiment recommendations for "+settings.companyName+",",
@@ -598,7 +767,7 @@ async function callExpandRecommendation(candidate, portfolioCtx, learningsIndex,
   const citedBlock = citedLearnings.length === 0
     ? "  (this candidate did not cite specific past learnings)"
     : citedLearnings.map(l =>
-        `  [${l.id}] (${l.outcome}|${l.retailer}|${l.category}|${l.durability}|closed ${l.closedDate||"unknown"}) ${l.title} — ${l.learning}`
+        `  [${l.id}] (${l.outcome}|${l.retailer}|${l.category}|${l.durability}|${l.provenance}|closed ${l.closedDate||"unknown"}) ${l.title} — ${l.learning}`
       ).join("\n");
 
   const sys = [
@@ -614,7 +783,7 @@ async function callExpandRecommendation(candidate, portfolioCtx, learningsIndex,
     "initType (one of: A/B Test, Campaign, Process, Research, Infrastructure),",
     "impact (int 1-10), impactRationale (string, one sentence),",
     "certainty (int 1-10), certaintyRationale (string, one sentence — explicitly reference cited learnings if any),",
-    "When setting certainty, weight cited learnings by recency and durability: a stale tactical learning (closed >~12mo ago, tagged tactical) supports lower certainty than a recent or structural one. If high certainty rests on an old tactical learning, say so in the rationale.",
+    "When setting certainty, weight cited learnings by recency, durability, AND provenance: a stale tactical learning (closed >~12mo ago, tagged tactical) supports lower certainty than a recent or structural one, and a backfilled learning (outcome is a remembered estimate, no frozen prediction) supports lower certainty than a tracked one. If high certainty rests on an old tactical or a backfilled learning, say so in the rationale.",
     "reasoningTrace (string — 2-3 sentences explaining the full logic: why this, why now, what specific evidence supports it. Reference the cited learnings by what they showed, not by id.).",
     "Be specific. No hedging. No generic advice. If certainty is high, the cited learnings should justify it.",
   ].join(" ");
@@ -1374,6 +1543,29 @@ function CitationModal({ item, t, dk, cats, brands, onClose }) {
           </div>
         )}
 
+        {/* Calibration readout — the rigor artifact. Reads the frozen prediction
+            (snapshot at launch) against the recorded outcome. Only renders when
+            we have a frozen predictionError with a measurable delta, so older
+            closed initiatives without a snapshot simply don't show it. */}
+        {r.predictionError && r.predictionError.revenueDelta != null && (() => {
+          const pe = r.predictionError;
+          const beat = pe.revenueDelta >= 0;
+          const deltaColor = beat ? "#4a7c59" : "#a24b4b";
+          const pct = pe.predictedRevenue ? Math.round((pe.revenueDelta / Math.abs(pe.predictedRevenue)) * 100) : null;
+          return (
+            <div style={{marginTop:4,padding:"10px 12px",borderRadius:6,border:"1px solid "+t.border,background:dk?"#15150f":"#faf9f4"}}>
+              <div style={{fontSize:9,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:6}}>
+                Calibration · frozen at launch {pe.snapshotDate ? "("+pe.snapshotDate+")" : ""}
+              </div>
+              <div style={{display:"flex",gap:18,fontSize:12,fontFamily:t.mono,color:t.textMuted,flexWrap:"wrap"}}>
+                <span>Predicted: <strong style={{color:t.text}}>{fmtCur(pe.predictedRevenue)}</strong></span>
+                <span>Actual: <strong style={{color:t.text}}>{fmtCur(pe.actualRevenue)}</strong></span>
+                <span>Δ <strong style={{color:deltaColor}}>{beat?"+":""}{fmtCur(pe.revenueDelta)}{pct!=null?" ("+(beat?"+":"")+pct+"%)":""}</strong></span>
+              </div>
+            </div>
+          );
+        })()}
+
         {!r.keyLearning && (
           <div style={{fontSize:12,color:t.textMuted,fontFamily:t.mono,fontStyle:"italic"}}>No logged results for this initiative yet.</div>
         )}
@@ -1965,8 +2157,17 @@ export default function App() {
         : overallWinRate;
     });
     const contribution = cats.map(c=>{
-      const realised = completed
-        .filter(e=>e.category===c&&e.results&&typeof e.results.actualRevenueImpact==="number")
+      const realisedItems = completed
+        .filter(e=>e.category===c&&e.results&&typeof e.results.actualRevenueImpact==="number");
+      // Guard the revenue artifact: only count revenue from TRACKED initiatives
+      // (real frozen prediction → measured actual) toward the headline figure.
+      // Backfilled actuals are remembered estimates; surface them separately so a
+      // client-facing number is never silently inflated by guesswork.
+      const realised = realisedItems
+        .filter(e=>e.predictionSnapshot)
+        .reduce((s,e)=>s+Math.max(0,e.results.actualRevenueImpact),0);
+      const realisedBackfilled = realisedItems
+        .filter(e=>!e.predictionSnapshot)
         .reduce((s,e)=>s+Math.max(0,e.results.actualRevenueImpact),0);
       const inflightRaw = running.filter(e=>e.category===c).reduce((s,e)=>s+Math.max(0,e.revenueImpact||0),0);
       const pipelineRaw = pipeline.filter(e=>e.category===c).reduce((s,e)=>s+Math.max(0,e.revenueImpact||0),0);
@@ -1974,17 +2175,19 @@ export default function App() {
       return {
         category: c,
         realised,
+        realisedBackfilled,
         inflight: Math.round(inflightRaw * rate),
         pipeline: Math.round(pipelineRaw * rate),
         winRate: Math.round(rate * 100),
         usesFallback: allClosedForRate.filter(e=>e.category===c).length < 3,
       };
-    }).filter(r=>r.realised>0||r.inflight>0||r.pipeline>0);
+    }).filter(r=>r.realised>0||r.realisedBackfilled>0||r.inflight>0||r.pipeline>0);
     const contributionTotals = contribution.reduce((acc,r)=>({
       realised: acc.realised + r.realised,
+      realisedBackfilled: acc.realisedBackfilled + r.realisedBackfilled,
       inflight: acc.inflight + r.inflight,
       pipeline: acc.pipeline + r.pipeline,
-    }),{realised:0,inflight:0,pipeline:0});
+    }),{realised:0,realisedBackfilled:0,inflight:0,pipeline:0});
 
     return {completed:completed.length,killed:killed.length,pipeline:pipeline.length,running:running.length,revImpacted,revAtRisk,totalEstimated,totalActual,calibration,totalEstCost,totalActualCost,closedROI,winRate,wins:wins.length,closed:closed.length,avgDays,catCounts,typeCounts,outCounts,vel,avgIce,contribution,contributionTotals,_runningItems:running};
   },[items,bounds,cats,activeBrand,brands]);
@@ -2026,7 +2229,7 @@ export default function App() {
 
   const reqStatus = s=>{
     if(s==="Completed"||s==="Killed"){setPendS(s);setConfC(sel&&sel.ice&&sel.ice.certainty?sel.ice.certainty*10:75);setShowSM(true);}
-    else saveItems(items.map(e=>e.id===selId?{...e,status:s}:e));
+    else saveItems(items.map(e=>e.id===selId?withRunningSnapshot({...e,status:s},s):e));
   };
 
   const applyStatus = (s,conf)=>{
@@ -2045,7 +2248,12 @@ export default function App() {
       actualSpendCost:rForm.actualSpendCost!==""&&rForm.actualSpendCost!==undefined?parseInt(rForm.actualSpendCost)||0:null,
       actualResourceCost:rForm.actualResourceCost!==""&&rForm.actualResourceCost!==undefined?parseInt(rForm.actualResourceCost)||0:null,
     };
-    saveItems(items.map(e=>e.id===selId?{...e,results:r}:e));
+    saveItems(items.map(e=>{
+      if(e.id!==selId) return e;
+      // Freeze the signed prediction-vs-actual delta against the launch
+      // snapshot at the moment of close — the calibration record.
+      return {...e, results:{...r, predictionError: computePredictionError(e, r)}};
+    }));
     setShowR(false);
   };
 
@@ -2076,6 +2284,10 @@ export default function App() {
     "results_actualOutcome","results_keyLearning","results_outcomeClassification",
     "results_decisionMade","results_outcomeCertainty","results_actualRevenueImpact",
     "results_actualSpendCost","results_actualResourceCost",
+    // Prediction ledger — the frozen launch commitment. Carried through CSV so a
+    // round-trip (export -> edit -> re-import) never drops the calibration record.
+    "snapshot_ice_impact","snapshot_ice_certainty","snapshot_ice_ease",
+    "snapshot_revenueImpact","snapshot_date",
   ];
 
   const itemToCSVRow = (item) => ({
@@ -2111,6 +2323,11 @@ export default function App() {
     results_actualRevenueImpact:    item.results?.actualRevenueImpact ?? "",
     results_actualSpendCost:        item.results?.actualSpendCost ?? "",
     results_actualResourceCost:     item.results?.actualResourceCost ?? "",
+    snapshot_ice_impact:       item.predictionSnapshot?.ice?.impact ?? "",
+    snapshot_ice_certainty:    item.predictionSnapshot?.ice?.certainty ?? "",
+    snapshot_ice_ease:         item.predictionSnapshot?.ice?.ease ?? "",
+    snapshot_revenueImpact:    item.predictionSnapshot?.revenueImpact ?? "",
+    snapshot_date:             item.predictionSnapshot?.snapshotDate || "",
   });
 
   const escapeCSV = (v) => {
@@ -2198,56 +2415,10 @@ export default function App() {
 
         if (rowErrs.length) errs.push({ row: idx + 2, title: r.title || r.initId || "(no title)", issues: rowErrs, isUpdate });
 
-        const clamp = (v, lo, hi) => { const n = parseInt(v); return isNaN(n) ? lo : Math.min(hi, Math.max(lo, n)); };
-        const numOrNull = (v) => (v !== "" && v !== undefined && v !== null) ? (parseInt(v) || 0) : null;
-
-        const item = {
-          // Preserve existing id/initId on update, generate fresh on create
-          id:     existingById ? existingById.id     : "csv-" + Date.now() + "-" + idx,
-          initId: existingById ? existingById.initId : (r.initId?.trim() || generateInitId(resolvedBrandId, brands, items)),
-          title:  r.title || existingById?.title || "",
-          initType: INIT_TYPES.includes(r.initType) ? r.initType : (existingById?.initType || "A/B Test"),
-          category: r.category || existingById?.category || cats[0] || "",
-          status:   STATUSES.includes(r.status)   ? r.status   : (existingById?.status   || "Draft"),
-          brandId:  resolvedBrandId,
-          owner:    r.owner    !== undefined ? r.owner    : (existingById?.owner    || ""),
-          hypothesis:    r.hypothesis    || existingById?.hypothesis    || "",
-          primaryMetric: r.primaryMetric || existingById?.primaryMetric || "",
-          killCriteria:  r.killCriteria  || existingById?.killCriteria  || "",
-          measurementMetric: r.measurementMetric || existingById?.measurementMetric || "",
-          measurementScope:  r.measurementScope  || existingById?.measurementScope  || "",
-          trackingTag:       r.trackingTag       || existingById?.trackingTag       || "",
-          startDate: sd || existingById?.startDate || "",
-          endDate:   ed || existingById?.endDate   || "",
-          sampleSize: r.sampleSize || existingById?.sampleSize || "",
-          duration:   r.duration   || existingById?.duration   || "",
-          ice: {
-            impact:    clamp(r.ice_impact,    1, 10) || existingById?.ice?.impact    || 5,
-            certainty: clamp(r.ice_certainty, 1, 10) || existingById?.ice?.certainty || 5,
-            ease:      clamp(r.ice_ease,      1, 10) || existingById?.ice?.ease      || 5,
-          },
-          revenueImpact: r.revenueImpact !== "" ? (parseInt(r.revenueImpact) || 0) : (existingById?.revenueImpact || 0),
-          spendCost:     r.spendCost     !== "" ? (parseInt(r.spendCost)     || 0) : (existingById?.spendCost     || 0),
-          resourceCost:  r.resourceCost  !== "" ? (parseInt(r.resourceCost)  || 0) : (existingById?.resourceCost  || 0),
-          notes: r.notes || existingById?.notes || "",
-          linkedIds: existingById?.linkedIds || [],
-          createdAt: existingById?.createdAt || new Date().toISOString().slice(0, 10),
-          testValidity: existingById?.testValidity || null,
-          results: r.results_keyLearning ? {
-            actualOutcome: r.results_actualOutcome || "",
-            keyLearning:   r.results_keyLearning,
-            outcomeClassification: ["Jackpot","Success","Failed","Inconclusive"].includes(r.results_outcomeClassification)
-              ? r.results_outcomeClassification : "Inconclusive",
-            decisionMade: r.results_decisionMade || "",
-            outcomeCertainty: parseInt(r.results_outcomeCertainty) || 75,
-            actualRevenueImpact: numOrNull(r.results_actualRevenueImpact),
-            actualSpendCost:     numOrNull(r.results_actualSpendCost),
-            actualResourceCost:  numOrNull(r.results_actualResourceCost),
-          } : (existingById?.results || null),
-          _fromCSV: true,
-          _isUpdate: isUpdate,
-        };
-        return item;
+        // Delegate shape-building to the shared ingestion contract. CSV rows
+        // already use the contract's field names, so they pass straight through.
+        // A future Shopify/GA4 adapter targets this same function.
+        return normalizeInitiativeRecord(r, { items, brands, cats, idPrefix: "csv", idx, sd, ed });
       });
       setImportRows(parsed);
       setImportErrs(errs);
@@ -2426,7 +2597,7 @@ export default function App() {
         onStatus={(id,status)=>{const it=items.find(e=>e.id===id); if(it){setSelId(id); reqStatus(status);}}}
         onLogResults={(id)=>{const it=items.find(e=>e.id===id); if(it){setSelId(id); setRForm(it.results?{...it.results,actualRevenueImpact:it.results.actualRevenueImpact!=null?it.results.actualRevenueImpact:"",actualSpendCost:it.results.actualSpendCost!=null?it.results.actualSpendCost:"",actualResourceCost:it.results.actualResourceCost!=null?it.results.actualResourceCost:""}:{actualOutcome:"",keyLearning:"",outcomeClassification:"Success",decisionMade:"",outcomeCertainty:75,actualRevenueImpact:"",actualSpendCost:"",actualResourceCost:""}); setShowR(true);}}}
         onExtend={(id,days)=>{saveItems(items.map(e=>{if(e.id!==id)return e; const base=e.endDate?new Date(e.endDate+"T12:00:00"):new Date(); base.setDate(base.getDate()+days); return {...e,endDate:base.toISOString().slice(0,10)};})); showToast("Extended "+days+" days.","success");}}
-        onActivate={(id)=>{saveItems(items.map(e=>e.id===id?{...e,status:"Running",startDate:e.startDate||new Date().toISOString().slice(0,10)}:e)); showToast("Initiative activated — now running.","success");}}
+        onActivate={(id)=>{saveItems(items.map(e=>e.id===id?withRunningSnapshot({...e,status:"Running",startDate:e.startDate||new Date().toISOString().slice(0,10)},"Running"):e)); showToast("Initiative activated — now running.","success");}}
       />}
       {nav==="library"&&<LearningLibrary items={items} t={t} dk={dk} cats={cats} brands={brands} activeBrand={activeBrand} settings={settings} onReplicate={(item)=>{const base=mkDefault(cats,activeBrand);setForm({...base,title:"[Replicate] "+item.title,hypothesis:"Based on learning from: "+item.title+". Original: "+item.hypothesis,category:item.category,initType:item.initType,ice:{...item.ice},revenueImpact:item.revenueImpact,notes:"Replicated from initiative "+item.id+". Original learning: "+item.results.keyLearning});setNav("form");}}/>}
 
@@ -3832,9 +4003,10 @@ function ContributionView({t, dk, contribution, totals, dRange, activeBrand, bra
   const rangeLabel = dRange==="thisMonth"?"this month":dRange==="lastMonth"?"last month":"selected range";
   const retailerLabel = activeBrand==="all" ? "All retailers" : brandName(activeBrand, brands);
   const grand = totals.realised + totals.inflight + totals.pipeline;
+  const grandWithBackfill = grand + (totals.realisedBackfilled||0);
 
   // Empty state — no data at all
-  if (grand === 0) {
+  if (grandWithBackfill === 0) {
     return (
       <div style={{...gCd(t,dk)}}>
         <div style={gSL(t)}>Contribution to revenue</div>
@@ -3865,11 +4037,15 @@ function ContributionView({t, dk, contribution, totals, dRange, activeBrand, bra
       "Realised (completed, measured): "+fmtBig(totals.realised),
       "In-flight (running, probability-weighted): "+fmtBig(totals.inflight),
       "Pipeline (draft, probability-weighted): "+fmtBig(totals.pipeline),
+      ...(totals.realisedBackfilled>0 ? [
+        "",
+        "Plus "+fmtBig(totals.realisedBackfilled)+" from backfilled history (self-reported estimates, not measured by the system — excluded from the totals above)."
+      ] : []),
       "",
       "BY CATEGORY",
       ...contribution.map(r=>"  "+r.category+": realised "+fmt(r.realised)+" | in-flight "+fmt(r.inflight)+" | pipeline "+fmt(r.pipeline)+" (win rate "+r.winRate+"%)"),
       "",
-      "Note: In-flight and pipeline figures are probability-weighted by historical category win rate. Realised is sum of measured actual revenue impact on completed initiatives.",
+      "Note: In-flight and pipeline figures are probability-weighted by historical category win rate. Realised is sum of measured actual revenue impact on completed, system-tracked initiatives.",
     ].join("\n");
     try { navigator.clipboard.writeText(lines); showToast("Contribution summary copied to clipboard.", "success"); } catch { showToast("Couldn't copy to clipboard.", "error"); }
   };
@@ -3904,6 +4080,12 @@ function ContributionView({t, dk, contribution, totals, dRange, activeBrand, bra
           <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginTop:4}}>draft, probability-weighted</div>
         </div>
       </div>
+
+      {totals.realisedBackfilled>0 && (
+        <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,lineHeight:1.5,marginTop:-8,marginBottom:14,fontStyle:"italic"}}>
+          + {fmtBig(totals.realisedBackfilled)} from backfilled history (self-reported estimates, not system-measured). Excluded from Realised above.
+        </div>
+      )}
 
       {/* By category — stacked bars */}
       <div style={{display:"flex",flexDirection:"column",gap:10}}>
@@ -4727,6 +4909,41 @@ function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResults,onL
               </div>
             </div>
           )}
+          {/* Calibration — frozen launch prediction vs. recorded actual. The
+              rigor artifact: it proves the prediction was made before the
+              outcome was known. Renders only when a frozen delta exists. */}
+          {item.results?.predictionError && item.results.predictionError.revenueDelta != null && (()=>{
+            const pe = item.results.predictionError;
+            const beat = pe.revenueDelta >= 0;
+            const deltaColor = beat ? t.gold : "#c04040";
+            const pct = pe.predictedRevenue ? Math.round((pe.revenueDelta/Math.abs(pe.predictedRevenue))*100) : null;
+            const certCol = pe.predictedCertainty!=null ? pe.predictedCertainty : null;
+            return (
+              <div style={{marginTop:14,paddingTop:12,borderTop:"1px solid "+t.border}}>
+                <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:8,letterSpacing:"0.06em",textTransform:"uppercase"}}>
+                  Calibration · prediction frozen {pe.snapshotDate?"at launch ("+pe.snapshotDate+")":"at launch"}
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:12}}>
+                  <div>
+                    <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Predicted revenue</div>
+                    <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.serif}}>{fmtCur(pe.predictedRevenue)}</div>
+                  </div>
+                  <div>
+                    <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Actual revenue</div>
+                    <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.serif}}>{fmtCur(pe.actualRevenue)}</div>
+                  </div>
+                  <div>
+                    <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Prediction error</div>
+                    <div style={{fontSize:20,fontWeight:700,color:deltaColor,fontFamily:t.serif}}>{beat?"+":""}{fmtCur(pe.revenueDelta)}{pct!=null?" ("+(beat?"+":"")+pct+"%)":""}</div>
+                  </div>
+                  {certCol!=null&&<div>
+                    <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Predicted certainty</div>
+                    <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.serif}}>{certCol}%</div>
+                  </div>}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -5692,6 +5909,7 @@ function LearningLibrary({items, t, dk, cats, brands, activeBrand, onReplicate, 
         category: e.category,
         retailer: brandName(e.brandId||"default", brands),
         durability: e.results.durability==="structural" ? "structural" : "tactical",
+        provenance: e.predictionSnapshot ? "tracked" : "backfilled",
         closedDate: e.endDate || e.createdAt || null,
         learning: e.results.keyLearning,
         decision: e.results.decisionMade || "",

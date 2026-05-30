@@ -7,6 +7,7 @@ import {
   AGENTS as CONFIG_AGENTS,
   TEMPLATES,
   SEED,
+  SEED_WEEKLY_METRICS,
 } from "./config.js";
 
 const KEY_ITEMS    = "gos_items_v4";
@@ -1874,6 +1875,7 @@ export default function App() {
         else { setOnboarding(true); }
         if(dr&&dr.value) setDebates(JSON.parse(dr.value));
         if(mr&&mr.value) setWeeklyMetrics(JSON.parse(mr.value));
+        else { setWeeklyMetrics(SEED_WEEKLY_METRICS); store.set(KEY_METRICS,JSON.stringify(SEED_WEEKLY_METRICS)); }
         if(rr&&rr.value) setRecs(JSON.parse(rr.value));
       } catch { setItems(SEED); }
       setLoaded(true);
@@ -2023,6 +2025,13 @@ export default function App() {
     setShowRecModal(null);
   };
 
+
+  // -- Demo data reset ----------------------------------------------------------
+  const handleResetDemoData = () => {
+    saveItems(SEED);
+    saveMetrics(SEED_WEEKLY_METRICS);
+    showToast(`Demo data restored — ${SEED.length} initiatives and ${SEED_WEEKLY_METRICS.length} weeks of metrics loaded.`, "success");
+  };
 
   // -- JSON backup / restore ---------------------------------------------------
   const handleDownloadBackup = () => {
@@ -2770,7 +2779,7 @@ export default function App() {
         </Modal>
       )}
 
-      {showSet&&<SettingsModal t={t} dk={dk} settings={settings} onSave={s=>{saveSettings(s);setShowSet(false);}} onClose={()=>setShowSet(false)} onDownloadBackup={handleDownloadBackup} onRestoreBackup={handleRestoreBackup}/>}
+      {showSet&&<SettingsModal t={t} dk={dk} settings={settings} onSave={s=>{saveSettings(s);setShowSet(false);}} onClose={()=>setShowSet(false)} onDownloadBackup={handleDownloadBackup} onRestoreBackup={handleRestoreBackup} onResetDemo={handleResetDemoData}/>}
 
       {guideSection&&(
         <GuideDrawer t={t} dk={dk} openSection={guideSection} onClose={()=>setGuideSection(null)}
@@ -5422,7 +5431,7 @@ function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hypReview,
 }
 
 // -- Settings ------------------------------------------------------------------
-function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onRestoreBackup}) {
+function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onRestoreBackup,onResetDemo}) {
   const [local,setLocal]=useState({...settings});
   const [newCat,setNewCat]=useState("");
   const f=(k,v)=>setLocal(p=>({...p,[k]:v}));
@@ -5557,6 +5566,11 @@ function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onRestoreB
                 onChange={e=>{ const f=e.target.files?.[0]; if(f){onRestoreBackup(f); e.target.value="";} }}/>
             </label>
           </div>
+        </div>
+        <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
+          <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:8,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Demo data</div>
+          <p style={{fontSize:12,color:t.textMuted,fontFamily:t.mono,lineHeight:1.6,margin:"0 0 10px"}}>Reload the built-in demo initiatives and weekly metrics. Replaces all current initiatives and weekly pulse data.</p>
+          <button onClick={onResetDemo} style={{...gGh(t),fontSize:12}}>&#8635; Reset to demo data</button>
         </div>
         <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>

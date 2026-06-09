@@ -2,6 +2,7 @@ import { useState } from "react";
 import { OUTCOMES, INIT_TYPES, METRIC_SOURCES, OL, OD, TYPE_L, TYPE_D, catColor, brandName, iceScore, iceColor, fmtCur, fmtDate } from "../constants.js";
 import { gG, gGh, gSL, gCd } from "../components/styles.js";
 import { Spark } from "../components/Spark.jsx";
+import { WeeklyStandupModal } from "../components/WeeklyStandupModal.jsx";
 
 // -- Weekly Pulse --------------------------------------------------------------
 function WeeklyPulseSection({t, dk, settings, brands, weeklyMetrics, onLog, onImport}) {
@@ -512,9 +513,10 @@ function NextPlaysCard({ t, dk, recs, recsLoad, recsErr, brands, items, onGenera
 // Modal — full recommendation detail with hypothesis, ICE rationale, reasoning
 // trace, and cited learnings. Actions: Add to backlog | Dismiss.
 
-export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetrics,onLog,onImport,dRange,setDRange,cFrom,cTo,setCFrom,setCTo,onGo,recs,recsLoad,recsErr,items,onGenerateRecs,onOpenRec,showToast}) {
+export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetrics,onLog,onImport,dRange,setDRange,cFrom,cTo,setCFrom,setCTo,onGo,recs,recsLoad,recsErr,items,onGenerateRecs,onOpenRec,showToast,onSaveItems}) {
   const maxCat  = Math.max(...Object.values(dash.catCounts),1);
   const maxType = Math.max(...Object.values(dash.typeCounts),1);
+  const [showStandup, setShowStandup] = useState(false);
   return (
     <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:14}}>
       {/* North star */}
@@ -534,7 +536,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
         </div>
       </div>
 
-      {/* Attention nudge — overdue and expiring initiatives */}
+      {/* This week's focus — attention nudges + weekly standup entry point */}
       {(()=>{
         const today = new Date();
         const expiring = (dash._runningItems||[]).filter(e => {
@@ -551,35 +553,53 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
           ...expiring.map(e => ({ type:"expiring", item:e })),
           ...overdue.filter(e => !expiring.find(x=>x.id===e.id)).map(e => ({ type:"overdue", item:e })),
         ].slice(0,3);
-        if(nudges.length===0) return null;
+        const hasNudges = nudges.length>0;
         return (
-          <div style={{padding:"10px 14px",background:dk?"#2a2010":"#fffbf0",border:"1px solid "+(dk?"#6a5010":"#e0c060"),borderRadius:6}}>
-            <div style={{fontSize:10,fontWeight:700,color:dk?"#d4a830":"#8a6000",fontFamily:t.mono,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:8}}>
-              ⚡ {nudges.length} initiative{nudges.length!==1?"s":""} need attention
+          <div style={hasNudges
+            ? {padding:"10px 14px",background:dk?"#2a2010":"#fffbf0",border:"1px solid "+(dk?"#6a5010":"#e0c060"),borderRadius:6}
+            : {padding:"10px 14px",background:t.surface,border:"1px solid "+t.border,borderRadius:6}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:hasNudges?8:0}}>
+              <div style={{fontSize:10,fontWeight:700,color:hasNudges?(dk?"#d4a830":"#8a6000"):t.textMuted,fontFamily:t.mono,letterSpacing:"0.08em",textTransform:"uppercase"}}>
+                {hasNudges ? `⚡ ${nudges.length} initiative${nudges.length!==1?"s":""} need attention` : "⚡ This week's focus"}
+              </div>
+              <button onClick={()=>setShowStandup(true)} style={{...gGh(t),fontSize:11,padding:"3px 10px"}}>Weekly standup</button>
             </div>
-            <div style={{display:"flex",flexDirection:"column",gap:6}}>
-              {nudges.map(({type,item},i)=>{
-                const days = type==="expiring"
-                  ? Math.ceil((new Date(item.endDate+"T12:00:00") - today) / 86400000)
-                  : Math.ceil((today - new Date(item.startDate+"T12:00:00")) / 86400000);
-                return (
-                  <div key={i} style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-                    <span style={{fontSize:10,fontWeight:700,fontFamily:t.mono,
-                      color:type==="expiring"?(dk?"#e09040":"#a04000"):(dk?"#e08080":"#a03030"),
-                      background:type==="expiring"?(dk?"#3a2010":"#fff0e0"):(dk?"#3a1010":"#fff0f0"),
-                      border:"1px solid "+(type==="expiring"?(dk?"#7a4010":"#e09060"):(dk?"#7a2020":"#e09090")),
-                      borderRadius:3,padding:"1px 6px",flexShrink:0}}>
-                      {type==="expiring" ? `ends in ${days}d` : `running ${days}d`}
-                    </span>
-                    <span style={{fontSize:12,color:t.textSub,fontFamily:t.mono,flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.title}</span>
-                    {item.owner&&<span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,flexShrink:0}}>{item.owner}</span>}
-                  </div>
-                );
-              })}
-            </div>
+            {hasNudges && (
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                {nudges.map(({type,item},i)=>{
+                  const days = type==="expiring"
+                    ? Math.ceil((new Date(item.endDate+"T12:00:00") - today) / 86400000)
+                    : Math.ceil((today - new Date(item.startDate+"T12:00:00")) / 86400000);
+                  return (
+                    <div key={i} style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                      <span style={{fontSize:10,fontWeight:700,fontFamily:t.mono,
+                        color:type==="expiring"?(dk?"#e09040":"#a04000"):(dk?"#e08080":"#a03030"),
+                        background:type==="expiring"?(dk?"#3a2010":"#fff0e0"):(dk?"#3a1010":"#fff0f0"),
+                        border:"1px solid "+(type==="expiring"?(dk?"#7a4010":"#e09060"):(dk?"#7a2020":"#e09090")),
+                        borderRadius:3,padding:"1px 6px",flexShrink:0}}>
+                        {type==="expiring" ? `ends in ${days}d` : `running ${days}d`}
+                      </span>
+                      <span style={{fontSize:12,color:t.textSub,fontFamily:t.mono,flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.title}</span>
+                      {item.owner&&<span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,flexShrink:0}}>{item.owner}</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         );
       })()}
+
+      {showStandup && (
+        <WeeklyStandupModal
+          t={t} dk={dk}
+          items={items}
+          brands={brands}
+          onCommit={(updated)=>onSaveItems&&onSaveItems(updated)}
+          onClose={()=>setShowStandup(false)}
+          showToast={showToast}
+        />
+      )}
 
       {/* Next Plays — AI-recommended experiments */}
       <NextPlaysCard

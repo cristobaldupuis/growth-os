@@ -1,36 +1,33 @@
 # Roadmap: Growth OS
 
-This roadmap outlines the evolution of **Growth OS** from a passive, client-side tracking application into an automated, **AI-native execution loop** tailored for Consulting as a Service (CaaS) and high-leverage growth operations.
+This roadmap outlines the evolution of **Growth OS** from a manual tracking dashboard into an automated, **AI-native execution loop** and prediction ledger. The system is designed to support Consulting as a Service (CaaS) by making elite growth processes inevitable, trackable, and self-scoring.
 
-## Phase 1: Foundational Sync & Local Testing (Current to Short-Term)
-*Target: Establish deterministic guardrails and build the background execution infrastructure.*
+## Phase 1: Stabilization & Bug Sweep (Current)
+*Target: Secure the newly modularized architecture and eliminate silent failure modes.*
 
-- [ ] **Install and Configure Orchestration Layer**
-  - Integrate `inngest` or `trigger.dev` into the Next.js stack via a dedicated API route handler (`/api/inngest`).
-  - Set up local development environment using the Inngest Dev Server to test background event triggers locally.
-- [ ] **Define Structured Output Schemas**
-  - Create a robust `Zod` validation schema that models exactly what an execution card looks like in the current database schema (e.g., hooks, copy variants, target audience, KPIs).
-- [ ] **Build First Isolated Background Function**
-  - Implement a single, non-blocking asynchronous function: `growth/experiment.generate-variants`.
-  - Configure the Vercel AI SDK (`generateObject` or `streamText`) to parse an amorphous client request (e.g., "Test ad angles for a protein snack") into 5 structured copy variants adhering to the Zod schema.
+- [ ] **Fix Toast Scope:** Route `showToast` correctly to `ContributionView` and `DashView` to prevent clipboard crashes.
+- [ ] **Surface AI Errors:** Standardize error handling on form-side AI calls to throw and toast on proxy failures (e.g., rate limits) instead of failing silently.
+- [ ] **State Persistence:** Include `recs` (Next Plays) in JSON backup/restore payloads. 
+- [ ] **Data Integrity:** Move `acceptRecommendation` status transitions strictly into `handleSave` to prevent orphaned accepted states.
+- [ ] **UI Polish:** Persist dark mode (`KEY_THEME`) across sessions and rename the dashboard's "Revenue Impacted" to "Projected Impact" to clearly separate estimates from actuals.
 
-## Phase 2: Closed-Loop Tool Integration (Medium-Term)
-*Target: Turn AI reflections into automated operational actions.*
+## Phase 2: The Data Moat (Short-Term)
+*Target: Replace manual CSV data entry with live API connections to validate the Prediction Ledger with ground-truth numbers.*
 
-- [ ] **Develop Third-Party Connectors (Tool Calling)**
-  - Expose verified JavaScript functions to the LLM context so the background agent can read from or write to external marketing channels (e.g., Meta Ads API, Google Analytics API).
-- [ ] **Implement State Management & Real-Time Sync**
-  - Configure the background worker to continuously write its execution state directly into the Postgres/Supabase database.
-  - Wire up frontend real-time subscriptions or optimized data polling so cards move dynamically across the kanban board as the agent updates them.
-- [ ] **Build the Automated Audit Pipeline**
-  - Implement a cron-style background task (`growth/account.weekly-audit`) that scans live account performance metrics, compares them against historical experiment logs, and auto-drafts a "Lessons Learned" summary markdown block inside the app.
+- [ ] **Shopify Dev Store Integration:** Build a serverless function adapter to pull real order/revenue data from a Shopify Development Store.
+- [ ] **API Ingestion Routing:** Route the Shopify data feed through the newly established `normalizeInitiativeRecord` contract, ensuring API data and CSV data share identical internal state.
+- [ ] **GA4 Funnel Integration:** Connect Google Analytics 4 Data API to auto-populate the funnel context, ensuring the recommendation engine targets actual drop-off points rather than guesses.
+- [ ] **Proxy Security Hardening:** Transition `api/proxy.js` away from shared-secret demo mode to secure, authenticated routes before live client tokens are processed.
 
-## Phase 3: Productized Autonomous Scaling (Long-Term)
-*Target: Scale multi-client management with near-zero manual overhead.*
+## Phase 3: Autonomous Orchestration (Medium-Term)
+*Target: Automate the AI loops to scale multi-client management with near-zero manual overhead.*
 
-- [ ] **Multi-Tenant Account Context Partitioning**
-  - Separate database indexing so a single Growth OS internal instance can manage multiple client growth frameworks, ad accounts, and historical context stores securely.
-- [ ] **Context & Knowledge Engine Realization**
-  - Integrate a vector database layer (`pgvector` or Pinecone) to embed past winning experiment outcomes, allowing the system to use semantic search to reference historical wins before generating new variants.
-- [ ] **Anomaly Detection & Proactive Alert Guardrails**
-  - Architect an autonomous alerting worker that monitors sudden shifts in CPA or CTR, automatically pauses underperforming campaign variants, and pushes a deterministic notification to a client Slack channel or dashboard view.
+- [ ] **Background Execution Engine:** Install `inngest` or `trigger.dev` to handle durable, long-running AI tasks without Vercel serverless timeouts.
+- [ ] **Zod Schema Enforcement:** Wrap all LLM outputs in strict Zod validation to guarantee AI-generated hooks and hypotheses perfectly match the database schema.
+- [ ] **Continuous Audit Loop:** Architect a background cron worker that cross-references live Shopify/Meta metrics against active experiments, automatically flagging anomalies and drafting weekly executive summaries.
+
+## Phase 4: Productized Scaling (Long-Term)
+*Target: Transition from a private consulting OS to a multi-tenant platform.*
+
+- [ ] **Multi-Tenant Architecture:** Separate database indexing and client contexts so a single instance can securely manage multiple brands.
+- [ ] **Cross-Customer Anonymized Benchmarking:** (Pending contract/legal updates) Aggregate de-identified outcome data to inform the Ask-Library and candidate generation tools with broader market trends.

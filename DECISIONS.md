@@ -60,7 +60,7 @@ Architecture decisions worth remembering. The bar for this file is a real tradeo
 
 ---
 
-## Repo kept private until paying clients establish the moat
+## Repo will be moved private until paying clients establish the moat
 
 **Decision:** The repository is public, but the defensible value — prompts, agent personas, and methodology — is embedded in the codebase rather than abstracted into protected IP. The decision is to accept this and compete on relationships and process once clients exist, rather than attempt to protect the approach through obscurity.
 

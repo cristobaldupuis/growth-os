@@ -10,7 +10,7 @@ import {
   SEED_WEEKLY_METRICS,
 } from "./config.js";
 
-import { KEY_ITEMS, KEY_SETTINGS, KEY_DEBATES, KEY_METRICS, KEY_RECS, store, handleDownloadBackup, handleRestoreBackup } from "./services/store.js";
+import { KEY_ITEMS, KEY_SETTINGS, KEY_DEBATES, KEY_METRICS, KEY_RECS, KEY_THEME, store, handleDownloadBackup, handleRestoreBackup } from "./services/store.js";
 import {
   applyBrandBriefDefaults, DEFAULT_AGENTS, DEFAULT_SETTINGS,
   STATUSES, OUTCOMES, INIT_TYPES, METRIC_SOURCES,
@@ -399,6 +399,7 @@ export default function App() {
   const [recsLoad,  setRecsLoad]  = useState(false);
   const [recsErr,   setRecsErr]   = useState("");
   const [showRecModal, setShowRecModal] = useState(null); // {batchId, recId} or null
+  const [pendingRecAccept, setPendingRecAccept] = useState(null); // {batchId, recId} — rec awaiting a successful save before its status flips
   const [weeklyMetrics, setWeeklyMetrics] = useState([]);
   const [showPulse, setShowPulse] = useState(false);
   const [showMetricsImport, setShowMetricsImport] = useState(false);
@@ -413,10 +414,12 @@ export default function App() {
   const brands = settings.brands || DEFAULT_SETTINGS.brands || CONFIG_BRANDS;
 
   useEffect(()=>{
-    // Theme persisted in memory only (localStorage not available in all environments)
     const load = async ()=>{
       try {
-        const [ir,sr,dr,mr,rr] = await Promise.all([store.get(KEY_ITEMS),store.get(KEY_SETTINGS),store.get(KEY_DEBATES),store.get(KEY_METRICS),store.get(KEY_RECS)]);
+        const [ir,sr,dr,mr,rr,tr] = await Promise.all([store.get(KEY_ITEMS),store.get(KEY_SETTINGS),store.get(KEY_DEBATES),store.get(KEY_METRICS),store.get(KEY_RECS),store.get(KEY_THEME)]);
+        // Read theme from the resolved store before first render (gated on `loaded`),
+        // so the persisted choice applies without an async flash.
+        if(tr&&tr.value) setDk(tr.value==="dark");
         setItems(ir&&ir.value?JSON.parse(ir.value):SEED);
         if(!ir||!ir.value) store.set(KEY_ITEMS,JSON.stringify(SEED));
         if(sr&&sr.value) {
@@ -443,7 +446,7 @@ export default function App() {
   const saveDebates  = d => { setDebates(d); try{store.set(KEY_DEBATES,JSON.stringify(d));}catch{} };
   const saveMetrics  = m => { setWeeklyMetrics(m); try{store.set(KEY_METRICS,JSON.stringify(m));}catch{} };
   const saveRecs     = r => { setRecs(r);          try{store.set(KEY_RECS,JSON.stringify(r));}catch{} };
-  const toggleDk     = ()=> { setDk(n => !n); };
+  const toggleDk     = ()=> { setDk(n => { const next=!n; try{store.set(KEY_THEME,next?"dark":"light");}catch{} return next; }); };
 
   // -- Next Plays orchestrator -------------------------------------------------
   // Two-step: candidate generation then parallel expansion of the top 3. Keeps
@@ -557,14 +560,10 @@ export default function App() {
         : "From Next Plays",
     });
 
-    // Mark accepted in the rec store
-    const updated = recs.map(b => b.id !== batchId ? b : {
-      ...b,
-      recommendations: b.recommendations.map(r =>
-        r.id === recId ? { ...r, status: "accepted", acceptedAsInitId: base.id } : r
-      ),
-    });
-    saveRecs(updated);
+    // Defer the status flip until the initiative is actually saved. If the user
+    // dismisses the form without saving, the recommendation stays in its prior
+    // state — see handleSave (commit) and onCancel (clear).
+    setPendingRecAccept({ batchId, recId });
     setShowRecModal(null);
     setNav("form");
   };
@@ -621,7 +620,12 @@ export default function App() {
     const closed    = [...completed,...killed];
     const wins      = closed.filter(e=>e.results&&(e.results.outcomeClassification==="Jackpot"||e.results.outcomeClassification==="Success"));
     const winRate   = closed.length>0?Math.round((wins.length/closed.length)*100):null;
-    const revImpacted   = completed.reduce((s,e)=>s+Math.max(0,e.revenueImpact),0);
+    // Prefer measured actuals; fall back to the projected estimate only where
+    // actuals haven't been logged yet. revImpactedProjected flags that the
+    // headline includes at least one estimate (so the tile can qualify it).
+    const hasActualRev = e => e.results && typeof e.results.actualRevenueImpact==="number";
+    const revImpacted   = completed.reduce((s,e)=>s+Math.max(0,hasActualRev(e)?e.results.actualRevenueImpact:e.revenueImpact),0);
+    const revImpactedProjected = completed.some(e=>!hasActualRev(e)&&(e.revenueImpact||0)>0);
     const revAtRisk     = running.reduce((s,e)=>s+Math.max(0,e.revenueImpact),0);
     const closedWithActual = closed.filter(e=>e.results&&typeof e.results.actualRevenueImpact==="number");
     const totalEstimated   = closedWithActual.reduce((s,e)=>s+e.revenueImpact,0);
@@ -702,7 +706,7 @@ export default function App() {
       pipeline: acc.pipeline + r.pipeline,
     }),{realised:0,realisedBackfilled:0,inflight:0,pipeline:0});
 
-    return {completed:completed.length,killed:killed.length,pipeline:pipeline.length,running:running.length,revImpacted,revAtRisk,totalEstimated,totalActual,calibration,totalEstCost,totalActualCost,closedROI,winRate,wins:wins.length,closed:closed.length,avgDays,catCounts,typeCounts,outCounts,vel,avgIce,contribution,contributionTotals,_runningItems:running};
+    return {completed:completed.length,killed:killed.length,pipeline:pipeline.length,running:running.length,revImpacted,revImpactedProjected,revAtRisk,totalEstimated,totalActual,calibration,totalEstCost,totalActualCost,closedROI,winRate,wins:wins.length,closed:closed.length,avgDays,catCounts,typeCounts,outCounts,vel,avgIce,contribution,contributionTotals,_runningItems:running};
   },[items,bounds,cats,activeBrand,brands]);
 
   const filtered = useMemo(()=>{
@@ -736,7 +740,19 @@ export default function App() {
     const {_new,...data}=form;
     if(_new && !data.initId) data.initId = generateInitId(data.brandId||"default", brands, items);
     const updated=_new?[data,...items]:items.map(e=>e.id===data.id?data:e);
-    saveItems(updated);setNav(_new?"initiatives":"detail");
+    saveItems(updated);
+    // A recommendation only transitions to "accepted" once its initiative saves.
+    if(pendingRecAccept){
+      const {batchId,recId}=pendingRecAccept;
+      saveRecs(recs.map(b=>b.id!==batchId?b:{
+        ...b,
+        recommendations:b.recommendations.map(r=>
+          r.id===recId?{...r,status:"accepted",acceptedAsInitId:data.id}:r
+        ),
+      }));
+      setPendingRecAccept(null);
+    }
+    setNav(_new?"initiatives":"detail");
     setForm(null);setHypReview(null);setIceReview(null);setDataCtx("");
   };
 
@@ -773,14 +789,16 @@ export default function App() {
   const handleAiExpand = async()=>{
     if(!form||!form.hypothesis||form.hypothesis.length<60) return;
     setAiLoad(true);
-    try{const x=await callExpandHypothesis(form.hypothesis,form.title,settings,dataCtx);if(x)setHypReview({proposed:x});}catch{}
+    try{const x=await callExpandHypothesis(form.hypothesis,form.title,settings,dataCtx);if(x)setHypReview({proposed:x});}
+    catch(err){console.error("Expand hypothesis error:",err);showToast(err.message||"AI expand failed — try again.","error");}
     setAiLoad(false);
   };
 
   const handleIceAssist = async()=>{
     if(!form||!form.hypothesis) return;
     setIceLoad(true);
-    try{const x=await callSuggestICE(form,settings,dataCtx);if(x&&x.impact)setIceReview(x);}catch{}
+    try{const x=await callSuggestICE(form,settings,dataCtx);if(x&&x.impact)setIceReview(x);}
+    catch(err){console.error("ICE assist error:",err);showToast(err.message||"AI scoring failed — try again.","error");}
     setIceLoad(false);
   };
 
@@ -903,6 +921,7 @@ export default function App() {
                 <div>Initiatives: <strong style={{color:t.text}}>{restorePayload.counts.items}</strong></div>
                 <div>Debates: <strong style={{color:t.text}}>{restorePayload.counts.debates}</strong></div>
                 <div>Weekly metrics: <strong style={{color:t.text}}>{restorePayload.counts.metrics}</strong></div>
+                <div>Next Plays: <strong style={{color:t.text}}>{restorePayload.counts.recs}</strong></div>
               </div>
             </div>
             <div style={{fontSize:12,color:t.textMuted,fontFamily:t.mono}}>Your current initiatives, settings, and metrics will be replaced. This cannot be undone.</div>
@@ -914,6 +933,7 @@ export default function App() {
                 if (parsed.settings)                     saveSettings(parsed.settings);
                 if (Array.isArray(parsed.debates))       saveDebates(parsed.debates);
                 if (Array.isArray(parsed.weeklyMetrics)) saveMetrics(parsed.weeklyMetrics);
+                if (Array.isArray(parsed.recs))          saveRecs(parsed.recs);
                 setRestorePayload(null);
                 showToast("Backup restored successfully.", "success");
               }}>Restore backup</button>
@@ -1001,7 +1021,7 @@ export default function App() {
         </div>
       </div>
 
-      {nav==="dashboard"&&<DashView t={t} dk={dk} dash={dash} cats={cats} settings={settings} brands={brands} activeBrand={activeBrand} weeklyMetrics={weeklyMetrics} onLog={()=>setShowPulse(true)} onImport={()=>setShowMetricsImport(true)} dRange={dRange} setDRange={setDRange} cFrom={cFrom} cTo={cTo} setCFrom={setCFrom} setCTo={setCTo} onGo={()=>setNav("initiatives")} recs={recs} recsLoad={recsLoad} recsErr={recsErr} items={items} onGenerateRecs={generateRecommendations} onOpenRec={(batchId,recId)=>setShowRecModal({batchId,recId})}/>}
+      {nav==="dashboard"&&<DashView t={t} dk={dk} dash={dash} cats={cats} settings={settings} brands={brands} activeBrand={activeBrand} weeklyMetrics={weeklyMetrics} onLog={()=>setShowPulse(true)} onImport={()=>setShowMetricsImport(true)} dRange={dRange} setDRange={setDRange} cFrom={cFrom} cTo={cTo} setCFrom={setCFrom} setCTo={setCTo} onGo={()=>setNav("initiatives")} recs={recs} recsLoad={recsLoad} recsErr={recsErr} items={items} onGenerateRecs={generateRecommendations} onOpenRec={(batchId,recId)=>setShowRecModal({batchId,recId})} showToast={showToast} onSaveItems={saveItems}/>}
       {nav==="triage"&&<TriageView items={items} t={t} dk={dk} cats={cats} brands={brands} activeBrand={activeBrand} onDetail={(id)=>goDetail(id,"triage")}
         onStatus={(id,status)=>{const it=items.find(e=>e.id===id); if(it){setSelId(id); reqStatus(status);}}}
         onLogResults={(id)=>{const it=items.find(e=>e.id===id); if(it){setSelId(id); setRForm(it.results?{...it.results,actualRevenueImpact:it.results.actualRevenueImpact!=null?it.results.actualRevenueImpact:"",actualSpendCost:it.results.actualSpendCost!=null?it.results.actualSpendCost:"",actualResourceCost:it.results.actualResourceCost!=null?it.results.actualResourceCost:""}:{actualOutcome:"",keyLearning:"",outcomeClassification:"Success",decisionMade:"",outcomeCertainty:75,actualRevenueImpact:"",actualSpendCost:"",actualResourceCost:""}); setShowR(true);}}}
@@ -1123,7 +1143,7 @@ export default function App() {
           onAcceptIce={()=>{if(iceReview){setForm(p=>({...p,ice:{...p.ice,impact:iceReview.impact,certainty:iceReview.certainty}}));setIceReview(null);}}}
           onRejectIce={()=>setIceReview(null)}
           onSave={handleSave}
-          onCancel={()=>{setForm(null);setHypReview(null);setIceReview(null);setDataCtx("");setNav("initiatives");}}/>
+          onCancel={()=>{setForm(null);setHypReview(null);setIceReview(null);setDataCtx("");setPendingRecAccept(null);setNav("initiatives");}}/>
       )}
 
       {showCapture&&(
@@ -1179,7 +1199,7 @@ export default function App() {
         </Modal>
       )}
 
-      {showSet&&<SettingsModal t={t} dk={dk} settings={settings} onSave={s=>{saveSettings(s);setShowSet(false);}} onClose={()=>setShowSet(false)} onDownloadBackup={() => handleDownloadBackup(items, settings, debates, weeklyMetrics)} onRestoreBackup={(file) => handleRestoreBackup(file, showToast, setRestorePayload)} onResetDemo={handleResetDemoData}/>}
+      {showSet&&<SettingsModal t={t} dk={dk} settings={settings} onSave={s=>{saveSettings(s);setShowSet(false);}} onClose={()=>setShowSet(false)} onDownloadBackup={() => handleDownloadBackup(items, settings, debates, weeklyMetrics, recs)} onRestoreBackup={(file) => handleRestoreBackup(file, showToast, setRestorePayload)} onResetDemo={handleResetDemoData}/>}
 
       {guideSection&&(
         <GuideDrawer t={t} dk={dk} openSection={guideSection} onClose={()=>setGuideSection(null)}

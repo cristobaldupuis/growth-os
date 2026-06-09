@@ -24,7 +24,7 @@ export const store = (() => {
   };
 })();
 
-export const handleDownloadBackup = (items, settings, debates, weeklyMetrics) => {
+export const handleDownloadBackup = (items, settings, debates, weeklyMetrics, recs) => {
   const payload = {
     _meta: {
       format: "growth-os-backup",
@@ -36,6 +36,7 @@ export const handleDownloadBackup = (items, settings, debates, weeklyMetrics) =>
     settings,
     debates,
     weeklyMetrics,
+    recs,
   };
   const json = JSON.stringify(payload, null, 2);
   const blob = new Blob([json], { type: "application/json" });
@@ -62,6 +63,7 @@ export const handleRestoreBackup = (file, showToast, setRestorePayload) => {
         items: Array.isArray(parsed.items) ? parsed.items.length : 0,
         debates: Array.isArray(parsed.debates) ? parsed.debates.length : 0,
         metrics: Array.isArray(parsed.weeklyMetrics) ? parsed.weeklyMetrics.length : 0,
+        recs: Array.isArray(parsed.recs) ? parsed.recs.length : 0,
       };
       const stamp = parsed._meta?.exportedAt
         ? new Date(parsed._meta.exportedAt).toLocaleString()

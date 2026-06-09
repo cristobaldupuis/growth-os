@@ -14,6 +14,8 @@ export async function callExpandHypothesis(rough, title, settings, dataCtx) {
     body:JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:300, system:sys,
       messages:[{role:"user", content:"Title: "+(title||"none")+". Rough idea: "+rough}] }),
   });
+  if (!resp.ok) throw new Error("AI request failed ("+resp.status+"). The service may be rate-limited or unavailable — try again shortly.");
   const data = await resp.json();
+  if (data.error) throw new Error(data.error.message || "The AI service returned an error.");
   return data.content && data.content[0] ? data.content[0].text.trim() : "";
 }

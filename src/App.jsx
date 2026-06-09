@@ -465,8 +465,14 @@ export default function App() {
         throw new Error("No candidates were generated. Add more learnings or running initiatives for grounding.");
       }
 
-      // Take the first 3 (the generator orders them by quality)
-      const top3 = candidates.slice(0, 3);
+      // Rank by the candidate's self-assessed confidence (high > medium > low),
+      // preserving the generator's best-first order within a tier, then take 3.
+      const confRank = { high: 3, medium: 2, low: 1 };
+      const top3 = candidates
+        .map((c, i) => ({ c, i, r: confRank[(c.confidence || "").toLowerCase()] ?? 0 }))
+        .sort((a, b) => b.r - a.r || a.i - b.i)
+        .slice(0, 3)
+        .map(x => x.c);
 
       // Parallel expansion — tolerate per-item failure
       const settled = await Promise.allSettled(

@@ -15,9 +15,7 @@ export function WeeklyStandupModal({ t, dk, items, brands, onCommit, onClose, sh
   const [notes, setNotes] = useState({}); // { [itemId]: "this week's note" }
   const today = new Date();
 
-  // Best-available "last activity" date for a running initiative. No updatedAt
-  // exists in the schema, so fall back through the logged note → start → created.
-  const lastActivity = e => parseD(e.weeklyNotesAt) || parseD(e.startDate) || parseD(e.createdAt);
+  const lastActivity = e => parseD(e.updatedAt) || parseD(e.startDate);
 
   const staleRunning = items.filter(e => {
     if (e.status !== "Running") return false;
@@ -108,7 +106,7 @@ export function WeeklyStandupModal({ t, dk, items, brands, onCommit, onClose, sh
                 <div key={e.id} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                   <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
                     <span style={{ fontSize: 12.5, fontWeight: 600, color: t.text, fontFamily: t.mono, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.title}</span>
-                    {e.weeklyNotesAt && <span style={{ fontSize: 10, color: t.textMuted, fontFamily: t.mono, flexShrink: 0 }}>last note {fmtDate(e.weeklyNotesAt)}</span>}
+                    {e.updatedAt && <span style={{ fontSize: 10, color: t.textMuted, fontFamily: t.mono, flexShrink: 0 }}>last update {fmtDate(e.updatedAt)}</span>}
                   </div>
                   <textarea
                     style={{ ...gTA(t), fontSize: 12.5, minHeight: 0 }}

@@ -646,7 +646,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
               "",
               "— RESULTS —",
               "• Win rate: "+(dash.winRate!==null?dash.winRate+"% ("+dash.wins+" of "+dash.closed+" closed)":"no closed initiatives yet"),
-              "• Revenue impacted (completed): "+fmtCur(dash.revImpacted),
+              "• Projected impact (completed): "+fmtCur(dash.revImpacted),
               "• ROI on closed work: "+(dash.closedROI!==null?dash.closedROI+"x return":"not yet measurable"),
               "• Avg time to close: "+(dash.avgDays?dash.avgDays+" days":"n/a"),
               "",
@@ -680,7 +680,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
       {/* KPIs */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:10}}>
         {[
-          {l:"Revenue Impact", v:fmtCur(dash.revImpacted), s:dash.revImpactedProjected?"from completed (projected)":"from completed", hero:true},
+          {l:"Projected Impact", v:fmtCur(dash.revImpacted), s:dash.revImpactedProjected?"from completed (projected)":"from completed", hero:true},
           {l:"Revenue at risk",  v:fmtCur(dash.revAtRisk),   s:"running now"},
           {l:"Completed",        v:dash.completed,            s:" "},
           {l:"Killed",           v:dash.killed,               s:" "},

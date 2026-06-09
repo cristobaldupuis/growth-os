@@ -1180,7 +1180,7 @@ export default function App() {
                     setCaptureText("");
                     setNav("form");
                   }
-                } catch(e){ showToast("AI extraction failed — try adding more detail.", "error"); }
+                } catch(e){ showToast(e.message || "AI extraction failed — try adding more detail.", "error"); }
                 setCaptureLoad(false);
               }}>
               {captureLoad?<><span style={{display:"inline-block",animation:"spin 1s linear infinite"}}>&#8635;</span> Extracting…</>:<><span>&#9889;</span> Extract with AI</>}

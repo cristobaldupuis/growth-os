@@ -442,7 +442,7 @@ export default function App() {
     load();
   },[]);
 
-  const saveItems    = d => { setItems(d); try{store.set(KEY_ITEMS,JSON.stringify(d));}catch{} };
+  const saveItems    = d => { const now = new Date().toISOString(); const stamped = d.map(item => ({ ...item, updatedAt: now })); setItems(stamped); try{store.set(KEY_ITEMS,JSON.stringify(stamped));}catch{} };
   const saveSettings = s => { setSettings(s); try{store.set(KEY_SETTINGS,JSON.stringify(s));}catch{} };
   const saveDebates  = d => { setDebates(d); try{store.set(KEY_DEBATES,JSON.stringify(d));}catch{} };
   const saveMetrics  = m => { setWeeklyMetrics(m); try{store.set(KEY_METRICS,JSON.stringify(m));}catch{} };

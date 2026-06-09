@@ -40,6 +40,7 @@ import { DetailView } from "./views/DetailView.jsx";
 import { FormView } from "./views/FormView.jsx";
 import { TriageView } from "./views/TriageView.jsx";
 import { LearningLibrary } from "./views/LearningLibrary.jsx";
+import { ClientReadoutView } from "./views/ClientReadoutView.jsx";
 
 // ── Guide drawer ─────────────────────────────────────────────────────────────
 // Feature discovery, organized by job-to-be-done rather than by feature name.
@@ -974,6 +975,7 @@ export default function App() {
               {navBtn("initiatives","Initiatives")}
               {navBtn("library","Library")}
               {navBtn("triage","Triage")}
+              {navBtn("readout","Client Readout")}
             </div>
             {(nav==="detail"||nav==="form")&&(
               <button onClick={()=>setNav(nav==="detail"?detailOrigin:"initiatives")} style={{...gGh(t),padding:"6px 12px",fontSize:12}}>
@@ -1039,6 +1041,7 @@ export default function App() {
         onActivate={(id)=>{saveItems(items.map(e=>e.id===id?withRunningSnapshot({...e,status:"Running",startDate:e.startDate||new Date().toISOString().slice(0,10)},"Running"):e)); showToast("Initiative activated — now running.","success");}}
       />}
       {nav==="library"&&<LearningLibrary items={items} t={t} dk={dk} cats={cats} brands={brands} activeBrand={activeBrand} settings={settings} onReplicate={(item)=>{const base=mkDefault(cats,activeBrand);setForm({...base,title:"[Replicate] "+item.title,hypothesis:"Based on learning from: "+item.title+". Original: "+item.hypothesis,category:item.category,initType:item.initType,ice:{...item.ice},revenueImpact:item.revenueImpact,notes:"Replicated from initiative "+item.id+". Original learning: "+item.results.keyLearning});setNav("form");}}/>}
+      {nav==="readout"&&<ClientReadoutView t={t} dk={dk} dash={dash} items={items} brands={brands} activeBrand={activeBrand} cats={cats} weeklyMetrics={weeklyMetrics} settings={settings}/>}
 
       {nav==="initiatives"&&(
         <div style={{padding:"16px 20px"}}>

@@ -37,6 +37,8 @@ The core workflow loop is missing a weekly ritual entry point. Build a lightweig
 
 A dedicated read-only React view that aggregates the current week's state: Scorecard, completed learnings, live variants, and next drafts. Structured for copy-paste into a client-facing report. Keeps the operational and reporting layers separate in the data model.
 
+- [x] **Business Health Panel:** Operator-defined portfolio-level guardrail metrics (default: New Customer CVR, Orders, Registrations, Blended CAC, Return Rate) surfaced as a standing dashboard panel with WoW delta and optional targets. Reads from existing weekly pulse data — no new data connections required. Closes the gap between experiment activity and unintended portfolio-level effects.
+
 ---
 
 ## Phase 2 — The Data Moat
@@ -58,6 +60,8 @@ Connect the GA4 Data API to auto-populate funnel context. The recommendation eng
 ### Proxy hardening
 
 Transition `api/proxy.js` from shared-secret demo mode to authenticated per-client routes before live client API tokens are processed. The existing shared-secret and rate-limiting infrastructure is a valid scaffold; this step adds per-client credential isolation.
+
+- [ ] **Health Metric Anomaly Flagging:** When a designated health metric moves beyond a configurable threshold in a week where experiments are active, surface a passive contextual flag in the Business Health Panel. Requires live data connections to be meaningful at scale.
 
 ---
 

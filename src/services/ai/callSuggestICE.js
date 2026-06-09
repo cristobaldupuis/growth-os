@@ -26,7 +26,9 @@ export async function callSuggestICE(form, settings, dataCtx) {
     body:JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:400, system:sys,
       messages:[{role:"user", content:user}] }),
   });
+  if (!resp.ok) throw new Error("AI request failed ("+resp.status+"). The service may be rate-limited or unavailable — try again shortly.");
   const data = await resp.json();
+  if (data.error) throw new Error(data.error.message || "The AI service returned an error.");
   const raw   = data.content && data.content[0] ? data.content[0].text.trim() : "{}";
   return safeParseJSON(raw, false) || null;
 }

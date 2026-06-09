@@ -240,7 +240,7 @@ function FunnelCoverageMap({t, dk, items, cats, brands, activeBrand}) {
 }
 
 
-function ContributionView({t, dk, contribution, totals, dRange, activeBrand, brands}) {
+function ContributionView({t, dk, contribution, totals, dRange, activeBrand, brands, showToast}) {
   const rangeLabel = dRange==="thisMonth"?"this month":dRange==="lastMonth"?"last month":"selected range";
   const retailerLabel = activeBrand==="all" ? "All retailers" : brandName(activeBrand, brands);
   const grand = totals.realised + totals.inflight + totals.pipeline;
@@ -512,7 +512,7 @@ function NextPlaysCard({ t, dk, recs, recsLoad, recsErr, brands, items, onGenera
 // Modal — full recommendation detail with hypothesis, ICE rationale, reasoning
 // trace, and cited learnings. Actions: Add to backlog | Dismiss.
 
-export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetrics,onLog,onImport,dRange,setDRange,cFrom,cTo,setCFrom,setCTo,onGo,recs,recsLoad,recsErr,items,onGenerateRecs,onOpenRec}) {
+export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetrics,onLog,onImport,dRange,setDRange,cFrom,cTo,setCFrom,setCTo,onGo,recs,recsLoad,recsErr,items,onGenerateRecs,onOpenRec,showToast}) {
   const maxCat  = Math.max(...Object.values(dash.catCounts),1);
   const maxType = Math.max(...Object.values(dash.typeCounts),1);
   return (
@@ -660,7 +660,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
       {/* KPIs */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:10}}>
         {[
-          {l:"Revenue impacted", v:fmtCur(dash.revImpacted), s:"from completed", hero:true},
+          {l:"Revenue Impact", v:fmtCur(dash.revImpacted), s:dash.revImpactedProjected?"from completed (projected)":"from completed", hero:true},
           {l:"Revenue at risk",  v:fmtCur(dash.revAtRisk),   s:"running now"},
           {l:"Completed",        v:dash.completed,            s:" "},
           {l:"Killed",           v:dash.killed,               s:" "},
@@ -696,6 +696,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
         dRange={dRange}
         activeBrand={activeBrand}
         brands={brands}
+        showToast={showToast}
       />
 
       {/* Calibration card */}

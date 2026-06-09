@@ -19,6 +19,7 @@ Built to demonstrate how a Director of Growth thinks about velocity, incremental
 - **Signal AI pre-populated context** — opens with a live read of your portfolio so the first debate starts from something real
 - **Toast notifications** — all native browser alerts replaced with in-app slide-up toasts
 - **Restore backup modal** — destructive action now requires an in-app confirmation with full details of what will be overwritten
+- **Weekly standup mode** — guided weekly review modal that auto-surfaces stalled experiments and missing post-mortems, with a quick status log across all running initiatives
 
 ---
 
@@ -136,9 +137,52 @@ This is what makes recommendations specific — instead of "test SMS cart recove
 | Runtime | React 18 / Vite |
 | Hosting | Vercel (frontend + serverless API proxy) |
 | Design | Sand/charcoal enterprise palette; serif body; monospace for all financial figures, dates, and tags; light and dark mode |
-| State persistence | Environment-agnostic: `window.storage` (Claude artifacts), `localStorage` (browser/production), in-memory fallback |
+| State persistence | Environment-agnostic: `localStorage` (production), in-memory fallback for sandboxed environments |
 | AI | Anthropic Claude API via server-side proxy — `claude-sonnet-4-6` with tool use for agentic features |
 | Data I/O | CSV import/export; JSON backup/restore; Google Sheets template |
+
+---
+
+## Architecture
+
+### Structure
+
+```
+src/
+  App.jsx              # Orchestration layer (~1,580 lines post-refactor)
+  config.js            # Per-client deployment context — brands, agents, categories, seed data
+  views/               # DashView, BacklogView, LearningsView, MetricsView, ContributionView, etc.
+  components/          # Shared UI components
+  services/            # store.js, ai.js, backup.js
+  prompts/             # LLM prompt definitions
+api/
+  proxy.js             # Serverless Anthropic proxy — shared secret auth, per-IP rate limiting
+```
+
+### Key design decisions
+
+**Config-first per-client deployment.** Client context lives in `config.js`, isolated from app logic. Each client gets a separate Vercel project with a single file swap — no auth layer, no shared database, no cross-client data risk. Multi-tenant architecture is a planned future phase, triggered when managing per-client deployments becomes the operational constraint.
+
+**localStorage with a backend-agnostic store abstraction.** All state persists via `store.get` / `store.set`. The abstraction is backend-agnostic by design — migrating to Postgres is a layer swap when a real client constraint demands it, not a rewrite. The operational overhead of a backend is not justified before that trigger exists.
+
+**Serverless proxy, no browser-side API key.** All Anthropic calls route through `api/proxy.js`, which validates a shared secret header, enforces per-IP rate limiting at 50 requests/hour, and locks CORS to the production domain.
+
+**No router, no state management library.** Keeps the app portable and the full state shape visible in one place — a deliberate tradeoff that favours legibility and AI-assisted development over framework convention. Both are addable later without structural changes.
+
+**Signal AI's moat is the integration, not the debate format.** The multi-agent debate is a recognisable pattern. What is not common is grounding the debate in a live experiment portfolio — agents reasoning from specific fatigue patterns, funnel gaps, and learning signals — and having the output land directly in the initiative backlog as ICE-scored, trackable items.
+
+For the full rationale behind each decision, including forcing conditions for when they should be revisited, see [DECISIONS.md](./DECISIONS.md).
+
+---
+
+## Roadmap
+
+See [ROADMAP.md](./ROADMAP.md) for the full phase breakdown.
+
+- **Phase 1 (complete):** Modularisation, bug sweep, weekly standup mode
+- **Phase 2:** Live data ingestion — Shopify adapter, GA4 funnel, normalisation contract
+- **Phase 3:** Autonomous orchestration — background execution, Zod output validation, prompt versioning, continuous audit loop
+- **Phase 4:** Multi-tenant platform — Supabase RLS, federated knowledge base (pgvector), cross-customer anonymised benchmarking
 
 ---
 
@@ -154,6 +198,16 @@ npm run dev
 ```
 
 Open `http://localhost:5173/`. Click ⚙ Settings to configure your workspace, add your Anthropic API key, and fill in your brand briefs to activate context-aware AI recommendations.
+
+Requires a `.env` file with:
+
+```
+ANTHROPIC_API_KEY=your_key
+VITE_GOS_SECRET=your_secret
+GOS_SECRET=your_secret        # Must match VITE_GOS_SECRET
+```
+
+The proxy validates `x-gos-secret` on every AI call. Without a matching secret, all AI features return 401.
 
 ---
 

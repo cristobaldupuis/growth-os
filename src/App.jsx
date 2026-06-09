@@ -1,3 +1,4 @@
+import { Analytics } from "@vercel/analytics/react";
 import { useState, useEffect, useMemo } from "react";
 import {
   COMPANY_NAME, BUSINESS_MODEL,
@@ -1423,6 +1424,7 @@ export default function App() {
           onClose={()=>setShowMetricsImport(false)}
         />
       )}
+      <Analytics />
     </div>
   );
 }

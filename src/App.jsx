@@ -465,8 +465,14 @@ export default function App() {
         throw new Error("No candidates were generated. Add more learnings or running initiatives for grounding.");
       }
 
-      // Take the first 3 (the generator orders them by quality)
-      const top3 = candidates.slice(0, 3);
+      // Rank by the candidate's self-assessed confidence (high > medium > low),
+      // preserving the generator's best-first order within a tier, then take 3.
+      const confRank = { high: 3, medium: 2, low: 1 };
+      const top3 = candidates
+        .map((c, i) => ({ c, i, r: confRank[(c.confidence || "").toLowerCase()] ?? 0 }))
+        .sort((a, b) => b.r - a.r || a.i - b.i)
+        .slice(0, 3)
+        .map(x => x.c);
 
       // Parallel expansion — tolerate per-item failure
       const settled = await Promise.allSettled(
@@ -486,6 +492,9 @@ export default function App() {
             title: cand.title,
             category: cand.category,
             brandTarget: cand.brandTarget || "Portfolio",
+            // Pass 1 rationale — the specific portfolio signal that triggered this
+            // candidate. Surfaced as the "Why now" line on the recommendation card.
+            whyNow: cand.rationale || "",
             observation: exp.observation || "",
             hypothesis: exp.hypothesis || "",
             successMetric: exp.successMetric || "",
@@ -1707,6 +1716,17 @@ function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, cats, onAc
             )}
           </div>
         </div>
+
+        {/* Why now — the specific portfolio signal that drove this recommendation
+            (Pass 1 rationale). Muted single line, distinct from the hypothesis
+            block. Older recs predate this field — render nothing rather than a
+            placeholder. */}
+        {rec.whyNow && (
+          <div style={{fontSize:12,color:t.textMuted,fontFamily:t.mono,lineHeight:1.5,marginTop:-6}}>
+            <span style={{fontWeight:700,letterSpacing:"0.04em",textTransform:"uppercase",marginRight:6}}>Why now</span>
+            {rec.whyNow}
+          </div>
+        )}
 
         {/* Reasoning trace — the trust-builder. Footnote superscripts map to the
             cited learnings below; prose stays clean, references are clickable. */}

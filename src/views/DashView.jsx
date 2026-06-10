@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { OUTCOMES, INIT_TYPES, METRIC_SOURCES, OL, OD, TYPE_L, TYPE_D, catColor, brandName, iceScore, iceColor, fmtCur, fmtDate } from "../constants.js";
+import { OUTCOMES, INIT_TYPES, METRIC_SOURCES, OL, OD, TYPE_L, TYPE_D, DEFAULT_SETTINGS, catColor, brandName, iceScore, iceColor, fmtCur, fmtDate } from "../constants.js";
 import { gG, gGh, gSL, gCd } from "../components/styles.js";
 import { Spark } from "../components/Spark.jsx";
 import { WeeklyStandupModal } from "../components/WeeklyStandupModal.jsx";
@@ -236,6 +236,132 @@ function FunnelCoverageMap({t, dk, items, cats, brands, activeBrand}) {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+
+// -- Business Health Panel -----------------------------------------------------
+function BusinessHealthPanel({ t, dk, settings, weeklyMetrics }) {
+  const [expanded, setExpanded] = useState(true);
+
+  const allEntries = weeklyMetrics || [];
+  const sorted = [...allEntries].sort((a,b) => b.date.localeCompare(a.date));
+  const latestDate = sorted[0]?.date || null;
+  const priorDate  = latestDate ? (sorted.find(m => m.date < latestDate)?.date || null) : null;
+  const latestEntries = latestDate ? allEntries.filter(m => m.date === latestDate) : [];
+  const priorEntries  = priorDate  ? allEntries.filter(m => m.date === priorDate)  : [];
+
+  const sumField = (entries, field) => {
+    const vals = entries.map(m => m.metrics[field]).filter(v => v != null);
+    return vals.length > 0 ? vals.reduce((s,v) => s+v, 0) : null;
+  };
+
+  const calcCurrent = (metric) => {
+    if (!metric.isCalculated) return null;
+    if (metric.key === "orders")      return sumField(latestEntries, "conversions");
+    if (metric.key === "blended_cac") {
+      const spend = sumField(latestEntries, "spend");
+      const conv  = sumField(latestEntries, "conversions");
+      return (spend != null && conv != null && conv > 0) ? spend / conv : null;
+    }
+    return null;
+  };
+
+  const calcPrior = (metric) => {
+    if (!metric.isCalculated) return null;
+    if (metric.key === "orders")      return sumField(priorEntries, "conversions");
+    if (metric.key === "blended_cac") {
+      const spend = sumField(priorEntries, "spend");
+      const conv  = sumField(priorEntries, "conversions");
+      return (spend != null && conv != null && conv > 0) ? spend / conv : null;
+    }
+    return null;
+  };
+
+  const fmtVal = (metric, val) => {
+    if (val === null || val === undefined) return null;
+    const lbl = metric.label || "";
+    if (lbl.includes("(%)") || metric.key.endsWith("_cvr") || metric.key.endsWith("_rate")) {
+      return val.toFixed(1) + "%";
+    }
+    if (lbl.includes("($)") || metric.key.endsWith("_cac") || metric.key.includes("spend") || metric.key.includes("cost")) {
+      return "$" + (val >= 100 ? Math.round(val).toLocaleString() : val.toFixed(2));
+    }
+    return Math.round(val).toLocaleString();
+  };
+
+  const deltaChip = (curr, prior, higherIsBetter) => {
+    if (curr === null || prior === null || prior === 0) return null;
+    const d    = ((curr - prior) / Math.abs(prior)) * 100;
+    const pos  = d > 0;
+    const good = higherIsBetter ? pos : !pos;
+    return (
+      <span style={{fontSize:10,fontWeight:600,fontFamily:t.mono,color:good?t.teal:t.red,marginLeft:4}}>
+        {pos?"▲":"▼"}{Math.abs(d).toFixed(1)}%
+      </span>
+    );
+  };
+
+  const healthMetrics = (settings.healthMetrics || DEFAULT_SETTINGS.healthMetrics).filter(m => m.enabled);
+  if (healthMetrics.length === 0) return null;
+
+  return (
+    <div style={{...gCd(t,dk),border:"1px solid "+t.border}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <button onClick={()=>setExpanded(e=>!e)} style={{background:"none",border:"none",cursor:"pointer",color:t.textMuted,fontSize:13,padding:0,lineHeight:1}}>
+            {expanded?"▾":"▸"}
+          </button>
+          <div>
+            <span style={{fontSize:11,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono}}>Business Health</span>
+            <div style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,marginTop:1}}>
+              Portfolio-level guardrail metrics — watch these when experiments are running
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {expanded && (
+        <div style={{marginTop:12,display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:10}}>
+          {healthMetrics.map(metric => {
+            const autoVal  = calcCurrent(metric);
+            const priorVal = calcPrior(metric);
+            const val      = autoVal !== null ? autoVal : (metric.manualValue ?? null);
+            const fmtd     = fmtVal(metric, val);
+            const showTgt  = metric.target != null && val !== null;
+            const tgtPct   = showTgt ? Math.min(
+              metric.higherIsBetter
+                ? (val / metric.target) * 100
+                : (metric.target / val) * 100,
+              100
+            ) : null;
+
+            return (
+              <div key={metric.key} style={{background:t.surface,border:"1px solid "+t.border,borderRadius:12,padding:"14px 16px",boxShadow:t.shadow,minHeight:96,display:"flex",flexDirection:"column"}}>
+                <div style={{fontSize:9.5,letterSpacing:"0.1em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,fontWeight:600,marginBottom:"auto",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>{metric.label}</div>
+                <div style={{marginTop:9,display:"flex",alignItems:"baseline",flexWrap:"wrap",gap:2}}>
+                  {fmtd !== null
+                    ? <span style={{fontSize:26,fontWeight:700,color:t.gold,fontFamily:t.mono,lineHeight:1,letterSpacing:"-0.03em"}}>{fmtd}</span>
+                    : <span style={{fontSize:22,fontWeight:700,color:t.textMuted,fontFamily:t.mono,lineHeight:1}}>—</span>}
+                  {fmtd !== null && deltaChip(val, priorVal, metric.higherIsBetter)}
+                </div>
+                {fmtd === null && (
+                  <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginTop:4,lineHeight:1.4}}>Configure in Settings</div>
+                )}
+                {showTgt && tgtPct !== null && (
+                  <div style={{marginTop:8}}>
+                    <div style={{fontSize:9.5,color:t.textMuted,fontFamily:t.mono,marginBottom:3}}>Target {fmtVal(metric, metric.target)}</div>
+                    <div style={{height:3,borderRadius:2,background:t.border,overflow:"hidden"}}>
+                      <div style={{width:tgtPct+"%",height:"100%",borderRadius:2,background:tgtPct>=100?t.teal:t.gold,transition:"width .3s"}}/>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -622,6 +748,9 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
         onLog={onLog}
         onImport={onImport}
       />
+
+      {/* Business Health */}
+      <BusinessHealthPanel t={t} dk={dk} settings={settings} weeklyMetrics={weeklyMetrics}/>
 
       {/* Executive summary */}
       <div style={{display:"flex",justifyContent:"flex-end"}}>

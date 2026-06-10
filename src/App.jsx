@@ -1993,6 +1993,72 @@ function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onRestoreB
           </div>
         </div>
         <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
+          <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:4,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Health Metrics</div>
+          <p style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,lineHeight:1.5,margin:"0 0 10px"}}>
+            Portfolio-level guardrail metrics surfaced on the dashboard. Calculated metrics pull from weekly pulse data automatically.
+          </p>
+          <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:8}}>
+            {(local.healthMetrics||DEFAULT_SETTINGS.healthMetrics).map((metric,idx)=>{
+              const updhm=(k,v)=>{const hm=(local.healthMetrics||DEFAULT_SETTINGS.healthMetrics).map((m,i)=>i===idx?{...m,[k]:v}:m);setLocal(p=>({...p,healthMetrics:hm}));};
+              return (
+                <div key={metric.key} style={{padding:"10px 12px",background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:6,display:"flex",flexDirection:"column",gap:8,opacity:metric.enabled?1:0.55}}>
+                  <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                    <button onClick={()=>updhm("enabled",!metric.enabled)}
+                      style={{flexShrink:0,width:34,height:20,borderRadius:10,cursor:"pointer",border:"none",
+                        background:metric.enabled?t.teal:t.border,position:"relative",transition:"background 0.15s"}}>
+                      <span style={{position:"absolute",top:3,left:metric.enabled?16:3,width:14,height:14,borderRadius:"50%",background:"#fff",transition:"left 0.15s"}}/>
+                    </button>
+                    <input style={{...gI(t),flex:1,fontWeight:600,fontSize:12}} value={metric.label}
+                      onChange={e=>updhm("label",e.target.value)} placeholder="Metric label"/>
+                    <button onClick={()=>setLocal(p=>({...p,healthMetrics:(local.healthMetrics||DEFAULT_SETTINGS.healthMetrics).filter((_,i)=>i!==idx)}))}
+                      style={{background:"none",border:"none",color:t.textMuted,cursor:"pointer",fontSize:14,padding:"0 4px"}}>&#10005;</button>
+                  </div>
+                  {metric.isCalculated&&(
+                    <div style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,lineHeight:1.5,padding:"5px 8px",background:t.surface,border:"1px solid "+t.borderSoft,borderRadius:4}}>
+                      {metric.calculationNote}
+                    </div>
+                  )}
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                    <div>
+                      <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>
+                        {metric.isCalculated?"MANUAL FALLBACK":"CURRENT VALUE"}
+                      </label>
+                      <input style={{...gI(t),fontSize:12}} type="number" step="any"
+                        value={metric.manualValue??""} placeholder={metric.isCalculated?"Used if auto-calc unavailable":"Enter current value"}
+                        onChange={e=>updhm("manualValue",e.target.value===""?null:parseFloat(e.target.value))}/>
+                    </div>
+                    <div>
+                      <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>TARGET (OPTIONAL)</label>
+                      <input style={{...gI(t),fontSize:12}} type="number" step="any"
+                        value={metric.target??""} placeholder="Target value"
+                        onChange={e=>updhm("target",e.target.value===""?null:parseFloat(e.target.value))}/>
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                    <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono}}>Direction:</span>
+                    {[{v:true,l:"Higher is better"},{v:false,l:"Lower is better"}].map(opt=>(
+                      <button key={String(opt.v)} onClick={()=>updhm("higherIsBetter",opt.v)}
+                        style={{fontSize:10,padding:"3px 8px",borderRadius:3,cursor:"pointer",fontFamily:t.mono,
+                          background:metric.higherIsBetter===opt.v?t.gold:"transparent",
+                          border:"1px solid "+(metric.higherIsBetter===opt.v?t.gold:t.border),
+                          color:metric.higherIsBetter===opt.v?t.goldText:t.textMuted}}>
+                        {opt.l}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {(local.healthMetrics||DEFAULT_SETTINGS.healthMetrics).length<8&&(
+            <button style={{...gGh(t),fontSize:11}} onClick={()=>{
+              const hm=local.healthMetrics||DEFAULT_SETTINGS.healthMetrics;
+              if(hm.length>=8)return;
+              setLocal(p=>({...p,healthMetrics:[...hm,{key:"metric_"+Date.now(),label:"Custom Metric",enabled:true,isCalculated:false,calculationNote:"",manualValue:null,target:null,higherIsBetter:true}]}));
+            }}>+ Add metric</button>
+          )}
+        </div>
+        <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
           <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:10,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Backup &amp; restore</div>
           <p style={{fontSize:12,color:t.textMuted,fontFamily:t.mono,lineHeight:1.6,margin:"0 0 10px"}}>Download a full snapshot of your data (initiatives, settings, debates, weekly metrics) as a JSON file. Keep a copy somewhere safe — this is the only off-device record until cloud sync ships.</p>
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>

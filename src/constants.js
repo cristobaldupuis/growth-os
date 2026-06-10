@@ -63,6 +63,13 @@ export const DEFAULT_SETTINGS = {
   dataSources:      [],
   brands:           (CONFIG_BRANDS||[]).map(applyBrandBriefDefaults),
   agents:           DEFAULT_AGENTS,
+  healthMetrics: [
+    { key:"new_customer_cvr",  label:"New Customer CVR (%)",          enabled:true, isCalculated:false, calculationNote:"",                                                                                                                                     manualValue:null, target:null, higherIsBetter:true  },
+    { key:"orders",            label:"Orders",                         enabled:true, isCalculated:true,  calculationNote:"Auto-calculated from weekly pulse: sum of conversions across all sources for the latest week",                                        manualValue:null, target:null, higherIsBetter:true  },
+    { key:"registrations",     label:"Registrations / New Accounts",   enabled:true, isCalculated:false, calculationNote:"",                                                                                                                                     manualValue:null, target:null, higherIsBetter:true  },
+    { key:"blended_cac",       label:"Blended CAC ($)",                enabled:true, isCalculated:true,  calculationNote:"Auto-calculated from weekly pulse: total spend ÷ total conversions across all sources for the latest week. Falls back to manual if spend data is absent.", manualValue:null, target:null, higherIsBetter:false },
+    { key:"return_rate",       label:"Return Rate (%)",                enabled:true, isCalculated:false, calculationNote:"",                                                                                                                                     manualValue:null, target:null, higherIsBetter:false },
+  ],
 };
 
 export const STATUSES  = ["Draft","Running","Completed","Killed"];
@@ -81,8 +88,10 @@ export const METRIC_SOURCES = [
       {key:"cvr",         label:"CVR (%)",               type:"number", hint:"Conversion rate (e.g. 2.4 for 2.4%)"},
       {key:"aov",         label:"AOV ($)",               type:"number", hint:"Average order value"},
       {key:"traffic",     label:"Sessions / Traffic",    type:"number", hint:"Total sessions or visits"},
-      {key:"conversions", label:"Total Conversions",     type:"number", hint:"Total orders / goal completions"},
-      {key:"notes",       label:"Notes",                 type:"text",   hint:"Any context for this week"},
+      {key:"conversions",   label:"Total Conversions",          type:"number", hint:"Total orders / goal completions"},
+      {key:"return_rate",   label:"Return Rate (%)",             type:"number", hint:"Returns / total orders × 100"},
+      {key:"registrations", label:"Registrations / New Accounts", type:"number", hint:"New account sign-ups this week"},
+      {key:"notes",         label:"Notes",                       type:"text",   hint:"Any context for this week"},
     ]
   },
   { id:"meta",        label:"Meta Ads",     icon:"📘",
@@ -167,6 +176,10 @@ export const METRIC_CSV_ALIASES = {
   "cpc":"cpc","avg._cpc":"cpc","avg_cpc":"cpc","average_cpc":"cpc",
   // bounce
   "bounce":"bounce","bounce_rate":"bounce","engagement_rate":"bounce",
+  // return_rate
+  "return_rate":"return_rate","returns_rate":"return_rate",
+  // registrations
+  "registrations":"registrations","new_accounts":"registrations","sign_ups":"registrations","signups":"registrations",
   // notes
   "notes":"notes","note":"notes","comment":"notes","comments":"notes",
 };
@@ -260,7 +273,7 @@ export function parseMetricsCSV(text) {
     obj.date = d.toISOString().slice(0,10);
 
     // Normalise numeric fields
-    const numericKeys = ["revenue","spend","cac","roas","cvr","aov","traffic","sessions","conversions","impressions","clicks","cpm","ctr","cpc","bounce"];
+    const numericKeys = ["revenue","spend","cac","roas","cvr","aov","traffic","sessions","conversions","impressions","clicks","cpm","ctr","cpc","bounce","return_rate","registrations"];
     const metrics = {};
     numericKeys.forEach(k => {
       if (obj[k] !== undefined && obj[k] !== "") {

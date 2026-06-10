@@ -410,6 +410,8 @@ export default function App() {
 
   // Restore confirm modal state
   const [restorePayload, setRestorePayload] = useState(null);
+  // Backup nudge — fires at most once per session if the last backup is stale
+  const [backupNudged, setBackupNudged] = useState(false);
 
   const t    = dk ? TD : TL;
   const cats   = settings.categories || DEFAULT_SETTINGS.categories;
@@ -439,6 +441,17 @@ export default function App() {
         if(rr&&rr.value) setRecs(JSON.parse(rr.value));
       } catch { setItems(SEED); }
       setLoaded(true);
+      // Stale-backup nudge — once per session, if it's been >14 days since the last download
+      try {
+        const lastBackup = localStorage.getItem("gos_last_backup");
+        if (lastBackup && !backupNudged) {
+          const daysSince = (Date.now() - new Date(lastBackup).getTime()) / 86400000;
+          if (daysSince > 14) {
+            showToast("You haven't backed up in over 14 days — consider downloading a backup.", "info");
+            setBackupNudged(true);
+          }
+        }
+      } catch {}
     };
     load();
   },[]);
@@ -1212,7 +1225,7 @@ export default function App() {
         </Modal>
       )}
 
-      {showSet&&<SettingsModal t={t} dk={dk} settings={settings} onSave={s=>{saveSettings(s);setShowSet(false);}} onClose={()=>setShowSet(false)} onDownloadBackup={() => handleDownloadBackup(items, settings, debates, weeklyMetrics, recs)} onRestoreBackup={(file) => handleRestoreBackup(file, showToast, setRestorePayload)} onResetDemo={handleResetDemoData}/>}
+      {showSet&&<SettingsModal t={t} dk={dk} settings={settings} onSave={s=>{saveSettings(s);setShowSet(false);}} onClose={()=>setShowSet(false)} onDownloadBackup={() => { handleDownloadBackup(items, settings, debates, weeklyMetrics, recs); try { localStorage.setItem("gos_last_backup", new Date().toISOString()); } catch {} }} onRestoreBackup={(file) => handleRestoreBackup(file, showToast, setRestorePayload)} onResetDemo={handleResetDemoData}/>}
 
       {guideSection&&(
         <GuideDrawer t={t} dk={dk} openSection={guideSection} onClose={()=>setGuideSection(null)}

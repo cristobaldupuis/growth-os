@@ -26,22 +26,24 @@ These decisions were made deliberately and constrain the roadmap.
 - [x] **Surface AI Errors:** Standardise error handling on form-side AI calls to surface proxy failures (rate limits, timeouts) as toasts instead of failing silently.
 - [x] **State Persistence:** Include `KEY_RECS` (Next Plays recommendations) in JSON backup/restore payloads — currently omitted.
 - [x] **Data Integrity:** Move `acceptRecommendation` status transitions strictly into `handleSave` to prevent orphaned accepted states when a user dismisses the form mid-flow.
-- [ ] **Dark mode persistence:** Verify `KEY_THEME` round-trips correctly through the `store` abstraction on page reload.
-- [ ] **Revenue clarity:** Rename dashboard "Revenue Impacted" KPI to "Projected Impact" and source the metric from `actualRevenueImpact` where available, falling back to `revenueImpact` — separates estimates from actuals.
+- [x] **Dark mode persistence:** Verify `KEY_THEME` round-trips correctly through the `store` abstraction on page reload.
+- [x] **Revenue clarity:** Rename dashboard "Revenue Impacted" KPI to "Projected Impact" and source the metric from `actualRevenueImpact` where available, falling back to `revenueImpact` — separates estimates from actuals.
 
 ### UI Polish (dark mode)
 
-[ ] Verify dark mode colors and theme persistence across all components
+[x] Verify dark mode colors and theme persistence across all components
 
 ### Client Readout View
 
-[ ] A dedicated read-only React view that aggregates the current week's state: Scorecard, completed learnings, live variants, and next drafts. Structured for copy-paste into a client-facing report. Keeps the operational and reporting layers separate in the data model.
+[x] A dedicated read-only React view that aggregates the current week's state: Scorecard, completed learnings, live variants, and next drafts. Structured for copy-paste into a client-facing report. Keeps the operational and reporting layers separate in the data model.
 
 ### Business Health Panel
 
 [x] just shipped — lightweight guided flow: auto-surfaced initiatives needing attention (overdue, no update in 7+ days, completed tests without post-mortems), a structured status log prompt across running experiments, and a "This week's focus" confirmation step. Implemented as a modal triggered from the Dashboard triage card — not a new view. Closes the gap between one-time setup and ongoing weekly use.
 
 - [x] **Business Health Panel:** Operator-defined portfolio-level guardrail metrics (default: New Customer CVR, Orders, Registrations, Blended CAC, Return Rate) surfaced as a standing dashboard panel with WoW delta and optional targets. Reads from existing weekly pulse data — no new data connections required. Closes the gap between experiment activity and unintended portfolio-level effects.
+
+*Phase 1 complete — June 2026.*
 
 ---
 

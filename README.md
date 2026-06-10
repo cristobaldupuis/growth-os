@@ -2,6 +2,8 @@
 
 A growth execution framework for multi-brand ecommerce portfolios. Replaces fragmented marketing spreadsheets with a structured operating engine — combining initiative lifecycle management, statistical rigour, AI-assisted prioritisation, and an autonomous C-Suite strategy debate in a single interface.
 
+Growth OS sits between your data layer (Shopify, GA4, Triple Whale) and your execution layer (Meta, Klaviyo, native ad tools). It doesn't replace attribution or automation — it's the decision engine in the middle: enforcing scientific rigour on every experiment, synthesising learnings across brands, and surfacing what to test next before the team has to ask.
+
 Built to demonstrate how a Director of Growth thinks about velocity, incrementality, and portfolio-level learning at scale.
 
 **[→ Launch Live Application](https://growth-os-iota-seven.vercel.app/)**
@@ -19,6 +21,8 @@ Built to demonstrate how a Director of Growth thinks about velocity, incremental
 - **Signal AI pre-populated context** — opens with a live read of your portfolio so the first debate starts from something real
 - **Toast notifications** — all native browser alerts replaced with in-app slide-up toasts
 - **Restore backup modal** — destructive action now requires an in-app confirmation with full details of what will be overwritten
+- **Client Readout View** — a dedicated read-only view that aggregates the week's state (scorecard, completed learnings, live variants, next drafts) for instant copy-paste to clients or stakeholders
+- **Business Health Panel** — five configurable health metrics on the dashboard (New Customer CVR, Orders, Registrations, Blended CAC, Return Rate) with WoW delta and trend context injected into every AI call
 - **Weekly standup mode** — guided weekly review modal that auto-surfaces stalled experiments and missing post-mortems, with a quick status log across all running initiatives
 
 ---
@@ -46,7 +50,11 @@ Every initiative requires three distinct fields: **Observation** (what prompted 
 Impact, Certainty, Ease on a 1–10 scale. AI-assisted scoring suggests Impact and Certainty with written rationales. Sort by highest ICE or highest revenue at risk.
 
 ### Test validity panel
-Built into every running or completed initiative: sample size calculator, statistical significance indicator with z-statistic and observed uplift, and a required incrementality/counterfactual field before marking a test complete.
+Built into every running or completed initiative:
+- **Sample size calculator** — enter baseline CVR, minimum detectable effect, and confidence level (90% or 95%); returns sessions needed per variant at 80% power
+- **Statistical significance** — live z-statistic, confidence level, and observed uplift as you enter control/variant conversion and session counts
+- **Incrementality / counterfactual** — required free-text field before a test can be marked Complete; defines what would have happened without the intervention
+- **Calibration** — at close-out, prediction error (estimated vs actual revenue) is computed from the frozen prediction snapshot taken at launch, and displayed on the initiative card and in the learning library
 
 ### CSV import / export
 Row-by-row preview before writing. Matched on `initId` for non-destructive updates. Handles date format normalisation, case-insensitive brand matching, and ICE clamping. Google Sheets template included.
@@ -138,7 +146,7 @@ This is what makes recommendations specific — instead of "test SMS cart recove
 | Hosting | Vercel (frontend + serverless API proxy) |
 | Design | Sand/charcoal enterprise palette; serif body; monospace for all financial figures, dates, and tags; light and dark mode |
 | State persistence | Environment-agnostic: `localStorage` (production), in-memory fallback for sandboxed environments |
-| AI | Anthropic Claude API via server-side proxy — `claude-sonnet-4-6` with tool use for agentic features |
+| AI | Anthropic Claude API via server-side proxy — `claude-sonnet-4-6` for all features; agentic tool-calling loop for Signal AI (up to 4 tool iterations per agent turn); ~$0.25–0.35 per full debate |
 | Data I/O | CSV import/export; JSON backup/restore; Google Sheets template |
 
 ---

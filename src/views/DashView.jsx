@@ -775,7 +775,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
               "",
               "— RESULTS —",
               "• Win rate: "+(dash.winRate!==null?dash.winRate+"% ("+dash.wins+" of "+dash.closed+" closed)":"no closed initiatives yet"),
-              "• Projected impact (completed): "+fmtCur(dash.revImpacted),
+              "• Projected Impact (completed): "+fmtCur(dash.revImpacted),
               "• ROI on closed work: "+(dash.closedROI!==null?dash.closedROI+"x return":"not yet measurable"),
               "• Avg time to close: "+(dash.avgDays?dash.avgDays+" days":"n/a"),
               "",

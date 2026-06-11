@@ -51,6 +51,7 @@ import { ClientReadoutView } from "./views/ClientReadoutView.jsx";
 const GUIDE_SECTIONS = [
   {
     id: "signal",
+    views: ["signal","dashboard"],
     label: "Generate net-new strategy",
     feature: "Signal AI — C-suite debate engine",
     what: "A panel of C-suite AI personas debates your current portfolio and constraints, then synthesizes net-new initiatives you haven't thought of — each one grounded in your real brand brief and learnings.",
@@ -60,6 +61,7 @@ const GUIDE_SECTIONS = [
   },
   {
     id: "recs",
+    views: ["dashboard"],
     label: "Get this week's experiments",
     feature: "Next Plays — weekly recommendations",
     what: "Proactive experiment suggestions with the hypothesis pre-written and ICE pre-scored, drawn from your portfolio, learnings library, brand briefs, and latest metrics.",
@@ -69,6 +71,7 @@ const GUIDE_SECTIONS = [
   },
   {
     id: "contribution",
+    views: ["dashboard"],
     label: "Prove ROI to justify the retainer",
     feature: "Contribution-to-revenue view",
     what: "A three-layer revenue picture — realised, probability-weighted in-flight, and probability-weighted pipeline — broken down by category, with one-click copy for client emails.",
@@ -78,6 +81,7 @@ const GUIDE_SECTIONS = [
   },
   {
     id: "library",
+    views: ["library"],
     label: "Never re-run a dead experiment",
     feature: "Learnings library",
     what: "Every closed initiative becomes a searchable learning, tagged by outcome, category, and type. Filter, synthesize across them with AI, or replicate a winner in one click.",
@@ -87,6 +91,7 @@ const GUIDE_SECTIONS = [
   },
   {
     id: "initiatives",
+    views: ["initiatives","detail","form"],
     label: "Track & prioritize the portfolio",
     feature: "Initiatives + ICE scoring",
     what: "The full initiative pipeline with ICE scoring, status tracking, blockers, owners, multi-retailer support, CSV import/export, and quick capture for half-formed ideas.",
@@ -96,6 +101,7 @@ const GUIDE_SECTIONS = [
   },
   {
     id: "triage",
+    views: ["triage"],
     label: "Run the weekly review",
     feature: "Triage",
     what: "Surfaces initiatives that need a decision this week — overdue, awaiting results, or blocked — so nothing stalls silently.",
@@ -105,6 +111,7 @@ const GUIDE_SECTIONS = [
   },
   {
     id: "data",
+    views: ["settings"],
     label: "Keep your data safe & portable",
     feature: "Backup, restore & metrics import",
     what: "Download a full JSON backup any time, restore from one, log weekly metrics manually, or import from Meta / GA4. Brand briefs and settings live in one place.",
@@ -114,13 +121,55 @@ const GUIDE_SECTIONS = [
   },
 ];
 
-function GuideDrawer({ t, dk, openSection, onClose, onNavigate }) {
+function GuideDrawer({ t, dk, openSection, onClose, onNavigate, nav }) {
+  const [expanded, setExpanded] = useState(() => {
+    const init = {};
+    GUIDE_SECTIONS.forEach(s => { init[s.id] = s.views.includes(nav); });
+    if (openSection && openSection !== true) init[openSection] = true;
+    return init;
+  });
+
+  useEffect(() => {
+    setExpanded(() => {
+      const next = {};
+      GUIDE_SECTIONS.forEach(s => { next[s.id] = s.views.includes(nav); });
+      if (openSection && openSection !== true) next[openSection] = true;
+      return next;
+    });
+  }, [nav, openSection]);
+
   useEffect(() => {
     if (openSection && openSection !== true) {
       const el = document.getElementById("guide-sec-" + openSection);
       if (el) setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
     }
   }, [openSection]);
+
+  const relevant = GUIDE_SECTIONS.filter(s => s.views.includes(nav));
+  const rest = GUIDE_SECTIONS.filter(s => !s.views.includes(nav));
+  const hasRelevant = relevant.length > 0;
+
+  const renderCard = (s) => (
+    <div key={s.id} id={"guide-sec-"+s.id}
+      style={{background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:12,padding:"16px 18px"}}>
+      <div onClick={()=>setExpanded(prev=>({...prev,[s.id]:!prev[s.id]}))}
+        style={{cursor:"pointer",display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8,marginBottom:8}}>
+        <div style={{flex:1}}>
+          <div style={{fontSize:10,letterSpacing:"0.09em",textTransform:"uppercase",color:t.gold,fontFamily:t.mono,fontWeight:700,marginBottom:6}}>{s.label}</div>
+          <div style={{fontSize:14.5,fontWeight:700,color:t.text,fontFamily:t.serif}}>{s.feature}</div>
+        </div>
+        <span style={{color:t.textMuted,fontSize:10,flexShrink:0,marginTop:4,display:"inline-block",transition:"transform 0.18s",transform:expanded[s.id]?"rotate(180deg)":"rotate(0deg)"}}>&#9660;</span>
+      </div>
+      {expanded[s.id] && (
+        <>
+          <p style={{margin:"0 0 8px",fontSize:13,color:t.textSub,lineHeight:1.6,fontFamily:t.sans}}>{s.what}</p>
+          <p style={{margin:"0 0 12px",fontSize:12.5,color:t.textMuted,lineHeight:1.6,fontFamily:t.sans,fontStyle:"italic"}}>{s.why}</p>
+        </>
+      )}
+      <button onClick={e=>{e.stopPropagation();onNavigate(s.action);}} style={{...gG(t),fontSize:11.5,padding:"5px 12px"}}>{s.cta} &#8594;</button>
+    </div>
+  );
+
   return (
     <div style={{position:"fixed",inset:0,background:dk?"rgba(0,0,0,0.6)":"rgba(20,18,10,0.35)",zIndex:320,display:"flex",justifyContent:"flex-end"}}
       onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
@@ -137,16 +186,22 @@ function GuideDrawer({ t, dk, openSection, onClose, onNavigate }) {
         </div>
         {/* Sections */}
         <div style={{padding:"16px 22px 40px",display:"flex",flexDirection:"column",gap:14}}>
-          {GUIDE_SECTIONS.map(s=>(
-            <div key={s.id} id={"guide-sec-"+s.id}
-              style={{background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:12,padding:"16px 18px"}}>
-              <div style={{fontSize:10,letterSpacing:"0.09em",textTransform:"uppercase",color:t.gold,fontFamily:t.mono,fontWeight:700,marginBottom:6}}>{s.label}</div>
-              <div style={{fontSize:14.5,fontWeight:700,color:t.text,fontFamily:t.serif,marginBottom:8}}>{s.feature}</div>
-              <p style={{margin:"0 0 8px",fontSize:13,color:t.textSub,lineHeight:1.6,fontFamily:t.sans}}>{s.what}</p>
-              <p style={{margin:"0 0 12px",fontSize:12.5,color:t.textMuted,lineHeight:1.6,fontFamily:t.sans,fontStyle:"italic"}}>{s.why}</p>
-              <button onClick={()=>onNavigate(s.action)} style={{...gG(t),fontSize:11.5,padding:"5px 12px"}}>{s.cta} &#8594;</button>
-            </div>
-          ))}
+          {hasRelevant ? (
+            <>
+              <div>
+                <div style={{fontSize:9,letterSpacing:"0.12em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,fontWeight:700,paddingBottom:6}}>Relevant to where you are</div>
+                <div style={{height:1,background:t.border}}/>
+              </div>
+              {relevant.map(renderCard)}
+              <div style={{marginTop:4}}>
+                <div style={{fontSize:9,letterSpacing:"0.12em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,fontWeight:700,paddingBottom:6}}>Everything else</div>
+                <div style={{height:1,background:t.border}}/>
+              </div>
+              {rest.map(renderCard)}
+            </>
+          ) : (
+            GUIDE_SECTIONS.map(renderCard)
+          )}
           <div style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,textAlign:"center",lineHeight:1.7,paddingTop:6}}>
             Tip: open this any time from the <strong style={{color:t.textSub}}>?</strong> in the top bar.
           </div>
@@ -1229,6 +1284,7 @@ export default function App() {
 
       {guideSection&&(
         <GuideDrawer t={t} dk={dk} openSection={guideSection} onClose={()=>setGuideSection(null)}
+          nav={nav}
           onNavigate={(action)=>{
             setGuideSection(null);
             if(action==="signal")        setShowCopilot(true);

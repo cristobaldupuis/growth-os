@@ -1,4 +1,5 @@
 import { brandName, generateInitId, INIT_TYPES, STATUSES, withRunningSnapshot } from "../constants.js";
+import { ATTRIBUTION_CONFIG } from "../config.js";
 
 export const CSV_COLS = [
   "initId","title","initType","category","status","brandId","owner",
@@ -133,11 +134,29 @@ export const parseCSV = (text) => {
 // ctx = { items, brands, cats, idPrefix, idx, sd, ed }
 //   sd/ed are pre-normalised dates (producers own date parsing for their format);
 //   idPrefix tags the generated id by source (e.g. "csv", "shopify").
-export function normalizeInitiativeRecord(rec, ctx) {
+export function normalizeInitiativeRecord(rec, ctx, attributionConfig = ATTRIBUTION_CONFIG) {
   const { items, brands, cats, idPrefix = "imp", idx = 0, sd = "", ed = "" } = ctx;
-  const r = rec || {};
+  const r = { ...(rec || {}) };
   const clamp = (v, lo, hi) => { const n = parseInt(v); return isNaN(n) ? lo : Math.min(hi, Math.max(lo, n)); };
   const numOrNull = (v) => (v !== "" && v !== undefined && v !== null) ? (parseInt(v) || 0) : null;
+
+  // Attribution enrichment: mutate the record copy before normalisation reads it.
+  // idMappings first (direct field-to-ID); patterns as fallback (regex extraction).
+  if (attributionConfig) {
+    for (const mapping of (attributionConfig.idMappings || [])) {
+      if (r[mapping.sourceField]) r[mapping.initiativeIdField] = r[mapping.sourceField];
+    }
+    for (const pattern of (attributionConfig.patterns || [])) {
+      if (!r[pattern.sourceField]) continue;
+      try {
+        const re = new RegExp(pattern.regex);
+        const match = re.exec(r[pattern.sourceField]);
+        if (match && match[pattern.captureGroup] !== undefined) r[pattern.target] = match[pattern.captureGroup];
+      } catch (e) {
+        console.warn(`[attribution] skipping malformed pattern "${pattern.name}": ${e.message}`);
+      }
+    }
+  }
 
   const existingById = r.initId ? items.find(e => e.initId === r.initId.trim()) : null;
   const isUpdate = !!existingById;

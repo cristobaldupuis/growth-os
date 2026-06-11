@@ -184,6 +184,80 @@ export const TEMPLATES = [
 ];
 
 // -----------------------------------------------------------------------------
+// ATTRIBUTION CONFIG
+// Contract for config-driven attribution mapping consumed by
+// normalizeInitiativeRecord() in src/services/csv.js.
+//
+// idMappings  — direct field-to-ID resolution; applied first, wins over patterns.
+//   platform          — source adapter identifier (informational only).
+//   sourceField       — field name on the incoming raw record.
+//   initiativeIdField — internal field that receives the source field's value.
+//
+// patterns    — regex extraction for messy legacy naming; applied as fallback.
+//   name          — human label used in warning logs when the pattern is skipped.
+//   sourceField   — field on the raw record to match against.
+//   regex         — string compiled at runtime via new RegExp(). Never eval'd.
+//   captureGroup  — 1-based index of the capture group to extract.
+//   target        — internal field on the normalised record to populate.
+//
+// Both mechanisms enrich a copy of the raw record before normalisation runs;
+// callers remain unaware of the mapping step.
+// -----------------------------------------------------------------------------
+export const ATTRIBUTION_CONFIG = {
+  idMappings: [
+    // Meta Ads campaign_name carries the initiative ID when campaigns are
+    // named by initiative (e.g. a campaign named exactly "NH-005").
+    {
+      platform: "meta",
+      sourceField: "campaign_name",
+      initiativeIdField: "initId",
+    },
+    // GA4 custom dimension written at event time by the tagging layer.
+    {
+      platform: "ga4",
+      sourceField: "custom_dimension_initiative",
+      initiativeIdField: "initId",
+    },
+    // Shopify order tags used by promos tied to a named initiative.
+    {
+      platform: "shopify",
+      sourceField: "order_tag",
+      initiativeIdField: "initId",
+    },
+  ],
+  patterns: [
+    // Extract initiative tracking slug from legacy Meta campaign names:
+    //   "2025_Q3_retargeting_v2"  → "retargeting"   (→ trackingTag)
+    //   "2026_Q1_sms-winback_v1"  → "sms-winback"
+    {
+      name: "legacy-campaign-slug",
+      sourceField: "campaign_name",
+      regex: "^\\d{4}_Q\\d_([a-z0-9-]+?)_v\\d+$",
+      captureGroup: 1,
+      target: "trackingTag",
+    },
+    // Extract initiative ID from GA4 event_label strings:
+    //   "initiative:NH-007:bedding-quiz" → "NH-007"  (→ initId)
+    {
+      name: "ga4-event-label-id",
+      sourceField: "event_label",
+      regex: "initiative:([A-Z0-9]+-\\d+):",
+      captureGroup: 1,
+      target: "initId",
+    },
+    // Extract owner name from ad-set naming convention:
+    //   "NH_Priya_retention_2025Q3" → "Priya"        (→ owner)
+    {
+      name: "adset-owner-extraction",
+      sourceField: "adset_name",
+      regex: "^[A-Z0-9]+_([A-Za-z]+)_",
+      captureGroup: 1,
+      target: "owner",
+    },
+  ],
+};
+
+// -----------------------------------------------------------------------------
 // SEED INITIATIVES
 // Shown on first load before the user has added any data.
 // Replace with real initiatives relevant to the client, or set to [] for a

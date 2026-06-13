@@ -246,6 +246,14 @@ export const fmtDate = (d) => d ? new Date(d+"T12:00:00").toLocaleDateString("en
 export const parseD  = (d) => d ? new Date(d+"T12:00:00") : null;
 export const somM    = (d) => new Date(d.getFullYear(), d.getMonth(), 1);
 export const eomM    = (d) => new Date(d.getFullYear(), d.getMonth()+1, 0, 23, 59, 59);
+// Returns the Monday (local time) of the week containing d. Used for weekly rec batch anchoring.
+export const mondayOf = (d) => {
+  const copy = new Date(d);
+  const day  = copy.getDay(); // 0=Sun, 1=Mon … 6=Sat
+  copy.setDate(copy.getDate() - (day === 0 ? 6 : day - 1));
+  copy.setHours(0, 0, 0, 0);
+  return copy;
+};
 
 // Parse a weekly metrics CSV — header-driven, order-independent
 export function parseMetricsCSV(text) {

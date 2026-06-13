@@ -43,6 +43,11 @@ These decisions were made deliberately and constrain the roadmap.
 
 - [x] **Business Health Panel:** Operator-defined portfolio-level guardrail metrics (default: New Customer CVR, Orders, Registrations, Blended CAC, Return Rate) surfaced as a standing dashboard panel with WoW delta and optional targets. Reads from existing weekly pulse data — no new data connections required. Closes the gap between experiment activity and unintended portfolio-level effects.
 
+### Next Plays maturation
+
+- [x] **Weekly cadence anchoring:** Stamp `weekOf` (YYYY-MM-DD, Monday of the generation week) onto each batch at save time. Makes the recommendation history week-addressable — a second generation in the same calendar week doesn't displace the prior-week reference point for diffing.
+- [x] **Batch diffing:** Collapsed "Changes from last week" section on the Next Plays card — surfaces entered, dropped, and re-ranked plays between the current week's batch and the immediately preceding prior-week batch. Pure render-time computation; no persisted state. Match key is `title` (rec IDs are time-stamped and not stable across independently generated batches).
+
 *Phase 1 complete — June 2026.*
 
 ---

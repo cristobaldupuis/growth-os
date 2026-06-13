@@ -522,7 +522,14 @@ function NextPlaysCard({ t, dk, recs, recsLoad, recsErr, brands, items, onGenera
   const [diffExpanded, setDiffExpanded] = useState(false);
 
   const latest   = recs && recs.length > 0 ? recs[0] : null;
-  const prev     = recs && recs.length > 1 ? recs[1] : null;
+  // If latest carries weekOf, find the most recent batch from a prior week so
+  // same-week regenerations don't clobber the prior-week reference point.
+  // Falls back to recs[1] for batches generated before weekOf was stamped.
+  const prev = latest
+    ? (latest.weekOf
+        ? (recs.find(b => b.weekOf && b.weekOf < latest.weekOf) || null)
+        : (recs.length > 1 ? recs[1] : null))
+    : null;
   const pending  = latest ? latest.recommendations.filter(r => r.status === "pending")  : [];
   const accepted = latest ? latest.recommendations.filter(r => r.status === "accepted") : [];
   const dismissed = latest ? latest.recommendations.filter(r => r.status === "dismissed") : [];

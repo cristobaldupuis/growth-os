@@ -589,9 +589,19 @@ export default function App() {
         throw new Error("All candidate expansions failed. Try regenerating.");
       }
 
+      // weekOf: Monday of the generation week (YYYY-MM-DD). Stable across same-week
+      // regenerations so the diff always compares against a prior-week batch, not the
+      // earlier generation from the same Monday session.
+      const _now = new Date();
+      const _day = _now.getDay();
+      const _mon = new Date(_now);
+      _mon.setDate(_now.getDate() + (_day === 0 ? -6 : 1 - _day));
+      const weekOf = _mon.toISOString().slice(0, 10);
+
       const batch = {
         id: "recbatch-"+Date.now(),
-        generatedAt: new Date().toISOString(),
+        generatedAt: _now.toISOString(),
+        weekOf,
         recommendations,
       };
 

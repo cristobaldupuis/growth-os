@@ -17,7 +17,7 @@ import {
   STATUSES, OUTCOMES, INIT_TYPES, METRIC_SOURCES,
   TL, TD, SL, SD, OL, OD,
   catColor, brandColor, brandName, iceScore, iceColor,
-  fmtCur, fmtDate, parseD, somM, eomM,
+  fmtCur, fmtDate, parseD, somM, eomM, mondayOf,
   parseMetricsCSV, generateInitId, mkDefault, withRunningSnapshot, computePredictionError,
 } from "./constants.js";
 import { downloadCSV, itemToCSVRow, normaliseDate, parseCSV, normalizeInitiativeRecord } from "./services/csv.js";
@@ -589,9 +589,11 @@ export default function App() {
         throw new Error("All candidate expansions failed. Try regenerating.");
       }
 
+      const now = new Date();
       const batch = {
         id: "recbatch-"+Date.now(),
-        generatedAt: new Date().toISOString(),
+        generatedAt: now.toISOString(),
+        weekOf: mondayOf(now).toISOString().slice(0,10),
         recommendations,
       };
 

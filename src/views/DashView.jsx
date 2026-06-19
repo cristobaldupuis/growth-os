@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { OUTCOMES, INIT_TYPES, METRIC_SOURCES, OL, OD, TYPE_L, TYPE_D, DEFAULT_SETTINGS, catColor, brandName, iceScore, iceColor, fmtCur, fmtDate } from "../constants.js";
+import { OUTCOMES, INIT_TYPES, METRIC_SOURCES, OL, OD, TYPE_L, TYPE_D, DEFAULT_SETTINGS, catColor, brandName, iceScore, iceColor, fmtCur, fmtDate, mondayOf } from "../constants.js";
 import { gG, gGh, gSL, gCd } from "../components/styles.js";
 import { Spark } from "../components/Spark.jsx";
 import { WeeklyStandupModal } from "../components/WeeklyStandupModal.jsx";
@@ -516,6 +516,19 @@ function diffBatches(latest, prev) {
 }
 
 // -- Next Plays UI -----------------------------------------------------------
+
+// Pure helper — derives week state from rec batches and today's date.
+// Returns "current" (this week has a slate), "stale" (latest is a prior week),
+// or "none" (no batches ever generated).
+function recWeekState(recs, today) {
+  if (!recs || recs.length === 0) return "none";
+  const latest = recs[0];
+  const thisMonday = mondayOf(today).toISOString().slice(0, 10);
+  // Fall back to deriving from generatedAt for legacy batches missing weekOf.
+  const batchMonday = latest.weekOf || mondayOf(new Date(latest.generatedAt)).toISOString().slice(0, 10);
+  return batchMonday === thisMonday ? "current" : "stale";
+}
+
 // Card that lives on the Dashboard. Shows the latest batch of recommendations
 // or a generate CTA if none exist yet. Clicking a rec opens the detail modal.
 function NextPlaysCard({ t, dk, recs, recsLoad, recsErr, brands, items, onGenerate, onOpenRec }) {
@@ -541,12 +554,28 @@ function NextPlaysCard({ t, dk, recs, recsLoad, recsErr, brands, items, onGenera
     (e.status==="Completed"||e.status==="Killed") && e.results && e.results.keyLearning
   ).length;
 
+  const weekState = recWeekState(recs, new Date());
+  // Derive the Monday date string for labelling — use weekOf if present, fall back to generatedAt.
+  const batchWeekOf = latest
+    ? (latest.weekOf || mondayOf(new Date(latest.generatedAt)).toISOString().slice(0, 10))
+    : null;
+  const weekLabel = batchWeekOf
+    ? new Date(batchWeekOf + "T12:00:00").toLocaleDateString("en-CA", { month: "short", day: "numeric" })
+    : null;
+
   // -- COMPACT MODE — recs exist and not currently loading -------------------
   // One header strip + one row per pending recommendation. Clicking any row
   // opens the detail modal directly (Option 2 — skip the intermediate list).
   if (latest && !recsLoad) {
     return (
       <div style={{...gCd(t,dk),display:"flex",flexDirection:"column",gap:8,border:"1px solid "+t.goldBorder,padding:"10px 14px"}}>
+        {/* Staleness nudge — shown when the current week has no slate yet */}
+        {weekState === "stale" && (
+          <div style={{padding:"6px 10px",background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:4,fontSize:11,color:t.textSub,fontFamily:t.mono}}>
+            This week's plays haven't been generated yet
+          </div>
+        )}
+
         {/* Header strip */}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -557,9 +586,9 @@ function NextPlaysCard({ t, dk, recs, recsLoad, recsErr, brands, items, onGenera
                 ? pending.length+" ready"
                 : "all resolved"}
             </span>
-            {latest && (
+            {weekLabel && (
               <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,opacity:0.7}}>
-                · {fmtDate(latest.generatedAt.slice(0,10))}
+                · {weekState === "current" ? "Week of "+weekLabel : weekLabel}
               </span>
             )}
           </div>
@@ -571,7 +600,9 @@ function NextPlaysCard({ t, dk, recs, recsLoad, recsErr, brands, items, onGenera
                 {dismissed.length > 0 && <span>✕ {dismissed.length}</span>}
               </span>
             )}
-            <button onClick={onGenerate} style={{...gGh(t),fontSize:10,padding:"3px 8px"}} title="Regenerate from current portfolio state">
+            <button onClick={onGenerate}
+              style={{...(weekState==="stale"?gG(t):gGh(t)),fontSize:10,padding:"3px 8px"}}
+              title="Regenerate from current portfolio state">
               ↻ Regenerate
             </button>
           </div>

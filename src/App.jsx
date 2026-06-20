@@ -598,10 +598,6 @@ export default function App() {
       _mon.setDate(_now.getDate() + (_day === 0 ? -6 : 1 - _day));
       const weekOf = _mon.toISOString().slice(0, 10);
 
-      const batch = {
-        id: "recbatch-"+Date.now(),
-        generatedAt: _now.toISOString(),
-        weekOf,
       const now = new Date();
       const batch = {
         id: "recbatch-"+Date.now(),

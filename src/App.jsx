@@ -787,6 +787,10 @@ export default function App() {
         pipeline: Math.round(pipelineRaw * rate),
         winRate: Math.round(rate * 100),
         usesFallback: allClosedForRate.filter(e=>e.category===c).length < 3,
+        // Counts for the data-confidence header in ContributionView
+        actualsCount: realisedItems.length,
+        inflightCount: running.filter(e=>e.category===c&&(e.revenueImpact||0)>0).length,
+        pipelineCount: pipeline.filter(e=>e.category===c&&(e.revenueImpact||0)>0).length,
       };
     }).filter(r=>r.realised>0||r.realisedBackfilled>0||r.inflight>0||r.pipeline>0);
     const contributionTotals = contribution.reduce((acc,r)=>({

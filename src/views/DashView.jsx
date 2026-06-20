@@ -418,6 +418,11 @@ function ContributionView({t, dk, contribution, totals, dRange, activeBrand, bra
     try { navigator.clipboard.writeText(lines); showToast("Contribution summary copied to clipboard.", "success"); } catch { showToast("Couldn't copy to clipboard.", "error"); }
   };
 
+  // Data confidence header counts — derived from fields on each contribution row
+  const totalActualsCount   = contribution.reduce((s,r) => s + (r.actualsCount   || 0), 0);
+  const totalEstimatesCount = contribution.reduce((s,r) => s + (r.inflightCount || 0) + (r.pipelineCount || 0), 0);
+  const totalInView = totalActualsCount + totalEstimatesCount;
+
   return (
     <div style={{...gCd(t,dk)}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8,flexWrap:"wrap",marginBottom:14}}>
@@ -426,6 +431,11 @@ function ContributionView({t, dk, contribution, totals, dRange, activeBrand, bra
           <div style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,lineHeight:1.5}}>
             {retailerLabel} &middot; {rangeLabel} &middot; in-flight and pipeline are probability-weighted by category win rate
           </div>
+          {totalInView > 0 && (
+            <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginTop:3}}>
+              {totalActualsCount} of {totalInView} initiatives use recorded actuals — remaining figures are team estimates
+            </div>
+          )}
         </div>
         <button onClick={copyText} style={{...gGh(t),fontSize:11,padding:"3px 10px"}}>&#128203; Copy</button>
       </div>

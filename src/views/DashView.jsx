@@ -3,6 +3,7 @@ import { OUTCOMES, INIT_TYPES, METRIC_SOURCES, OL, OD, TYPE_L, TYPE_D, DEFAULT_S
 import { gG, gGh, gSL, gCd } from "../components/styles.js";
 import { Spark } from "../components/Spark.jsx";
 import { WeeklyStandupModal } from "../components/WeeklyStandupModal.jsx";
+import { buildCrossBrandTransfers } from "../services/portfolio.js";
 
 // -- Weekly Pulse --------------------------------------------------------------
 function WeeklyPulseSection({t, dk, settings, brands, weeklyMetrics, onLog, onImport}) {
@@ -418,6 +419,11 @@ function ContributionView({t, dk, contribution, totals, dRange, activeBrand, bra
     try { navigator.clipboard.writeText(lines); showToast("Contribution summary copied to clipboard.", "success"); } catch { showToast("Couldn't copy to clipboard.", "error"); }
   };
 
+  // Data confidence header counts — derived from fields on each contribution row
+  const totalActualsCount   = contribution.reduce((s,r) => s + (r.actualsCount   || 0), 0);
+  const totalEstimatesCount = contribution.reduce((s,r) => s + (r.inflightCount || 0) + (r.pipelineCount || 0), 0);
+  const totalInView = totalActualsCount + totalEstimatesCount;
+
   return (
     <div style={{...gCd(t,dk)}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8,flexWrap:"wrap",marginBottom:14}}>
@@ -426,6 +432,11 @@ function ContributionView({t, dk, contribution, totals, dRange, activeBrand, bra
           <div style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,lineHeight:1.5}}>
             {retailerLabel} &middot; {rangeLabel} &middot; in-flight and pipeline are probability-weighted by category win rate
           </div>
+          {totalInView > 0 && (
+            <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginTop:3}}>
+              {totalActualsCount} of {totalInView} initiatives use recorded actuals — remaining figures are team estimates
+            </div>
+          )}
         </div>
         <button onClick={copyText} style={{...gGh(t),fontSize:11,padding:"3px 10px"}}>&#128203; Copy</button>
       </div>
@@ -751,10 +762,40 @@ function NextPlaysCard({ t, dk, recs, recsLoad, recsErr, brands, items, onGenera
 // Modal — full recommendation detail with hypothesis, ICE rationale, reasoning
 // trace, and cited learnings. Actions: Add to backlog | Dismiss.
 
+// Parse a north star display string (e.g. "$1.4M/mo", "$320k", "42000") into a
+// raw number so gap coverage can be computed. Returns null if unparseable.
+function parseNorthStarValue(str) {
+  if (!str) return null;
+  const s = String(str).replace(/[$,\s]/g, "").toLowerCase();
+  const m = s.match(/^([\d.]+)(m|k)?(?:\/.*)?$/);
+  if (!m) return null;
+  const num = parseFloat(m[1]);
+  if (isNaN(num)) return null;
+  if (m[2] === "m") return num * 1_000_000;
+  if (m[2] === "k") return num * 1_000;
+  return num;
+}
+
 export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetrics,onLog,onImport,dRange,setDRange,cFrom,cTo,setCFrom,setCTo,onGo,recs,recsLoad,recsErr,items,onGenerateRecs,onOpenRec,showToast,onSaveItems}) {
   const maxCat  = Math.max(...Object.values(dash.catCounts),1);
   const maxType = Math.max(...Object.values(dash.typeCounts),1);
   const [showStandup, setShowStandup] = useState(false);
+
+  // Gap coverage: what % of (target - current) does the probability-weighted
+  // portfolio cover? Uses the same totals already computed for ContributionView.
+  const nsCurrentNum = parseNorthStarValue(settings.northStarCurrent);
+  const nsTargetNum  = parseNorthStarValue(settings.northStarTarget);
+  const nsGap = (nsCurrentNum !== null && nsTargetNum !== null && nsTargetNum > nsCurrentNum)
+    ? nsTargetNum - nsCurrentNum : null;
+  const portfolioCoverage = (dash.contributionTotals.realised || 0)
+    + (dash.contributionTotals.inflight || 0)
+    + (dash.contributionTotals.pipeline || 0);
+  const gapCovPct = (nsGap !== null && nsGap > 0 && portfolioCoverage > 0)
+    ? Math.min(Math.round((portfolioCoverage / nsGap) * 100), 999) : null;
+
+  // Cross-brand transfer opportunities — top 3, only shown if >= 2 exist.
+  const transfers = buildCrossBrandTransfers(items, brands).slice(0, 3);
+
   return (
     <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:14}}>
       {/* North star */}
@@ -768,6 +809,11 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
           <div style={{fontSize:20,color:t.textMuted,alignSelf:"center"}}>&#8594;</div>
           <div><div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Target</div><div style={{fontSize:26,fontWeight:700,color:t.text,fontFamily:t.mono,letterSpacing:"-0.02em"}}>{settings.northStarTarget}</div></div>
         </div>
+        {gapCovPct !== null && (
+          <div style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>
+            Portfolio covers <strong style={{color:t.gold}}>{gapCovPct}%</strong> of gap
+          </div>
+        )}
         <div style={{marginLeft:"auto",fontSize:11,color:t.textMuted,fontFamily:t.mono,textAlign:"right"}}>
           {activeBrand!=="all"&&<div style={{fontSize:12,fontWeight:600,color:t.gold,marginBottom:2}}>{brandName(activeBrand,brands)}</div>}
           {settings.businessModel}
@@ -959,6 +1005,29 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
         brands={brands}
         showToast={showToast}
       />
+
+      {/* Transfer Opportunities — only render when >= 2 gaps exist */}
+      {transfers.length >= 2 && (
+        <div style={{...gCd(t,dk)}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8,flexWrap:"wrap",marginBottom:10}}>
+            <div style={gSL(t)}>Transfer opportunities</div>
+            <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono}}>proven at one brand, not yet running at another</span>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:7}}>
+            {transfers.map((tr,i) => {
+              const revStr = tr.revenueActual !== null
+                ? " (+$"+(tr.revenueActual>=1000?Math.round(tr.revenueActual/100)/10+"k":tr.revenueActual.toLocaleString())+" actual)"
+                : "";
+              return (
+                <div key={i} style={{fontSize:12,fontFamily:t.mono,color:t.textSub,lineHeight:1.5}}>
+                  <span style={{fontWeight:700,color:t.text}}>{tr.category}:</span>{" "}
+                  proven at <span style={{color:t.gold}}>{tr.winningBrand}</span>{revStr} — not running at {tr.missingBrands.join(", ")}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Calibration card */}
       <div style={{...gCd(t,dk),border:"1px solid "+(dash.calibration!==null?(dash.calibration>=80?t.goldBorder:dash.calibration>=50?"#c0a030":t.border):t.border)}}>

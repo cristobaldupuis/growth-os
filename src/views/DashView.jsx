@@ -751,10 +751,37 @@ function NextPlaysCard({ t, dk, recs, recsLoad, recsErr, brands, items, onGenera
 // Modal — full recommendation detail with hypothesis, ICE rationale, reasoning
 // trace, and cited learnings. Actions: Add to backlog | Dismiss.
 
+// Parse a north star display string (e.g. "$1.4M/mo", "$320k", "42000") into a
+// raw number so gap coverage can be computed. Returns null if unparseable.
+function parseNorthStarValue(str) {
+  if (!str) return null;
+  const s = String(str).replace(/[$,\s]/g, "").toLowerCase();
+  const m = s.match(/^([\d.]+)(m|k)?(?:\/.*)?$/);
+  if (!m) return null;
+  const num = parseFloat(m[1]);
+  if (isNaN(num)) return null;
+  if (m[2] === "m") return num * 1_000_000;
+  if (m[2] === "k") return num * 1_000;
+  return num;
+}
+
 export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetrics,onLog,onImport,dRange,setDRange,cFrom,cTo,setCFrom,setCTo,onGo,recs,recsLoad,recsErr,items,onGenerateRecs,onOpenRec,showToast,onSaveItems}) {
   const maxCat  = Math.max(...Object.values(dash.catCounts),1);
   const maxType = Math.max(...Object.values(dash.typeCounts),1);
   const [showStandup, setShowStandup] = useState(false);
+
+  // Gap coverage: what % of (target - current) does the probability-weighted
+  // portfolio cover? Uses the same totals already computed for ContributionView.
+  const nsCurrentNum = parseNorthStarValue(settings.northStarCurrent);
+  const nsTargetNum  = parseNorthStarValue(settings.northStarTarget);
+  const nsGap = (nsCurrentNum !== null && nsTargetNum !== null && nsTargetNum > nsCurrentNum)
+    ? nsTargetNum - nsCurrentNum : null;
+  const portfolioCoverage = (dash.contributionTotals.realised || 0)
+    + (dash.contributionTotals.inflight || 0)
+    + (dash.contributionTotals.pipeline || 0);
+  const gapCovPct = (nsGap !== null && nsGap > 0 && portfolioCoverage > 0)
+    ? Math.min(Math.round((portfolioCoverage / nsGap) * 100), 999) : null;
+
   return (
     <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:14}}>
       {/* North star */}
@@ -768,6 +795,11 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
           <div style={{fontSize:20,color:t.textMuted,alignSelf:"center"}}>&#8594;</div>
           <div><div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Target</div><div style={{fontSize:26,fontWeight:700,color:t.text,fontFamily:t.mono,letterSpacing:"-0.02em"}}>{settings.northStarTarget}</div></div>
         </div>
+        {gapCovPct !== null && (
+          <div style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>
+            Portfolio covers <strong style={{color:t.gold}}>{gapCovPct}%</strong> of gap
+          </div>
+        )}
         <div style={{marginLeft:"auto",fontSize:11,color:t.textMuted,fontFamily:t.mono,textAlign:"right"}}>
           {activeBrand!=="all"&&<div style={{fontSize:12,fontWeight:600,color:t.gold,marginBottom:2}}>{brandName(activeBrand,brands)}</div>}
           {settings.businessModel}

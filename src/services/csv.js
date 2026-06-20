@@ -164,7 +164,8 @@ export function normalizeInitiativeRecord(rec, ctx, attributionConfig = ATTRIBUT
   const resolvedBrandId = matchedBrand ? matchedBrand.id : (existingById?.brandId || "default");
 
   const hasSnapshotCols = (
-    r.snapshot_date || r.snapshot_revenueImpact !== "" && r.snapshot_revenueImpact !== undefined ||
+    r.snapshot_date ||
+    (r.snapshot_revenueImpact !== "" && r.snapshot_revenueImpact !== undefined) ||
     (r.snapshot_ice_impact !== "" && r.snapshot_ice_impact !== undefined) ||
     (r.snapshot_ice_certainty !== "" && r.snapshot_ice_certainty !== undefined) ||
     (r.snapshot_ice_ease !== "" && r.snapshot_ice_ease !== undefined)

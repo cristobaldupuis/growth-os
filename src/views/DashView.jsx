@@ -3,6 +3,7 @@ import { OUTCOMES, INIT_TYPES, METRIC_SOURCES, OL, OD, TYPE_L, TYPE_D, DEFAULT_S
 import { gG, gGh, gSL, gCd } from "../components/styles.js";
 import { Spark } from "../components/Spark.jsx";
 import { WeeklyStandupModal } from "../components/WeeklyStandupModal.jsx";
+import { buildCrossBrandTransfers } from "../services/portfolio.js";
 
 // -- Weekly Pulse --------------------------------------------------------------
 function WeeklyPulseSection({t, dk, settings, brands, weeklyMetrics, onLog, onImport}) {
@@ -792,6 +793,9 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
   const gapCovPct = (nsGap !== null && nsGap > 0 && portfolioCoverage > 0)
     ? Math.min(Math.round((portfolioCoverage / nsGap) * 100), 999) : null;
 
+  // Cross-brand transfer opportunities — top 3, only shown if >= 2 exist.
+  const transfers = buildCrossBrandTransfers(items, brands).slice(0, 3);
+
   return (
     <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:14}}>
       {/* North star */}
@@ -1001,6 +1005,29 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
         brands={brands}
         showToast={showToast}
       />
+
+      {/* Transfer Opportunities — only render when >= 2 gaps exist */}
+      {transfers.length >= 2 && (
+        <div style={{...gCd(t,dk)}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8,flexWrap:"wrap",marginBottom:10}}>
+            <div style={gSL(t)}>Transfer opportunities</div>
+            <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono}}>proven at one brand, not yet running at another</span>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:7}}>
+            {transfers.map((tr,i) => {
+              const revStr = tr.revenueActual !== null
+                ? " (+$"+(tr.revenueActual>=1000?Math.round(tr.revenueActual/100)/10+"k":tr.revenueActual.toLocaleString())+" actual)"
+                : "";
+              return (
+                <div key={i} style={{fontSize:12,fontFamily:t.mono,color:t.textSub,lineHeight:1.5}}>
+                  <span style={{fontWeight:700,color:t.text}}>{tr.category}:</span>{" "}
+                  proven at <span style={{color:t.gold}}>{tr.winningBrand}</span>{revStr} — not running at {tr.missingBrands.join(", ")}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Calibration card */}
       <div style={{...gCd(t,dk),border:"1px solid "+(dash.calibration!==null?(dash.calibration>=80?t.goldBorder:dash.calibration>=50?"#c0a030":t.border):t.border)}}>

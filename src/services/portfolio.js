@@ -189,6 +189,40 @@ export function buildPortfolioTools(items, settings, brands, activeBrand) {
   };
 }
 
+// Returns a structured array of cross-brand transfer opportunities — categories
+// proven (Success/Jackpot) at one brand that have no running/completed equivalent
+// at another. Used both by the AI context pipeline and the dashboard widget.
+export function buildCrossBrandTransfers(items, brands) {
+  const normB = id => (!id||id==="default") ? ((brands[0]&&brands[0].id)||"default") : id;
+  const pursued = (cat, bid) => (items||[]).some(e =>
+    e.category===cat && normB(e.brandId)===bid &&
+    (e.status==="Running"||e.status==="Completed"||e.status==="Killed"));
+  const winsByCat = {};
+  (items||[]).filter(e => e.status==="Completed" && e.results &&
+      (e.results.outcomeClassification==="Jackpot"||e.results.outcomeClassification==="Success"))
+    .forEach(e => {
+      const cat = e.category;
+      const rev = typeof e.results.actualRevenueImpact==="number" ? e.results.actualRevenueImpact : -Infinity;
+      if (!winsByCat[cat] || rev > winsByCat[cat]._rev) winsByCat[cat] = { e, _rev:rev };
+    });
+  const transfers = [];
+  Object.entries(winsByCat).forEach(([cat, { e, _rev }]) => {
+    const srcBid = normB(e.brandId);
+    const missing = (brands||[]).filter(b => normB(b.id)!==srcBid && !pursued(cat, normB(b.id)));
+    if (missing.length>0) {
+      transfers.push({
+        category: cat,
+        winningBrand: brandName(e.brandId, brands),
+        winningInitId: e.initId || e.id,
+        winningInitTitle: e.title,
+        revenueActual: _rev > 0 ? _rev : null,
+        missingBrands: missing.map(b => b.name),
+      });
+    }
+  });
+  return transfers;
+}
+
 // Build a concise portfolio snapshot (still used as initial context)
 export function buildPortfolioContext(items, settings, brands, activeBrand, weeklyMetrics) {
   const tools = buildPortfolioTools(items, settings, brands, activeBrand);
@@ -242,27 +276,11 @@ export function buildPortfolioContext(items, settings, brands, activeBrand, week
     return `  ${b.name}: ${missing.length>0 ? "no running initiative in — "+missing.join(", ") : "all categories have running coverage"}`;
   }).join("\n") || "  (no brands configured)";
 
-  // Cross-brand gaps — a category proven (a Success/Jackpot win) at one brand with
-  // no running/completed equivalent at another. Category-level matching only.
-  const pursued = (cat, bid) => (items||[]).some(e =>
-    e.category===cat && normB(e.brandId)===bid &&
-    (e.status==="Running"||e.status==="Completed"||e.status==="Killed"));
-  const winsByCat = {};
-  (items||[]).filter(e => e.status==="Completed" && e.results &&
-      (e.results.outcomeClassification==="Jackpot"||e.results.outcomeClassification==="Success"))
-    .forEach(e => {
-      const cat = e.category;
-      const rev = typeof e.results.actualRevenueImpact==="number" ? e.results.actualRevenueImpact : -Infinity;
-      if (!winsByCat[cat] || rev > winsByCat[cat]._rev) winsByCat[cat] = { e, _rev:rev };
-    });
-  const crossBrandLines = [];
-  Object.entries(winsByCat).forEach(([cat, { e, _rev }]) => {
-    const srcBid = normB(e.brandId);
-    const missing = (brands||[]).filter(b => normB(b.id)!==srcBid && !pursued(cat, normB(b.id)));
-    if (missing.length>0) {
-      const revStr = _rev>0 ? ` +$${_rev.toLocaleString()}` : "";
-      crossBrandLines.push(`  [${cat}] proven at ${brandName(e.brandId, brands)} (${e.initId||e.id} "${e.title}"${revStr}) — no running/completed equivalent at: ${missing.map(b=>b.name).join(", ")}`);
-    }
+  // Cross-brand gaps — use the exported helper so UI and AI share the same logic.
+  const transfers = buildCrossBrandTransfers(items, brands);
+  const crossBrandLines = transfers.map(tr => {
+    const revStr = tr.revenueActual !== null ? ` +$${tr.revenueActual.toLocaleString()}` : "";
+    return `  [${tr.category}] proven at ${tr.winningBrand} (${tr.winningInitId} "${tr.winningInitTitle}"${revStr}) — no running/completed equivalent at: ${tr.missingBrands.join(", ")}`;
   });
   const crossBrandStr = crossBrandLines.length>0 ? crossBrandLines.join("\n") : "  (no clear cross-brand transfer gaps detected)";
 

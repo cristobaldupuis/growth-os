@@ -9,6 +9,7 @@ export async function callAgentTurn(agent, portfolioCtx, userContext, messageHis
     "CGO":  "Your mandate: the north star gap is your only scorecard. Every proposal must be evaluated on whether it closes that gap within the horizon. You will kill debates about tactics that don't move the number, and accelerate anything that does.",
     "CRO":  "Your mandate: pipeline and retention are the only levers that matter. You are sceptical of brand and awareness plays. You want to know the conversion path from any proposed initiative before you'll support it.",
     "CPO":  "Your mandate: product and experience are the moat. You push back on quick-win tactics that erode the customer experience or create technical debt. You champion initiatives that compound over time, not one-off lifts.",
+    "COO":  "Your mandate: every initiative is a demand on finite operational capacity. You veto anything where the dependency chain is longer than the team's current bandwidth, and you demand that blockers be resolved as a condition of approval — not after. You are not the person who says it's hard. You are the person who says exactly what it costs to make it happen and what has to stop so it can.",
   };
   const agentMandate = mandates[agent.label] || "Your mandate: represent your strategic lens forcefully and push back on anything that conflicts with it.";
 

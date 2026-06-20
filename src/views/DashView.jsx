@@ -489,6 +489,32 @@ function ContributionView({t, dk, contribution, totals, dRange, activeBrand, bra
   );
 }
 
+// -- Batch diffing helpers ----------------------------------------------------
+// Pure functions; no side effects. Match plays across batches by title —
+// rec IDs are time-stamped and are never stable across independently generated
+// batches, so title (lowercased + trimmed) is the only viable stable key.
+function iceTier(rec) {
+  const s = iceScore(rec.ice.impact, rec.ice.certainty, rec.ice.ease);
+  if (s === null) return "low";
+  return s >= 7 ? "high" : s >= 4 ? "medium" : "low";
+}
+
+function diffBatches(latest, prev) {
+  if (!latest || !prev) return { entered: [], dropped: [], changed: [] };
+  const latestRecs    = latest.recommendations || [];
+  const prevRecs      = prev.recommendations   || [];
+  const latestByTitle = new Map(latestRecs.map(r => [r.title.toLowerCase().trim(), r]));
+  const prevByTitle   = new Map(prevRecs.map(r =>   [r.title.toLowerCase().trim(), r]));
+  const entered = latestRecs.filter(r => !prevByTitle.has(r.title.toLowerCase().trim()));
+  const dropped = prevRecs.filter(r =>   !latestByTitle.has(r.title.toLowerCase().trim()));
+  const changed = latestRecs.filter(r => {
+    const key = r.title.toLowerCase().trim();
+    const p   = prevByTitle.get(key);
+    return p && iceTier(r) !== iceTier(p);
+  });
+  return { entered, dropped, changed };
+}
+
 // -- Next Plays UI -----------------------------------------------------------
 
 // Pure helper — derives week state from rec batches and today's date.
@@ -506,10 +532,23 @@ function recWeekState(recs, today) {
 // Card that lives on the Dashboard. Shows the latest batch of recommendations
 // or a generate CTA if none exist yet. Clicking a rec opens the detail modal.
 function NextPlaysCard({ t, dk, recs, recsLoad, recsErr, brands, items, onGenerate, onOpenRec }) {
-  const latest = recs && recs.length > 0 ? recs[0] : null;
-  const pending = latest ? latest.recommendations.filter(r => r.status === "pending") : [];
+  const [diffExpanded, setDiffExpanded] = useState(false);
+
+  const latest   = recs && recs.length > 0 ? recs[0] : null;
+  // If latest carries weekOf, find the most recent batch from a prior week so
+  // same-week regenerations don't clobber the prior-week reference point.
+  // Falls back to recs[1] for batches generated before weekOf was stamped.
+  const prev = latest
+    ? (latest.weekOf
+        ? (recs.find(b => b.weekOf && b.weekOf < latest.weekOf) || null)
+        : (recs.length > 1 ? recs[1] : null))
+    : null;
+  const pending  = latest ? latest.recommendations.filter(r => r.status === "pending")  : [];
   const accepted = latest ? latest.recommendations.filter(r => r.status === "accepted") : [];
   const dismissed = latest ? latest.recommendations.filter(r => r.status === "dismissed") : [];
+
+  const diff    = diffBatches(latest, prev);
+  const hasDiff = diff.entered.length > 0 || diff.dropped.length > 0 || diff.changed.length > 0;
 
   const closedCount = (items||[]).filter(e =>
     (e.status==="Completed"||e.status==="Killed") && e.results && e.results.keyLearning
@@ -610,6 +649,48 @@ function NextPlaysCard({ t, dk, recs, recsLoad, recsErr, brands, items, onGenera
         {pending.length === 0 && (accepted.length > 0 || dismissed.length > 0) && (
           <div style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,fontStyle:"italic",padding:"4px 2px"}}>
             All recommendations from this batch have been resolved. Regenerate when you're ready for the next slate.
+          </div>
+        )}
+
+        {/* Changes from last week — collapsed by default; subordinate context, not primary content */}
+        {hasDiff && (
+          <div style={{borderTop:"1px solid "+t.border,paddingTop:6,marginTop:2}}>
+            <button
+              onClick={() => setDiffExpanded(x => !x)}
+              style={{background:"none",border:"none",cursor:"pointer",padding:"2px 0",display:"flex",alignItems:"center",gap:6,width:"100%",textAlign:"left"}}
+            >
+              <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono}}>{diffExpanded ? "▾" : "▸"}</span>
+              <span style={{fontSize:10,color:t.textSub,fontFamily:t.mono}}>Changes from last week</span>
+              <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginLeft:2}}>
+                {[
+                  diff.entered.length > 0 && `${diff.entered.length} new`,
+                  diff.dropped.length > 0 && `${diff.dropped.length} dropped`,
+                  diff.changed.length > 0 && `${diff.changed.length} re-ranked`,
+                ].filter(Boolean).join(" · ")}
+              </span>
+            </button>
+            {diffExpanded && (
+              <div style={{marginTop:4,display:"flex",flexDirection:"column",gap:3}}>
+                {diff.entered.map(r => (
+                  <div key={r.id} style={{fontSize:11,color:t.textSub,fontFamily:t.mono,display:"flex",gap:6,paddingLeft:4}}>
+                    <span style={{color:t.textMuted}}>+</span>
+                    <span>{r.title}</span>
+                  </div>
+                ))}
+                {diff.dropped.map(r => (
+                  <div key={r.id} style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,display:"flex",gap:6,paddingLeft:4}}>
+                    <span>−</span>
+                    <span style={{textDecoration:"line-through"}}>{r.title}</span>
+                  </div>
+                ))}
+                {diff.changed.map(r => (
+                  <div key={r.id} style={{fontSize:11,color:t.textSub,fontFamily:t.mono,display:"flex",gap:6,paddingLeft:4}}>
+                    <span style={{color:t.textMuted}}>↕</span>
+                    <span>{r.title}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

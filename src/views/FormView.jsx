@@ -28,16 +28,16 @@ export function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hyp
 
           <div>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
-              <label style={{fontSize:12,color:t.textMuted,fontFamily:t.mono}}>💡 Hypothesis — If we do X, then Y… *</label>
+              <label style={{fontSize:12,color:t.textMuted,fontFamily:t.sans}}>💡 Hypothesis — If we do X, then Y… *</label>
               <button style={{...gGh(t),fontSize:11,padding:"2px 9px",opacity:canAi?1:0.4}} onClick={onAi} disabled={!canAi||aiLoad} title={canAi?"Expand with AI — requires your confirmation":"Write 60+ chars in hypothesis first"}>
                 {aiLoad?<><span style={{display:"inline-block",animation:"spin 1s linear infinite"}}>&#8635;</span> Expanding…</>:<><span style={{fontSize:12}}>&#10024;</span> Expand with AI</>}
               </button>
             </div>
             <textarea style={gTA(t)} rows={3} value={form.hypothesis} onChange={e=>f("hypothesis",e.target.value)} placeholder="We believe that [specific change] will result in [measurable outcome] for [context], because [evidence-based reason]."/>
-            {!canAi&&form.hypothesis&&form.hypothesis.length>0&&form.hypothesis.length<60&&<div style={{fontSize:11,color:t.textMuted,marginTop:3,fontFamily:t.mono}}>{60-form.hypothesis.length} more chars to unlock AI expand</div>}
+            {!canAi&&form.hypothesis&&form.hypothesis.length>0&&form.hypothesis.length<60&&<div style={{fontSize:11,color:t.textMuted,marginTop:3,fontFamily:t.sans}}>{60-form.hypothesis.length} more chars to unlock AI expand</div>}
             {hypReview&&(
               <div style={{marginTop:10,padding:"12px 14px",borderRadius:6,background:dk?"#122a18":"#edfaf2",border:"1px solid "+(dk?"#2a7a40":"#7adca0")}}>
-                <div style={{fontSize:10,color:dk?"#60d080":"#1a7a48",letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:8}}>AI suggestion — review before accepting</div>
+                <div style={{fontSize:10,color:dk?"#60d080":"#1a7a48",letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.sans,marginBottom:8}}>AI suggestion — review before accepting</div>
                 <p style={{margin:"0 0 12px",fontSize:13,color:t.text,lineHeight:1.7,fontStyle:"italic"}}>"{hypReview.proposed}"</p>
                 <div style={{display:"flex",gap:6}}>
                   <button onClick={onAcceptHyp} style={{...gG(t),fontSize:11,padding:"4px 11px"}}><span>&#10003;</span> Accept</button>
@@ -70,7 +70,7 @@ export function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hyp
       <div style={gSc(t,dk)}>
         <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:4}}>
           <div style={gSL(t)}>Measurement &amp; attribution</div>
-          <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono}}>optional · powers data matching</span>
+          <span style={{fontSize:10,color:t.textMuted,fontFamily:t.sans}}>optional · powers data matching</span>
         </div>
         <p style={{fontSize:11.5,color:t.textSub,fontFamily:t.sans,lineHeight:1.5,margin:"0 0 12px"}}>
           Tells Growth OS which metric, segment, and date window this initiative is judged on — so an imported CSV or feed can be matched to it. The window is the start/end dates below.
@@ -102,7 +102,7 @@ export function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hyp
           {BLOCKERS.map(b=><option key={b}>{b}</option>)}
         </select>
         {form.blocker&&form.blocker!=="None"&&(
-          <div style={{marginTop:4,fontSize:11,color:dk?"#ffd700":"#8a6000",fontFamily:t.mono,fontWeight:600}}>
+          <div style={{marginTop:4,fontSize:11,color:dk?"#ffd700":"#8a6000",fontFamily:t.sans,fontWeight:600}}>
             ⚠️ This initiative is flagged as blocked. It will display a warning badge in all views.
           </div>
         )}
@@ -117,15 +117,15 @@ export function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hyp
         </div>
         {iceReview&&(
           <div style={{marginBottom:14,padding:"12px 14px",borderRadius:6,background:dk?"#2a2410":"#fdf8ee",border:"1px solid "+(dk?"#6a5818":"#e0c070")}}>
-            <div style={{fontSize:10,color:dk?"#d0a838":"#8a6010",letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:10}}>AI scoring suggestion — review and adjust before accepting</div>
+            <div style={{fontSize:10,color:dk?"#d0a838":"#8a6010",letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.sans,marginBottom:10}}>AI scoring suggestion — review and adjust before accepting</div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
               {[{label:"Impact",score:iceReview.impact,rationale:iceReview.impact_rationale},{label:"Certainty",score:iceReview.certainty,rationale:iceReview.certainty_rationale}].map(d=>(
                 <div key={d.label}>
                   <div style={{display:"flex",alignItems:"baseline",gap:6,marginBottom:4}}>
                     <span style={{fontSize:20,fontWeight:700,color:t.gold,fontFamily:t.serif}}>{d.score}</span>
-                    <span style={{fontSize:12,color:t.textMuted,fontFamily:t.mono}}>/10 {d.label}</span>
+                    <span style={{fontSize:12,color:t.textMuted,fontFamily:t.sans}}>/10 {d.label}</span>
                   </div>
-                  <div style={{fontSize:12,color:t.textSub,lineHeight:1.5,fontFamily:t.mono}}>{d.rationale}</div>
+                  <div style={{fontSize:12,color:t.textSub,lineHeight:1.5,fontFamily:t.sans}}>{d.rationale}</div>
                 </div>
               ))}
             </div>
@@ -157,7 +157,7 @@ export function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hyp
           <FR label="Est. revenue impact ($)" t={t}><input style={gI(t)} type="number" value={form.revenueImpact||0} onChange={e=>f("revenueImpact",parseInt(e.target.value)||0)} placeholder="0"/></FR>
         </div>
         {((form.spendCost||0)+(form.resourceCost||0))>0&&(
-          <div style={{marginTop:10,padding:"8px 12px",background:t.surfaceAlt,borderRadius:4,fontSize:12,fontFamily:t.mono,color:t.textMuted,display:"flex",gap:16,flexWrap:"wrap"}}>
+          <div style={{marginTop:10,padding:"8px 12px",background:t.surfaceAlt,borderRadius:4,fontSize:12,fontFamily:t.sans,color:t.textMuted,display:"flex",gap:16,flexWrap:"wrap"}}>
             <span>Total est. cost: <strong style={{color:t.text}}>{fmtCur((form.spendCost||0)+(form.resourceCost||0))}</strong></span>
             {(form.revenueImpact||0)>0&&<span>Est. ROI: <strong style={{color:t.gold}}>{((form.revenueImpact||0)/((form.spendCost||0)+(form.resourceCost||0))).toFixed(1)}x</strong></span>}
           </div>
@@ -167,7 +167,7 @@ export function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hyp
       <div style={{...gSc(t,dk),border:"1px dashed "+t.border}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
           <div style={gSL(t)}>Data context <span style={{fontWeight:400,textTransform:"none",letterSpacing:0,color:t.textMuted}}>(optional — used by AI)</span></div>
-          <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,background:t.border,padding:"2px 6px",borderRadius:3}}>Placeholder</span>
+          <span style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,background:t.border,padding:"2px 6px",borderRadius:3}}>Placeholder</span>
         </div>
         <textarea style={{...gTA(t),fontSize:12}} rows={3} value={dataCtx} onChange={e=>setDataCtx(e.target.value)} placeholder={"Paste relevant metrics here — CVR, ROAS, sessions, revenue trends, etc.\nExample: Paid social CVR last 4W: 0.42% vs prior 4W: 1.85%. ROAS: 0.24x.\nFuture: will connect to Google Sheets, GA4, Meta Ads."}/>
       </div>
@@ -207,13 +207,13 @@ function LinkedInitiativePicker({form, setForm, items, t, dk}) {
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:6}}>
-      <label style={{fontSize:12,color:t.textMuted,fontFamily:t.mono}}>Link related initiatives</label>
+      <label style={{fontSize:12,color:t.textMuted,fontFamily:t.sans}}>Link related initiatives</label>
 
       {/* Selected chips */}
       {linkedItems.length>0&&(
         <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
           {linkedItems.map(e=>(
-            <span key={e.id} style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:11,padding:"3px 9px",borderRadius:4,background:dk?"#122a18":"#edfaf2",border:"1px solid "+(dk?"#2a7a40":"#7adca0"),color:dk?"#60d080":"#1a7a48",fontFamily:t.mono}}>
+            <span key={e.id} style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:11,padding:"3px 9px",borderRadius:4,background:dk?"#122a18":"#edfaf2",border:"1px solid "+(dk?"#2a7a40":"#7adca0"),color:dk?"#60d080":"#1a7a48",fontFamily:t.sans}}>
               {e.initId&&<span style={{opacity:0.7}}>{e.initId}</span>}
               {e.title.slice(0,32)}{e.title.length>32?"…":""}
               <button onClick={()=>toggle(e.id)} style={{background:"none",border:"none",color:"inherit",cursor:"pointer",padding:"0 0 0 2px",fontSize:12,lineHeight:1}}>&#10005;</button>
@@ -242,7 +242,7 @@ function LinkedInitiativePicker({form, setForm, items, t, dk}) {
                     background:isLinked?(dk?"#122a18":"#edfaf2"):t.surface,
                     borderBottom:"1px solid "+t.border}}>
                   <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,minWidth:52,flexShrink:0}}>{e.initId||"—"}</span>
-                  <span style={{fontSize:12,color:t.text,flex:1,fontFamily:t.mono}}>{e.title.slice(0,50)}{e.title.length>50?"…":""}</span>
+                  <span style={{fontSize:12,color:t.text,flex:1,fontFamily:t.sans}}>{e.title.slice(0,50)}{e.title.length>50?"…":""}</span>
                   <span style={{fontSize:10,fontWeight:600,color:c.text,background:c.bg,border:"1px solid "+c.border,borderRadius:3,padding:"1px 5px",flexShrink:0}}>{e.status}</span>
                   {isLinked&&<span style={{fontSize:11,color:dk?"#60d080":"#1a7a48"}}>&#10003;</span>}
                 </div>
@@ -251,7 +251,7 @@ function LinkedInitiativePicker({form, setForm, items, t, dk}) {
           </div>
         )}
       </div>
-      {!open&&!query&&linkedItems.length===0&&<div style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>Start typing to search initiatives…</div>}
+      {!open&&!query&&linkedItems.length===0&&<div style={{fontSize:11,color:t.textMuted,fontFamily:t.sans}}>Start typing to search initiatives…</div>}
     </div>
   );
 }

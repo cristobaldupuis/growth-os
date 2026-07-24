@@ -37,20 +37,20 @@ export function CitationModal({ item, t, dk, cats, brands, onClose }) {
 
         {r.keyLearning && (
           <div style={{borderLeft:"3px solid "+(c.border||t.gold),paddingLeft:14}}>
-            <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:6}}>Key learning</div>
+            <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.sans,marginBottom:6}}>Key learning</div>
             <p style={{margin:0,fontSize:15,fontWeight:600,color:t.text,lineHeight:1.6,fontFamily:t.serif,fontStyle:"italic"}}>"{r.keyLearning}"</p>
           </div>
         )}
 
         {item.hypothesis && (
           <div>
-            <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>Original hypothesis</div>
+            <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.sans,marginBottom:4}}>Original hypothesis</div>
             <p style={{margin:0,fontSize:13,color:t.textSub,lineHeight:1.6,fontFamily:t.sans}}>{item.hypothesis}</p>
           </div>
         )}
 
         {r.decisionMade && (
-          <div style={{fontSize:12.5,color:t.textSub,fontFamily:t.mono,lineHeight:1.6,padding:"10px 12px",background:t.surfaceAlt,borderRadius:6}}>
+          <div style={{fontSize:12.5,color:t.textSub,fontFamily:t.sans,lineHeight:1.6,padding:"10px 12px",background:t.surfaceAlt,borderRadius:6}}>
             <span style={{color:t.textMuted,fontSize:10,textTransform:"uppercase",letterSpacing:"0.06em"}}>Decision: </span>
             {r.decisionMade}
           </div>
@@ -74,7 +74,7 @@ export function CitationModal({ item, t, dk, cats, brands, onClose }) {
           const pct = pe.predictedRevenue ? Math.round((pe.revenueDelta / Math.abs(pe.predictedRevenue)) * 100) : null;
           return (
             <div style={{marginTop:4,padding:"10px 12px",borderRadius:6,border:"1px solid "+t.border,background:dk?"#15150f":"#faf9f4"}}>
-              <div style={{fontSize:9,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:6}}>
+              <div style={{fontSize:9,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.sans,marginBottom:6}}>
                 Calibration · frozen at launch {pe.snapshotDate ? "("+pe.snapshotDate+")" : ""}
               </div>
               <div style={{display:"flex",gap:18,fontSize:12,fontFamily:t.mono,color:t.textMuted,flexWrap:"wrap"}}>
@@ -87,7 +87,7 @@ export function CitationModal({ item, t, dk, cats, brands, onClose }) {
         })()}
 
         {!r.keyLearning && (
-          <div style={{fontSize:12,color:t.textMuted,fontFamily:t.mono,fontStyle:"italic"}}>No logged results for this initiative yet.</div>
+          <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,fontStyle:"italic"}}>No logged results for this initiative yet.</div>
         )}
       </div>
     </Modal>

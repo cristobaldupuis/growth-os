@@ -79,23 +79,23 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
 
       {/* Ask the library — natural-language retrieval over the full closed record */}
       <div style={{...gSc(t,dk),background:t.goldBg,border:"1px solid "+t.goldBorder}}>
-        <div style={{fontSize:11,fontWeight:700,color:t.gold,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:8}}>Ask the library</div>
+        <div style={{fontSize:11,fontWeight:700,color:t.gold,fontFamily:t.sans,letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:8}}>Ask the library</div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"flex-start"}}>
           <input style={{...gI(t),flex:1,minWidth:200}} value={ask} onChange={e=>setAsk(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")runAsk();}} placeholder={String.fromCharCode(34)+"Have we tried creative angles for retention?"+String.fromCharCode(34)+"  ·  "+String.fromCharCode(34)+"What worked for us at BFCM?"+String.fromCharCode(34)}/>
           <button style={{...gG(t),whiteSpace:"nowrap"}} disabled={askLoad||!ask.trim()||closed.length===0} onClick={runAsk}>
             {askLoad ? <><span style={{display:"inline-block",animation:"spin 1s linear infinite"}}>&#8635;</span> Searching…</> : <>&#128269; Ask</>}
           </button>
         </div>
-        <div style={{fontSize:10.5,color:t.textMuted,fontFamily:t.mono,marginTop:6}}>Searches every closed initiative — wins and failures — weighing relevance first, recency second.</div>
+        <div style={{fontSize:10.5,color:t.textMuted,fontFamily:t.sans,marginTop:6}}>Searches every closed initiative — wins and failures — weighing relevance first, recency second.</div>
         {askVisible&&(
           <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid "+t.goldBorder}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-              <div style={{fontSize:10,fontWeight:700,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Answer from {closed.length} closed initiative{closed.length!==1?"s":""}</div>
+              <div style={{fontSize:10,fontWeight:700,color:t.textMuted,fontFamily:t.sans,letterSpacing:"0.06em",textTransform:"uppercase"}}>Answer from {closed.length} closed initiative{closed.length!==1?"s":""}</div>
               <button onClick={()=>{setAskVisible(false);setAskAnswer("");}} style={{background:"none",border:"none",color:t.textMuted,cursor:"pointer",fontSize:14}}>&#10005;</button>
             </div>
             {askLoad
-              ? <div style={{fontSize:13,color:t.textMuted,fontFamily:t.mono}}>Reading the record…</div>
-              : <div style={{fontSize:13,color:t.textSub,lineHeight:1.75,whiteSpace:"pre-wrap",fontFamily:t.mono}}>{renderCitedText(askAnswer, (id)=>closed.find(e=>(e.initId||e.id)===id)||null, setCiteItem, t)}</div>}
+              ? <div style={{fontSize:13,color:t.textMuted,fontFamily:t.sans}}>Reading the record…</div>
+              : <div style={{fontSize:13,color:t.textSub,lineHeight:1.75,whiteSpace:"pre-wrap",fontFamily:t.sans}}>{renderCitedText(askAnswer, (id)=>closed.find(e=>(e.initId||e.id)===id)||null, setCiteItem, t)}</div>}
           </div>
         )}
       </div>
@@ -111,7 +111,7 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
                 background:active?c.bg:t.surface,cursor:"pointer",textAlign:"center",
                 transition:"all 0.15s",opacity:active?1:0.45}}>
               <div style={{fontSize:28,fontWeight:700,color:active?c.text:t.textMuted,fontFamily:t.serif,lineHeight:1}}>{counts[o]||0}</div>
-              <div style={{fontSize:11,fontWeight:600,color:active?c.text:t.textMuted,fontFamily:t.mono,marginTop:4,letterSpacing:"0.04em"}}>{o}</div>
+              <div style={{fontSize:11,fontWeight:600,color:active?c.text:t.textMuted,fontFamily:t.sans,marginTop:4,letterSpacing:"0.04em"}}>{o}</div>
             </button>
           );
         })}
@@ -120,22 +120,22 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
       {/* Search + filters */}
       <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"flex-end"}}>
         <div style={{display:"flex",flexDirection:"column",gap:2,flex:1,minWidth:180}}>
-          <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Search learnings</label>
+          <label style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,letterSpacing:"0.06em",textTransform:"uppercase"}}>Search learnings</label>
           <input style={gI2(t)} value={query} onChange={e=>setQuery(e.target.value)} placeholder="Keyword across learnings and titles..."/>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:2}}>
-          <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Category</label>
+          <label style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,letterSpacing:"0.06em",textTransform:"uppercase"}}>Category</label>
           <select value={fCat} onChange={e=>setFCat(e.target.value)} style={{...gSl(t),minWidth:130}}>{["All",...cats].map(c=><option key={c}>{c}</option>)}</select>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:2}}>
-          <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Type</label>
+          <label style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,letterSpacing:"0.06em",textTransform:"uppercase"}}>Type</label>
           <select value={fType} onChange={e=>setFType(e.target.value)} style={{...gSl(t),minWidth:120}}>{["All",...INIT_TYPES].map(tp=><option key={tp}>{tp}</option>)}</select>
         </div>
       </div>
 
       {/* Count + Synthesize */}
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
-        <div style={{fontSize:12,color:t.textMuted,fontFamily:t.mono}}>
+        <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans}}>
           {filtered.length} learning{filtered.length!==1?"s":""} {query?"matching":""}
           {filtered.length===0&&closed.length>0&&<span style={{color:t.gold}}> — try adjusting filters or clicking more outcome tiles above</span>}
         </div>
@@ -164,21 +164,21 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
       {synthVisible&&(
         <div style={{...gSc(t,dk),background:dk?"#1a2a18":"#f0faf2",border:"1px solid "+(dk?"#2a6a40":"#7adca0")}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-            <div style={{fontSize:11,fontWeight:700,color:dk?"#60d080":"#1a7a48",fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>AI Synthesis — {filtered.length} learnings</div>
+            <div style={{fontSize:11,fontWeight:700,color:dk?"#60d080":"#1a7a48",fontFamily:t.sans,letterSpacing:"0.06em",textTransform:"uppercase"}}>AI Synthesis — {filtered.length} learnings</div>
             <button onClick={()=>setSynthVisible(false)} style={{background:"none",border:"none",color:t.textMuted,cursor:"pointer",fontSize:14}}>&#10005;</button>
           </div>
           {synthLoad
-            ?<div style={{fontSize:13,color:t.textMuted,fontFamily:t.mono}}>Analysing learnings…</div>
+            ?<div style={{fontSize:13,color:t.textMuted,fontFamily:t.sans}}>Analysing learnings…</div>
             :synthesis
-              ?<div style={{fontSize:13,color:t.textSub,lineHeight:1.8,whiteSpace:"pre-wrap",fontFamily:t.mono}}>{synthesis}</div>
-              :<div style={{fontSize:12,color:dk?"#e08080":"#a03030",fontFamily:t.mono}}>Synthesis failed — check that your API proxy is deployed and the API key is configured.</div>
+              ?<div style={{fontSize:13,color:t.textSub,lineHeight:1.8,whiteSpace:"pre-wrap",fontFamily:t.sans}}>{synthesis}</div>
+              :<div style={{fontSize:12,color:dk?"#e08080":"#a03030",fontFamily:t.sans}}>Synthesis failed — check that your API proxy is deployed and the API key is configured.</div>
           }
         </div>
       )}
 
       {/* Empty state */}
       {closed.length===0&&(
-        <div style={{padding:"48px 24px",textAlign:"center",color:t.textMuted,fontFamily:t.mono,border:"1px dashed "+t.border,borderRadius:8}}>
+        <div style={{padding:"48px 24px",textAlign:"center",color:t.textMuted,fontFamily:t.sans,border:"1px dashed "+t.border,borderRadius:8}}>
           <div style={{fontSize:32,marginBottom:12}}>&#128218;</div>
           <div style={{fontSize:14,marginBottom:6,color:t.text}}>No learnings yet</div>
           <div style={{fontSize:12}}>Learnings appear here when you close an initiative and log results.</div>
@@ -188,12 +188,9 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
       {/* Learning cards */}
       <div style={{display:"flex",flexDirection:"column",gap:10}}>
         {filtered.map(item=>{
-          const c=(dk?OD:OL)[item.results.outcomeClassification]||{};
           const isWin=item.results.outcomeClassification==="Jackpot"||item.results.outcomeClassification==="Success";
           return (
-            <div key={item.id} style={{background:t.surface,border:"1px solid "+(c.border||t.border),borderRadius:8,overflow:"hidden"}}>
-              {/* Outcome stripe */}
-              <div style={{height:3,background:c.border||t.border}}/>
+            <div key={item.id} style={{background:t.surface,border:"1px solid "+t.border,borderRadius:8,overflow:"hidden"}}>
               <div style={{padding:"16px 18px"}}>
                 {/* Badges row */}
                 <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center",marginBottom:12}}>
@@ -208,21 +205,21 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
                 </div>
 
                 {/* The learning — hero element */}
-                <div style={{borderLeft:"3px solid "+c.border,paddingLeft:14,marginBottom:14}}>
-                  <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:6}}>Key learning</div>
+                <div style={{borderLeft:"3px solid "+t.border,paddingLeft:14,marginBottom:14}}>
+                  <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.sans,marginBottom:6}}>Key learning</div>
                   <p style={{margin:0,fontSize:16,fontWeight:600,color:t.text,lineHeight:1.6,fontFamily:t.serif,fontStyle:"italic"}}>
                     "{item.results.keyLearning}"
                   </p>
                 </div>
 
                 {/* Initiative title */}
-                <div style={{fontSize:12,color:t.textMuted,fontFamily:t.mono,marginBottom:item.results.decisionMade?10:0}}>
+                <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,marginBottom:item.results.decisionMade?10:0}}>
                   From: <span style={{color:t.textSub,fontWeight:600}}>{item.title}</span>
                 </div>
 
                 {/* Decision made — collapsed but visible */}
                 {item.results.decisionMade&&(
-                  <div style={{fontSize:12,color:t.textSub,fontFamily:t.mono,lineHeight:1.5,padding:"8px 10px",background:t.surfaceAlt,borderRadius:4,marginBottom:10}}>
+                  <div style={{fontSize:12,color:t.textSub,fontFamily:t.sans,lineHeight:1.5,padding:"8px 10px",background:t.surfaceAlt,borderRadius:4,marginBottom:10}}>
                     <span style={{color:t.textMuted,fontSize:10,textTransform:"uppercase",letterSpacing:"0.06em"}}>Decision: </span>
                     {item.results.decisionMade}
                   </div>

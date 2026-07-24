@@ -25,7 +25,7 @@ export function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResu
             {item.initId&&<span style={{fontSize:11,fontWeight:700,color:t.gold,fontFamily:t.mono,background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:3,padding:"2px 8px",flexShrink:0}}>{item.initId}</span>}
             <h2 style={{margin:0,fontSize:19,fontWeight:700,color:t.text,lineHeight:1.3,letterSpacing:"-0.02em",fontFamily:t.serif}}>{item.title}</h2>
           </div>
-          {item.owner&&<div style={{fontSize:13,color:t.textMuted,marginTop:5,fontFamily:t.mono}}>{item.owner}</div>}
+          {item.owner&&<div style={{fontSize:13,color:t.textMuted,marginTop:5,fontFamily:t.sans}}>{item.owner}</div>}
         </div>
         <div style={{display:"flex",gap:6}}>
           <button style={gGh(t)} onClick={onEdit}><span style={{fontSize:12}}>&#9998;</span> Edit</button>
@@ -51,7 +51,7 @@ export function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResu
         <div style={{background:dk?"#1a1400":"#fffbe6",border:"2px solid #ffd700",borderRadius:6,padding:"10px 16px",display:"flex",alignItems:"center",gap:10,boxShadow:"0 0 0 1px #b8a000"}}>
           <span style={{fontSize:20,flexShrink:0}}>⚠️</span>
           <div>
-            <div style={{fontSize:12,fontWeight:800,color:dk?"#ffd700":"#7a5800",letterSpacing:"0.04em",fontFamily:t.mono,textTransform:"uppercase"}}>BLOCKED</div>
+            <div style={{fontSize:12,fontWeight:800,color:dk?"#ffd700":"#7a5800",letterSpacing:"0.04em",fontFamily:t.sans,textTransform:"uppercase"}}>BLOCKED</div>
             <div style={{fontSize:14,fontWeight:700,color:dk?"#ffd700":"#5a4000",fontFamily:t.serif}}>{item.blocker}</div>
           </div>
         </div>
@@ -64,25 +64,25 @@ export function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResu
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
             {item.observation&&(
               <div>
-                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>📊 Observation — what data prompted this?</div>
+                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.sans,marginBottom:4}}>📊 Observation — what data prompted this?</div>
                 <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:13}}>{item.observation}</p>
               </div>
             )}
             {item.hypothesis&&(
               <div style={{borderLeft:"3px solid "+t.gold,paddingLeft:12}}>
-                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>💡 Hypothesis — if we do X, then Y…</div>
+                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.sans,marginBottom:4}}>💡 Hypothesis — if we do X, then Y…</div>
                 <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:14,fontWeight:600}}>{item.hypothesis}</p>
               </div>
             )}
             {item.successMetric&&(
               <div>
-                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>🎯 Success metric — what KPI determines a win?</div>
+                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.sans,marginBottom:4}}>🎯 Success metric — what KPI determines a win?</div>
                 <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:13}}>{item.successMetric}</p>
               </div>
             )}
             {/* Legacy fallback: show description if present and no new fields */}
             {!item.observation&&!item.successMetric&&item.hypothesis&&(
-              <p style={{margin:0,color:t.textMuted,fontSize:12,fontFamily:t.mono,fontStyle:"italic"}}>Legacy entry — observation and success metric not yet captured.</p>
+              <p style={{margin:0,color:t.textMuted,fontSize:12,fontFamily:t.sans,fontStyle:"italic"}}>Legacy entry — observation and success metric not yet captured.</p>
             )}
           </div>
         ) : (
@@ -96,13 +96,13 @@ export function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResu
           <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr) auto",gap:12,alignItems:"center"}}>
             {[["Impact",item.ice.impact],["Certainty",item.ice.certainty],["Ease",item.ice.ease]].map(([l,v])=>(
               <div key={l} style={{textAlign:"center"}}>
-                <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:3,textTransform:"uppercase",letterSpacing:"0.06em"}}>{l}</div>
+                <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginBottom:3,textTransform:"uppercase",letterSpacing:"0.06em"}}>{l}</div>
                 <div style={{fontSize:22,fontWeight:700,color:t.text,fontFamily:t.serif}}>{v}</div>
                 <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono}}>/10</div>
               </div>
             ))}
             <div style={{textAlign:"center",borderLeft:"1px solid "+t.border,paddingLeft:16}}>
-              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:3,textTransform:"uppercase",letterSpacing:"0.06em"}}>Score</div>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginBottom:3,textTransform:"uppercase",letterSpacing:"0.06em"}}>Score</div>
               <div style={{fontSize:22,fontWeight:700,fontFamily:t.serif,color:score!==null?iceColor(score,t):t.textMuted}}>{score!==null?score:"—"}</div>
               <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono}}>/100</div>
             </div>
@@ -116,41 +116,41 @@ export function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResu
           <div style={gSL(t)}>Investment and return</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:12}}>
             {(item.spendCost||0)>0&&<div>
-              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Est. spend cost</div>
-              <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.serif}}>{fmtCur(item.spendCost)}</div>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginBottom:2}}>Est. spend cost</div>
+              <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.mono}}>{fmtCur(item.spendCost)}</div>
             </div>}
             {(item.resourceCost||0)>0&&<div>
-              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Est. resource cost</div>
-              <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.serif}}>{fmtCur(item.resourceCost)}</div>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginBottom:2}}>Est. resource cost</div>
+              <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.mono}}>{fmtCur(item.resourceCost)}</div>
             </div>}
             {((item.spendCost||0)+(item.resourceCost||0))>0&&<div>
-              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Total est. cost</div>
-              <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.serif}}>{fmtCur((item.spendCost||0)+(item.resourceCost||0))}</div>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginBottom:2}}>Total est. cost</div>
+              <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.mono}}>{fmtCur((item.spendCost||0)+(item.resourceCost||0))}</div>
             </div>}
             {item.revenueImpact!==0&&<div>
-              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Est. revenue</div>
-              <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.serif}}>{fmtCur(item.revenueImpact)}</div>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginBottom:2}}>Est. revenue</div>
+              <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.mono}}>{fmtCur(item.revenueImpact)}</div>
             </div>}
             {item.revenueImpact!==0&&((item.spendCost||0)+(item.resourceCost||0))>0&&<div>
-              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Est. ROI</div>
-              <div style={{fontSize:16,fontWeight:700,color:t.gold,fontFamily:t.serif}}>{((item.revenueImpact||0)/((item.spendCost||0)+(item.resourceCost||0))).toFixed(1)}x</div>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginBottom:2}}>Est. ROI</div>
+              <div style={{fontSize:16,fontWeight:700,color:t.gold,fontFamily:t.mono}}>{((item.revenueImpact||0)/((item.spendCost||0)+(item.resourceCost||0))).toFixed(1)}x</div>
             </div>}
           </div>
           {item.results?.actualRevenueImpact!=null&&(
             <div style={{marginTop:14,paddingTop:12,borderTop:"1px solid "+t.border}}>
-              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:8,letterSpacing:"0.06em",textTransform:"uppercase"}}>Actual results</div>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginBottom:8,letterSpacing:"0.06em",textTransform:"uppercase"}}>Actual results</div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:12}}>
                 {item.results.actualSpendCost!=null&&<div>
-                  <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Actual spend cost</div>
-                  <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.serif}}>{fmtCur(item.results.actualSpendCost)}</div>
+                  <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginBottom:2}}>Actual spend cost</div>
+                  <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.mono}}>{fmtCur(item.results.actualSpendCost)}</div>
                 </div>}
                 {item.results.actualResourceCost!=null&&<div>
-                  <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Actual resource cost</div>
-                  <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.serif}}>{fmtCur(item.results.actualResourceCost)}</div>
+                  <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginBottom:2}}>Actual resource cost</div>
+                  <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.mono}}>{fmtCur(item.results.actualResourceCost)}</div>
                 </div>}
                 <div>
-                  <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Actual revenue</div>
-                  <div style={{fontSize:16,fontWeight:700,color:t.gold,fontFamily:t.serif}}>{fmtCur(item.results.actualRevenueImpact)}</div>
+                  <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginBottom:2}}>Actual revenue</div>
+                  <div style={{fontSize:16,fontWeight:700,color:t.gold,fontFamily:t.mono}}>{fmtCur(item.results.actualRevenueImpact)}</div>
                 </div>
                 {(()=>{
                   const actCost=(item.results.actualSpendCost||0)+(item.results.actualResourceCost||0);
@@ -159,7 +159,7 @@ export function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResu
                   const roi=(actRev/actCost).toFixed(1);
                   const color=parseFloat(roi)>=2?t.gold:parseFloat(roi)>=1?"#c08820":"#c04040";
                   return <div>
-                    <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Actual ROI</div>
+                    <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginBottom:2}}>Actual ROI</div>
                     <div style={{fontSize:20,fontWeight:700,color,fontFamily:t.serif}}>{roi}x</div>
                   </div>;
                 })()}
@@ -177,25 +177,25 @@ export function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResu
             const certCol = pe.predictedCertainty!=null ? pe.predictedCertainty : null;
             return (
               <div style={{marginTop:14,paddingTop:12,borderTop:"1px solid "+t.border}}>
-                <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:8,letterSpacing:"0.06em",textTransform:"uppercase"}}>
+                <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginBottom:8,letterSpacing:"0.06em",textTransform:"uppercase"}}>
                   Calibration · prediction frozen {pe.snapshotDate?"at launch ("+pe.snapshotDate+")":"at launch"}
                 </div>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:12}}>
                   <div>
-                    <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Predicted revenue</div>
-                    <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.serif}}>{fmtCur(pe.predictedRevenue)}</div>
+                    <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginBottom:2}}>Predicted revenue</div>
+                    <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.mono}}>{fmtCur(pe.predictedRevenue)}</div>
                   </div>
                   <div>
-                    <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Actual revenue</div>
-                    <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.serif}}>{fmtCur(pe.actualRevenue)}</div>
+                    <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginBottom:2}}>Actual revenue</div>
+                    <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.mono}}>{fmtCur(pe.actualRevenue)}</div>
                   </div>
                   <div>
-                    <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Prediction error</div>
+                    <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginBottom:2}}>Prediction error</div>
                     <div style={{fontSize:20,fontWeight:700,color:deltaColor,fontFamily:t.serif}}>{beat?"+":""}{fmtCur(pe.revenueDelta)}{pct!=null?" ("+(beat?"+":"")+pct+"%)":""}</div>
                   </div>
                   {certCol!=null&&<div>
-                    <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:2}}>Predicted certainty</div>
-                    <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.serif}}>{certCol}%</div>
+                    <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginBottom:2}}>Predicted certainty</div>
+                    <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.mono}}>{certCol}%</div>
                   </div>}
                 </div>
               </div>
@@ -208,7 +208,7 @@ export function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResu
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:8}}>
           {[{l:"Primary metric",v:item.primaryMetric},{l:"Start date",v:fmtDate(item.startDate)},{l:"End date",v:fmtDate(item.endDate)},{l:"Sample size",v:item.sampleSize||"—"},{l:"Duration",v:item.duration||"—"}].map(m=>(
             <div key={m.l} style={{background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:6,padding:"10px 12px"}}>
-              <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:3,fontFamily:t.mono}}>{m.l}</div>
+              <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:3,fontFamily:t.sans}}>{m.l}</div>
               <div style={{fontSize:13,color:t.text,fontWeight:600}}>{m.v||"—"}</div>
             </div>
           ))}
@@ -232,12 +232,12 @@ export function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResu
               {item.results.outcomeCertainty&&<span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>Certainty: {item.results.outcomeCertainty}%</span>}
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:12}}>
-              {item.results.actualOutcome&&<div><div style={{fontSize:10,color:c.text,opacity:0.7,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:4,fontFamily:t.mono}}>Actual outcome</div><p style={{margin:0,color:t.textSub,fontSize:13,lineHeight:1.6}}>{item.results.actualOutcome}</p></div>}
+              {item.results.actualOutcome&&<div><div style={{fontSize:10,color:c.text,opacity:0.7,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:4,fontFamily:t.sans}}>Actual outcome</div><p style={{margin:0,color:t.textSub,fontSize:13,lineHeight:1.6}}>{item.results.actualOutcome}</p></div>}
               <div style={{borderLeft:"3px solid "+t.gold,paddingLeft:12}}>
-                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:3,fontFamily:t.mono}}>Key learning</div>
+                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:3,fontFamily:t.sans}}>Key learning</div>
                 <p style={{margin:0,color:dk?"#d4b870":"#6a4a10",fontSize:14,fontStyle:"italic",fontWeight:600}}>{item.results.keyLearning}</p>
               </div>
-              {item.results.decisionMade&&<div><div style={{fontSize:10,color:c.text,opacity:0.7,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:4,fontFamily:t.mono}}>Decision made</div><p style={{margin:0,color:t.textSub,fontSize:13,lineHeight:1.6}}>{item.results.decisionMade}</p></div>}
+              {item.results.decisionMade&&<div><div style={{fontSize:10,color:c.text,opacity:0.7,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:4,fontFamily:t.sans}}>Decision made</div><p style={{margin:0,color:t.textSub,fontSize:13,lineHeight:1.6}}>{item.results.decisionMade}</p></div>}
             </div>
           </div>
         );
@@ -343,7 +343,7 @@ function TestValidityPanel({ item, t, dk, onSaveTestValidity }) {
                  : conf90 ? (dk ? "#6a5818" : "#e0c070")
                  : (dk ? "#6a2828" : "#e09090");
 
-  const labelStyle = {fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:3};
+  const labelStyle = {fontSize:10,color:t.textMuted,fontFamily:t.sans,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:3};
   const numStyle   = {fontSize:20,fontWeight:700,fontFamily:t.serif};
 
   return (
@@ -360,7 +360,7 @@ function TestValidityPanel({ item, t, dk, onSaveTestValidity }) {
 
       {/* 1 — Sample size calculator */}
       <div style={{marginBottom:14,paddingBottom:14,borderBottom:"1px solid "+t.border}}>
-        <div style={{fontSize:11,fontWeight:700,color:t.textSub,fontFamily:t.mono,marginBottom:10,letterSpacing:"0.04em"}}>
+        <div style={{fontSize:11,fontWeight:700,color:t.textSub,fontFamily:t.sans,marginBottom:10,letterSpacing:"0.04em"}}>
           &#8680; Sample size calculator
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:10}}>
@@ -392,19 +392,19 @@ function TestValidityPanel({ item, t, dk, onSaveTestValidity }) {
               <div style={labelStyle}>Total sessions</div>
               <div style={{...numStyle,fontSize:16,color:t.textSub}}>{(n*2).toLocaleString()}</div>
             </div>
-            <div style={{marginLeft:"auto",fontSize:11,color:t.textMuted,fontFamily:t.mono,maxWidth:180,lineHeight:1.5}}>
+            <div style={{marginLeft:"auto",fontSize:11,color:t.textMuted,fontFamily:t.sans,maxWidth:180,lineHeight:1.5}}>
               Assumes 80% power, two-sided test.<br/>
               Detects a {mde}% relative change from {baseRate}% CVR.
             </div>
           </div>
         ) : (
-          <div style={{fontSize:12,color:t.textMuted,fontFamily:t.mono}}>Enter valid inputs above to calculate.</div>
+          <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans}}>Enter valid inputs above to calculate.</div>
         )}
       </div>
 
       {/* 2 — Statistical significance */}
       <div style={{marginBottom:14,paddingBottom:14,borderBottom:"1px solid "+t.border}}>
-        <div style={{fontSize:11,fontWeight:700,color:t.textSub,fontFamily:t.mono,marginBottom:10,letterSpacing:"0.04em"}}>
+        <div style={{fontSize:11,fontWeight:700,color:t.textSub,fontFamily:t.sans,marginBottom:10,letterSpacing:"0.04em"}}>
           &#8680; Statistical significance — current results
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:10}}>
@@ -459,13 +459,13 @@ function TestValidityPanel({ item, t, dk, onSaveTestValidity }) {
               </div>
             </div>
             {!conf90&&hasData&&(
-              <div style={{marginTop:8,fontSize:11,color:t.textMuted,fontFamily:t.mono,lineHeight:1.5}}>
+              <div style={{marginTop:8,fontSize:11,color:t.textMuted,fontFamily:t.sans,lineHeight:1.5}}>
                 Test has not reached statistical significance. Avoid calling a winner early — let it run to the target sample size.
               </div>
             )}
           </div>
         ) : (
-          <div style={{fontSize:12,color:t.textMuted,fontFamily:t.mono,padding:"8px 0"}}>
+          <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,padding:"8px 0"}}>
             Enter conversion and session counts to evaluate significance.
           </div>
         )}
@@ -473,10 +473,10 @@ function TestValidityPanel({ item, t, dk, onSaveTestValidity }) {
 
       {/* 3 — Incrementality / counterfactual */}
       <div>
-        <div style={{fontSize:11,fontWeight:700,color:t.textSub,fontFamily:t.mono,marginBottom:6,letterSpacing:"0.04em"}}>
+        <div style={{fontSize:11,fontWeight:700,color:t.textSub,fontFamily:t.sans,marginBottom:6,letterSpacing:"0.04em"}}>
           &#8680; Incrementality — counterfactual definition
         </div>
-        <div style={{fontSize:12,color:t.textMuted,fontFamily:t.mono,marginBottom:8,lineHeight:1.5}}>
+        <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,marginBottom:8,lineHeight:1.5}}>
           Required before marking this initiative Completed. What would have happened without this change?
         </div>
         <textarea style={{...gTA(t),fontSize:13}} rows={3}
@@ -484,12 +484,12 @@ function TestValidityPanel({ item, t, dk, onSaveTestValidity }) {
           onChange={e=>setCounterfactual(e.target.value)}
           placeholder={"e.g. Without this test, paid social would have continued driving traffic into a 1.2% CVR funnel — at current spend, that's approx. $80k/mo in lost revenue vs the 1.76% baseline."}/>
         {item.status==="Completed" && !counterfactual && (
-          <div style={{marginTop:6,padding:"6px 10px",background:dk?"#2a1212":"#fdf0f0",border:"1px solid "+(dk?"#6a2828":"#e09090"),borderRadius:4,fontSize:11,color:dk?"#e08080":"#a03030",fontFamily:t.mono}}>
+          <div style={{marginTop:6,padding:"6px 10px",background:dk?"#2a1212":"#fdf0f0",border:"1px solid "+(dk?"#6a2828":"#e09090"),borderRadius:4,fontSize:11,color:dk?"#e08080":"#a03030",fontFamily:t.sans}}>
             &#9888; Counterfactual is required for Completed initiatives. Define what success would look like vs the null scenario.
           </div>
         )}
         {counterfactual && (
-          <div style={{marginTop:6,fontSize:11,color:dk?"#60d080":"#1a7a48",fontFamily:t.mono}}>
+          <div style={{marginTop:6,fontSize:11,color:dk?"#60d080":"#1a7a48",fontFamily:t.sans}}>
             &#10003; Counterfactual defined — incrementality claim is documented.
           </div>
         )}

@@ -123,16 +123,16 @@ export function TriageView({items, t, dk, cats, brands, activeBrand, onDetail, o
         background: topItem?t.surface:(dk?"#122a18":"#edfaf2"),
         border:"1px solid "+(topItem?t.border:(dk?"#2a7a40":"#7adca0"))}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8,flexWrap:"wrap",marginBottom:topItem?12:4}}>
-          <div style={{fontSize:10,letterSpacing:"0.11em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,fontWeight:600}}>
+          <div style={{fontSize:10,letterSpacing:"0.11em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.sans,fontWeight:600}}>
             {today.toLocaleDateString("en-CA",{weekday:"long",month:"long",day:"numeric"})}
           </div>
-          <div style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>
+          <div style={{fontSize:11,color:t.textMuted,fontFamily:t.sans}}>
             {totalAtRisk>0?fmtCur(totalAtRisk)+" at risk across "+running.length+" running":running.length+" running · "+draft.length+" in draft"}
           </div>
         </div>
         {topItem ? (
           <div>
-            <div style={{fontSize:10,fontWeight:600,color:topItem.accent,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:4}}>
+            <div style={{fontSize:10,fontWeight:600,color:topItem.accent,fontFamily:t.sans,letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:4}}>
               Do this first · {topItem.tag}
             </div>
             <div style={{fontSize:16,fontWeight:600,color:t.text,fontFamily:t.sans,lineHeight:1.3,marginBottom:4}}>{topItem.title}</div>
@@ -160,8 +160,8 @@ export function TriageView({items, t, dk, cats, brands, activeBrand, onDetail, o
           {l:"Revenue at risk", v:fmtCur(totalAtRisk), gold:true},
         ].map(m=>(
           <div key={m.l} style={{background:t.surface,border:"1px solid "+t.border,borderRadius:12,padding:"13px 15px",boxShadow:t.shadow}}>
-            <div style={{fontSize:9.5,letterSpacing:"0.1em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,fontWeight:600,marginBottom:8}}>{m.l}</div>
-            <div style={{fontSize:24,fontWeight:700,color:m.gold?t.gold:t.text,fontFamily:t.mono,letterSpacing:"-0.03em",lineHeight:1}}>{m.v}</div>
+            <div style={{fontSize:9.5,letterSpacing:"0.1em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.sans,fontWeight:600,marginBottom:8}}>{m.l}</div>
+            <div style={{fontSize:24,fontWeight:700,color:m.gold?t.gold:t.text,fontFamily:t.serif,letterSpacing:"-0.03em",lineHeight:1}}>{m.v}</div>
           </div>
         ))}
       </div>
@@ -188,8 +188,8 @@ export function TriageView({items, t, dk, cats, brands, activeBrand, onDetail, o
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,marginBottom:6}}>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3,flexWrap:"wrap"}}>
-                    <span style={{fontSize:10,fontWeight:600,color:q.accent,fontFamily:t.mono,letterSpacing:"0.05em"}}>{q.tag}</span>
-                    {q.brand&&brands.length>1&&<span style={{fontSize:10.5,color:t.textMuted,fontFamily:t.mono}}>{q.brand}</span>}
+                    <span style={{fontSize:10,fontWeight:600,color:q.accent,fontFamily:t.sans,letterSpacing:"0.05em"}}>{q.tag}</span>
+                    {q.brand&&brands.length>1&&<span style={{fontSize:10.5,color:t.textMuted,fontFamily:t.sans}}>{q.brand}</span>}
                   </div>
                   <div onClick={()=>onDetail(q.id)} style={{fontSize:14.5,fontWeight:600,color:t.text,fontFamily:t.sans,lineHeight:1.3,cursor:"pointer"}}>{q.title}</div>
                 </div>
@@ -201,7 +201,7 @@ export function TriageView({items, t, dk, cats, brands, activeBrand, onDetail, o
                   <button key={i} onClick={a.fn} style={a.primary?{...gG(t),fontSize:12,padding:"6px 13px"}:{...gGh(t),fontSize:12,padding:"6px 12px"}}>{a.label}</button>
                 ))}
                 <button onClick={()=>onDetail(q.id)} style={{...gGh(t),fontSize:12,padding:"6px 12px",border:"none",background:"transparent",color:t.textSub}}>View detail →</button>
-                {q.metric&&<span style={{marginLeft:"auto",fontSize:11,color:t.textMuted,fontFamily:t.mono}}>{q.metric.slice(0,42)}{q.metric.length>42?"…":""}</span>}
+                {q.metric&&<span style={{marginLeft:"auto",fontSize:11,color:t.textMuted,fontFamily:t.sans}}>{q.metric.slice(0,42)}{q.metric.length>42?"…":""}</span>}
               </div>
             </div>
           </div>

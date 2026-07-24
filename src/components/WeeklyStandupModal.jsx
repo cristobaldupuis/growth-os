@@ -63,7 +63,7 @@ export function WeeklyStandupModal({ t, dk, items, brands, onCommit, onClose, sh
         <div>
           <div style={gSL(t)}>Needs attention</div>
           {groups.length === 0 ? (
-            <div style={{ fontSize: 12.5, color: t.textMuted, fontFamily: t.mono, lineHeight: 1.6, padding: "4px 0" }}>
+            <div style={{ fontSize: 12.5, color: t.textMuted, fontFamily: t.sans, lineHeight: 1.6, padding: "4px 0" }}>
               Nothing flagged — every running initiative has a recent update and every closed one has a post-mortem.
             </div>
           ) : (
@@ -72,17 +72,17 @@ export function WeeklyStandupModal({ t, dk, items, brands, onCommit, onClose, sh
                 const c = reasonColor(g.reason);
                 return (
                   <div key={g.reason}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: c.fg, fontFamily: t.mono, marginBottom: 6 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: c.fg, fontFamily: t.sans, marginBottom: 6 }}>
                       {g.reason} <span style={{ color: t.textMuted, fontWeight: 500 }}>· {g.items.length}</span>
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       {g.items.map(e => (
                         <div key={e.id} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "7px 10px", background: t.surfaceAlt, border: "1px solid " + t.border, borderRadius: 8 }}>
-                          <span style={{ fontSize: 9.5, fontWeight: 700, fontFamily: t.mono, color: c.fg, background: c.bg, border: "1px solid " + c.bd, borderRadius: 3, padding: "1px 6px", flexShrink: 0 }}>
+                          <span style={{ fontSize: 9.5, fontWeight: 700, fontFamily: t.sans, color: c.fg, background: c.bg, border: "1px solid " + c.bd, borderRadius: 3, padding: "1px 6px", flexShrink: 0 }}>
                             {g.reason}
                           </span>
-                          <span style={{ fontSize: 12.5, color: t.text, fontFamily: t.mono, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.title}</span>
-                          {brands && brands.length > 1 && <span style={{ fontSize: 10, color: t.textMuted, fontFamily: t.mono, flexShrink: 0 }}>{brandName(e.brandId || "default", brands)}</span>}
+                          <span style={{ fontSize: 12.5, color: t.text, fontFamily: t.sans, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.title}</span>
+                          {brands && brands.length > 1 && <span style={{ fontSize: 10, color: t.textMuted, fontFamily: t.sans, flexShrink: 0 }}>{brandName(e.brandId || "default", brands)}</span>}
                         </div>
                       ))}
                     </div>
@@ -97,7 +97,7 @@ export function WeeklyStandupModal({ t, dk, items, brands, onCommit, onClose, sh
         <div>
           <div style={gSL(t)}>Status log — running initiatives</div>
           {running.length === 0 ? (
-            <div style={{ fontSize: 12.5, color: t.textMuted, fontFamily: t.mono, lineHeight: 1.6, padding: "4px 0" }}>
+            <div style={{ fontSize: 12.5, color: t.textMuted, fontFamily: t.sans, lineHeight: 1.6, padding: "4px 0" }}>
               No running initiatives right now.
             </div>
           ) : (
@@ -105,7 +105,7 @@ export function WeeklyStandupModal({ t, dk, items, brands, onCommit, onClose, sh
               {running.map(e => (
                 <div key={e.id} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                   <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 12.5, fontWeight: 600, color: t.text, fontFamily: t.mono, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.title}</span>
+                    <span style={{ fontSize: 12.5, fontWeight: 600, color: t.text, fontFamily: t.sans, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.title}</span>
                     {e.updatedAt && <span style={{ fontSize: 10, color: t.textMuted, fontFamily: t.mono, flexShrink: 0 }}>last update {fmtDate(e.updatedAt)}</span>}
                   </div>
                   <textarea

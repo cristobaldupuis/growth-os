@@ -191,9 +191,7 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
           const c=(dk?OD:OL)[item.results.outcomeClassification]||{};
           const isWin=item.results.outcomeClassification==="Jackpot"||item.results.outcomeClassification==="Success";
           return (
-            <div key={item.id} style={{background:t.surface,border:"1px solid "+(c.border||t.border),borderRadius:8,overflow:"hidden"}}>
-              {/* Outcome stripe */}
-              <div style={{height:3,background:c.border||t.border}}/>
+            <div key={item.id} style={{background:t.surface,border:"1px solid "+t.border,borderRadius:8,overflow:"hidden"}}>
               <div style={{padding:"16px 18px"}}>
                 {/* Badges row */}
                 <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center",marginBottom:12}}>
@@ -208,7 +206,7 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
                 </div>
 
                 {/* The learning — hero element */}
-                <div style={{borderLeft:"3px solid "+c.border,paddingLeft:14,marginBottom:14}}>
+                <div style={{borderLeft:"3px solid "+t.border,paddingLeft:14,marginBottom:14}}>
                   <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:6}}>Key learning</div>
                   <p style={{margin:0,fontSize:16,fontWeight:600,color:t.text,lineHeight:1.6,fontFamily:t.serif,fontStyle:"italic"}}>
                     "{item.results.keyLearning}"

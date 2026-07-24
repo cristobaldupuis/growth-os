@@ -6,7 +6,7 @@ export const gI  = (t) => ({width:"100%",padding:"8px 11px",fontSize:13,fontFami
 export const gTA = (t) => ({...gI(t),resize:"vertical"});
 export const gSl = (t) => ({...gI(t),cursor:"pointer"});
 export const gSc = (t,dk) => ({background:t.surface,border:"1px solid "+t.border,borderRadius:14,padding:"15px 18px",boxShadow:t.shadow});
-export const gSL = (t) => ({fontSize:10,letterSpacing:"0.11em",textTransform:"uppercase",color:t.textMuted,marginBottom:8,fontFamily:t.mono,fontWeight:600});
+export const gSL = (t) => ({fontSize:10,letterSpacing:"0.11em",textTransform:"uppercase",color:t.textMuted,marginBottom:8,fontFamily:t.sans,fontWeight:600});
 export const gCd = (t,dk) => ({background:t.surface,border:"1px solid "+t.border,borderRadius:14,padding:"15px 18px",boxShadow:t.shadow});
 // Financial metric style — large, high-contrast, instantly scannable
-export const gFin = (t) => ({fontFamily:t.mono,fontWeight:700,fontSize:28,letterSpacing:"-0.02em",color:t.gold,lineHeight:1});
+export const gFin = (t) => ({fontFamily:t.serif,fontWeight:700,fontSize:28,letterSpacing:"-0.02em",color:t.gold,lineHeight:1});

@@ -184,8 +184,10 @@ export const METRIC_CSV_ALIASES = {
   "notes":"notes","note":"notes","comment":"notes","comments":"notes",
 };
 
-export const FONT_SANS = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, system-ui, sans-serif";
-export const FONT_MONO = "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, 'Liberation Mono', monospace";
+export const FONT_SANS  = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, system-ui, sans-serif";
+export const FONT_MONO  = "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, 'Liberation Mono', monospace";
+// Display face: headings, titles, and hero numerals only. Loaded in index.html.
+export const FONT_SERIF = "'Fraunces', ui-serif, Georgia, 'Times New Roman', serif";
 
 export const TL = {
   bg:"#EBE8E1", surface:"#FFFFFF", surfaceAlt:"#F6F4EE",
@@ -196,7 +198,7 @@ export const TL = {
   headerBg:"#FFFFFF", inputBg:"#FFFFFF", inputBorder:"#DCD9D2",
   shadow:"0 1px 2px rgba(40,38,30,0.04), 0 4px 14px rgba(40,38,30,0.06)",
   shadowHi:"0 2px 6px rgba(40,38,30,0.06), 0 12px 30px rgba(40,38,30,0.10)",
-  mono:FONT_MONO, sans:FONT_SANS, serif:FONT_SANS,
+  mono:FONT_MONO, sans:FONT_SANS, serif:FONT_SERIF,
 };
 export const TD = {
   bg:"#100F0D", surface:"#1A1916", surfaceAlt:"#232118",
@@ -207,7 +209,7 @@ export const TD = {
   headerBg:"#100F0D", inputBg:"#1A1916", inputBorder:"#322F26",
   shadow:"0 1px 2px rgba(0,0,0,0.4), 0 4px 16px rgba(0,0,0,0.35)",
   shadowHi:"0 2px 8px rgba(0,0,0,0.5), 0 14px 36px rgba(0,0,0,0.5)",
-  mono:FONT_MONO, sans:FONT_SANS, serif:FONT_SANS,
+  mono:FONT_MONO, sans:FONT_SANS, serif:FONT_SERIF,
 };
 
 export const SL = { Draft:{bg:"#f4f4ee",border:"#c8c4a8",text:"#666440"}, Running:{bg:"#edfaf2",border:"#7adca0",text:"#1a7a48"}, Completed:{bg:"#eef0fd",border:"#9090e0",text:"#3a3aa0"}, Killed:{bg:"#fdf0f0",border:"#e09090",text:"#a03030"} };

@@ -188,7 +188,6 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
       {/* Learning cards */}
       <div style={{display:"flex",flexDirection:"column",gap:10}}>
         {filtered.map(item=>{
-          const c=(dk?OD:OL)[item.results.outcomeClassification]||{};
           const isWin=item.results.outcomeClassification==="Jackpot"||item.results.outcomeClassification==="Success";
           return (
             <div key={item.id} style={{background:t.surface,border:"1px solid "+t.border,borderRadius:8,overflow:"hidden"}}>

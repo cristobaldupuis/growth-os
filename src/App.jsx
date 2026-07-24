@@ -155,8 +155,8 @@ function GuideDrawer({ t, dk, openSection, onClose, onNavigate, nav }) {
       <div onClick={()=>setExpanded(prev=>({...prev,[s.id]:!prev[s.id]}))}
         style={{cursor:"pointer",display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8,marginBottom:8}}>
         <div style={{flex:1}}>
-          <div style={{fontSize:10,letterSpacing:"0.09em",textTransform:"uppercase",color:t.gold,fontFamily:t.sans,fontWeight:700,marginBottom:6}}>{s.label}</div>
-          <div style={{fontSize:14.5,fontWeight:700,color:t.text,fontFamily:t.serif}}>{s.feature}</div>
+          <div style={{fontSize:10,letterSpacing:"0.09em",textTransform:"uppercase",color:t.gold,fontFamily:t.mono,fontWeight:700,marginBottom:6}}>{s.label}</div>
+          <div style={{fontSize:14.5,fontWeight:600,color:t.text,fontFamily:t.serif}}>{s.feature}</div>
         </div>
         <span style={{color:t.textMuted,fontSize:10,flexShrink:0,marginTop:4,display:"inline-block",transition:"transform 0.18s",transform:expanded[s.id]?"rotate(180deg)":"rotate(0deg)"}}>&#9660;</span>
       </div>
@@ -178,8 +178,8 @@ function GuideDrawer({ t, dk, openSection, onClose, onNavigate, nav }) {
         <div style={{position:"sticky",top:0,background:t.surface,borderBottom:"1px solid "+t.border,padding:"18px 22px",zIndex:2}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
             <div>
-              <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.serif}}>What can Growth OS do?</div>
-              <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,marginTop:3}}>Every capability, grouped by what you're trying to accomplish.</div>
+              <div style={{fontSize:16,fontWeight:600,color:t.text,fontFamily:t.serif}}>What can Growth OS do?</div>
+              <div style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,marginTop:3}}>Every capability, grouped by what you're trying to accomplish.</div>
             </div>
             <button onClick={onClose} style={{background:"transparent",border:"none",color:t.textMuted,cursor:"pointer",fontSize:18,lineHeight:1,flexShrink:0}}><span>&#10005;</span></button>
           </div>
@@ -189,12 +189,12 @@ function GuideDrawer({ t, dk, openSection, onClose, onNavigate, nav }) {
           {hasRelevant ? (
             <>
               <div>
-                <div style={{fontSize:9,letterSpacing:"0.12em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.sans,fontWeight:700,paddingBottom:6}}>Relevant to where you are</div>
+                <div style={{fontSize:9,letterSpacing:"0.12em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,fontWeight:700,paddingBottom:6}}>Relevant to where you are</div>
                 <div style={{height:1,background:t.border}}/>
               </div>
               {relevant.map(renderCard)}
               <div style={{marginTop:4}}>
-                <div style={{fontSize:9,letterSpacing:"0.12em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.sans,fontWeight:700,paddingBottom:6}}>Everything else</div>
+                <div style={{fontSize:9,letterSpacing:"0.12em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,fontWeight:700,paddingBottom:6}}>Everything else</div>
                 <div style={{height:1,background:t.border}}/>
               </div>
               {rest.map(renderCard)}
@@ -202,7 +202,7 @@ function GuideDrawer({ t, dk, openSection, onClose, onNavigate, nav }) {
           ) : (
             GUIDE_SECTIONS.map(renderCard)
           )}
-          <div style={{fontSize:11,color:t.textMuted,fontFamily:t.sans,textAlign:"center",lineHeight:1.7,paddingTop:6}}>
+          <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,textAlign:"center",lineHeight:1.7,paddingTop:6}}>
             Tip: open this any time from the <strong style={{color:t.textSub}}>?</strong> in the top bar.
           </div>
         </div>
@@ -242,12 +242,12 @@ function OnboardingModal({ t, dk, settings, onSave, onSkip }) {
       fields: (
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
           <div>
-            <label style={{fontSize:11,color:t.textMuted,fontFamily:t.sans,display:"block",marginBottom:4}}>Company name</label>
+            <label style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,display:"block",marginBottom:4}}>Company name</label>
             <input style={gI(t)} value={data.companyName} onChange={e=>f("companyName",e.target.value)}
               placeholder="e.g. Northcove Home" autoFocus/>
           </div>
           <div>
-            <label style={{fontSize:11,color:t.textMuted,fontFamily:t.sans,display:"block",marginBottom:4}}>Business model</label>
+            <label style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,display:"block",marginBottom:4}}>Business model</label>
             <input style={gI(t)} value={data.businessModel} onChange={e=>f("businessModel",e.target.value)}
               placeholder="e.g. Multi-retailer DTC, eCommerce brand, SaaS, Marketplace"/>
           </div>
@@ -261,18 +261,18 @@ function OnboardingModal({ t, dk, settings, onSave, onSkip }) {
       fields: (
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
           <div>
-            <label style={{fontSize:11,color:t.textMuted,fontFamily:t.sans,display:"block",marginBottom:4}}>Metric name</label>
+            <label style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,display:"block",marginBottom:4}}>Metric name</label>
             <input style={gI(t)} value={data.northStarMetric} onChange={e=>f("northStarMetric",e.target.value)}
               placeholder="e.g. Portfolio Revenue, Monthly Recurring Revenue, GMV"/>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
             <div>
-              <label style={{fontSize:11,color:t.textMuted,fontFamily:t.sans,display:"block",marginBottom:4}}>Current value</label>
+              <label style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,display:"block",marginBottom:4}}>Current value</label>
               <input style={gI(t)} value={data.northStarCurrent} onChange={e=>f("northStarCurrent",e.target.value)}
                 placeholder="e.g. $1.1M/mo"/>
             </div>
             <div>
-              <label style={{fontSize:11,color:t.textMuted,fontFamily:t.sans,display:"block",marginBottom:4}}>Target value</label>
+              <label style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,display:"block",marginBottom:4}}>Target value</label>
               <input style={gI(t)} value={data.northStarTarget} onChange={e=>f("northStarTarget",e.target.value)}
                 placeholder="e.g. $1.4M/mo"/>
             </div>
@@ -288,36 +288,36 @@ function OnboardingModal({ t, dk, settings, onSave, onSkip }) {
         <div style={{display:"flex",flexDirection:"column",gap:10,maxHeight:320,overflowY:"auto",paddingRight:4}}>
           {brands.map((b,i)=>(
             <div key={b.id} style={{padding:"10px 12px",background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:6,display:"flex",flexDirection:"column",gap:8}}>
-              <div style={{fontSize:12,fontWeight:700,color:t.text,fontFamily:t.serif}}>{b.name}</div>
+              <div style={{fontSize:12,fontWeight:600,color:t.text,fontFamily:t.serif}}>{b.name}</div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
                 <div>
-                  <label style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,display:"block",marginBottom:2}}>WHAT THEY SELL</label>
+                  <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:2}}>WHAT THEY SELL</label>
                   <input style={{...gI(t),fontSize:11}} value={b.whatTheySell} onChange={e=>fb(i,"whatTheySell",e.target.value)} placeholder="e.g. Premium home décor, $80–$300 AOV"/>
                 </div>
                 <div>
-                  <label style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,display:"block",marginBottom:2}}>CATEGORIES</label>
+                  <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:2}}>CATEGORIES</label>
                   <input style={{...gI(t),fontSize:11}} value={b.categories} onChange={e=>fb(i,"categories",e.target.value)} placeholder="e.g. Home decor, Gifting, Candles"/>
                 </div>
                 <div>
-                  <label style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,display:"block",marginBottom:2}}>ICP</label>
+                  <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:2}}>ICP</label>
                   <input style={{...gI(t),fontSize:11}} value={b.icp} onChange={e=>fb(i,"icp",e.target.value)} placeholder="e.g. Women 28–45, gifting buyers"/>
                 </div>
                 <div>
-                  <label style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,display:"block",marginBottom:2}}>WHY THEY WIN</label>
+                  <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:2}}>WHY THEY WIN</label>
                   <input style={{...gI(t),fontSize:11}} value={b.whyTheyWin} onChange={e=>fb(i,"whyTheyWin",e.target.value)} placeholder="e.g. Visual brand, strong LTV"/>
                 </div>
                 <div>
-                  <label style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,display:"block",marginBottom:2}}>RELATIONSHIP</label>
+                  <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:2}}>RELATIONSHIP</label>
                   <input style={{...gI(t),fontSize:11}} value={b.relationship} onChange={e=>fb(i,"relationship",e.target.value)} placeholder="e.g. Own DTC, wholesale, marketplace"/>
                 </div>
                 <div>
-                  <label style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,display:"block",marginBottom:2}}>CURRENT CONSTRAINT</label>
+                  <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:2}}>CURRENT CONSTRAINT</label>
                   <input style={{...gI(t),fontSize:11}} value={b.constraint} onChange={e=>fb(i,"constraint",e.target.value)} placeholder="e.g. Rising CAC, thin margin"/>
                 </div>
               </div>
             </div>
           ))}
-          {brands.length===0&&<div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,padding:"12px 0"}}>No brands configured — add them in Settings after setup.</div>}
+          {brands.length===0&&<div style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,padding:"12px 0"}}>No brands configured — add them in Settings after setup.</div>}
         </div>
       ),
     },
@@ -336,8 +336,8 @@ function OnboardingModal({ t, dk, settings, onSave, onSkip }) {
               background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:6}}>
               <span style={{fontSize:18,flexShrink:0,marginTop:1}}>{icon}</span>
               <div>
-                <div style={{fontSize:13,fontWeight:700,color:t.text,fontFamily:t.serif,marginBottom:2}}>{label}</div>
-                <div style={{fontSize:11,color:t.textMuted,fontFamily:t.sans,lineHeight:1.5}}>{desc}</div>
+                <div style={{fontSize:13,fontWeight:600,color:t.text,fontFamily:t.serif,marginBottom:2}}>{label}</div>
+                <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,lineHeight:1.5}}>{desc}</div>
               </div>
             </div>
           ))}
@@ -366,13 +366,13 @@ function OnboardingModal({ t, dk, settings, onSave, onSkip }) {
         {/* Header */}
         <div style={{padding:"20px 24px 0",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
           <div>
-            <div style={{fontSize:10,fontFamily:t.sans,color:t.gold,letterSpacing:"0.10em",textTransform:"uppercase",marginBottom:6}}>
+            <div style={{fontSize:10,fontFamily:t.mono,color:t.gold,letterSpacing:"0.10em",textTransform:"uppercase",marginBottom:6}}>
               Growth OS {step < STEPS.length - 1 ? `· Step ${step+1} of ${STEPS.length - 1}` : "· Ready"}
             </div>
-            <div style={{fontSize:20,fontWeight:700,color:t.text,fontFamily:t.serif,lineHeight:1.2}}>{currentStep.title}</div>
+            <div style={{fontSize:20,fontWeight:600,color:t.text,fontFamily:t.serif,lineHeight:1.2}}>{currentStep.title}</div>
           </div>
           <button onClick={onSkip} style={{background:"transparent",border:"none",color:t.textMuted,cursor:"pointer",
-            fontSize:11,fontFamily:t.sans,padding:"2px 6px",borderRadius:3,flexShrink:0,marginTop:2,
+            fontSize:11,fontFamily:t.serif,padding:"2px 6px",borderRadius:3,flexShrink:0,marginTop:2,
             textDecoration:"underline",textUnderlineOffset:3}}>
             Skip all
           </button>
@@ -386,7 +386,7 @@ function OnboardingModal({ t, dk, settings, onSave, onSkip }) {
         )}
 
         {/* Subtitle */}
-        <div style={{padding:"8px 24px 0",fontSize:12,color:t.textMuted,fontFamily:t.sans,lineHeight:1.6}}>
+        <div style={{padding:"8px 24px 0",fontSize:12,color:t.textMuted,fontFamily:t.serif,lineHeight:1.6}}>
           {currentStep.subtitle}
         </div>
 
@@ -962,7 +962,7 @@ export default function App() {
     setTimeout(() => { setShowImport(false); setImportRows([]); setImportErrs([]); setImportDone(false); }, 1800);
   };
 
-  if(!loaded) return <div style={{background:t.bg,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{color:t.textMuted,fontFamily:t.sans}}>Loading Growth OS…</span></div>;
+  if(!loaded) return <div style={{background:t.bg,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{color:t.textMuted,fontFamily:t.serif}}>Loading Growth OS…</span></div>;
 
   const navBtn=(v,lbl)=>(
     <button key={v} onClick={()=>setNav(v)} style={{fontSize:13,fontWeight:nav===v?600:500,padding:"6px 14px",borderRadius:8,cursor:"pointer",fontFamily:t.sans,background:nav===v?t.surface:"transparent",border:"none",color:nav===v?t.text:t.textSub,boxShadow:nav===v?t.shadow:"none",transition:"all .15s"}}>{lbl}</button>
@@ -997,7 +997,7 @@ export default function App() {
           background:toast.type==="error"?(dk?"#3a1a1a":"#fff0f0"):toast.type==="success"?(dk?"#1a2a1a":"#f0faf2"):(dk?"#1a1a2a":"#f0f4ff"),
           border:"1px solid "+(toast.type==="error"?(dk?"#7a3030":"#e09090"):toast.type==="success"?(dk?"#2a6a40":"#7adca0"):(dk?"#3a4a7a":"#a0b4e0")),
           color:toast.type==="error"?(dk?"#f08080":"#a03030"):toast.type==="success"?(dk?"#60d080":"#1a7a48"):(dk?"#a0b4f0":"#2a3a8a"),
-          borderRadius:8,padding:"10px 18px",fontSize:13,fontFamily:t.sans,fontWeight:600,
+          borderRadius:8,padding:"10px 18px",fontSize:13,fontFamily:t.serif,fontWeight:600,
           boxShadow:"0 4px 20px rgba(0,0,0,0.15)",animation:"slideIn 0.2s ease",whiteSpace:"nowrap",
           maxWidth:"90vw",textOverflow:"ellipsis",overflow:"hidden"}}>
           {toast.type==="error"?"⚠ ":toast.type==="success"?"✓ ":"ℹ "}{toast.msg}
@@ -1009,8 +1009,8 @@ export default function App() {
         <Modal t={t} dk={dk} onClose={()=>setRestorePayload(null)} title="Restore from backup?">
           <div style={{display:"flex",flexDirection:"column",gap:14}}>
             <div style={{padding:"10px 14px",background:dk?"#2a1a1a":"#fff8f0",border:"1px solid "+(dk?"#7a3030":"#e0a060"),borderRadius:6}}>
-              <div style={{fontSize:12,fontWeight:700,color:dk?"#e08060":"#a04010",fontFamily:t.sans,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.06em"}}>⚠ This will overwrite your current data</div>
-              <div style={{fontSize:12,color:t.textSub,fontFamily:t.sans,lineHeight:1.8}}>
+              <div style={{fontSize:12,fontWeight:700,color:dk?"#e08060":"#a04010",fontFamily:t.mono,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.06em"}}>⚠ This will overwrite your current data</div>
+              <div style={{fontSize:12,color:t.textSub,fontFamily:t.serif,lineHeight:1.8}}>
                 <div>Exported: <strong style={{color:t.text}}>{restorePayload.stamp}</strong></div>
                 <div>Initiatives: <strong style={{color:t.text}}>{restorePayload.counts.items}</strong></div>
                 <div>Debates: <strong style={{color:t.text}}>{restorePayload.counts.debates}</strong></div>
@@ -1018,7 +1018,7 @@ export default function App() {
                 <div>Next Plays: <strong style={{color:t.text}}>{restorePayload.counts.recs}</strong></div>
               </div>
             </div>
-            <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans}}>Your current initiatives, settings, and metrics will be replaced. This cannot be undone.</div>
+            <div style={{fontSize:12,color:t.textMuted,fontFamily:t.serif}}>Your current initiatives, settings, and metrics will be replaced. This cannot be undone.</div>
             <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
               <button style={gGh(t)} onClick={()=>setRestorePayload(null)}>Cancel</button>
               <button style={{...gG(t),background:"#c03030",border:"none"}} onClick={()=>{
@@ -1046,10 +1046,10 @@ export default function App() {
                 background:"transparent",border:"1px solid transparent",transition:"background .15s, border-color .15s"}}
               onMouseEnter={e=>{e.currentTarget.style.background=t.goldBg;e.currentTarget.style.borderColor=t.goldBorder;}}
               onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.borderColor="transparent";}}>
-              <span style={{width:26,height:26,borderRadius:8,background:t.gold,color:t.goldText,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:12,fontFamily:t.sans,letterSpacing:"-0.02em",flexShrink:0}}>GO</span>
+              <span style={{width:26,height:26,borderRadius:8,background:t.gold,color:t.goldText,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:600,fontSize:12,fontFamily:t.serif,letterSpacing:"-0.02em",flexShrink:0}}>GO</span>
               <span style={{display:"flex",flexDirection:"column",alignItems:"flex-start",lineHeight:1.15}}>
                 <span style={{fontSize:14,fontWeight:700,letterSpacing:"0.06em",color:t.text,fontFamily:t.sans,whiteSpace:"nowrap"}}>GROWTH OS</span>
-                <span style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,letterSpacing:"0.02em",whiteSpace:"nowrap"}}>{settings.companyName}</span>
+                <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,letterSpacing:"0.02em",whiteSpace:"nowrap"}}>{settings.companyName}</span>
               </span>
             </button>
             <div style={{width:1,height:24,background:t.border}}/>
@@ -1071,7 +1071,7 @@ export default function App() {
           <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
             {brands.length>1&&(
               <select value={activeBrand} onChange={e=>setActiveBrand(e.target.value)}
-                style={{fontSize:12,padding:"6px 11px",borderRadius:9,border:"1px solid "+(activeBrand==="all"?t.border:t.goldBorder),background:activeBrand==="all"?t.surfaceAlt:t.goldBg,color:activeBrand==="all"?t.textSub:t.gold,fontFamily:t.sans,cursor:"pointer",maxWidth:150}}>
+                style={{fontSize:12,padding:"6px 11px",borderRadius:9,border:"1px solid "+(activeBrand==="all"?t.border:t.goldBorder),background:activeBrand==="all"?t.surfaceAlt:t.goldBg,color:activeBrand==="all"?t.textSub:t.gold,fontFamily:t.serif,cursor:"pointer",maxWidth:150}}>
                 <option value="all">All retailers</option>
                 {brands.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
@@ -1131,24 +1131,24 @@ export default function App() {
           <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
             <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
               {["All",...STATUSES].map(s=>(
-                <button key={s} onClick={()=>setFSt(s)} style={{fontSize:12,padding:"4px 10px",borderRadius:4,cursor:"pointer",fontFamily:t.sans,background:fSt===s?t.gold:"transparent",border:"1px solid "+(fSt===s?t.gold:t.border),color:fSt===s?t.goldText:t.textMuted}}>{s}</button>
+                <button key={s} onClick={()=>setFSt(s)} style={{fontSize:12,padding:"4px 10px",borderRadius:4,cursor:"pointer",fontFamily:t.serif,background:fSt===s?t.gold:"transparent",border:"1px solid "+(fSt===s?t.gold:t.border),color:fSt===s?t.goldText:t.textMuted}}>{s}</button>
               ))}
             </div>
             <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
-                <label style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,letterSpacing:"0.06em",textTransform:"uppercase"}}>Category</label>
+                <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Category</label>
                 <select value={fCat} onChange={e=>setFCat(e.target.value)} style={{...gSl(t),minWidth:130}}>{["All",...cats].map(c=><option key={c}>{c}</option>)}</select>
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
-                <label style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,letterSpacing:"0.06em",textTransform:"uppercase"}}>Type</label>
+                <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Type</label>
                 <select value={fType} onChange={e=>setFType(e.target.value)} style={{...gSl(t),minWidth:120}}>{["All",...INIT_TYPES].map(tp=><option key={tp}>{tp}</option>)}</select>
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
-                <label style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,letterSpacing:"0.06em",textTransform:"uppercase"}}>Owner</label>
+                <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Owner</label>
                 <select value={fOwn} onChange={e=>setFOwn(e.target.value)} style={{...gSl(t),minWidth:120}}>{owners.map(o=><option key={o}>{o}</option>)}</select>
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
-                <label style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,letterSpacing:"0.06em",textTransform:"uppercase"}}>Sort by</label>
+                <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Sort by</label>
                 <select value={sort} onChange={e=>setSort(e.target.value)} style={{...gSl(t),minWidth:110}}>
                   <option value="ice">Highest ICE Score</option>
                   <option value="revenue">Highest Rev at Risk</option>
@@ -1169,7 +1169,7 @@ export default function App() {
                     <button onClick={goNew} style={{...gG(t),fontSize:12.5,padding:"8px 16px"}}>+ New initiative</button>
                     <button onClick={()=>setShowCapture(true)} style={{...gGh(t),fontSize:12.5,padding:"8px 14px"}}>&#9889; Quick capture</button>
                   </div>
-                  <button onClick={()=>setGuideSection(true)} style={{background:"none",border:"none",color:t.textMuted,fontSize:12,fontFamily:t.sans,cursor:"pointer",marginTop:14,textDecoration:"underline",textUnderlineOffset:3}}>New here? See everything Growth OS can do &#8594;</button>
+                  <button onClick={()=>setGuideSection(true)} style={{background:"none",border:"none",color:t.textMuted,fontSize:12,fontFamily:t.serif,cursor:"pointer",marginTop:14,textDecoration:"underline",textUnderlineOffset:3}}>New here? See everything Growth OS can do &#8594;</button>
                 </div>
               ) : (
                 <div style={{...gCd(t,dk),padding:"40px 24px",textAlign:"center"}}>
@@ -1244,14 +1244,14 @@ export default function App() {
 
       {showCapture&&(
         <Modal t={t} dk={dk} onClose={()=>{setShowCapture(false);setCaptureText("");}} title="Quick capture">
-          <p style={{fontSize:13,color:t.textSub,fontFamily:t.sans,marginBottom:14,lineHeight:1.6}}>
+          <p style={{fontSize:13,color:t.textSub,fontFamily:t.serif,marginBottom:14,lineHeight:1.6}}>
             Describe the initiative in plain language — one sentence or a few. AI will pre-fill the form. You review and adjust before saving.
           </p>
           <FR label="What do you want to test or change?" t={t}>
             <textarea style={{...gTA(t),fontSize:13}} rows={4} value={captureText} onChange={e=>setCaptureText(e.target.value)}
               placeholder={"e.g. We should test removing the discount banner on the homepage for new visitors — I think it's training customers to wait for deals rather than buying at full price. Primary metric would be full-price order rate."}/>
           </FR>
-          {captureText.length>0&&captureText.length<30&&<div style={{fontSize:11,color:t.textMuted,fontFamily:t.sans,marginTop:4}}>{30-captureText.length} more chars to enable AI</div>}
+          {captureText.length>0&&captureText.length<30&&<div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,marginTop:4}}><span style={{fontFamily:t.mono}}>{30-captureText.length}</span> more chars to enable AI</div>}
           <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:14}}>
             <button style={gGh(t)} onClick={()=>{setShowCapture(false);setCaptureText("");}}>Cancel</button>
             <button style={{...gG(t),opacity:captureText.length>=30?1:0.4}} disabled={captureText.length<30||captureLoad}
@@ -1276,7 +1276,7 @@ export default function App() {
       )}
       {showTpl&&(
         <Modal t={t} dk={dk} onClose={()=>setShowTpl(false)} wide title="Start from a template">
-          <p style={{fontSize:13,color:t.textSub,marginBottom:16,fontFamily:t.sans}}>Pick a template to pre-fill the form, or start blank.</p>
+          <p style={{fontSize:13,color:t.textSub,marginBottom:16,fontFamily:t.serif}}>Pick a template to pre-fill the form, or start blank.</p>
           <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:16}}>
             {TEMPLATES.map(tpl=>(
               <div key={tpl.id} onClick={()=>startFromTemplate(tpl)} style={{...gCd(t,dk),cursor:"pointer",display:"flex",alignItems:"flex-start",gap:12}}>
@@ -1286,7 +1286,7 @@ export default function App() {
                     <span style={{fontSize:13,fontWeight:700,color:t.text}}>{tpl.label}</span>
                     <TBdg type={tpl.initType} dk={dk}/>
                   </div>
-                  <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans}}>{tpl.description}</div>
+                  <div style={{fontSize:12,color:t.textMuted,fontFamily:t.serif}}>{tpl.description}</div>
                 </div>
               </div>
             ))}
@@ -1314,24 +1314,24 @@ export default function App() {
             {importDone?(
               <div style={{textAlign:"center",padding:"24px 0"}}>
                 <div style={{fontSize:28,marginBottom:8}}>&#10003;</div>
-                <div style={{fontSize:15,fontWeight:700,color:t.text,fontFamily:t.serif,marginBottom:4}}>{importRows.length} initiative{importRows.length!==1?"s":""} imported</div>
-                <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans}}>Closing…</div>
+                <div style={{fontSize:15,fontWeight:600,color:t.text,fontFamily:t.serif,marginBottom:4}}><span style={{fontFamily:t.mono}}>{importRows.length}</span> initiative{importRows.length!==1?"s":""} imported</div>
+                <div style={{fontSize:12,color:t.textMuted,fontFamily:t.serif}}>Closing…</div>
               </div>
             ) : importRows.length === 0 ? (
               <>
-                <p style={{fontSize:13,color:t.textSub,fontFamily:t.sans,lineHeight:1.6,marginBottom:4}}>
+                <p style={{fontSize:13,color:t.textSub,fontFamily:t.serif,lineHeight:1.6,marginBottom:4}}>
                   Upload a CSV exported from the Growth OS Import Template. Column headers must match the template exactly.
                 </p>
                 <label style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:10,padding:"28px 20px",border:"2px dashed "+t.border,borderRadius:8,cursor:"pointer",background:t.surfaceAlt}}
                   onDragOver={e=>{e.preventDefault();e.stopPropagation();}}
                   onDrop={e=>{e.preventDefault();e.stopPropagation();const f=e.dataTransfer.files[0];if(f)handleCSVFile(f);}}>
                   <span style={{fontSize:28}}>&#128196;</span>
-                  <span style={{fontSize:13,fontWeight:700,color:t.text,fontFamily:t.sans}}>Click to choose a CSV file</span>
-                  <span style={{fontSize:11,color:t.textMuted,fontFamily:t.sans}}>or drag and drop here</span>
+                  <span style={{fontSize:13,fontWeight:600,color:t.text,fontFamily:t.serif}}>Click to choose a CSV file</span>
+                  <span style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>or drag and drop here</span>
                   <input type="file" accept=".csv" style={{display:"none"}} onChange={e=>{if(e.target.files[0])handleCSVFile(e.target.files[0]);}}/>
                 </label>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,padding:"10px 12px",background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:6}}>
-                  <span style={{fontSize:11,color:t.textMuted,fontFamily:t.sans,lineHeight:1.5}}>
+                  <span style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,lineHeight:1.5}}>
                     First time? Download the CSV template — correct headers, one example row.
                   </span>
                   <button style={{...gG(t),fontSize:11,padding:"4px 11px",flexShrink:0}} onClick={handleDownloadTemplate}>
@@ -1342,15 +1342,15 @@ export default function App() {
             ) : (
               <>
                 <div style={{padding:"10px 14px",background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:6,display:"flex",gap:16,flexWrap:"wrap"}}>
-                  <div><span style={{fontSize:11,color:t.textMuted,fontFamily:t.sans}}>Rows parsed: </span><strong style={{color:t.text,fontFamily:t.mono}}>{importRows.length}</strong></div>
-                  <div><span style={{fontSize:11,color:t.textMuted,fontFamily:t.sans}}>New: </span><strong style={{color:dk?"#60d080":"#1a7a48",fontFamily:t.mono}}>{importRows.filter(r=>!r._isUpdate).length}</strong></div>
-                  <div><span style={{fontSize:11,color:t.textMuted,fontFamily:t.sans}}>Updates: </span><strong style={{color:dk?"#d0a838":"#8a6010",fontFamily:t.mono}}>{importRows.filter(r=>r._isUpdate).length}</strong></div>
-                  {importErrs.length>0&&<div><span style={{fontSize:11,color:t.textMuted,fontFamily:t.sans}}>Warnings: </span><strong style={{color:dk?"#e08080":"#a03030",fontFamily:t.mono}}>{importErrs.length}</strong></div>}
+                  <div><span style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>Rows parsed: </span><strong style={{color:t.text,fontFamily:t.serif}}>{importRows.length}</strong></div>
+                  <div><span style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>New: </span><strong style={{color:dk?"#60d080":"#1a7a48",fontFamily:t.serif}}>{importRows.filter(r=>!r._isUpdate).length}</strong></div>
+                  <div><span style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>Updates: </span><strong style={{color:dk?"#d0a838":"#8a6010",fontFamily:t.serif}}>{importRows.filter(r=>r._isUpdate).length}</strong></div>
+                  {importErrs.length>0&&<div><span style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>Warnings: </span><strong style={{color:dk?"#e08080":"#a03030",fontFamily:t.serif}}>{importErrs.length}</strong></div>}
                 </div>
                 {importErrs.length>0&&(
                   <div style={{maxHeight:120,overflowY:"auto",display:"flex",flexDirection:"column",gap:4}}>
                     {importErrs.map((e,i)=>(
-                      <div key={i} style={{fontSize:11,fontFamily:t.sans,padding:"5px 10px",background:dk?"#2a1212":"#fdf0f0",border:"1px solid "+(dk?"#6a2828":"#e09090"),borderRadius:4,color:dk?"#e08080":"#a03030"}}>
+                      <div key={i} style={{fontSize:11,fontFamily:t.serif,padding:"5px 10px",background:dk?"#2a1212":"#fdf0f0",border:"1px solid "+(dk?"#6a2828":"#e09090"),borderRadius:4,color:dk?"#e08080":"#a03030"}}>
                         Row {e.row} — <strong>{e.title}</strong>: {e.issues.join("; ")}
                       </div>
                     ))}
@@ -1361,10 +1361,10 @@ export default function App() {
                     const sc=(dk?SD:SL)[row.status]||SL.Draft;
                     return(
                       <div key={i} style={{display:"flex",gap:8,alignItems:"center",padding:"7px 10px",background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:5}}>
-                        <span style={{fontSize:10,padding:"2px 7px",borderRadius:3,background:sc.bg,border:"1px solid "+sc.border,color:sc.text,fontFamily:t.sans,fontWeight:600,flexShrink:0}}>{row.status}</span>
-                        {row._isUpdate&&<span style={{fontSize:10,color:dk?"#d0a838":"#8a6010",fontFamily:t.sans,flexShrink:0}}>update</span>}
-                        <span style={{fontSize:12,color:t.text,fontFamily:t.sans,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{row.title}</span>
-                        <span style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,flexShrink:0}}>{row.category}</span>
+                        <span style={{fontSize:10,padding:"2px 7px",borderRadius:3,background:sc.bg,border:"1px solid "+sc.border,color:sc.text,fontFamily:t.serif,fontWeight:600,flexShrink:0}}>{row.status}</span>
+                        {row._isUpdate&&<span style={{fontSize:10,color:dk?"#d0a838":"#8a6010",fontFamily:t.serif,flexShrink:0}}>update</span>}
+                        <span style={{fontSize:12,color:t.text,fontFamily:t.serif,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{row.title}</span>
+                        <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,flexShrink:0}}>{row.category}</span>
                       </div>
                     );
                   })}
@@ -1383,7 +1383,7 @@ export default function App() {
 
       {showSM&&(
         <Modal t={t} dk={dk} onClose={()=>{setShowSM(false);setPendS(null);}} title={"Mark as "+pendS}>
-          <p style={{fontSize:13,color:t.textSub,marginBottom:16,fontFamily:t.sans}}>Confirm outcome certainty before closing — how confident are you in the result based on data collected?</p>
+          <p style={{fontSize:13,color:t.textSub,marginBottom:16,fontFamily:t.serif}}>Confirm outcome certainty before closing — how confident are you in the result based on data collected?</p>
           <FR label={"Outcome certainty: "+confC+"%"} t={t}>
             <input type="range" min={0} max={100} step={5} value={confC} onChange={e=>setConfC(parseInt(e.target.value))} style={{width:"100%",marginTop:4}}/>
             <CBar pct={confC} t={t}/>
@@ -1406,11 +1406,11 @@ export default function App() {
                 </div>
                 {sel.hypothesis&&(
                   <div style={{fontSize:12.5,color:t.textSub,fontFamily:t.sans,lineHeight:1.5,marginBottom:8}}>
-                    <span style={{fontFamily:t.sans,fontSize:10,letterSpacing:"0.06em",textTransform:"uppercase",color:t.textMuted,marginRight:6}}>Hypothesis</span>
+                    <span style={{fontFamily:t.mono,fontSize:10,letterSpacing:"0.06em",textTransform:"uppercase",color:t.textMuted,marginRight:6}}>Hypothesis</span>
                     {sel.hypothesis}
                   </div>
                 )}
-                <div style={{display:"flex",gap:18,flexWrap:"wrap",fontSize:11.5,fontFamily:t.sans,color:t.textSub}}>
+                <div style={{display:"flex",gap:18,flexWrap:"wrap",fontSize:11.5,fontFamily:t.serif,color:t.textSub}}>
                   {sel.primaryMetric&&<span><span style={{color:t.textMuted}}>Metric:</span> {sel.primaryMetric}</span>}
                   {sel.measurementScope&&<span><span style={{color:t.textMuted}}>Scope:</span> {sel.measurementScope}</span>}
                   {sel.revenueImpact>0&&<span><span style={{color:t.textMuted}}>Est. impact:</span> <span style={{color:t.gold,fontWeight:600}}>{fmtCur(sel.revenueImpact)}</span></span>}
@@ -1441,7 +1441,7 @@ export default function App() {
                   );
                 })}
               </div>
-              <div style={{fontSize:10.5,color:t.textMuted,fontFamily:t.sans,marginTop:6,lineHeight:1.5}}>
+              <div style={{fontSize:10.5,color:t.textMuted,fontFamily:t.serif,marginTop:6,lineHeight:1.5}}>
                 {(rForm.durability||"tactical")==="structural"
                   ? "Structural — Signal treats this as enduring evidence; not discounted by age."
                   : "Tactical — Signal down-weights this as it ages; library search still surfaces it, flagged by recency."}
@@ -1581,11 +1581,11 @@ function MetricsLogModal({t, dk, settings, brands, weeklyMetrics, onSave, onClos
           return (
             <div key={idx} style={{border:"1px solid "+t.border,borderRadius:6,padding:"12px 14px",background:t.surfaceAlt}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginBottom:10,flexWrap:"wrap"}}>
-                <div style={{fontSize:13,fontWeight:700,color:t.text,fontFamily:t.serif}}>{brand.name}</div>
+                <div style={{fontSize:13,fontWeight:600,color:t.text,fontFamily:t.serif}}>{brand.name}</div>
                 <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                   {METRIC_SOURCES.map(s=>(
                     <button key={s.id} onClick={()=>updateRow(idx,"source",s.id)}
-                      style={{fontSize:10,padding:"3px 8px",borderRadius:4,cursor:"pointer",fontFamily:t.sans,
+                      style={{fontSize:10,padding:"3px 8px",borderRadius:4,cursor:"pointer",fontFamily:t.serif,
                         background:row.source===s.id?t.gold:"transparent",
                         border:"1px solid "+(row.source===s.id?t.gold:t.border),
                         color:row.source===s.id?t.goldText:t.textMuted,fontWeight:row.source===s.id?700:400}}>
@@ -1597,7 +1597,7 @@ function MetricsLogModal({t, dk, settings, brands, weeklyMetrics, onSave, onClos
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:8}}>
                 {srcDef && srcDef.fields.map(f=>(
                   <div key={f.key} style={{display:"flex",flexDirection:"column",gap:3}}>
-                    <label style={{fontSize:10,color:t.textMuted,fontFamily:t.sans}}>{f.label}</label>
+                    <label style={{fontSize:10,color:t.textMuted,fontFamily:t.serif}}>{f.label}</label>
                     {f.type==="text"
                       ? <input style={{...gI(t),fontSize:12}} value={row.metrics[f.key]||""} placeholder={f.hint} onChange={e=>updateMetric(idx,f.key,e.target.value)}/>
                       : <input style={{...gI(t),fontSize:12}} type="number" step="any" value={row.metrics[f.key]||""} placeholder={f.hint} onChange={e=>updateMetric(idx,f.key,e.target.value)}/>
@@ -1677,7 +1677,7 @@ function MetricsImportModal({t, dk, weeklyMetrics, onSave, onClose}) {
     <Modal t={t} dk={dk} onClose={onClose} wide title="Import metrics CSV">
       <div style={{display:"flex",flexDirection:"column",gap:12}}>
         {step==="done" && (
-          <div style={{padding:"24px",textAlign:"center",color:dk?"#60d080":"#1a7a48",fontFamily:t.sans,fontSize:13}}>
+          <div style={{padding:"24px",textAlign:"center",color:dk?"#60d080":"#1a7a48",fontFamily:t.serif,fontSize:13}}>
             ✓ Metrics imported successfully
           </div>
         )}
@@ -1689,10 +1689,10 @@ function MetricsImportModal({t, dk, weeklyMetrics, onSave, onClose}) {
               onClick={()=>document.getElementById("metrics-csv-input").click()}>
               <div style={{fontSize:28,marginBottom:8}}>📂</div>
               <div style={{fontSize:13,color:t.text,marginBottom:4}}>Drop your CSV here or click to upload</div>
-              <div style={{fontSize:11,color:t.textMuted,fontFamily:t.sans}}>Header-driven — column order doesn't matter. See template for required columns.</div>
+              <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>Header-driven — column order doesn't matter. See template for required columns.</div>
               <input id="metrics-csv-input" type="file" accept=".csv" style={{display:"none"}} onChange={handleFile}/>
             </div>
-            <div style={{background:dk?"#1a1a12":"#f5f5f0",borderRadius:6,padding:"10px 12px",fontSize:11,fontFamily:t.sans,color:t.textMuted,lineHeight:1.7}}>
+            <div style={{background:dk?"#1a1a12":"#f5f5f0",borderRadius:6,padding:"10px 12px",fontSize:11,fontFamily:t.serif,color:t.textMuted,lineHeight:1.7}}>
               <strong style={{color:t.textSub}}>Required columns:</strong> date, brand, source<br/>
               <strong style={{color:t.textSub}}>Common columns:</strong> revenue, spend, roas, cvr, cac, aov, traffic, conversions, impressions, clicks, cpm, ctr, notes<br/>
               <strong style={{color:t.textSub}}>Source values:</strong> manual, meta, ga4, google_ads<br/>
@@ -1706,22 +1706,22 @@ function MetricsImportModal({t, dk, weeklyMetrics, onSave, onClose}) {
             {parsed.errors.length > 0 && (
               <div style={{display:"flex",flexDirection:"column",gap:3,maxHeight:100,overflowY:"auto"}}>
                 {parsed.errors.map((e,i)=>(
-                  <div key={i} style={{fontSize:11,fontFamily:t.sans,padding:"4px 8px",background:dk?"#2a1212":"#fdf0f0",border:"1px solid "+(dk?"#6a2828":"#e09090"),borderRadius:4,color:dk?"#e08080":"#a03030"}}>{e}</div>
+                  <div key={i} style={{fontSize:11,fontFamily:t.serif,padding:"4px 8px",background:dk?"#2a1212":"#fdf0f0",border:"1px solid "+(dk?"#6a2828":"#e09090"),borderRadius:4,color:dk?"#e08080":"#a03030"}}>{e}</div>
                 ))}
               </div>
             )}
 
-            <div style={{fontSize:12,fontFamily:t.sans,color:t.textSub}}>
-              {parsed.rows.length} row{parsed.rows.length!==1?"s":""} ready to import
+            <div style={{fontSize:12,fontFamily:t.serif,color:t.textSub}}>
+              <span style={{fontFamily:t.mono}}>{parsed.rows.length}</span> row{parsed.rows.length!==1?"s":""} ready to import
               {conflicts.length > 0 && <span style={{color:dk?"#d0a838":"#8a6010"}}> · {conflicts.length} conflict{conflicts.length!==1?"s":""} with existing data</span>}
             </div>
 
             {conflicts.length > 0 && (
               <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-                <span style={{fontSize:11,color:t.textMuted,fontFamily:t.sans}}>On conflict:</span>
+                <span style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>On conflict:</span>
                 {[["overwrite","Overwrite existing"],["skip","Keep existing"]].map(([v,l])=>(
                   <button key={v} onClick={()=>setConflictMode(v)}
-                    style={{fontSize:11,padding:"3px 9px",borderRadius:4,cursor:"pointer",fontFamily:t.sans,
+                    style={{fontSize:11,padding:"3px 9px",borderRadius:4,cursor:"pointer",fontFamily:t.serif,
                       background:conflictMode===v?t.gold:"transparent",border:"1px solid "+(conflictMode===v?t.gold:t.border),
                       color:conflictMode===v?t.goldText:t.textMuted}}>{l}</button>
                 ))}
@@ -1737,12 +1737,12 @@ function MetricsImportModal({t, dk, weeklyMetrics, onSave, onClose}) {
                     background:isConflict?(dk?"#2a2410":"#fdf8ee"):t.surfaceAlt,
                     border:"1px solid "+(isConflict?(dk?"#6a5818":"#e0c070"):t.border),borderRadius:4}}>
                     <span style={{fontSize:10,fontFamily:t.mono,color:t.textMuted,minWidth:80,flexShrink:0}}>{row.date}</span>
-                    <span style={{fontSize:11,fontFamily:t.sans,color:t.text,fontWeight:600,minWidth:80,flexShrink:0}}>{row.brand}</span>
-                    <span style={{fontSize:10,fontFamily:t.sans,color:t.textMuted,minWidth:60,flexShrink:0}}>{srcDef?.label||row.source}</span>
+                    <span style={{fontSize:11,fontFamily:t.serif,color:t.text,fontWeight:600,minWidth:80,flexShrink:0}}>{row.brand}</span>
+                    <span style={{fontSize:10,fontFamily:t.serif,color:t.textMuted,minWidth:60,flexShrink:0}}>{srcDef?.label||row.source}</span>
                     <span style={{fontSize:10,fontFamily:t.mono,color:t.textMuted,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                       {Object.entries(row.metrics).filter(([k])=>k!=="notes").map(([k,v])=>`${k}: ${v}`).join(" · ")}
                     </span>
-                    {isConflict&&<span style={{fontSize:9,color:dk?"#d0a838":"#8a6010",fontFamily:t.sans,flexShrink:0}}>conflict</span>}
+                    {isConflict&&<span style={{fontSize:9,color:dk?"#d0a838":"#8a6010",fontFamily:t.serif,flexShrink:0}}>conflict</span>}
                   </div>
                 );
               })}
@@ -1788,13 +1788,13 @@ function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, cats, onAc
       <div style={{display:"flex",flexDirection:"column",gap:16}}>
         {/* Title + meta */}
         <div>
-          <div style={{fontSize:20,fontWeight:700,color:t.text,fontFamily:t.serif,lineHeight:1.3,marginBottom:8}}>{rec.title}</div>
+          <div style={{fontSize:20,fontWeight:600,color:t.text,fontFamily:t.serif,lineHeight:1.3,marginBottom:8}}>{rec.title}</div>
           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-            <span style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,padding:"2px 8px",border:"1px solid "+t.border,borderRadius:3,textTransform:"uppercase",letterSpacing:"0.04em"}}>{rec.category}</span>
-            <span style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,padding:"2px 8px",border:"1px solid "+t.border,borderRadius:3}}>{rec.brandTarget}</span>
-            <span style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,padding:"2px 8px",border:"1px solid "+t.border,borderRadius:3}}>{rec.initType}</span>
+            <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,padding:"2px 8px",border:"1px solid "+t.border,borderRadius:3,textTransform:"uppercase",letterSpacing:"0.04em"}}>{rec.category}</span>
+            <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,padding:"2px 8px",border:"1px solid "+t.border,borderRadius:3}}>{rec.brandTarget}</span>
+            <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,padding:"2px 8px",border:"1px solid "+t.border,borderRadius:3}}>{rec.initType}</span>
             {isResolved && (
-              <span style={{fontSize:10,fontFamily:t.sans,padding:"2px 8px",borderRadius:3,fontWeight:700,
+              <span style={{fontSize:10,fontFamily:t.serif,padding:"2px 8px",borderRadius:3,fontWeight:600,
                 background: rec.status==="accepted"?(dk?"#1a3a1a":"#e8f5e8"):(dk?"#2a2a2a":"#f0f0f0"),
                 color: rec.status==="accepted"?(dk?"#8ad08a":"#2a7a2a"):t.textMuted,
                 border:"1px solid "+(rec.status==="accepted"?(dk?"#3a6a3a":"#a0d0a0"):t.border)}}>
@@ -1809,7 +1809,7 @@ function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, cats, onAc
             block. Older recs predate this field — render nothing rather than a
             placeholder. */}
         {rec.whyNow && (
-          <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,lineHeight:1.5,marginTop:-6}}>
+          <div style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,lineHeight:1.5,marginTop:-6}}>
             <span style={{fontWeight:700,letterSpacing:"0.04em",textTransform:"uppercase",marginRight:6}}>Why now</span>
             {rec.whyNow}
           </div>
@@ -1820,7 +1820,7 @@ function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, cats, onAc
         {rec.reasoningTrace && (
           <div style={gSc(t,dk)}>
             <div style={gSL(t)}>Why this, why now</div>
-            <p style={{margin:0,color:t.textSub,lineHeight:1.6,fontSize:14,fontFamily:t.sans}}>
+            <p style={{margin:0,color:t.textSub,lineHeight:1.6,fontSize:14,fontFamily:t.serif}}>
               {rec.reasoningTrace}
               {footnotes.map(f => (
                 <button key={f.n} onClick={()=>setCiteItem(f.item)} title={f.item.title}
@@ -1834,7 +1834,7 @@ function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, cats, onAc
               <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid "+t.border,display:"flex",flexDirection:"column",gap:4}}>
                 {footnotes.map(f => (
                   <button key={f.n} onClick={()=>setCiteItem(f.item)}
-                    style={{display:"flex",gap:6,alignItems:"baseline",background:"none",border:"none",cursor:"pointer",textAlign:"left",padding:0,fontFamily:t.sans}}>
+                    style={{display:"flex",gap:6,alignItems:"baseline",background:"none",border:"none",cursor:"pointer",textAlign:"left",padding:0,fontFamily:t.serif}}>
                     <span style={{fontSize:10,fontWeight:700,color:t.gold}}>{f.n}</span>
                     <span style={{fontSize:11,color:t.textMuted}}>
                       {f.item.initId ? f.item.initId+" — " : ""}{f.item.title}
@@ -1852,25 +1852,25 @@ function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, cats, onAc
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
             {rec.observation && (
               <div>
-                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.sans,marginBottom:4}}>📊 Observation</div>
+                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>📊 Observation</div>
                 <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:13}}>{rec.observation}</p>
               </div>
             )}
             {rec.hypothesis && (
               <div style={{borderLeft:"3px solid "+t.gold,paddingLeft:12}}>
-                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.sans,marginBottom:4}}>💡 Hypothesis</div>
+                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>💡 Hypothesis</div>
                 <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:14,fontWeight:600}}>{rec.hypothesis}</p>
               </div>
             )}
             {rec.successMetric && (
               <div>
-                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.sans,marginBottom:4}}>🎯 Success metric</div>
+                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>🎯 Success metric</div>
                 <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:13}}>{rec.successMetric}</p>
               </div>
             )}
             {rec.killCriteria && (
               <div>
-                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.sans,marginBottom:4}}>⏹ Kill criteria</div>
+                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>⏹ Kill criteria</div>
                 <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:13}}>{rec.killCriteria}</p>
               </div>
             )}
@@ -1883,25 +1883,25 @@ function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, cats, onAc
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:14,alignItems:"center"}}>
             <div>
               <div style={{display:"flex",alignItems:"baseline",gap:6,marginBottom:4}}>
-                <span style={{fontSize:22,fontWeight:700,color:t.gold,fontFamily:t.serif}}>{rec.ice.impact}</span>
-                <span style={{fontSize:11,color:t.textMuted,fontFamily:t.sans}}>/10 Impact</span>
+                <span style={{fontSize:22,fontWeight:700,color:t.gold,fontFamily:t.mono}}>{rec.ice.impact}</span>
+                <span style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>/10 Impact</span>
               </div>
-              {rec.impactRationale && <div style={{fontSize:12,color:t.textSub,lineHeight:1.5,fontFamily:t.sans}}>{rec.impactRationale}</div>}
+              {rec.impactRationale && <div style={{fontSize:12,color:t.textSub,lineHeight:1.5,fontFamily:t.serif}}>{rec.impactRationale}</div>}
             </div>
             <div>
               <div style={{display:"flex",alignItems:"baseline",gap:6,marginBottom:4}}>
-                <span style={{fontSize:22,fontWeight:700,color:t.gold,fontFamily:t.serif}}>{rec.ice.certainty}</span>
-                <span style={{fontSize:11,color:t.textMuted,fontFamily:t.sans}}>/10 Certainty</span>
+                <span style={{fontSize:22,fontWeight:700,color:t.gold,fontFamily:t.mono}}>{rec.ice.certainty}</span>
+                <span style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>/10 Certainty</span>
               </div>
-              {rec.certaintyRationale && <div style={{fontSize:12,color:t.textSub,lineHeight:1.5,fontFamily:t.sans}}>{rec.certaintyRationale}</div>}
+              {rec.certaintyRationale && <div style={{fontSize:12,color:t.textSub,lineHeight:1.5,fontFamily:t.serif}}>{rec.certaintyRationale}</div>}
             </div>
             <div style={{textAlign:"center",borderLeft:"1px solid "+t.border,paddingLeft:16}}>
-              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginBottom:3,textTransform:"uppercase",letterSpacing:"0.06em"}}>Total</div>
-              <div style={{fontSize:24,fontWeight:700,fontFamily:t.serif,color:iceTotal!==null?iceColor(iceTotal,t):t.textMuted}}>{iceTotal!==null?iceTotal:"—"}</div>
-              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans}}>/100</div>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:3,textTransform:"uppercase",letterSpacing:"0.06em"}}>Total</div>
+              <div style={{fontSize:24,fontWeight:700,fontFamily:t.mono,color:iceTotal!==null?iceColor(iceTotal,t):t.textMuted}}>{iceTotal!==null?iceTotal:"—"}</div>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono}}>/100</div>
             </div>
           </div>
-          <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginTop:8,fontStyle:"italic"}}>
+          <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginTop:8,fontStyle:"italic"}}>
             Ease is left at 5 — adjust when you add to backlog based on your team's capacity.
           </div>
         </div>
@@ -1913,17 +1913,17 @@ function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, cats, onAc
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
               {citedLearnings.map(item => (
                 <div key={item.id} onClick={()=>setCiteItem(item)} style={{padding:"10px 12px",background:dk?"#1a1a14":"#fafaf5",borderLeft:"3px solid "+t.gold,borderRadius:"0 4px 4px 0",cursor:"pointer"}}>
-                  <div style={{fontSize:12,fontWeight:700,color:t.text,fontFamily:t.serif,marginBottom:4}}>{item.title}</div>
+                  <div style={{fontSize:12,fontWeight:600,color:t.text,fontFamily:t.serif,marginBottom:4}}>{item.title}</div>
                   <div style={{display:"flex",gap:6,marginBottom:6,flexWrap:"wrap"}}>
-                    <span style={{fontSize:9,color:t.textMuted,fontFamily:t.sans,padding:"1px 6px",border:"1px solid "+t.border,borderRadius:3}}>
+                    <span style={{fontSize:9,color:t.textMuted,fontFamily:t.serif,padding:"1px 6px",border:"1px solid "+t.border,borderRadius:3}}>
                       {item.results?.outcomeClassification || "Inconclusive"}
                     </span>
-                    <span style={{fontSize:9,color:t.textMuted,fontFamily:t.sans,padding:"1px 6px",border:"1px solid "+t.border,borderRadius:3}}>
+                    <span style={{fontSize:9,color:t.textMuted,fontFamily:t.serif,padding:"1px 6px",border:"1px solid "+t.border,borderRadius:3}}>
                       {brandName(item.brandId, brands)}
                     </span>
                   </div>
                   {item.results?.keyLearning && (
-                    <div style={{fontSize:12,color:t.textSub,fontFamily:t.sans,lineHeight:1.5,fontStyle:"italic"}}>"{item.results.keyLearning}"</div>
+                    <div style={{fontSize:12,color:t.textSub,fontFamily:t.serif,lineHeight:1.5,fontStyle:"italic"}}>"{item.results.keyLearning}"</div>
                   )}
                 </div>
               ))}
@@ -1963,7 +1963,7 @@ function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onRestoreB
         <FR label="Company / workspace name" t={t}><input style={gI(t)} value={local.companyName} onChange={e=>f("companyName",e.target.value)}/></FR>
         <FR label="Business model (one line)" t={t}><input style={gI(t)} value={local.businessModel} onChange={e=>f("businessModel",e.target.value)}/></FR>
         <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
-          <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:10,fontFamily:t.sans,letterSpacing:"0.06em",textTransform:"uppercase"}}>North star metric</div>
+          <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:10,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>North star metric</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
             <FR label="Metric name" t={t}><input style={gI(t)} value={local.northStarMetric} onChange={e=>f("northStarMetric",e.target.value)}/></FR>
             <FR label="Current value" t={t}><input style={gI(t)} value={local.northStarCurrent} onChange={e=>f("northStarCurrent",e.target.value)}/></FR>
@@ -1971,7 +1971,7 @@ function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onRestoreB
           </div>
         </div>
         <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
-          <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:10,fontFamily:t.sans,letterSpacing:"0.06em",textTransform:"uppercase"}}>Categories</div>
+          <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:10,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Categories</div>
           <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}}>
             {local.categories.map(c=>(
               <span key={c} style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:12,fontWeight:600,color:catColor(c,local.categories,dk),background:dk?"#1e1e14":"#f8f7f2",border:"1px solid "+(dk?"#2a2820":"#ddd8c8"),borderRadius:4,padding:"3px 8px"}}>
@@ -1985,7 +1985,7 @@ function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onRestoreB
           </div>
         </div>
         <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
-          <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:10,fontFamily:t.sans,letterSpacing:"0.06em",textTransform:"uppercase"}}>Retailers / Partners</div>
+          <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:10,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Retailers / Partners</div>
           <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:10}}>
             {(local.brands||[]).map((b,i)=>{
               const upd = (k,v) => { const bs=[...(local.brands||[])]; bs[i]={...bs[i],[k]:v}; setLocal(p=>({...p,brands:bs})); };
@@ -2002,32 +2002,32 @@ function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onRestoreB
                 {/* Brief fields */}
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
                   <div>
-                    <label style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>WHAT THEY SELL</label>
+                    <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>WHAT THEY SELL</label>
                     <input style={{...gI(t),fontSize:11}} value={b.whatTheySell||""} onChange={e=>upd("whatTheySell",e.target.value)}
                       placeholder="e.g. Premium home décor, $80–$300 AOV"/>
                   </div>
                   <div>
-                    <label style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>CATEGORIES (comma-separated)</label>
+                    <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>CATEGORIES (comma-separated)</label>
                     <input style={{...gI(t),fontSize:11}} value={b.categories||""} onChange={e=>upd("categories",e.target.value)}
                       placeholder="e.g. Home decor, Gifting, Candles"/>
                   </div>
                   <div>
-                    <label style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>ICP (comma-separated)</label>
+                    <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>ICP (comma-separated)</label>
                     <input style={{...gI(t),fontSize:11}} value={b.icp||""} onChange={e=>upd("icp",e.target.value)}
                       placeholder="e.g. Women 28–45, gifting buyers, high-intent decorators"/>
                   </div>
                   <div>
-                    <label style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>WHY THEY WIN</label>
+                    <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>WHY THEY WIN</label>
                     <input style={{...gI(t),fontSize:11}} value={b.whyTheyWin||""} onChange={e=>upd("whyTheyWin",e.target.value)}
                       placeholder="e.g. Visual brand, strong repeat buyer LTV"/>
                   </div>
                   <div>
-                    <label style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>RELATIONSHIP</label>
+                    <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>RELATIONSHIP</label>
                     <input style={{...gI(t),fontSize:11}} value={b.relationship||""} onChange={e=>upd("relationship",e.target.value)}
                       placeholder="e.g. Own DTC brand, wholesale account, marketplace"/>
                   </div>
                   <div>
-                    <label style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>CURRENT CONSTRAINT</label>
+                    <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>CURRENT CONSTRAINT</label>
                     <input style={{...gI(t),fontSize:11}} value={b.constraint||""} onChange={e=>upd("constraint",e.target.value)}
                       placeholder="e.g. CAC rising, thin margin on hero SKU"/>
                   </div>
@@ -2039,8 +2039,8 @@ function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onRestoreB
             style={{...gGh(t),fontSize:11}}>+ Add retailer</button>
         </div>
         <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
-          <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:4,fontFamily:t.sans,letterSpacing:"0.06em",textTransform:"uppercase"}}>C-Suite Debate Agents</div>
-          <p style={{fontSize:11,color:t.textMuted,fontFamily:t.sans,lineHeight:1.5,margin:"0 0 10px"}}>
+          <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:4,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>C-Suite Debate Agents</div>
+          <p style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,lineHeight:1.5,margin:"0 0 10px"}}>
             Customise the agents that participate in the strategy debate. Edit lenses to match your industry (e.g. "Category Manager" for CPG, "Buyer Relations" for retail).
           </p>
           <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:8}}>
@@ -2077,8 +2077,8 @@ function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onRestoreB
           </div>
         </div>
         <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
-          <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:4,fontFamily:t.sans,letterSpacing:"0.06em",textTransform:"uppercase"}}>Health Metrics</div>
-          <p style={{fontSize:11,color:t.textMuted,fontFamily:t.sans,lineHeight:1.5,margin:"0 0 10px"}}>
+          <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:4,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Health Metrics</div>
+          <p style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,lineHeight:1.5,margin:"0 0 10px"}}>
             Portfolio-level guardrail metrics surfaced on the dashboard. Calculated metrics pull from weekly pulse data automatically.
           </p>
           <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:8}}>
@@ -2098,13 +2098,13 @@ function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onRestoreB
                       style={{background:"none",border:"none",color:t.textMuted,cursor:"pointer",fontSize:14,padding:"0 4px"}}>&#10005;</button>
                   </div>
                   {metric.isCalculated&&(
-                    <div style={{fontSize:11,color:t.textMuted,fontFamily:t.sans,lineHeight:1.5,padding:"5px 8px",background:t.surface,border:"1px solid "+t.borderSoft,borderRadius:4}}>
+                    <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,lineHeight:1.5,padding:"5px 8px",background:t.surface,border:"1px solid "+t.borderSoft,borderRadius:4}}>
                       {metric.calculationNote}
                     </div>
                   )}
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                     <div>
-                      <label style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>
+                      <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>
                         {metric.isCalculated?"MANUAL FALLBACK":"CURRENT VALUE"}
                       </label>
                       <input style={{...gI(t),fontSize:12}} type="number" step="any"
@@ -2112,17 +2112,17 @@ function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onRestoreB
                         onChange={e=>updhm("manualValue",e.target.value===""?null:parseFloat(e.target.value))}/>
                     </div>
                     <div>
-                      <label style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>TARGET (OPTIONAL)</label>
+                      <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>TARGET (OPTIONAL)</label>
                       <input style={{...gI(t),fontSize:12}} type="number" step="any"
                         value={metric.target??""} placeholder="Target value"
                         onChange={e=>updhm("target",e.target.value===""?null:parseFloat(e.target.value))}/>
                     </div>
                   </div>
                   <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                    <span style={{fontSize:10,color:t.textMuted,fontFamily:t.sans}}>Direction:</span>
+                    <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif}}>Direction:</span>
                     {[{v:true,l:"Higher is better"},{v:false,l:"Lower is better"}].map(opt=>(
                       <button key={String(opt.v)} onClick={()=>updhm("higherIsBetter",opt.v)}
-                        style={{fontSize:10,padding:"3px 8px",borderRadius:3,cursor:"pointer",fontFamily:t.sans,
+                        style={{fontSize:10,padding:"3px 8px",borderRadius:3,cursor:"pointer",fontFamily:t.serif,
                           background:metric.higherIsBetter===opt.v?t.gold:"transparent",
                           border:"1px solid "+(metric.higherIsBetter===opt.v?t.gold:t.border),
                           color:metric.higherIsBetter===opt.v?t.goldText:t.textMuted}}>
@@ -2143,8 +2143,8 @@ function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onRestoreB
           )}
         </div>
         <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
-          <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:10,fontFamily:t.sans,letterSpacing:"0.06em",textTransform:"uppercase"}}>Backup &amp; restore</div>
-          <p style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,lineHeight:1.6,margin:"0 0 10px"}}>Download a full snapshot of your data (initiatives, settings, debates, weekly metrics) as a JSON file. Keep a copy somewhere safe — this is the only off-device record until cloud sync ships.</p>
+          <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:10,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Backup &amp; restore</div>
+          <p style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,lineHeight:1.6,margin:"0 0 10px"}}>Download a full snapshot of your data (initiatives, settings, debates, weekly metrics) as a JSON file. Keep a copy somewhere safe — this is the only off-device record until cloud sync ships.</p>
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
             <button onClick={onDownloadBackup} style={{...gG(t),fontSize:12}}>&#8659; Download backup</button>
             <label style={{...gGh(t),fontSize:12,cursor:"pointer"}}>
@@ -2155,17 +2155,17 @@ function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onRestoreB
           </div>
         </div>
         <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
-          <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:8,fontFamily:t.sans,letterSpacing:"0.06em",textTransform:"uppercase"}}>Demo data</div>
-          <p style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,lineHeight:1.6,margin:"0 0 10px"}}>Reload the built-in demo initiatives and weekly metrics. Replaces all current initiatives and weekly pulse data.</p>
+          <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:8,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Demo data</div>
+          <p style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,lineHeight:1.6,margin:"0 0 10px"}}>Reload the built-in demo initiatives and weekly metrics. Replaces all current initiatives and weekly pulse data.</p>
           <button onClick={onResetDemo} style={{...gGh(t),fontSize:12}}>&#8635; Reset to demo data</button>
         </div>
         <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-            <div style={{fontSize:12,fontWeight:700,color:t.textSub,fontFamily:t.sans,letterSpacing:"0.06em",textTransform:"uppercase"}}>Data sources</div>
-            <span style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,background:t.border,padding:"2px 6px",borderRadius:3}}>Placeholder — coming soon</span>
+            <div style={{fontSize:12,fontWeight:700,color:t.textSub,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Data sources</div>
+            <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,background:t.border,padding:"2px 6px",borderRadius:3}}>Placeholder — coming soon</span>
           </div>
-          <p style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,lineHeight:1.6,margin:"0 0 8px"}}>Planned: Google Sheets (pulling from GA4, Looker, Meta Ads), BigQuery, direct GA4 and Meta Ads APIs. Paste data manually in the initiative form for now.</p>
-          <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,padding:"10px 12px",background:dk?"#1a1a12":"#f5f5f0",borderRadius:4,border:"1px dashed "+t.border}}>No data sources connected yet.</div>
+          <p style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,lineHeight:1.6,margin:"0 0 8px"}}>Planned: Google Sheets (pulling from GA4, Looker, Meta Ads), BigQuery, direct GA4 and Meta Ads APIs. Paste data manually in the initiative form for now.</p>
+          <div style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,padding:"10px 12px",background:dk?"#1a1a12":"#f5f5f0",borderRadius:4,border:"1px dashed "+t.border}}>No data sources connected yet.</div>
         </div>
         <div style={{display:"flex",gap:8,justifyContent:"flex-end",paddingTop:4}}>
           <button style={gGh(t)} onClick={onClose}>Cancel</button>

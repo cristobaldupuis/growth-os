@@ -155,7 +155,7 @@ function ScorecardSection({ t, dk, dash, weeklyMetrics, brands, activeBrand, set
       {/* North star strip */}
       {settings.northStarMetric && (
         <div style={{ display: "flex", gap: 20, padding: "10px 14px", background: t.goldBg, border: "1px solid " + t.goldBorder, borderRadius: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <div style={{ fontSize: 11, color: t.gold, fontFamily: t.sans, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", flexShrink: 0 }}>{settings.northStarMetric}</div>
+          <div style={{ fontSize: 11, color: t.gold, fontFamily: t.mono, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", flexShrink: 0 }}>{settings.northStarMetric}</div>
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
             <span style={{ fontSize: 11, color: t.textMuted, fontFamily: t.mono }}>Current <strong style={{ color: t.gold }}>{settings.northStarCurrent || "—"}</strong></span>
             <span style={{ fontSize: 11, color: t.textMuted, fontFamily: t.mono }}>&#8594; Target <strong style={{ color: t.text }}>{settings.northStarTarget || "—"}</strong></span>
@@ -167,9 +167,9 @@ function ScorecardSection({ t, dk, dash, weeklyMetrics, brands, activeBrand, set
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px,1fr))", gap: 8 }}>
         {kpis.map(k => (
           <div key={k.label} style={{ background: k.hero ? t.goldBg : t.surfaceAlt, border: "1px solid " + (k.hero ? t.goldBorder : t.border), borderRadius: 10, padding: "12px 14px" }}>
-            <div style={{ fontSize: 9.5, letterSpacing: "0.1em", textTransform: "uppercase", color: t.textMuted, fontFamily: t.sans, fontWeight: 600, marginBottom: 6 }}>{k.label}</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: k.hero ? t.gold : t.text, fontFamily: t.serif, letterSpacing: "-0.02em", lineHeight: 1 }}>{k.value}</div>
-            {k.sub && k.sub !== " " && <div style={{ fontSize: 10, color: t.textMuted, fontFamily: t.sans, marginTop: 5 }}>{k.sub}</div>}
+            <div style={{ fontSize: 9.5, letterSpacing: "0.1em", textTransform: "uppercase", color: t.textMuted, fontFamily: t.mono, fontWeight: 600, marginBottom: 6 }}>{k.label}</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: k.hero ? t.gold : t.text, fontFamily: t.mono, letterSpacing: "-0.02em", lineHeight: 1 }}>{k.value}</div>
+            {k.sub && k.sub !== " " && <div style={{ fontSize: 10, color: t.textMuted, fontFamily: t.serif, marginTop: 5 }}>{k.sub}</div>}
           </div>
         ))}
       </div>
@@ -177,13 +177,13 @@ function ScorecardSection({ t, dk, dash, weeklyMetrics, brands, activeBrand, set
       {/* Weekly metrics */}
       {latestWeek && weekKpis.length > 0 && (
         <div>
-          <div style={{ fontSize: 10, fontFamily: t.sans, color: t.textMuted, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>
+          <div style={{ fontSize: 10, fontFamily: t.mono, color: t.textMuted, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>
             Weekly metrics — {weekLabel}
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {weekKpis.map(k => (
               <div key={k.label} style={{ background: t.surfaceAlt, border: "1px solid " + t.border, borderRadius: 8, padding: "9px 13px", minWidth: 90 }}>
-                <div style={{ fontSize: 9.5, letterSpacing: "0.08em", textTransform: "uppercase", color: t.textMuted, fontFamily: t.sans, marginBottom: 4 }}>{k.label}</div>
+                <div style={{ fontSize: 9.5, letterSpacing: "0.08em", textTransform: "uppercase", color: t.textMuted, fontFamily: t.mono, marginBottom: 4 }}>{k.label}</div>
                 <div style={{ fontSize: 18, fontWeight: 700, color: t.gold, fontFamily: t.mono, letterSpacing: "-0.01em", lineHeight: 1 }}>{k.value}</div>
               </div>
             ))}
@@ -192,7 +192,7 @@ function ScorecardSection({ t, dk, dash, weeklyMetrics, brands, activeBrand, set
       )}
 
       {!latestWeek && (
-        <div style={{ fontSize: 12, color: t.textMuted, fontFamily: t.sans, fontStyle: "italic" }}>No weekly metrics logged yet.</div>
+        <div style={{ fontSize: 12, color: t.textMuted, fontFamily: t.serif, fontStyle: "italic" }}>No weekly metrics logged yet.</div>
       )}
     </Section>
   );
@@ -214,7 +214,7 @@ function LearnedSection({ t, dk, learned, onCopy }) {
   return (
     <Section t={t} dk={dk} title="What we learned this period" onCopy={onCopy}>
       {learned.length === 0 ? (
-        <div style={{ padding: "18px 12px", textAlign: "center", border: "1px dashed " + t.border, borderRadius: 8, color: t.textMuted, fontFamily: t.sans, fontSize: 12 }}>
+        <div style={{ padding: "18px 12px", textAlign: "center", border: "1px dashed " + t.border, borderRadius: 8, color: t.textMuted, fontFamily: t.serif, fontSize: 12 }}>
           No completed or closed initiatives with learnings in the last 30 days.
         </div>
       ) : (
@@ -230,13 +230,13 @@ function LearnedSection({ t, dk, learned, onCopy }) {
               </div>
               {item.results?.keyLearning && (
                 <div style={{ fontSize: 12.5, color: t.textSub, fontFamily: t.sans, lineHeight: 1.55 }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: t.textMuted, fontFamily: t.sans, marginRight: 6 }}>Learning</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: t.textMuted, fontFamily: t.mono, marginRight: 6 }}>Learning</span>
                   {item.results.keyLearning}
                 </div>
               )}
               {item.results?.decisionMade && (
                 <div style={{ fontSize: 12, color: t.textSub, fontFamily: t.sans, lineHeight: 1.5 }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: t.textMuted, fontFamily: t.sans, marginRight: 6 }}>Decision</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: t.textMuted, fontFamily: t.mono, marginRight: 6 }}>Decision</span>
                   {item.results.decisionMade}
                 </div>
               )}
@@ -254,7 +254,7 @@ function RunningSection({ t, dk, running, cats, onCopy }) {
   return (
     <Section t={t} dk={dk} title="What's running now" onCopy={onCopy}>
       {running.length === 0 ? (
-        <div style={{ padding: "18px 12px", textAlign: "center", border: "1px dashed " + t.border, borderRadius: 8, color: t.textMuted, fontFamily: t.sans, fontSize: 12 }}>
+        <div style={{ padding: "18px 12px", textAlign: "center", border: "1px dashed " + t.border, borderRadius: 8, color: t.textMuted, fontFamily: t.serif, fontSize: 12 }}>
           No initiatives currently running.
         </div>
       ) : (
@@ -272,13 +272,13 @@ function RunningSection({ t, dk, running, cats, onCopy }) {
                   </div>
                   {item.successMetric && (
                     <div style={{ fontSize: 11.5, color: t.textSub, fontFamily: t.sans, lineHeight: 1.5, marginTop: 5 }}>
-                      <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: t.textMuted, fontFamily: t.sans, marginRight: 5 }}>Success metric</span>
+                      <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: t.textMuted, fontFamily: t.mono, marginRight: 5 }}>Success metric</span>
                       {item.successMetric}
                     </div>
                   )}
                 </div>
                 <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontSize: 9.5, color: t.textMuted, fontFamily: t.sans, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 3 }}>Est. impact</div>
+                  <div style={{ fontSize: 9.5, color: t.textMuted, fontFamily: t.mono, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 3 }}>Est. impact</div>
                   <div style={{ fontSize: 17, fontWeight: 700, color: t.gold, fontFamily: t.mono, letterSpacing: "-0.01em" }}>{fmtCur(item.revenueImpact)}</div>
                 </div>
               </div>
@@ -296,7 +296,7 @@ function NextSection({ t, dk, next, cats, onCopy }) {
   return (
     <Section t={t} dk={dk} title="What's next" onCopy={onCopy}>
       {next.length === 0 ? (
-        <div style={{ padding: "18px 12px", textAlign: "center", border: "1px dashed " + t.border, borderRadius: 8, color: t.textMuted, fontFamily: t.sans, fontSize: 12 }}>
+        <div style={{ padding: "18px 12px", textAlign: "center", border: "1px dashed " + t.border, borderRadius: 8, color: t.textMuted, fontFamily: t.serif, fontSize: 12 }}>
           No draft initiatives in pipeline.
         </div>
       ) : (
@@ -314,13 +314,13 @@ function NextSection({ t, dk, next, cats, onCopy }) {
                   </div>
                   {hyp && (
                     <div style={{ fontSize: 11.5, color: t.textSub, fontFamily: t.sans, lineHeight: 1.5, marginTop: 5 }}>
-                      <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: t.textMuted, fontFamily: t.sans, marginRight: 5 }}>Hypothesis</span>
+                      <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: t.textMuted, fontFamily: t.mono, marginRight: 5 }}>Hypothesis</span>
                       {hyp}
                     </div>
                   )}
                 </div>
                 <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontSize: 9.5, color: t.textMuted, fontFamily: t.sans, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 3 }}>Est. impact</div>
+                  <div style={{ fontSize: 9.5, color: t.textMuted, fontFamily: t.mono, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 3 }}>Est. impact</div>
                   <div style={{ fontSize: 17, fontWeight: 700, color: t.gold, fontFamily: t.mono, letterSpacing: "-0.01em" }}>{fmtCur(item.revenueImpact)}</div>
                 </div>
               </div>
@@ -421,11 +421,11 @@ export function ClientReadoutView({ t, dk, dash, items, brands, activeBrand, cat
       {/* Header */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div>
-          <div style={{ fontSize: 10, letterSpacing: "0.10em", textTransform: "uppercase", color: t.gold, fontFamily: t.sans, fontWeight: 700, marginBottom: 4 }}>Client Readout</div>
+          <div style={{ fontSize: 10, letterSpacing: "0.10em", textTransform: "uppercase", color: t.gold, fontFamily: t.mono, fontWeight: 700, marginBottom: 4 }}>Client Readout</div>
           <div style={{ fontSize: 18, fontWeight: 700, color: t.text, fontFamily: t.sans, lineHeight: 1.2 }}>
             Weekly summary — {activeBrand === "all" ? "All brands" : brandName(activeBrand, brands)}
           </div>
-          <div style={{ fontSize: 12, color: t.textMuted, fontFamily: t.sans, marginTop: 3 }}>
+          <div style={{ fontSize: 12, color: t.textMuted, fontFamily: t.serif, marginTop: 3 }}>
             Read-only view. Use "Copy section" buttons or copy the full readout to share with clients.
           </div>
         </div>

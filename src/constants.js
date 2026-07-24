@@ -186,8 +186,9 @@ export const METRIC_CSV_ALIASES = {
 
 export const FONT_SANS  = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, system-ui, sans-serif";
 export const FONT_MONO  = "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, 'Liberation Mono', monospace";
-// Display face: headings, titles, and hero numerals only. Loaded in index.html.
-export const FONT_SERIF = "'Fraunces', ui-serif, Georgia, 'Times New Roman', serif";
+// Reading face: headings, titles, and narrative UI copy. Numerals never use it.
+// Weights are capped at 500 (default) / 600 (emphasis). Loaded in index.html.
+export const FONT_SERIF = "'Lora', ui-serif, Georgia, 'Times New Roman', serif";
 
 export const TL = {
   bg:"#EBE8E1", surface:"#FFFFFF", surfaceAlt:"#F6F4EE",

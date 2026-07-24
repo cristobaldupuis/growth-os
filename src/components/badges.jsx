@@ -1,8 +1,9 @@
-import { SD, SL, OD, OL, catColor, TYPE_D, TYPE_L, iceScore, iceColor } from "../constants.js";
+import { renderNums } from "./text.jsx";
+import { SD, SL, OD, OL, catColor, TYPE_D, TYPE_L, iceScore, iceColor, FONT_SERIF, FONT_MONO } from "../constants.js";
 
 // -- Atoms ---------------------------------------------------------------------
 export function Bdg({label,color,bg,border,small}) {
-  return <span style={{display:"inline-block",fontSize:small?10:11,fontWeight:600,letterSpacing:"0.03em",padding:small?"1px 6px":"2px 8px",borderRadius:4,border:"1px solid "+(border||"#ccc"),background:bg||"#f5f5f0",color:color||"#666",whiteSpace:"nowrap"}}>{label}</span>;
+  return <span style={{display:"inline-block",fontSize:small?10:11,fontWeight:600,fontFamily:FONT_SERIF,letterSpacing:"0.03em",padding:small?"1px 6px":"2px 8px",borderRadius:4,border:"1px solid "+(border||"#ccc"),background:bg||"#f5f5f0",color:color||"#666",whiteSpace:"nowrap"}}>{renderNums(label, FONT_MONO, "bl")}</span>;
 }
 export function SBdg({s,dk})        { const c=(dk?SD:SL)[s]||SL.Draft; return <Bdg label={s} color={c.text} bg={c.bg} border={c.border}/>; }
 export function OBdg({o,dk})        { const c=(dk?OD:OL)[o]||{};        return <Bdg label={o} color={c.text} bg={c.bg} border={c.border}/>; }
@@ -15,7 +16,7 @@ export function TBdg({type,dk}) {
 export function BlockerBadge({blocker}) {
   if (!blocker || blocker === "None") return null;
   return (
-    <span style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:11,fontWeight:800,
+    <span style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:11,fontWeight:600,fontFamily:FONT_SERIF,
       background:"#1a1400",color:"#ffd700",border:"2px solid #ffd700",borderRadius:4,
       padding:"3px 9px",letterSpacing:"0.03em",whiteSpace:"nowrap",boxShadow:"0 0 0 1px #b8a000"}}>
       ⚠️ BLOCKED: {blocker}

@@ -41,20 +41,20 @@ function IdeaCard({idea, idx, results, setResults, added, onAdd, t, dk, cats, ag
             <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center",marginBottom:6}}>
               <CBdg cat={idea.category||cats[0]} cats={cats} dk={dk}/>
               <TBdg type={idea.initType||"A/B Test"} dk={dk}/>
-              <span style={{fontSize:10,fontWeight:600,color:t.textMuted,fontFamily:t.sans,
+              <span style={{fontSize:10,fontWeight:600,color:t.textMuted,fontFamily:t.serif,
                 background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:3,padding:"1px 6px"}}>AI · Net New</span>
             </div>
             {isEditing
               ? <input style={{...gI(t),fontSize:14,fontWeight:700}} value={idea.title} autoFocus
                   onChange={e=>{const r=[...results];r[idx]={...r[idx],title:e.target.value};setResults(r);}}/>
-              : <div style={{fontSize:15,fontWeight:700,color:t.text,fontFamily:t.serif,lineHeight:1.35,cursor:"text"}}
+              : <div style={{fontSize:15,fontWeight:600,color:t.text,fontFamily:t.serif,lineHeight:1.35,cursor:"text"}}
                   onClick={()=>setEditing(true)}>{idea.title}</div>}
           </div>
           {score!==null&&(
             <div style={{textAlign:"center",flexShrink:0,paddingLeft:12,borderLeft:"1px solid "+t.border}}>
-              <div style={{fontSize:9,color:t.textMuted,fontFamily:t.sans,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:2}}>ICE</div>
-              <div style={{fontSize:22,fontWeight:700,fontFamily:t.serif,color:iceC(score),lineHeight:1}}>{score}</div>
-              <div style={{fontSize:9,color:t.textMuted,fontFamily:t.sans}}>/100</div>
+              <div style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:2}}>ICE</div>
+              <div style={{fontSize:22,fontWeight:700,fontFamily:t.mono,color:iceC(score),lineHeight:1}}>{score}</div>
+              <div style={{fontSize:9,color:t.textMuted,fontFamily:t.mono}}>/100</div>
             </div>
           )}
         </div>
@@ -64,27 +64,27 @@ function IdeaCard({idea, idx, results, setResults, added, onAdd, t, dk, cats, ag
           {idea.championedBy&&(
             <div style={{padding:"7px 10px",background:champAgent?champAgent.color+"18":t.goldBg,
               border:"1px solid "+(champAgent?champAgent.color+"50":t.goldBorder),borderRadius:5}}>
-              <div style={{fontSize:9,color:t.textMuted,fontFamily:t.sans,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>{champAgent?.icon} Championed by</div>
-              <div style={{fontSize:11,color:t.textSub,fontFamily:t.sans,lineHeight:1.5}}>{idea.championedBy}</div>
+              <div style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>{champAgent?.icon} Championed by</div>
+              <div style={{fontSize:11,color:t.textSub,fontFamily:t.serif,lineHeight:1.5}}>{idea.championedBy}</div>
             </div>
           )}
           {idea.dissentVoice&&(
             <div style={{padding:"7px 10px",background:dk?"#2a1a1a":"#fdf5f5",border:"1px solid "+(dk?"#6a3030":"#e0b0b0"),borderRadius:5}}>
-              <div style={{fontSize:9,color:t.textMuted,fontFamily:t.sans,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>{dissentAgent?.icon} Risk / Dissent</div>
-              <div style={{fontSize:11,color:dk?"#e09090":"#a03030",fontFamily:t.sans,lineHeight:1.5}}>{idea.dissentVoice}</div>
+              <div style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>{dissentAgent?.icon} Risk / Dissent</div>
+              <div style={{fontSize:11,color:dk?"#e09090":"#a03030",fontFamily:t.serif,lineHeight:1.5}}>{idea.dissentVoice}</div>
             </div>
           )}
         </div>
 
         {idea.csoRationale&&(
           <div style={{padding:"8px 12px",background:dk?"#1a1a2a":"#f4f4ff",border:"1px solid "+(dk?"#3a3a6a":"#c0c0e8"),borderRadius:5}}>
-            <div style={{fontSize:9,color:dk?"#8888cc":"#5555aa",fontFamily:t.sans,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>✦ CSO — Why we proceed</div>
-            <div style={{fontSize:11,color:dk?"#b0b0e0":"#333366",fontFamily:t.sans,lineHeight:1.5,fontWeight:600}}>{idea.csoRationale}</div>
+            <div style={{fontSize:9,color:dk?"#8888cc":"#5555aa",fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>✦ CSO — Why we proceed</div>
+            <div style={{fontSize:11,color:dk?"#b0b0e0":"#333366",fontFamily:t.serif,lineHeight:1.5,fontWeight:600}}>{idea.csoRationale}</div>
           </div>
         )}
 
         {idea.whyNotAlreadyRunning&&(
-          <div style={{padding:"7px 10px",background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:5,fontSize:11,color:t.textMuted,fontFamily:t.sans,lineHeight:1.5}}>
+          <div style={{padding:"7px 10px",background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:5,fontSize:11,color:t.textMuted,fontFamily:t.serif,lineHeight:1.5}}>
             <strong style={{color:t.textSub}}>Gap reason: </strong>{idea.whyNotAlreadyRunning}
           </div>
         )}
@@ -93,7 +93,7 @@ function IdeaCard({idea, idx, results, setResults, added, onAdd, t, dk, cats, ag
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           {idea.observation&&(
             <div>
-              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>📊 Observation</div>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>📊 Observation</div>
               {isEditing
                 ? <textarea style={{...gTA(t),fontSize:12}} rows={2} value={idea.observation}
                     onChange={e=>{const r=[...results];r[idx]={...r[idx],observation:e.target.value};setResults(r);}}/>
@@ -102,7 +102,7 @@ function IdeaCard({idea, idx, results, setResults, added, onAdd, t, dk, cats, ag
           )}
           {idea.hypothesis&&(
             <div style={{borderLeft:"3px solid "+t.gold,paddingLeft:10}}>
-              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>💡 Hypothesis</div>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>💡 Hypothesis</div>
               {isEditing
                 ? <textarea style={{...gTA(t),fontSize:12}} rows={3} value={idea.hypothesis}
                     onChange={e=>{const r=[...results];r[idx]={...r[idx],hypothesis:e.target.value};setResults(r);}}/>
@@ -111,7 +111,7 @@ function IdeaCard({idea, idx, results, setResults, added, onAdd, t, dk, cats, ag
           )}
           {idea.successMetric&&(
             <div>
-              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>🎯 Success metric</div>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>🎯 Success metric</div>
               {isEditing
                 ? <input style={{...gI(t),fontSize:12}} value={idea.successMetric}
                     onChange={e=>{const r=[...results];r[idx]={...r[idx],successMetric:e.target.value};setResults(r);}}/>
@@ -125,12 +125,12 @@ function IdeaCard({idea, idx, results, setResults, added, onAdd, t, dk, cats, ag
           <div style={{display:"flex",gap:10,padding:"8px 10px",background:t.surfaceAlt,borderRadius:5,border:"1px solid "+t.border}}>
             {[["Impact",idea.ice.impact],["Certainty",idea.ice.certainty],["Ease",idea.ice.ease]].map(([l,v])=>(
               <div key={l} style={{flex:1,textAlign:"center"}}>
-                <div style={{fontSize:9,color:t.textMuted,fontFamily:t.sans,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:2}}>{l}</div>
+                <div style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:2}}>{l}</div>
                 <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.mono}}>{v}<span style={{fontSize:9,color:t.textMuted}}>/10</span></div>
               </div>
             ))}
             <div style={{flex:1,textAlign:"center",borderLeft:"1px solid "+t.border}}>
-              <div style={{fontSize:9,color:t.textMuted,fontFamily:t.sans,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:2}}>Score</div>
+              <div style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:2}}>Score</div>
               <div style={{fontSize:16,fontWeight:700,fontFamily:t.mono,color:iceC(score)}}>{score||"—"}</div>
             </div>
           </div>
@@ -140,7 +140,7 @@ function IdeaCard({idea, idx, results, setResults, added, onAdd, t, dk, cats, ag
         <div style={{display:"flex",gap:6}}>
           {isAdded ? (
             <div style={{flex:1,padding:"7px 12px",borderRadius:5,background:t.goldBg,border:"1px solid "+t.goldBorder,
-              fontSize:12,fontWeight:700,color:t.gold,fontFamily:t.sans,textAlign:"center"}}>✓ Added to Growth Backlog</div>
+              fontSize:12,fontWeight:600,color:t.gold,fontFamily:t.serif,textAlign:"center"}}>✓ Added to Growth Backlog</div>
           ) : (
             <>
               <button onClick={()=>onAdd(idea,idx)} style={{...gG(t),flex:1,justifyContent:"center",fontSize:12,padding:"8px 12px",}}>
@@ -302,8 +302,8 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
         <div style={{padding:"13px 20px",borderBottom:"1px solid "+t.border,background:t.goldBg,flexShrink:0}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div>
-              <div style={{fontSize:15,fontWeight:700,color:t.text,fontFamily:t.serif}}>✦ Signal AI</div>
-              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginTop:2}}>
+              <div style={{fontSize:15,fontWeight:600,color:t.text,fontFamily:t.serif}}>✦ Signal AI</div>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginTop:2}}>
                 Agents query your live portfolio · Moderator routes the debate · 3 net-new initiatives
               </div>
             </div>
@@ -325,7 +325,7 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
           <div style={{display:"flex",gap:4,marginTop:10}}>
             {[["debate","🧠 Debate"],["history","🗂️ Past Debates ("+debates.length+")"]].map(([v,l])=>(
               <button key={v} onClick={()=>setTab(v)} style={{fontSize:11,padding:"4px 11px",borderRadius:4,cursor:"pointer",
-                fontFamily:t.sans,fontWeight:600,
+                fontFamily:t.serif,fontWeight:600,
                 background:tab===v?t.gold:"transparent",border:"1px solid "+(tab===v?t.gold:t.border),
                 color:tab===v?t.goldText:t.textMuted}}>{l}</button>
             ))}
@@ -340,7 +340,7 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
 
             {/* Context input */}
             <div>
-              <div style={{fontSize:10,letterSpacing:"0.10em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.sans,marginBottom:5}}>
+              <div style={{fontSize:10,letterSpacing:"0.10em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,marginBottom:5}}>
                 Situation context <span style={{fontWeight:400,textTransform:"none",letterSpacing:0}}>(optional — sharper with context)</span>
               </div>
               <textarea style={{...gTA(t),fontSize:12,minHeight:68,opacity:running?0.6:1}}
@@ -352,14 +352,14 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
 
             {/* Portfolio snapshot — collapsible */}
             <details style={{...gSc(t,dk),background:t.surfaceAlt}}>
-              <summary style={{fontSize:11,fontWeight:600,color:t.textSub,fontFamily:t.sans,cursor:"pointer",listStyle:"none",display:"flex",justifyContent:"space-between"}}>
+              <summary style={{fontSize:11,fontWeight:600,color:t.textSub,fontFamily:t.serif,cursor:"pointer",listStyle:"none",display:"flex",justifyContent:"space-between"}}>
                 <span>📋 Portfolio the agents will read</span>
                 <span style={{color:t.textMuted,fontWeight:400}}>▼</span>
               </summary>
-              <div style={{fontSize:11,color:t.textMuted,fontFamily:t.sans,lineHeight:1.7,whiteSpace:"pre-wrap",marginTop:10,maxHeight:200,overflowY:"auto"}}>
+              <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,lineHeight:1.7,whiteSpace:"pre-wrap",marginTop:10,maxHeight:200,overflowY:"auto"}}>
                 {portfolioCtx}
               </div>
-              <div style={{marginTop:8,fontSize:10,color:t.textMuted,fontFamily:t.sans,padding:"6px 8px",background:t.surface,borderRadius:4,border:"1px solid "+t.border}}>
+              <div style={{marginTop:8,fontSize:10,color:t.textMuted,fontFamily:t.serif,padding:"6px 8px",background:t.surface,borderRadius:4,border:"1px solid "+t.border}}>
                 🔧 Agents also have 8 live tools to query deeper: win rates, blocked items, coverage gaps, failure patterns, revenue gaps…
               </div>
             </details>
@@ -372,7 +372,7 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
             )}
 
             {error&&(
-              <div style={{padding:"10px 14px",background:dk?"#2a1010":"#fdf0f0",border:"1px solid "+(dk?"#6a2828":"#e09090"),borderRadius:6,fontSize:12,fontFamily:t.sans,color:dk?"#e08080":"#a03030"}}>
+              <div style={{padding:"10px 14px",background:dk?"#2a1010":"#fdf0f0",border:"1px solid "+(dk?"#6a2828":"#e09090"),borderRadius:6,fontSize:12,fontFamily:t.serif,color:dk?"#e08080":"#a03030"}}>
                 {error}
               </div>
             )}
@@ -380,7 +380,7 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
             {/* Live transcript */}
             {transcript.length>0&&(
               <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                <div style={{fontSize:10,letterSpacing:"0.10em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.sans,display:"flex",justifyContent:"space-between"}}>
+                <div style={{fontSize:10,letterSpacing:"0.10em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,display:"flex",justifyContent:"space-between"}}>
                   <span>Debate transcript</span>
                   <span>{turnCount}/{MAX_TURNS} turns</span>
                 </div>
@@ -391,11 +391,11 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
                     border:"1px solid "+t.border,borderLeft:"3px solid "+msg.color}}>
                     <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:5,flexWrap:"wrap"}}>
                       <span style={{fontSize:13}}>{msg.icon}</span>
-                      <span style={{fontSize:11,fontWeight:700,color:msg.color,fontFamily:t.sans,letterSpacing:"0.04em"}}>{msg.label}</span>
+                      <span style={{fontSize:11,fontWeight:600,color:msg.color,fontFamily:t.serif,letterSpacing:"0.04em"}}>{msg.label}</span>
                       {msg.toolsUsed&&msg.toolsUsed.length>0&&(
                         <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                           {msg.toolsUsed.map(tool=>(
-                            <span key={tool} style={{fontSize:9,color:t.textMuted,fontFamily:t.sans,background:t.surface,
+                            <span key={tool} style={{fontSize:9,color:t.textMuted,fontFamily:t.serif,background:t.surface,
                               border:"1px solid "+t.border,borderRadius:3,padding:"1px 5px"}}>
                               🔧 {tool.replace("get_","").replace(/_/g," ")}
                             </span>
@@ -403,14 +403,14 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
                         </div>
                       )}
                     </div>
-                    <p style={{margin:0,fontSize:12,color:t.textSub,lineHeight:1.7,fontFamily:t.sans}}>{msg.text}</p>
+                    <p style={{margin:0,fontSize:12,color:t.textSub,lineHeight:1.7,fontFamily:t.serif}}>{msg.text}</p>
                   </div>
                 ))}
 
                 {/* Moderator note */}
                 {modNote&&!running&&phase==="debating"&&(
                   <div style={{padding:"6px 10px",background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:5,
-                    fontSize:11,color:dk?"#d4b060":"#7a5800",fontFamily:t.sans,display:"flex",gap:6,alignItems:"center"}}>
+                    fontSize:11,color:dk?"#d4b060":"#7a5800",fontFamily:t.serif,display:"flex",gap:6,alignItems:"center"}}>
                     <span style={{fontWeight:700}}>🎙 Moderator:</span> {modNote}
                   </div>
                 )}
@@ -421,8 +421,8 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
                     background:t.surfaceAlt,borderRadius:"0 6px 6px 0",border:"1px solid "+t.border}}>
                     <div style={{display:"flex",alignItems:"center",gap:8}}>
                       <span style={{fontSize:13}}>{activeAgent.icon}</span>
-                      <span style={{fontSize:11,fontWeight:700,color:activeAgent.color,fontFamily:t.sans}}>{activeAgent.label}</span>
-                      <span style={{fontSize:11,color:t.textMuted,fontFamily:t.sans}}>
+                      <span style={{fontSize:11,fontWeight:600,color:activeAgent.color,fontFamily:t.serif}}>{activeAgent.label}</span>
+                      <span style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>
                         <span style={{display:"inline-block",animation:"spin 1.2s linear infinite"}}>⟳</span> querying portfolio data…
                       </span>
                     </div>
@@ -432,7 +432,7 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
                   <div style={{padding:"12px 16px",background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:6,
                     display:"flex",alignItems:"center",gap:8}}>
                     <span style={{display:"inline-block",animation:"spin 1.2s linear infinite",fontSize:14}}>⟳</span>
-                    <span style={{fontSize:12,fontWeight:600,color:t.gold,fontFamily:t.sans}}>CSO synthesizing debate → 3 net-new initiatives…</span>
+                    <span style={{fontSize:12,fontWeight:600,color:t.gold,fontFamily:t.serif}}>CSO synthesizing debate → 3 net-new initiatives…</span>
                   </div>
                 )}
               </div>
@@ -442,10 +442,10 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
             {results&&phase==="done"&&(
               <div style={{display:"flex",flexDirection:"column",gap:14}}>
                 <div style={{padding:"11px 14px",background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:6}}>
-                  <div style={{fontSize:12,fontWeight:700,color:t.gold,fontFamily:t.sans,marginBottom:2}}>
+                  <div style={{fontSize:12,fontWeight:600,color:t.gold,fontFamily:t.serif,marginBottom:2}}>
                     ✅ {results.length} net-new initiatives · {turnCount} agent turns · {transcript.reduce((s,m)=>s+(m.toolsUsed?.length||0),0)} tool calls
                   </div>
-                  <div style={{fontSize:11,color:t.textMuted,fontFamily:t.sans}}>
+                  <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>
                     Not currently running. Review, edit, then add to your Growth Backlog.
                   </div>
                 </div>
@@ -466,13 +466,13 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
                 <div style={{fontSize:13,fontWeight:600,color:t.text,fontFamily:t.serif,marginBottom:8}}>Autonomous C-Suite debate</div>
                 <div style={{display:"flex",justifyContent:"center",gap:6,flexWrap:"wrap",marginBottom:12}}>
                   {agents.map(a=>(
-                    <span key={a.id} style={{fontSize:11,padding:"4px 10px",borderRadius:4,fontFamily:t.sans,fontWeight:600,
+                    <span key={a.id} style={{fontSize:11,padding:"4px 10px",borderRadius:4,fontFamily:t.serif,fontWeight:600,
                       color:a.color,background:a.color+"15",border:"1px solid "+a.color+"30"}}>
                       {a.icon} {a.label}
                     </span>
                   ))}
                 </div>
-                <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,lineHeight:1.8,maxWidth:380,margin:"0 auto"}}>
+                <div style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,lineHeight:1.8,maxWidth:380,margin:"0 auto"}}>
                   Each exec has 8 live tools to query your portfolio data — win rates, blocked initiatives, coverage gaps, failure patterns, revenue gaps — before forming opinions.
                   A Moderator routes the debate dynamically. The CSO synthesizes into 3 net-new initiatives with champion and dissenting voice.
                   <br/><br/>
@@ -487,17 +487,17 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
           {tab==="history"&&(
             <div style={{display:"flex",flexDirection:"column",gap:12}}>
               {debates.length===0?(
-                <div style={{padding:"32px 16px",textAlign:"center",border:"1px dashed "+t.border,borderRadius:8,color:t.textMuted,fontFamily:t.sans,fontSize:12}}>
+                <div style={{padding:"32px 16px",textAlign:"center",border:"1px dashed "+t.border,borderRadius:8,color:t.textMuted,fontFamily:t.serif,fontSize:12}}>
                   No saved debates yet. Run your first debate and it will appear here.
                 </div>
               ):debates.map((d,i)=>(
                 <div key={d.id} style={{...gSc(t,dk)}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
                     <div>
-                      <div style={{fontSize:11,fontWeight:700,color:t.text,fontFamily:t.sans}}>
+                      <div style={{fontSize:11,fontWeight:600,color:t.text,fontFamily:t.serif}}>
                         {new Date(d.date).toLocaleDateString("en-CA",{month:"short",day:"numeric",year:"numeric",hour:"2-digit",minute:"2-digit"})}
                       </div>
-                      <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginTop:2}}>
+                      <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginTop:2}}>
                         {d.turnCount} turns · {d.results?.length||0} initiatives generated
                         {d.context&&<span> · "{d.context.slice(0,50)}{d.context.length>50?"…":""}"</span>}
                       </div>
@@ -506,7 +506,7 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
                       {(d.results||[]).map((idea,idx)=>(
                         <button key={idx} onClick={()=>{onAddToBacklog(idea);}}
                           title={"Add: "+idea.title}
-                          style={{fontSize:9,padding:"2px 7px",borderRadius:3,fontFamily:t.sans,fontWeight:600,cursor:"pointer",
+                          style={{fontSize:9,padding:"2px 7px",borderRadius:3,fontFamily:t.serif,fontWeight:600,cursor:"pointer",
                             background:t.goldBg,border:"1px solid "+t.goldBorder,color:t.gold}}>
                           + {(idea.title||"").split(" ").slice(0,3).join(" ")}…
                         </button>
@@ -514,12 +514,12 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
                     </div>
                   </div>
                   <details>
-                    <summary style={{fontSize:11,color:t.textMuted,fontFamily:t.sans,cursor:"pointer"}}>View transcript ({d.transcript?.length||0} turns)</summary>
+                    <summary style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,cursor:"pointer"}}>View transcript (<span style={{fontFamily:t.mono}}>{d.transcript?.length||0}</span> turns)</summary>
                     <div style={{marginTop:8,display:"flex",flexDirection:"column",gap:6,maxHeight:300,overflowY:"auto"}}>
                       {(d.transcript||[]).map((msg,j)=>(
                         <div key={j} style={{borderLeft:"3px solid "+msg.color,paddingLeft:10,paddingTop:4,paddingBottom:4}}>
-                          <div style={{fontSize:10,fontWeight:700,color:msg.color,fontFamily:t.sans,marginBottom:3}}>{msg.icon} {msg.label}</div>
-                          <p style={{margin:0,fontSize:11,color:t.textSub,fontFamily:t.sans,lineHeight:1.6}}>{msg.text}</p>
+                          <div style={{fontSize:10,fontWeight:600,color:msg.color,fontFamily:t.serif,marginBottom:3}}>{msg.icon} {msg.label}</div>
+                          <p style={{margin:0,fontSize:11,color:t.textSub,fontFamily:t.serif,lineHeight:1.6}}>{msg.text}</p>
                         </div>
                       ))}
                     </div>

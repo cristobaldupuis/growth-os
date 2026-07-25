@@ -46,7 +46,7 @@ function buildScorecardText(dash, latestWeek, weekLabel, brands, activeBrand, se
 
   if (latestWeek) {
     lines.push("");
-    lines.push("WEEKLY METRICS — " + weekLabel);
+    lines.push("WEEKLY METRICS · " + weekLabel);
     const m = latestWeek.metrics || {};
     if (m.revenue != null)     lines.push("Revenue: " + fmtCur(m.revenue));
     if (m.sessions != null)    lines.push("Sessions: " + m.sessions.toLocaleString());
@@ -179,7 +179,7 @@ function ScorecardSection({ t, dk, dash, weeklyMetrics, brands, activeBrand, set
       {latestWeek && weekKpis.length > 0 && (
         <div>
           <div style={{ fontSize: 10, fontFamily: t.mono, color: t.textMuted, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>
-            Weekly metrics — {weekLabel}
+            Weekly metrics · {weekLabel}
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {weekKpis.map(k => (
@@ -424,7 +424,7 @@ export function ClientReadoutView({ t, dk, dash, items, brands, activeBrand, cat
         <div>
           <div style={{ fontSize: 10, letterSpacing: "0.10em", textTransform: "uppercase", color: t.gold, fontFamily: t.mono, fontWeight: 700, marginBottom: 4 }}>Client Readout</div>
           <div style={{ fontSize: 18, fontWeight: 700, color: t.text, fontFamily: t.sans, lineHeight: 1.2 }}>
-            Weekly summary — {activeBrand === "all" ? "All brands" : brandName(activeBrand, brands)}
+            Weekly summary · {activeBrand === "all" ? "All brands" : brandName(activeBrand, brands)}
           </div>
           <div style={{ fontSize: 12, color: t.textMuted, fontFamily: t.serif, marginTop: 3 }}>
             Read-only view. Use "Copy section" buttons or copy the full readout to share with clients.

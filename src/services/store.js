@@ -71,7 +71,7 @@ export const handleRestoreBackup = (file, showToast, setRestorePayload) => {
         : "unknown date";
       setRestorePayload({ parsed, counts, stamp });
     } catch (err) {
-      showToast("Couldn't read that backup file — it may be corrupted.", "error");
+      showToast("Couldn't read that backup file. It may be corrupted.", "error");
       console.error("Restore error:", err);
     }
   };

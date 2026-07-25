@@ -54,9 +54,9 @@ const GUIDE_SECTIONS = [
     id: "signal",
     views: ["signal","dashboard"],
     label: "Generate net-new strategy",
-    feature: "Signal AI — C-suite debate engine",
-    what: "A panel of C-suite AI personas debates your current portfolio and constraints, then synthesizes net-new initiatives you haven't thought of — each one grounded in your real brand brief and learnings.",
-    why: "This is the part no spreadsheet or tracker can do. It turns your portfolio state into fresh, defensible strategy on demand — the thinking partner in the room.",
+    feature: "Signal AI: C-suite debate engine",
+    what: "A panel of C-suite AI personas debates your current portfolio and constraints, then synthesizes net-new initiatives you haven't thought of, each one grounded in your real brand brief and learnings.",
+    why: "This is the part no spreadsheet or tracker can do. It turns your portfolio state into fresh, defensible strategy on demand, the thinking partner in the room.",
     cta: "Open Signal",
     action: "signal",
   },
@@ -64,7 +64,7 @@ const GUIDE_SECTIONS = [
     id: "recs",
     views: ["dashboard"],
     label: "Get this week's experiments",
-    feature: "Next Plays — weekly recommendations",
+    feature: "Next Plays: weekly recommendations",
     what: "Proactive experiment suggestions with the hypothesis pre-written and ICE pre-scored, drawn from your portfolio, learnings library, brand briefs, and latest metrics.",
     why: "Removes the blank-page problem every week. You walk into the standup with three grounded plays already framed and prioritized.",
     cta: "Go to Dashboard",
@@ -75,7 +75,7 @@ const GUIDE_SECTIONS = [
     views: ["dashboard"],
     label: "Prove ROI to justify the retainer",
     feature: "Contribution-to-revenue view",
-    what: "A three-layer revenue picture — realised, probability-weighted in-flight, and probability-weighted pipeline — broken down by category, with one-click copy for client emails.",
+    what: "A three-layer revenue picture (realised, probability-weighted in-flight, and probability-weighted pipeline) broken down by category, with one-click copy for client emails.",
     why: "This is the answer to \"what did this engagement actually drive?\" It's the artifact that justifies renewals.",
     cta: "Go to Dashboard",
     action: "dashboard",
@@ -105,7 +105,7 @@ const GUIDE_SECTIONS = [
     views: ["triage"],
     label: "Run the weekly review",
     feature: "Triage",
-    what: "Surfaces initiatives that need a decision this week — overdue, awaiting results, or blocked — so nothing stalls silently.",
+    what: "Surfaces initiatives that need a decision this week (overdue, awaiting results, or blocked) so nothing stalls silently.",
     why: "Keeps the portfolio moving and gives the standup its agenda.",
     cta: "Open Triage",
     action: "triage",
@@ -116,7 +116,7 @@ const GUIDE_SECTIONS = [
     label: "Keep your data safe & portable",
     feature: "Backup, restore & metrics import",
     what: "Download a full JSON backup any time, restore from one, log weekly metrics manually, or import from Meta / GA4. Brand briefs and settings live in one place.",
-    why: "Your portfolio is portable and recoverable — no lock-in, no silent data loss.",
+    why: "Your portfolio is portable and recoverable, with no lock-in and no silent data loss.",
     cta: "Open Settings",
     action: "settings",
   },
@@ -239,7 +239,7 @@ function OnboardingModal({ t, dk, settings, onSave, onSkip }) {
     {
       id: "company",
       title: "Your company",
-      subtitle: "This personalises every AI output — hypotheses, debates, synthesis.",
+      subtitle: "This personalises every AI output: hypotheses, debates, synthesis.",
       fields: (
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
           <div>
@@ -284,7 +284,7 @@ function OnboardingModal({ t, dk, settings, onSave, onSkip }) {
     {
       id: "brands",
       title: "Your brands & retailers",
-      subtitle: "This is what makes AI recommendations specific to your business — not generic advice.",
+      subtitle: "This is what makes AI recommendations specific to your business, not generic advice.",
       fields: (
         <div style={{display:"flex",flexDirection:"column",gap:10,maxHeight:320,overflowY:"auto",paddingRight:4}}>
           {brands.map((b,i)=>(
@@ -318,7 +318,7 @@ function OnboardingModal({ t, dk, settings, onSave, onSkip }) {
               </div>
             </div>
           ))}
-          {brands.length===0&&<div style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,padding:"12px 0"}}>No brands configured — add them in Settings after setup.</div>}
+          {brands.length===0&&<div style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,padding:"12px 0"}}>No brands configured. Add them in Settings after setup.</div>}
         </div>
       ),
     },
@@ -329,7 +329,7 @@ function OnboardingModal({ t, dk, settings, onSave, onSkip }) {
       fields: (
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           {[
-            { icon:"⚡", label:"Quick capture", desc:"Paste any idea — AI structures it into an initiative" },
+            { icon:"⚡", label:"Quick capture", desc:"Paste any idea. AI structures it into an initiative" },
             { icon:"✦",  label:"Signal AI",     desc:"C-Suite debate that queries your live portfolio and recommends what to run next" },
             { icon:"📚", label:"Library",        desc:"Every completed initiative becomes searchable institutional memory" },
           ].map(({icon,label,desc})=>(
@@ -505,7 +505,7 @@ export default function App() {
         if (lastBackup && !backupNudged) {
           const daysSince = (Date.now() - new Date(lastBackup).getTime()) / 86400000;
           if (daysSince > 14) {
-            showToast("You haven't backed up in over 14 days — consider downloading a backup.", "info");
+            showToast("You haven't backed up in over 14 days. Consider downloading a backup.", "info");
             setBackupNudged(true);
           }
         }
@@ -650,7 +650,7 @@ export default function App() {
       ice: { ...rec.ice },
       linkedIds: rec.sourceLearningIds || [],
       notes: rec.reasoningTrace
-        ? "From Next Plays — reasoning: "+rec.reasoningTrace
+        ? "From Next Plays. Reasoning: "+rec.reasoningTrace
         : "From Next Plays",
     });
 
@@ -678,7 +678,7 @@ export default function App() {
   const handleResetDemoData = () => {
     saveItems(SEED);
     saveMetrics(SEED_WEEKLY_METRICS);
-    showToast(`Demo data restored — ${SEED.length} initiatives and ${SEED_WEEKLY_METRICS.length} weeks of metrics loaded.`, "success");
+    showToast(`Demo data restored: ${SEED.length} initiatives and ${SEED_WEEKLY_METRICS.length} weeks of metrics loaded.`, "success");
   };
 
 
@@ -888,7 +888,7 @@ export default function App() {
     if(!form||!form.hypothesis||form.hypothesis.length<60) return;
     setAiLoad(true);
     try{const x=await callExpandHypothesis(form.hypothesis,form.title,settings,dataCtx);if(x)setHypReview({proposed:x});}
-    catch(err){console.error("Expand hypothesis error:",err);showToast(err.message||"AI expand failed — try again.","error");}
+    catch(err){console.error("Expand hypothesis error:",err);showToast(err.message||"AI expand failed. Try again.","error");}
     setAiLoad(false);
   };
 
@@ -896,7 +896,7 @@ export default function App() {
     if(!form||!form.hypothesis) return;
     setIceLoad(true);
     try{const x=await callSuggestICE(form,settings,dataCtx);if(x&&x.impact)setIceReview(x);}
-    catch(err){console.error("ICE assist error:",err);showToast(err.message||"AI scoring failed — try again.","error");}
+    catch(err){console.error("ICE assist error:",err);showToast(err.message||"AI scoring failed. Try again.","error");}
     setIceLoad(false);
   };
 
@@ -1125,7 +1125,7 @@ export default function App() {
         onStatus={(id,status)=>{const it=items.find(e=>e.id===id); if(it){setSelId(id); reqStatus(status);}}}
         onLogResults={(id)=>{const it=items.find(e=>e.id===id); if(it){setSelId(id); setRForm(it.results?{...it.results,actualRevenueImpact:it.results.actualRevenueImpact!=null?it.results.actualRevenueImpact:"",actualSpendCost:it.results.actualSpendCost!=null?it.results.actualSpendCost:"",actualResourceCost:it.results.actualResourceCost!=null?it.results.actualResourceCost:""}:{actualOutcome:"",keyLearning:"",outcomeClassification:"Success",decisionMade:"",outcomeCertainty:75,actualRevenueImpact:"",actualSpendCost:"",actualResourceCost:""}); setShowR(true);}}}
         onExtend={(id,days)=>{saveItems(items.map(e=>{if(e.id!==id)return e; const base=e.endDate?new Date(e.endDate+"T12:00:00"):new Date(); base.setDate(base.getDate()+days); return {...e,endDate:base.toISOString().slice(0,10)};})); showToast("Extended "+days+" days.","success");}}
-        onActivate={(id)=>{saveItems(items.map(e=>e.id===id?withRunningSnapshot({...e,status:"Running",startDate:e.startDate||new Date().toISOString().slice(0,10)},"Running"):e)); showToast("Initiative activated — now running.","success");}}
+        onActivate={(id)=>{saveItems(items.map(e=>e.id===id?withRunningSnapshot({...e,status:"Running",startDate:e.startDate||new Date().toISOString().slice(0,10)},"Running"):e)); showToast("Initiative activated. Now running.","success");}}
       />}
       {nav==="library"&&<LearningLibrary items={items} t={t} dk={dk} cats={cats} brands={brands} activeBrand={activeBrand} settings={settings} view={libView} onView={saveLibView} onReplicate={(item)=>{const base=mkDefault(cats,activeBrand);setForm({...base,title:"[Replicate] "+item.title,hypothesis:"Based on learning from: "+item.title+". Original: "+item.hypothesis,category:item.category,initType:item.initType,ice:{...item.ice},revenueImpact:item.revenueImpact,notes:"Replicated from initiative "+item.id+". Original learning: "+item.results.keyLearning});setNav("form");}}/>}
       {nav==="readout"&&<ClientReadoutView t={t} dk={dk} dash={dash} items={items} brands={brands} activeBrand={activeBrand} cats={cats} weeklyMetrics={weeklyMetrics} settings={settings}/>}
@@ -1168,7 +1168,7 @@ export default function App() {
                 <div style={{...gCd(t,dk),padding:"44px 24px",textAlign:"center"}}>
                   <div style={{fontSize:28,marginBottom:10,opacity:.5}}>&#9670;</div>
                   <div style={{fontSize:15,fontWeight:600,color:t.text,fontFamily:t.sans,marginBottom:6}}>No initiatives yet</div>
-                  <div style={{fontSize:13,color:t.textSub,fontFamily:t.sans,lineHeight:1.55,maxWidth:380,margin:"0 auto 16px"}}>Start your growth portfolio — add an initiative, capture a quick idea, or generate a slate from Signal.</div>
+                  <div style={{fontSize:13,color:t.textSub,fontFamily:t.sans,lineHeight:1.55,maxWidth:380,margin:"0 auto 16px"}}>Start your growth portfolio: add an initiative, capture a quick idea, or generate a slate from Signal.</div>
                   <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
                     <button onClick={goNew} style={{...gG(t),fontSize:12.5,padding:"8px 16px"}}>+ New initiative</button>
                     <button onClick={()=>setShowCapture(true)} style={{...gGh(t),fontSize:12.5,padding:"8px 14px"}}>&#9889; Quick capture</button>
@@ -1249,11 +1249,11 @@ export default function App() {
       {showCapture&&(
         <Modal t={t} dk={dk} onClose={()=>{setShowCapture(false);setCaptureText("");}} title="Quick capture">
           <p style={{fontSize:13,color:t.textSub,fontFamily:t.serif,marginBottom:14,lineHeight:1.6}}>
-            Describe the initiative in plain language — one sentence or a few. AI will pre-fill the form. You review and adjust before saving.
+            Describe the initiative in plain language, one sentence or a few. AI will pre-fill the form. You review and adjust before saving.
           </p>
           <FR label="What do you want to test or change?" t={t}>
             <textarea style={{...gTA(t),fontSize:13}} rows={4} value={captureText} onChange={e=>setCaptureText(e.target.value)}
-              placeholder={"e.g. We should test removing the discount banner on the homepage for new visitors — I think it's training customers to wait for deals rather than buying at full price. Primary metric would be full-price order rate."}/>
+              placeholder={"e.g. We should test removing the discount banner on the homepage for new visitors. I think it's training customers to wait for deals rather than buying at full price. Primary metric would be full-price order rate."}/>
           </FR>
           {captureText.length>0&&captureText.length<30&&<div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,marginTop:4}}><span style={{fontFamily:t.mono}}>{30-captureText.length}</span> more chars to enable AI</div>}
           <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:14}}>
@@ -1270,7 +1270,7 @@ export default function App() {
                     setCaptureText("");
                     setNav("form");
                   }
-                } catch(e){ showToast(e.message || "AI extraction failed — try adding more detail.", "error"); }
+                } catch(e){ showToast(e.message || "AI extraction failed. Try adding more detail.", "error"); }
                 setCaptureLoad(false);
               }}>
               {captureLoad?<><span style={{display:"inline-block",animation:"spin 1s linear infinite"}}>&#8635;</span> Extracting…</>:<><span>&#9889;</span> Extract with AI</>}
@@ -1336,7 +1336,7 @@ export default function App() {
                 </label>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,padding:"10px 12px",background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:6}}>
                   <span style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,lineHeight:1.5}}>
-                    First time? Download the CSV template — correct headers, one example row.
+                    First time? Download the CSV template: correct headers, one example row.
                   </span>
                   <button style={{...gG(t),fontSize:11,padding:"4px 11px",flexShrink:0}} onClick={handleDownloadTemplate}>
                     &#8599; Open template in Google Sheets
@@ -1355,7 +1355,7 @@ export default function App() {
                   <div style={{maxHeight:120,overflowY:"auto",display:"flex",flexDirection:"column",gap:4}}>
                     {importErrs.map((e,i)=>(
                       <div key={i} style={{fontSize:11,fontFamily:t.serif,padding:"5px 10px",background:dk?"#2a1212":"#fdf0f0",border:"1px solid "+(dk?"#6a2828":"#e09090"),borderRadius:4,color:dk?"#e08080":"#a03030"}}>
-                        Row {e.row} — <strong>{e.title}</strong>: {e.issues.join("; ")}
+                        Row {e.row} · <strong>{e.title}</strong>: {e.issues.join("; ")}
                       </div>
                     ))}
                   </div>
@@ -1387,7 +1387,7 @@ export default function App() {
 
       {showSM&&(
         <Modal t={t} dk={dk} onClose={()=>{setShowSM(false);setPendS(null);}} title={"Mark as "+pendS}>
-          <p style={{fontSize:13,color:t.textSub,marginBottom:16,fontFamily:t.serif}}>Confirm outcome certainty before closing — how confident are you in the result based on data collected?</p>
+          <p style={{fontSize:13,color:t.textSub,marginBottom:16,fontFamily:t.serif}}>Confirm outcome certainty before closing. How confident are you in the result based on data collected?</p>
           <FR label={"Outcome certainty: "+confC+"%"} t={t}>
             <input type="range" min={0} max={100} step={5} value={confC} onChange={e=>setConfC(parseInt(e.target.value))} style={{width:"100%",marginTop:4}}/>
             <CBar pct={confC} t={t}/>
@@ -1423,7 +1423,7 @@ export default function App() {
               </div>
             )}
             <FR label="Actual outcome vs hypothesis" t={t}><textarea style={gTA(t)} rows={3} value={rForm.actualOutcome} onChange={e=>setRForm({...rForm,actualOutcome:e.target.value})}/></FR>
-            <FR label="Key learning — one sentence (required)" t={t}><input style={gI(t)} value={rForm.keyLearning} onChange={e=>setRForm({...rForm,keyLearning:e.target.value})}/></FR>
+            <FR label="Key learning (one sentence, required)" t={t}><input style={gI(t)} value={rForm.keyLearning} onChange={e=>setRForm({...rForm,keyLearning:e.target.value})}/></FR>
             <FR label="Outcome classification" t={t}>
               <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                 {OUTCOMES.map(o=>{const c=(dk?OD:OL)[o]||{},act=rForm.outcomeClassification===o;return(
@@ -1432,11 +1432,11 @@ export default function App() {
               </div>
             </FR>
             <FR label="Decision made" t={t}><textarea style={gTA(t)} rows={2} value={rForm.decisionMade} onChange={e=>setRForm({...rForm,decisionMade:e.target.value})}/></FR>
-            <FR label="Durability — how long does this learning stay relevant?" t={t}>
+            <FR label="Durability: how long does this learning stay relevant?" t={t}>
               <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                 {[
-                  {k:"tactical",   label:"Tactical",   hint:"Context-bound — decays as platforms, creative, or market shift"},
-                  {k:"structural", label:"Structural", hint:"Durable truth about the business — stays relevant for years"},
+                  {k:"tactical",   label:"Tactical",   hint:"Context-bound, decays as platforms, creative, or market shift"},
+                  {k:"structural", label:"Structural", hint:"Durable truth about the business, stays relevant for years"},
                 ].map(d=>{
                   const act=(rForm.durability||"tactical")===d.k;
                   return (
@@ -1447,11 +1447,11 @@ export default function App() {
               </div>
               <div style={{fontSize:10.5,color:t.textMuted,fontFamily:t.serif,marginTop:6,lineHeight:1.5}}>
                 {(rForm.durability||"tactical")==="structural"
-                  ? "Structural — Signal treats this as enduring evidence; not discounted by age."
-                  : "Tactical — Signal down-weights this as it ages; library search still surfaces it, flagged by recency."}
+                  ? "Structural: Signal treats this as enduring evidence; not discounted by age."
+                  : "Tactical: Signal down-weights this as it ages; library search still surfaces it, flagged by recency."}
               </div>
             </FR>
-            <FR label="Actual revenue impact ($) — leave blank if not measurable" t={t}><input style={gI(t)} type="number" value={rForm.actualRevenueImpact} placeholder="e.g. 42000 or -15000" onChange={e=>setRForm({...rForm,actualRevenueImpact:e.target.value})}/></FR>
+            <FR label="Actual revenue impact ($), leave blank if not measurable" t={t}><input style={gI(t)} type="number" value={rForm.actualRevenueImpact} placeholder="e.g. 42000 or -15000" onChange={e=>setRForm({...rForm,actualRevenueImpact:e.target.value})}/></FR>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
               <FR label="Actual media / spend cost ($)" t={t}><input style={gI(t)} type="number" value={rForm.actualSpendCost||""} placeholder="leave blank if unchanged" onChange={e=>setRForm({...rForm,actualSpendCost:e.target.value})}/></FR>
               <FR label="Actual resource cost ($)" t={t}><input style={gI(t)} type="number" value={rForm.actualResourceCost||""} placeholder="leave blank if unchanged" onChange={e=>setRForm({...rForm,actualResourceCost:e.target.value})}/></FR>
@@ -1693,7 +1693,7 @@ function MetricsImportModal({t, dk, weeklyMetrics, onSave, onClose}) {
               onClick={()=>document.getElementById("metrics-csv-input").click()}>
               <div style={{fontSize:28,marginBottom:8}}>📂</div>
               <div style={{fontSize:13,color:t.text,marginBottom:4}}>Drop your CSV here or click to upload</div>
-              <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>Header-driven — column order doesn't matter. See template for required columns.</div>
+              <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>Header-driven, so column order doesn't matter. See template for required columns.</div>
               <input id="metrics-csv-input" type="file" accept=".csv" style={{display:"none"}} onChange={handleFile}/>
             </div>
             <div style={{background:dk?"#1a1a12":"#f5f5f0",borderRadius:6,padding:"10px 12px",fontSize:11,fontFamily:t.serif,color:t.textMuted,lineHeight:1.7}}>
@@ -1841,7 +1841,7 @@ function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, cats, onAc
                     style={{display:"flex",gap:6,alignItems:"baseline",background:"none",border:"none",cursor:"pointer",textAlign:"left",padding:0,fontFamily:t.serif}}>
                     <span style={{fontSize:10,fontWeight:700,color:t.gold}}>{f.n}</span>
                     <span style={{fontSize:11,color:t.textMuted}}>
-                      {f.item.initId ? f.item.initId+" — " : ""}{f.item.title}
+                      {f.item.initId ? f.item.initId+" · " : ""}{f.item.title}
                     </span>
                   </button>
                 ))}
@@ -1883,7 +1883,7 @@ function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, cats, onAc
 
         {/* ICE with rationale */}
         <div style={gSc(t,dk)}>
-          <div style={gSL(t)}>ICE scoring — AI suggested</div>
+          <div style={gSL(t)}>ICE scoring · AI suggested</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:14,alignItems:"center"}}>
             <div>
               <div style={{display:"flex",alignItems:"baseline",gap:6,marginBottom:4}}>
@@ -1906,14 +1906,14 @@ function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, cats, onAc
             </div>
           </div>
           <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginTop:8,fontStyle:"italic"}}>
-            Ease is left at 5 — adjust when you add to backlog based on your team's capacity.
+            Ease is left at 5. Adjust when you add to backlog based on your team's capacity.
           </div>
         </div>
 
         {/* Cited source learnings — the grounding */}
         {citedLearnings.length > 0 && (
           <div style={gSc(t,dk)}>
-            <div style={gSL(t)}>Source learnings — what this is grounded in</div>
+            <div style={gSL(t)}>Source learnings · what this is grounded in</div>
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
               {citedLearnings.map(item => (
                 <div key={item.id} onClick={()=>setCiteItem(item)} style={{padding:"10px 12px",background:dk?"#1a1a14":"#fafaf5",borderLeft:"3px solid "+t.gold,borderRadius:"0 4px 4px 0",cursor:"pointer"}}>
@@ -2148,7 +2148,7 @@ function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onRestoreB
         </div>
         <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
           <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:10,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Backup &amp; restore</div>
-          <p style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,lineHeight:1.6,margin:"0 0 10px"}}>Download a full snapshot of your data (initiatives, settings, debates, weekly metrics) as a JSON file. Keep a copy somewhere safe — this is the only off-device record until cloud sync ships.</p>
+          <p style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,lineHeight:1.6,margin:"0 0 10px"}}>Download a full snapshot of your data (initiatives, settings, debates, weekly metrics) as a JSON file. Keep a copy somewhere safe. This is the only off-device record until cloud sync ships.</p>
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
             <button onClick={onDownloadBackup} style={{...gG(t),fontSize:12}}>&#8659; Download backup</button>
             <label style={{...gGh(t),fontSize:12,cursor:"pointer"}}>
@@ -2166,7 +2166,7 @@ function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onRestoreB
         <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
             <div style={{fontSize:12,fontWeight:700,color:t.textSub,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Data sources</div>
-            <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,background:t.border,padding:"2px 6px",borderRadius:3}}>Placeholder — coming soon</span>
+            <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,background:t.border,padding:"2px 6px",borderRadius:3}}>Placeholder · coming soon</span>
           </div>
           <p style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,lineHeight:1.6,margin:"0 0 8px"}}>Planned: Google Sheets (pulling from GA4, Looker, Meta Ads), BigQuery, direct GA4 and Meta Ads APIs. Paste data manually in the initiative form for now.</p>
           <div style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,padding:"10px 12px",background:dk?"#1a1a12":"#f5f5f0",borderRadius:4,border:"1px dashed "+t.border}}>No data sources connected yet.</div>

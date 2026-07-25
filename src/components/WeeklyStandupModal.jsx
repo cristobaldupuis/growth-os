@@ -64,7 +64,7 @@ export function WeeklyStandupModal({ t, dk, items, brands, onCommit, onClose, sh
           <div style={gSL(t)}>Needs attention</div>
           {groups.length === 0 ? (
             <div style={{ fontSize: 12.5, color: t.textMuted, fontFamily: t.serif, lineHeight: 1.6, padding: "4px 0" }}>
-              Nothing flagged — every running initiative has a recent update and every closed one has a post-mortem.
+              Nothing flagged. Every running initiative has a recent update and every closed one has a post-mortem.
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -95,7 +95,7 @@ export function WeeklyStandupModal({ t, dk, items, brands, onCommit, onClose, sh
 
         {/* Status log — quick notes on running work */}
         <div>
-          <div style={gSL(t)}>Status log — running initiatives</div>
+          <div style={gSL(t)}>Status log · running initiatives</div>
           {running.length === 0 ? (
             <div style={{ fontSize: 12.5, color: t.textMuted, fontFamily: t.serif, lineHeight: 1.6, padding: "4px 0" }}>
               No running initiatives right now.

@@ -65,25 +65,25 @@ export function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResu
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
             {item.observation&&(
               <div>
-                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>📊 Observation — what data prompted this?</div>
+                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>📊 Observation · what data prompted this?</div>
                 <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:13}}>{item.observation}</p>
               </div>
             )}
             {item.hypothesis&&(
               <div style={{borderLeft:"3px solid "+t.gold,paddingLeft:12}}>
-                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>💡 Hypothesis — if we do X, then Y…</div>
+                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>💡 Hypothesis · if we do X, then Y…</div>
                 <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:14,fontWeight:600}}>{item.hypothesis}</p>
               </div>
             )}
             {item.successMetric&&(
               <div>
-                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>🎯 Success metric — what KPI determines a win?</div>
+                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>🎯 Success metric · what KPI determines a win?</div>
                 <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:13}}>{item.successMetric}</p>
               </div>
             )}
             {/* Legacy fallback: show description if present and no new fields */}
             {!item.observation&&!item.successMetric&&item.hypothesis&&(
-              <p style={{margin:0,color:t.textMuted,fontSize:12,fontFamily:t.serif,fontStyle:"italic"}}>Legacy entry — observation and success metric not yet captured.</p>
+              <p style={{margin:0,color:t.textMuted,fontSize:12,fontFamily:t.serif,fontStyle:"italic"}}>Legacy entry. Observation and success metric not yet captured.</p>
             )}
           </div>
         ) : (
@@ -406,7 +406,7 @@ function TestValidityPanel({ item, t, dk, onSaveTestValidity }) {
       {/* 2 — Statistical significance */}
       <div style={{marginBottom:14,paddingBottom:14,borderBottom:"1px solid "+t.border}}>
         <div style={{fontSize:11,fontWeight:600,color:t.textSub,fontFamily:t.serif,marginBottom:10,letterSpacing:"0.04em"}}>
-          &#8680; Statistical significance — current results
+          &#8680; Statistical significance · current results
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:10}}>
           {[
@@ -461,7 +461,7 @@ function TestValidityPanel({ item, t, dk, onSaveTestValidity }) {
             </div>
             {!conf90&&hasData&&(
               <div style={{marginTop:8,fontSize:11,color:t.textMuted,fontFamily:t.serif,lineHeight:1.5}}>
-                Test has not reached statistical significance. Avoid calling a winner early — let it run to the target sample size.
+                Test has not reached statistical significance. Avoid calling a winner early; let it run to the target sample size.
               </div>
             )}
           </div>
@@ -475,7 +475,7 @@ function TestValidityPanel({ item, t, dk, onSaveTestValidity }) {
       {/* 3 — Incrementality / counterfactual */}
       <div>
         <div style={{fontSize:11,fontWeight:600,color:t.textSub,fontFamily:t.serif,marginBottom:6,letterSpacing:"0.04em"}}>
-          &#8680; Incrementality — counterfactual definition
+          &#8680; Incrementality · counterfactual definition
         </div>
         <div style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,marginBottom:8,lineHeight:1.5}}>
           Required before marking this initiative Completed. What would have happened without this change?
@@ -483,7 +483,7 @@ function TestValidityPanel({ item, t, dk, onSaveTestValidity }) {
         <textarea style={{...gTA(t),fontSize:13}} rows={3}
           value={counterfactual}
           onChange={e=>setCounterfactual(e.target.value)}
-          placeholder={"e.g. Without this test, paid social would have continued driving traffic into a 1.2% CVR funnel — at current spend, that's approx. $80k/mo in lost revenue vs the 1.76% baseline."}/>
+          placeholder={"e.g. Without this test, paid social would have continued driving traffic into a 1.2% CVR funnel. At current spend, that's approx. $80k/mo in lost revenue vs the 1.76% baseline."}/>
         {item.status==="Completed" && !counterfactual && (
           <div style={{marginTop:6,padding:"6px 10px",background:dk?"#2a1212":"#fdf0f0",border:"1px solid "+(dk?"#6a2828":"#e09090"),borderRadius:4,fontSize:11,color:dk?"#e08080":"#a03030",fontFamily:t.serif}}>
             &#9888; Counterfactual is required for Completed initiatives. Define what success would look like vs the null scenario.
@@ -491,7 +491,7 @@ function TestValidityPanel({ item, t, dk, onSaveTestValidity }) {
         )}
         {counterfactual && (
           <div style={{marginTop:6,fontSize:11,color:dk?"#60d080":"#1a7a48",fontFamily:t.serif}}>
-            &#10003; Counterfactual defined — incrementality claim is documented.
+            &#10003; Counterfactual defined. Incrementality claim is documented.
           </div>
         )}
       </div>

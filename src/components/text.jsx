@@ -5,13 +5,30 @@
 // optional currency symbol, the digit run, and a trailing unit (%, k, x, ...).
 const NUM_RE = /((?:[$£€]\s?)?\d[\d,]*(?:\.\d+)?(?:\s?[%kKxMB])?)/g;
 
+// Em dashes read as a machine tell, and a lot of the prose on screen arrives
+// from the model or from pasted notes. Normalise on the way out so no display
+// path has to remember: a dash between clauses becomes a comma, a dangling one
+// is dropped, and stacked punctuation is collapsed. En dashes are left alone,
+// they carry numeric ranges like $80-$300 written as $80–$300.
+const DASH_RE = /\s*[—―]\s*/g;
+
+export function deEmDash(text) {
+  if (text === null || text === undefined) return text;
+  return String(text)
+    .replace(DASH_RE, ", ")
+    .replace(/([,;:.!?])\s*,\s*/g, "$1 ")
+    .replace(/^\s*,\s*/, "")
+    .replace(/\s*,\s*$/, "")
+    .replace(/[ \t]{2,}/g, " ");
+}
+
 export function renderNums(text, t, keyPrefix = "n") {
   if (text === null || text === undefined || text === "") return null;
   // `t` may be the theme or, for components that don't receive one, the
   // monospace family directly.
   const mono = typeof t === "string" ? t : t.mono;
   // split() with a single capture group puts the matches at the odd indices.
-  return String(text).split(NUM_RE).map((seg, i) =>
+  return deEmDash(text).split(NUM_RE).map((seg, i) =>
     seg === "" ? null
     : i % 2
       ? <span key={keyPrefix + i} style={{fontFamily:mono}}>{seg}</span>

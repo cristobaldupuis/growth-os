@@ -3,6 +3,7 @@ import { STATUSES, SL, SD, OL, OD, iceScore, iceColor, fmtCur, fmtDate } from ".
 import { gG, gGh, gI, gTA, gSl, gSc, gSL } from "../components/styles.js";
 import { SBdg, OBdg, CBdg, TBdg, BlockerBadge, ICEChip } from "../components/badges.jsx";
 import { EAlert } from "../components/EAlert.jsx";
+import { renderNums } from "../components/text.jsx";
 
 // -- Detail --------------------------------------------------------------------
 export function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResults,onLink,onSaveTestValidity}) {
@@ -235,9 +236,9 @@ export function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResu
               {item.results.actualOutcome&&<div><div style={{fontSize:10,color:c.text,opacity:0.7,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:4,fontFamily:t.mono}}>Actual outcome</div><p style={{margin:0,color:t.textSub,fontSize:13,lineHeight:1.6}}>{item.results.actualOutcome}</p></div>}
               <div style={{borderLeft:"3px solid "+t.gold,paddingLeft:12}}>
                 <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:3,fontFamily:t.mono}}>Key learning</div>
-                <p style={{margin:0,color:dk?"#d4b870":"#6a4a10",fontSize:14,fontStyle:"italic",fontWeight:600}}>{item.results.keyLearning}</p>
+                <p style={{margin:0,color:dk?"#d4b870":"#6a4a10",fontSize:14,fontWeight:600}}>"{renderNums(item.results.keyLearning, t, "dkl")}"</p>
               </div>
-              {item.results.decisionMade&&<div><div style={{fontSize:10,color:c.text,opacity:0.7,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:4,fontFamily:t.mono}}>Decision made</div><p style={{margin:0,color:t.textSub,fontSize:13,lineHeight:1.6}}>{item.results.decisionMade}</p></div>}
+              {item.results.decisionMade&&<div><div style={{fontSize:10,color:c.text,opacity:0.7,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:4,fontFamily:t.mono}}>Decision made</div><p style={{margin:0,color:t.textSub,fontSize:13,lineHeight:1.6}}>{renderNums(item.results.decisionMade, t, "ddm")}</p></div>}
             </div>
           </div>
         );
@@ -251,7 +252,7 @@ export function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResu
               <div key={l.id} onClick={()=>onLink(l.id)} style={{background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:6,padding:"10px 14px",cursor:"pointer"}}>
                 <div style={{display:"flex",gap:5,marginBottom:4}}><CBdg cat={l.category} cats={cats} dk={dk}/><TBdg type={l.initType} dk={dk}/><SBdg s={l.status} dk={dk}/>{l.results&&<OBdg o={l.results.outcomeClassification} dk={dk}/>}<ICEChip ice={l.ice} t={t}/></div>
                 <div style={{fontSize:13,color:t.text,fontWeight:600}}>{l.title}</div>
-                {l.results&&l.results.keyLearning&&<div style={{fontSize:12,color:t.textMuted,marginTop:3,fontStyle:"italic"}}>"{l.results.keyLearning}"</div>}
+                {l.results&&l.results.keyLearning&&<div style={{fontSize:12,color:t.textMuted,marginTop:3}}>"{renderNums(l.results.keyLearning, t, "lkl"+l.id)}"</div>}
               </div>
             ))}
           </div>

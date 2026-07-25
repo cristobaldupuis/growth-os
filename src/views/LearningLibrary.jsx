@@ -68,17 +68,23 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
         hypothesis: e.hypothesis || "",
       }));
       const result = await callAskLibrary(q, corpus, settings||{companyName:COMPANY_NAME,businessModel:BUSINESS_MODEL});
-      setAskAnswer(result || "No answer returned — try rephrasing.");
-    } catch { setAskAnswer("Query failed — check that your API proxy is deployed and the secret is configured."); }
+      setAskAnswer(result || "No answer returned. Try rephrasing the question.");
+    } catch { setAskAnswer("Query failed. Check that your API proxy is deployed and the secret is configured."); }
     setAskLoad(false);
   };
 
   const gI2 = (t)=>({...gI(t),width:"auto",flex:1,minWidth:160});
 
+  // One micro-label style for every line of a card, so From / Decision /
+  // Est / Actual all read as the same rank and none of them needs a container.
+  const cLbl = (t)=>({fontSize:9.5,fontWeight:600,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.09em",textTransform:"uppercase",marginRight:6});
+  // Shared body line for the card's supporting rows.
+  const cLine = (t)=>({fontSize:11.5,color:t.textSub,fontFamily:t.serif,lineHeight:1.45,marginTop:3});
+
   return (
     <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:16}}>
 
-      {/* Ask the library — natural-language retrieval over the full closed record */}
+      {/* Ask the library: natural-language retrieval over the full closed record */}
       <div style={{...gSc(t,dk),background:t.goldBg,border:"1px solid "+t.goldBorder}}>
         <div style={{fontSize:11,fontWeight:700,color:t.gold,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:8}}>Ask the library</div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"flex-start"}}>
@@ -87,7 +93,7 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
             {askLoad ? <><span style={{display:"inline-block",animation:"spin 1s linear infinite"}}>&#8635;</span> Searching…</> : <>&#128269; Ask</>}
           </button>
         </div>
-        <div style={{fontSize:10.5,color:t.textMuted,fontFamily:t.serif,marginTop:6}}>Searches every closed initiative — wins and failures — weighing relevance first, recency second.</div>
+        <div style={{fontSize:10.5,color:t.textMuted,fontFamily:t.serif,marginTop:6}}>Searches every closed initiative, wins and failures alike, weighing relevance first and recency second.</div>
         {askVisible&&(
           <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid "+t.goldBorder}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
@@ -138,7 +144,7 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
         <div style={{fontSize:12,color:t.textMuted,fontFamily:t.serif}}>
           <span style={{fontFamily:t.mono}}>{filtered.length}</span> learning{filtered.length!==1?"s":""} {query?"matching":""}
-          {filtered.length===0&&closed.length>0&&<span style={{color:t.gold}}> — try adjusting filters or clicking more outcome tiles above</span>}
+          {filtered.length===0&&closed.length>0&&<span style={{color:t.gold}}> · try adjusting filters or clicking more outcome tiles above</span>}
         </div>
         {filtered.length>=2&&(
           <button style={{...gGh(t),fontSize:11,padding:"4px 10px"}} disabled={synthLoad}
@@ -151,9 +157,9 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
                   retailer: brandName(e.brandId||"default", brands),
                   learning: e.results.keyLearning,
                 }));
-                const result = await callSynthesizeLearnings(payload, settings||{companyName:COMPANY_NAME,businessModel:BUSINESS_MODEL,northStarMetric:NORTH_STAR_METRIC,northStarCurrent:"—",northStarTarget:"—"});
+                const result = await callSynthesizeLearnings(payload, settings||{companyName:COMPANY_NAME,businessModel:BUSINESS_MODEL,northStarMetric:NORTH_STAR_METRIC,northStarCurrent:"n/a",northStarTarget:"n/a"});
                 setSynthesis(result);
-              } catch { setSynthesis("Synthesis failed — check your API key in Settings."); }
+              } catch { setSynthesis("Synthesis failed. Check your API key in Settings."); }
               setSynthLoad(false);
             }}>
             {synthLoad?<><span style={{display:"inline-block",animation:"spin 1s linear infinite"}}>&#8635;</span> Synthesizing…</>:<><span>&#10024;</span> Synthesize learnings</>}
@@ -165,14 +171,14 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
       {synthVisible&&(
         <div style={{...gSc(t,dk),background:dk?"#1a2a18":"#f0faf2",border:"1px solid "+(dk?"#2a6a40":"#7adca0")}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-            <div style={{fontSize:11,fontWeight:700,color:dk?"#60d080":"#1a7a48",fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>AI Synthesis — {filtered.length} learnings</div>
+            <div style={{fontSize:11,fontWeight:700,color:dk?"#60d080":"#1a7a48",fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>AI Synthesis · {filtered.length} learnings</div>
             <button onClick={()=>setSynthVisible(false)} style={{background:"none",border:"none",color:t.textMuted,cursor:"pointer",fontSize:14}}>&#10005;</button>
           </div>
           {synthLoad
             ?<div style={{fontSize:13,color:t.textMuted,fontFamily:t.serif}}>Analysing learnings…</div>
             :synthesis
               ?<div style={{fontSize:13,color:t.textSub,lineHeight:1.8,whiteSpace:"pre-wrap",fontFamily:t.serif}}>{renderNums(synthesis, t, "sy")}</div>
-              :<div style={{fontSize:12,color:dk?"#e08080":"#a03030",fontFamily:t.serif}}>Synthesis failed — check that your API proxy is deployed and the API key is configured.</div>
+              :<div style={{fontSize:12,color:dk?"#e08080":"#a03030",fontFamily:t.serif}}>Synthesis failed. Check that your API proxy is deployed and the API key is configured.</div>
           }
         </div>
       )}
@@ -192,56 +198,57 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
           const isWin=item.results.outcomeClassification==="Jackpot"||item.results.outcomeClassification==="Success";
           return (
             <div key={item.id} style={{background:t.surface,border:"1px solid "+t.border,borderRadius:8,overflow:"hidden"}}>
-              <div style={{padding:"16px 18px"}}>
+              <div style={{padding:"10px 14px"}}>
                 {/* Badges row */}
-                <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center",marginBottom:12}}>
+                <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center",marginBottom:6}}>
                   <OBdg o={item.results.outcomeClassification} dk={dk}/>
                   <CBdg cat={item.category} cats={cats} dk={dk}/>
                   <TBdg type={item.initType} dk={dk}/>
                   {(item.results.durability==="structural")
-                    ? <Bdg label="Structural" color={dk?"#7fb8ff":"#1a5fb4"} bg={dk?"#16243a":"#eaf2ff"} border={dk?"#27425f":"#b8d4f0"}/>
-                    : <Bdg label="Tactical" color={t.textMuted} bg={dk?"#1e1e14":"#f4f3ee"} border={t.border}/>}
-                  {brands&&brands.length>1&&<Bdg label={brandName(item.brandId||"default",brands)} color={brandColor(item.brandId||"default",brands,dk)} bg={dk?"#1e1e14":"#f8f7f2"} border={dk?"#2a2820":"#ddd8c8"}/>}
-                  {item.endDate&&<span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,marginLeft:"auto"}}>{fmtDate(item.endDate)}</span>}
+                    ? <Bdg label="Structural" color={dk?"#7fb8ff":"#1a5fb4"} bg={dk?"#16243a":"#eaf2ff"} border={dk?"#27425f":"#b8d4f0"} small/>
+                    : <Bdg label="Tactical" color={t.textMuted} bg={dk?"#1e1e14":"#f4f3ee"} border={t.border} small/>}
+                  {brands&&brands.length>1&&<Bdg label={brandName(item.brandId||"default",brands)} color={brandColor(item.brandId||"default",brands,dk)} bg={dk?"#1e1e14":"#f8f7f2"} border={dk?"#2a2820":"#ddd8c8"} small/>}
+                  {item.endDate&&<span style={{fontSize:10.5,color:t.textMuted,fontFamily:t.mono,marginLeft:"auto"}}>{fmtDate(item.endDate)}</span>}
                 </div>
 
-                {/* The learning — hero element */}
-                <div style={{borderLeft:"3px solid "+t.border,paddingLeft:14,marginBottom:14}}>
-                  <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:6}}>Key learning</div>
-                  <p style={{margin:0,fontSize:16,fontWeight:600,color:t.text,lineHeight:1.6,fontFamily:t.serif,fontStyle:"italic"}}>
-                    "{renderNums(item.results.keyLearning, t, "kl")}"
-                  </p>
-                </div>
+                {/* The learning: hero element. Upright, not italic; the quotation
+                    marks are what mark it as a quote. The label runs in on the
+                    first line so the quote costs no extra row. */}
+                <p style={{margin:"0 0 5px",borderLeft:"3px solid "+t.border,paddingLeft:11,fontSize:14,fontWeight:600,color:t.text,lineHeight:1.38,fontFamily:t.serif}}>
+                  <span style={{...cLbl(t),fontWeight:600}}>Key learning</span>
+                  "{renderNums(item.results.keyLearning, t, "kl")}"
+                </p>
 
                 {/* Initiative title */}
-                <div style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,marginBottom:item.results.decisionMade?10:0}}>
-                  From: <span style={{color:t.textSub,fontWeight:600}}>{item.title}</span>
+                <div style={{...cLine(t),marginTop:0}}>
+                  <span style={cLbl(t)}>From</span>{renderNums(item.title, t, "ti")}
                 </div>
 
-                {/* Decision made — collapsed but visible */}
+                {/* Decision made: a plain line matching From, not a box */}
                 {item.results.decisionMade&&(
-                  <div style={{fontSize:12,color:t.textSub,fontFamily:t.serif,lineHeight:1.5,padding:"8px 10px",background:t.surfaceAlt,borderRadius:4,marginBottom:10}}>
-                    <span style={{color:t.textMuted,fontSize:10,textTransform:"uppercase",letterSpacing:"0.06em"}}>Decision: </span>
-                    {renderNums(item.results.decisionMade, t, "dm")}
+                  <div style={cLine(t)}>
+                    <span style={cLbl(t)}>Decision</span>{renderNums(item.results.decisionMade, t, "dm")}
                   </div>
                 )}
 
-                {/* Revenue delta if available */}
-                {item.revenueImpact!==0&&(
-                  <div style={{display:"flex",gap:16,fontSize:12,fontFamily:t.serif,color:t.textMuted,marginBottom:10}}>
-                    <span>Est: <strong style={{color:t.text,fontFamily:t.mono}}>{fmtCur(item.revenueImpact)}</strong></span>
-                    {item.results.actualRevenueImpact!=null&&(
-                      <span>Actual: <strong style={{color:t.gold,fontFamily:t.mono}}>{fmtCur(item.results.actualRevenueImpact)}</strong></span>
+                {/* Est / Actual stay on one inline row, and the action rides
+                    the same row rather than claiming a block of its own. */}
+                {(item.revenueImpact!==0||isWin)&&(
+                  <div style={{...cLine(t),display:"flex",gap:14,flexWrap:"wrap",alignItems:"baseline"}}>
+                    {item.revenueImpact!==0&&(
+                      <span><span style={cLbl(t)}>Est</span><strong style={{color:t.text,fontFamily:t.mono,fontWeight:600}}>{fmtCur(item.revenueImpact)}</strong></span>
+                    )}
+                    {item.revenueImpact!==0&&item.results.actualRevenueImpact!=null&&(
+                      <span><span style={cLbl(t)}>Actual</span><strong style={{color:t.gold,fontFamily:t.mono,fontWeight:600}}>{fmtCur(item.results.actualRevenueImpact)}</strong></span>
+                    )}
+                    {isWin&&(
+                      <button onClick={()=>onReplicate(item)}
+                        style={{marginLeft:"auto",padding:0,background:"none",border:"none",cursor:"pointer",
+                          fontSize:11,fontWeight:600,fontFamily:t.sans,color:t.gold,textDecoration:"underline",textUnderlineOffset:2}}>
+                        &#8635; Replicate this initiative
+                      </button>
                     )}
                   </div>
-                )}
-
-                {/* Actions */}
-                {isWin&&(
-                  <button onClick={()=>onReplicate(item)}
-                    style={{...gG(t),fontSize:11,padding:"5px 12px",marginTop:4}}>
-                    &#8635; Replicate this initiative
-                  </button>
                 )}
               </div>
             </div>

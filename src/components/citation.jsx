@@ -39,7 +39,7 @@ export function CitationModal({ item, t, dk, cats, brands, onClose }) {
         {r.keyLearning && (
           <div style={{borderLeft:"3px solid "+(c.border||t.gold),paddingLeft:14}}>
             <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:6}}>Key learning</div>
-            <p style={{margin:0,fontSize:15,fontWeight:600,color:t.text,lineHeight:1.6,fontFamily:t.serif,fontStyle:"italic"}}>"{renderNums(r.keyLearning, t, "kl")}"</p>
+            <p style={{margin:0,fontSize:15,fontWeight:600,color:t.text,lineHeight:1.6,fontFamily:t.serif}}>"{renderNums(r.keyLearning, t, "kl")}"</p>
           </div>
         )}
 
@@ -53,7 +53,7 @@ export function CitationModal({ item, t, dk, cats, brands, onClose }) {
         {r.decisionMade && (
           <div style={{fontSize:12.5,color:t.textSub,fontFamily:t.serif,lineHeight:1.6,padding:"10px 12px",background:t.surfaceAlt,borderRadius:6}}>
             <span style={{color:t.textMuted,fontSize:10,textTransform:"uppercase",letterSpacing:"0.06em"}}>Decision: </span>
-            {r.decisionMade}
+            {renderNums(r.decisionMade, t, "cdm")}
           </div>
         )}
 

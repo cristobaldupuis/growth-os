@@ -29,6 +29,7 @@ import { callGenerateCandidates } from "./services/ai/callGenerateCandidates.js"
 import { callExpandRecommendation } from "./services/ai/callExpandRecommendation.js";
 import { gG, gGh, gI, gTA, gSl, gSc, gSL, gCd } from "./components/styles.js";
 import { Bdg, SBdg, OBdg, CBdg, TBdg, BlockerBadge, ICEChip } from "./components/badges.jsx";
+import { renderNums } from "./components/text.jsx";
 import { Modal } from "./components/Modal.jsx";
 import { CBar } from "./components/CBar.jsx";
 import { EAlert } from "./components/EAlert.jsx";
@@ -1923,7 +1924,7 @@ function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, cats, onAc
                     </span>
                   </div>
                   {item.results?.keyLearning && (
-                    <div style={{fontSize:12,color:t.textSub,fontFamily:t.serif,lineHeight:1.5,fontStyle:"italic"}}>"{item.results.keyLearning}"</div>
+                    <div style={{fontSize:12,color:t.textSub,fontFamily:t.serif,lineHeight:1.5}}>"{renderNums(item.results.keyLearning, t, "akl")}"</div>
                   )}
                 </div>
               ))}

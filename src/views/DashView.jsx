@@ -4,7 +4,7 @@ import { gG, gGh, gSL, gCd } from "../components/styles.js";
 import { Spark } from "../components/Spark.jsx";
 import { WeeklyStandupModal } from "../components/WeeklyStandupModal.jsx";
 import { buildCrossBrandTransfers } from "../services/portfolio.js";
-import { renderNums } from "../components/text.jsx";
+import { renderProse } from "../components/text.jsx";
 
 // -- Weekly Pulse --------------------------------------------------------------
 function WeeklyPulseSection({t, dk, settings, brands, weeklyMetrics, onLog, onImport}) {
@@ -77,7 +77,7 @@ function WeeklyPulseSection({t, dk, settings, brands, weeklyMetrics, onLog, onIm
           <span style={{fontSize:11,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono}}>Weekly Pulse</span>
           {!isEmpty && (
             <span style={{fontSize:10,padding:"2px 7px",borderRadius:3,background:stalenessBg,border:"1px solid "+stalenessBorder,color:stalenessColor,fontFamily:t.serif,fontWeight:600}}>
-              {renderNums(isStale ? `Last logged ${daysSince}d ago ⚠️` : `Updated ${daysSince===0?"today":daysSince+"d ago"}`, t, "stale")}
+              {renderProse(isStale ? `Last logged ${daysSince}d ago ⚠️` : `Updated ${daysSince===0?"today":daysSince+"d ago"}`)}
             </span>
           )}
         </div>
@@ -594,7 +594,7 @@ function NextPlaysCard({ t, dk, recs, recsLoad, recsErr, brands, items, onGenera
             <span style={{fontSize:14,color:t.gold}}>◆</span>
             <span style={{fontSize:12,fontWeight:600,fontFamily:t.serif,color:t.text,letterSpacing:"0.02em"}}>Next Plays</span>
             <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif}}>
-              {renderNums(pending.length > 0 ? pending.length+" ready" : "all resolved", t, "pend")}
+              {renderProse(pending.length > 0 ? pending.length+" ready" : "all resolved")}
             </span>
             {weekLabel && (
               <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,opacity:0.7}}>
@@ -730,9 +730,9 @@ function NextPlaysCard({ t, dk, recs, recsLoad, recsErr, brands, items, onGenera
       {/* Empty state — first run */}
       {!recsLoad && !recsErr && (
         <div style={{padding:"14px 16px",background:dk?"#1a1a14":"#fafaf5",border:"1px dashed "+t.border,borderRadius:6,fontSize:12,color:t.textSub,fontFamily:t.serif,lineHeight:1.6}}>
-          {renderNums(closedCount === 0
+          {renderProse(closedCount === 0
             ? "No experiments closed yet. Recommendations will be sharpest once you have a few logged learnings — but you can still generate from your current portfolio state."
-            : "Generate to see 3 grounded experiment recommendations, with hypothesis, ICE, and reasoning trace pre-filled. Based on your "+closedCount+" closed initiative"+(closedCount===1?"":"s")+" and current portfolio state.", t, "np")}
+            : "Generate to see 3 grounded experiment recommendations, with hypothesis, ICE, and reasoning trace pre-filled. Based on your "+closedCount+" closed initiative"+(closedCount===1?"":"s")+" and current portfolio state.")}
         </div>
       )}
 

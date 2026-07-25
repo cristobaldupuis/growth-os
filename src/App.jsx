@@ -11,7 +11,7 @@ import {
   SEED_WEEKLY_METRICS,
 } from "./config.js";
 
-import { KEY_ITEMS, KEY_SETTINGS, KEY_DEBATES, KEY_METRICS, KEY_RECS, KEY_THEME, store, handleDownloadBackup, handleRestoreBackup } from "./services/store.js";
+import { KEY_ITEMS, KEY_SETTINGS, KEY_DEBATES, KEY_METRICS, KEY_RECS, KEY_THEME, KEY_LIB_VIEW, store, handleDownloadBackup, handleRestoreBackup } from "./services/store.js";
 import {
   applyBrandBriefDefaults, DEFAULT_AGENTS, DEFAULT_SETTINGS,
   STATUSES, OUTCOMES, INIT_TYPES, METRIC_SOURCES,
@@ -29,7 +29,7 @@ import { callGenerateCandidates } from "./services/ai/callGenerateCandidates.js"
 import { callExpandRecommendation } from "./services/ai/callExpandRecommendation.js";
 import { gG, gGh, gI, gTA, gSl, gSc, gSL, gCd } from "./components/styles.js";
 import { Bdg, SBdg, OBdg, CBdg, TBdg, BlockerBadge, ICEChip } from "./components/badges.jsx";
-import { renderNums } from "./components/text.jsx";
+import { renderProse } from "./components/text.jsx";
 import { Modal } from "./components/Modal.jsx";
 import { CBar } from "./components/CBar.jsx";
 import { EAlert } from "./components/EAlert.jsx";
@@ -468,6 +468,7 @@ export default function App() {
   const [restorePayload, setRestorePayload] = useState(null);
   // Backup nudge — fires at most once per session if the last backup is stale
   const [backupNudged, setBackupNudged] = useState(false);
+  const [libView,   setLibView]   = useState("list");   // library card layout: "list" | "grid"
 
   const t    = dk ? TD : TL;
   const cats   = settings.categories || DEFAULT_SETTINGS.categories;
@@ -476,10 +477,11 @@ export default function App() {
   useEffect(()=>{
     const load = async ()=>{
       try {
-        const [ir,sr,dr,mr,rr,tr] = await Promise.all([store.get(KEY_ITEMS),store.get(KEY_SETTINGS),store.get(KEY_DEBATES),store.get(KEY_METRICS),store.get(KEY_RECS),store.get(KEY_THEME)]);
+        const [ir,sr,dr,mr,rr,tr,lv] = await Promise.all([store.get(KEY_ITEMS),store.get(KEY_SETTINGS),store.get(KEY_DEBATES),store.get(KEY_METRICS),store.get(KEY_RECS),store.get(KEY_THEME),store.get(KEY_LIB_VIEW)]);
         // Read theme from the resolved store before first render (gated on `loaded`),
         // so the persisted choice applies without an async flash.
         if(tr&&tr.value) setDk(tr.value==="dark");
+        if(lv&&lv.value==="grid") setLibView("grid");
         setItems(ir&&ir.value?JSON.parse(ir.value):SEED);
         if(!ir||!ir.value) store.set(KEY_ITEMS,JSON.stringify(SEED));
         if(sr&&sr.value) {
@@ -518,6 +520,7 @@ export default function App() {
   const saveMetrics  = m => { setWeeklyMetrics(m); try{store.set(KEY_METRICS,JSON.stringify(m));}catch{} };
   const saveRecs     = r => { setRecs(r);          try{store.set(KEY_RECS,JSON.stringify(r));}catch{} };
   const toggleDk     = ()=> { setDk(n => { const next=!n; try{store.set(KEY_THEME,next?"dark":"light");}catch{} return next; }); };
+  const saveLibView  = v => { setLibView(v); try{store.set(KEY_LIB_VIEW,v);}catch{} };
 
   // -- Next Plays orchestrator -------------------------------------------------
   // Two-step: candidate generation then parallel expansion of the top 3. Keeps
@@ -1124,7 +1127,7 @@ export default function App() {
         onExtend={(id,days)=>{saveItems(items.map(e=>{if(e.id!==id)return e; const base=e.endDate?new Date(e.endDate+"T12:00:00"):new Date(); base.setDate(base.getDate()+days); return {...e,endDate:base.toISOString().slice(0,10)};})); showToast("Extended "+days+" days.","success");}}
         onActivate={(id)=>{saveItems(items.map(e=>e.id===id?withRunningSnapshot({...e,status:"Running",startDate:e.startDate||new Date().toISOString().slice(0,10)},"Running"):e)); showToast("Initiative activated — now running.","success");}}
       />}
-      {nav==="library"&&<LearningLibrary items={items} t={t} dk={dk} cats={cats} brands={brands} activeBrand={activeBrand} settings={settings} onReplicate={(item)=>{const base=mkDefault(cats,activeBrand);setForm({...base,title:"[Replicate] "+item.title,hypothesis:"Based on learning from: "+item.title+". Original: "+item.hypothesis,category:item.category,initType:item.initType,ice:{...item.ice},revenueImpact:item.revenueImpact,notes:"Replicated from initiative "+item.id+". Original learning: "+item.results.keyLearning});setNav("form");}}/>}
+      {nav==="library"&&<LearningLibrary items={items} t={t} dk={dk} cats={cats} brands={brands} activeBrand={activeBrand} settings={settings} view={libView} onView={saveLibView} onReplicate={(item)=>{const base=mkDefault(cats,activeBrand);setForm({...base,title:"[Replicate] "+item.title,hypothesis:"Based on learning from: "+item.title+". Original: "+item.hypothesis,category:item.category,initType:item.initType,ice:{...item.ice},revenueImpact:item.revenueImpact,notes:"Replicated from initiative "+item.id+". Original learning: "+item.results.keyLearning});setNav("form");}}/>}
       {nav==="readout"&&<ClientReadoutView t={t} dk={dk} dash={dash} items={items} brands={brands} activeBrand={activeBrand} cats={cats} weeklyMetrics={weeklyMetrics} settings={settings}/>}
 
       {nav==="initiatives"&&(
@@ -1924,7 +1927,7 @@ function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, cats, onAc
                     </span>
                   </div>
                   {item.results?.keyLearning && (
-                    <div style={{fontSize:12,color:t.textSub,fontFamily:t.serif,lineHeight:1.5}}>"{renderNums(item.results.keyLearning, t, "akl")}"</div>
+                    <div style={{fontSize:12,color:t.textSub,fontFamily:t.serif,lineHeight:1.5}}>"{renderProse(item.results.keyLearning)}"</div>
                   )}
                 </div>
               ))}

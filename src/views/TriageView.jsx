@@ -1,6 +1,6 @@
 import { fmtCur, fmtDate, parseD } from "../constants.js";
 import { gG, gGh, gSL, gCd } from "../components/styles.js";
-import { renderNums } from "../components/text.jsx";
+import { renderProse } from "../components/text.jsx";
 
 // -- Triage View --------------------------------------------------------------
 export function TriageView({items, t, dk, cats, brands, activeBrand, onDetail, onStatus, onLogResults, onExtend, onActivate}) {
@@ -128,7 +128,7 @@ export function TriageView({items, t, dk, cats, brands, activeBrand, onDetail, o
             {today.toLocaleDateString("en-CA",{weekday:"long",month:"long",day:"numeric"})}
           </div>
           <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>
-            {renderNums(totalAtRisk>0?fmtCur(totalAtRisk)+" at risk across "+running.length+" running":running.length+" running · "+draft.length+" in draft", t, "atr")}
+            {renderProse(totalAtRisk>0?fmtCur(totalAtRisk)+" at risk across "+running.length+" running":running.length+" running · "+draft.length+" in draft")}
           </div>
         </div>
         {topItem ? (

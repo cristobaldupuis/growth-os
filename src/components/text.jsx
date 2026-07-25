@@ -1,9 +1,12 @@
 // Shared text renderers for AI-generated and user-entered prose. Kept out of
 // citation.jsx so that file only exports components (react-refresh).
-// Figures stay monospaced even inside serif prose, so a "$28k" quoted in a
-// key learning lines up with the same number shown in a table. Captures an
-// optional currency symbol, the digit run, and a trailing unit (%, k, x, ...).
-const NUM_RE = /((?:[$£€]\s?)?\d[\d,]*(?:\.\d+)?(?:\s?[%kKxMB])?)/g;
+//
+// Numeral rule: a figure is set in the mono face only when it stands entirely
+// alone as a figure, which means Est/Actual values, the outcome tile counts,
+// dates, and standalone table cells. Those are styled at their own call sites,
+// where the whole element is a number and nothing else. Prose never switches
+// font mid-sentence, whatever shape the number takes ($28k, 80%, 0.3pp, 2.1x),
+// so there is deliberately no numeral handling in this file.
 
 // Em dashes read as a machine tell, and a lot of the prose on screen arrives
 // from the model or from pasted notes. Normalise on the way out so no display
@@ -22,30 +25,25 @@ export function deEmDash(text) {
     .replace(/[ \t]{2,}/g, " ");
 }
 
-export function renderNums(text, t, keyPrefix = "n") {
+// Every run of display prose goes through here. It returns a plain string, so
+// the text simply inherits whatever face its container sets.
+export function renderProse(text) {
   if (text === null || text === undefined || text === "") return null;
-  // `t` may be the theme or, for components that don't receive one, the
-  // monospace family directly.
-  const mono = typeof t === "string" ? t : t.mono;
-  // split() with a single capture group puts the matches at the odd indices.
-  return deEmDash(text).split(NUM_RE).map((seg, i) =>
-    seg === "" ? null
-    : i % 2
-      ? <span key={keyPrefix + i} style={{fontFamily:mono}}>{seg}</span>
-      : <span key={keyPrefix + i}>{seg}</span>
-  );
+  return deEmDash(text);
 }
 
 // Parse a text block, turning [INIT-ID] tokens into clickable citation chips.
 // idResolver maps an id string -> item (or null). Unknown ids render as plain
 // text so a hallucinated/stale id never produces a dead link. onCite(item) opens
 // the modal. Returns an array of React nodes safe to splice into a <p>.
+// The chip keeps the mono face: it is a discrete object with a border around it,
+// not a number sitting in a sentence.
 export function renderCitedText(text, idResolver, onCite, t) {
   if (!text) return null;
   const parts = String(text).split(/(\[[^\]]+\])/g);
   return parts.map((part, i) => {
     const m = part.match(/^\[([^\]]+)\]$/);
-    if (!m) return <span key={i}>{renderNums(part, t, "c" + i + "-")}</span>;
+    if (!m) return <span key={i}>{renderProse(part)}</span>;
     const item = idResolver(m[1].trim());
     if (!item) return <span key={i}>{part}</span>;
     return (
@@ -57,4 +55,3 @@ export function renderCitedText(text, idResolver, onCite, t) {
     );
   });
 }
-

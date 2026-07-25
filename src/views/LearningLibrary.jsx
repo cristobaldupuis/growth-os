@@ -5,12 +5,25 @@ import { gG, gGh, gI, gSl, gSc } from "../components/styles.js";
 import { Bdg, OBdg, CBdg, TBdg } from "../components/badges.jsx";
 import { Modal } from "../components/Modal.jsx";
 import { CitationModal } from "../components/citation.jsx";
-import { renderCitedText, renderNums } from "../components/text.jsx";
+import { renderCitedText, renderProse } from "../components/text.jsx";
 import { callSynthesizeLearnings } from "../services/ai/callSynthesizeLearnings.js";
 import { callAskLibrary } from "../services/ai/callAskLibrary.js";
 
+// Layout toggle glyphs. Drawn inline rather than pulled from an icon font so
+// the control renders on first paint and offline.
+const IconList = ({size=13}) => (
+  <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+    <line x1="2" y1="4" x2="14" y2="4"/><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="12" x2="14" y2="12"/>
+  </svg>
+);
+const IconGrid = ({size=13}) => (
+  <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+    <rect x="2" y="2.5" width="5" height="11" rx="1"/><rect x="9" y="2.5" width="5" height="11" rx="1"/>
+  </svg>
+);
+
 // -- Learning Library ---------------------------------------------------------
-export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onReplicate, settings}) {
+export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onReplicate, settings, view="list", onView}) {
   const [activeOutcomes, setActiveOutcomes] = useState(["Jackpot","Success"]);
   const [fCat,  setFCat]  = useState("All");
   const [fType, setFType] = useState("All");
@@ -138,6 +151,20 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
           <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Type</label>
           <select value={fType} onChange={e=>setFType(e.target.value)} style={{...gSl(t),minWidth:120}}>{["All",...INIT_TYPES].map(tp=><option key={tp}>{tp}</option>)}</select>
         </div>
+        {/* Layout toggle. Same segmented-control pattern as the header nav. */}
+        <div style={{display:"flex",flexDirection:"column",gap:2}}>
+          <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>View</label>
+          <div style={{display:"flex",gap:2,background:t.surfaceAlt,padding:3,borderRadius:9,border:"1px solid "+t.border}}>
+            {[["list",IconList,"List view"],["grid",IconGrid,"Two-column grid view"]].map(([v,Icon,title])=>(
+              <button key={v} onClick={()=>onView&&onView(v)} title={title} aria-label={title} aria-pressed={view===v}
+                style={{display:"flex",alignItems:"center",justifyContent:"center",width:28,height:26,borderRadius:7,cursor:"pointer",border:"none",
+                  background:view===v?t.surface:"transparent",color:view===v?t.text:t.textMuted,
+                  boxShadow:view===v?t.shadow:"none",transition:"all .15s"}}>
+                <Icon/>
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Count + Synthesize */}
@@ -177,7 +204,7 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
           {synthLoad
             ?<div style={{fontSize:13,color:t.textMuted,fontFamily:t.serif}}>Analysing learnings…</div>
             :synthesis
-              ?<div style={{fontSize:13,color:t.textSub,lineHeight:1.8,whiteSpace:"pre-wrap",fontFamily:t.serif}}>{renderNums(synthesis, t, "sy")}</div>
+              ?<div style={{fontSize:13,color:t.textSub,lineHeight:1.8,whiteSpace:"pre-wrap",fontFamily:t.serif}}>{renderProse(synthesis)}</div>
               :<div style={{fontSize:12,color:dk?"#e08080":"#a03030",fontFamily:t.serif}}>Synthesis failed. Check that your API proxy is deployed and the API key is configured.</div>
           }
         </div>
@@ -192,8 +219,11 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
         </div>
       )}
 
-      {/* Learning cards */}
-      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+      {/* Learning cards. Grid columns are minmax(0,...) so a long unbroken
+          learning cannot push a column past its share. */}
+      <div style={view==="grid"
+        ? {display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10,alignItems:"start"}
+        : {display:"flex",flexDirection:"column",gap:10}}>
         {filtered.map(item=>{
           const isWin=item.results.outcomeClassification==="Jackpot"||item.results.outcomeClassification==="Success";
           return (
@@ -216,18 +246,18 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
                     first line so the quote costs no extra row. */}
                 <p style={{margin:"0 0 5px",borderLeft:"3px solid "+t.border,paddingLeft:11,fontSize:14,fontWeight:600,color:t.text,lineHeight:1.38,fontFamily:t.serif}}>
                   <span style={{...cLbl(t),fontWeight:600}}>Key learning</span>
-                  "{renderNums(item.results.keyLearning, t, "kl")}"
+                  "{renderProse(item.results.keyLearning)}"
                 </p>
 
                 {/* Initiative title */}
                 <div style={{...cLine(t),marginTop:0}}>
-                  <span style={cLbl(t)}>From</span>{renderNums(item.title, t, "ti")}
+                  <span style={cLbl(t)}>From</span>{renderProse(item.title)}
                 </div>
 
                 {/* Decision made: a plain line matching From, not a box */}
                 {item.results.decisionMade&&(
                   <div style={cLine(t)}>
-                    <span style={cLbl(t)}>Decision</span>{renderNums(item.results.decisionMade, t, "dm")}
+                    <span style={cLbl(t)}>Decision</span>{renderProse(item.results.decisionMade)}
                   </div>
                 )}
 

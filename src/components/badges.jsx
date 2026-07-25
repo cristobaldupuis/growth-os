@@ -1,9 +1,9 @@
-import { renderNums } from "./text.jsx";
-import { SD, SL, OD, OL, catColor, TYPE_D, TYPE_L, iceScore, iceColor, FONT_SERIF, FONT_MONO } from "../constants.js";
+import { renderProse } from "./text.jsx";
+import { SD, SL, OD, OL, catColor, TYPE_D, TYPE_L, iceScore, iceColor, FONT_SERIF } from "../constants.js";
 
 // -- Atoms ---------------------------------------------------------------------
 export function Bdg({label,color,bg,border,small}) {
-  return <span style={{display:"inline-block",fontSize:small?10:11,fontWeight:600,fontFamily:FONT_SERIF,letterSpacing:"0.03em",padding:small?"1px 6px":"2px 8px",borderRadius:4,border:"1px solid "+(border||"#ccc"),background:bg||"#f5f5f0",color:color||"#666",whiteSpace:"nowrap"}}>{renderNums(label, FONT_MONO, "bl")}</span>;
+  return <span style={{display:"inline-block",fontSize:small?10:11,fontWeight:600,fontFamily:FONT_SERIF,letterSpacing:"0.03em",padding:small?"1px 6px":"2px 8px",borderRadius:4,border:"1px solid "+(border||"#ccc"),background:bg||"#f5f5f0",color:color||"#666",whiteSpace:"nowrap"}}>{renderProse(label)}</span>;
 }
 export function SBdg({s,dk})        { const c=(dk?SD:SL)[s]||SL.Draft; return <Bdg label={s} color={c.text} bg={c.bg} border={c.border}/>; }
 export function OBdg({o,dk})        { const c=(dk?OD:OL)[o]||{};        return <Bdg label={o} color={c.text} bg={c.bg} border={c.border}/>; }

@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { brandName, iceScore, fmtCur, fmtDate, parseD } from "../constants.js";
 import { gG, gGh, gCd, gSL } from "../components/styles.js";
 import { OBdg, CBdg, ICEChip } from "../components/badges.jsx";
-import { renderNums } from "../components/text.jsx";
+import { renderProse } from "../components/text.jsx";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -232,13 +232,13 @@ function LearnedSection({ t, dk, learned, onCopy }) {
               {item.results?.keyLearning && (
                 <div style={{ fontSize: 12.5, color: t.textSub, fontFamily: t.sans, lineHeight: 1.55 }}>
                   <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: t.textMuted, fontFamily: t.mono, marginRight: 6 }}>Learning</span>
-                  {renderNums(item.results.keyLearning, t, "rkl")}
+                  {renderProse(item.results.keyLearning)}
                 </div>
               )}
               {item.results?.decisionMade && (
                 <div style={{ fontSize: 12, color: t.textSub, fontFamily: t.sans, lineHeight: 1.5 }}>
                   <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: t.textMuted, fontFamily: t.mono, marginRight: 6 }}>Decision</span>
-                  {renderNums(item.results.decisionMade, t, "rdm")}
+                  {renderProse(item.results.decisionMade)}
                 </div>
               )}
             </div>

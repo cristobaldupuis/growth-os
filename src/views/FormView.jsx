@@ -13,7 +13,7 @@ export function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hyp
     <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:14}}>
       <div style={{fontSize:18,fontWeight:600,color:t.text,fontFamily:t.serif}}>{form._new?"New initiative":"Edit initiative"}</div>
 
-      <FR label="Title *" t={t}><input style={gI(t)} value={form.title} onChange={e=>f("title",e.target.value)} placeholder="e.g. Homepage hero A/B — lifestyle vs product-first creative"/></FR>
+      <FR label="Title *" t={t}><input style={gI(t)} value={form.title} onChange={e=>f("title",e.target.value)} placeholder="e.g. Homepage hero A/B: lifestyle vs product-first creative"/></FR>
 
       <div style={gSc(t,dk)}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
@@ -21,15 +21,15 @@ export function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hyp
         </div>
 
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
-          <FR label="📊 Observation — What data or behaviour prompted this? *" t={t}>
+          <FR label="📊 Observation · What data or behaviour prompted this? *" t={t}>
             <textarea style={gTA(t)} rows={2} value={form.observation||""} onChange={e=>f("observation",e.target.value)}
               placeholder="e.g. New-visitor CVR dropped from 1.85% to 0.42% over 4 weeks following the March widget rollout. Paid social mobile traffic is the most affected segment."/>
           </FR>
 
           <div>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
-              <label style={{fontSize:12,color:t.textMuted,fontFamily:t.serif}}>💡 Hypothesis — If we do X, then Y… *</label>
-              <button style={{...gGh(t),fontSize:11,padding:"2px 9px",opacity:canAi?1:0.4}} onClick={onAi} disabled={!canAi||aiLoad} title={canAi?"Expand with AI — requires your confirmation":"Write 60+ chars in hypothesis first"}>
+              <label style={{fontSize:12,color:t.textMuted,fontFamily:t.serif}}>💡 Hypothesis · If we do X, then Y… *</label>
+              <button style={{...gGh(t),fontSize:11,padding:"2px 9px",opacity:canAi?1:0.4}} onClick={onAi} disabled={!canAi||aiLoad} title={canAi?"Expand with AI, requires your confirmation":"Write 60+ chars in hypothesis first"}>
                 {aiLoad?<><span style={{display:"inline-block",animation:"spin 1s linear infinite"}}>&#8635;</span> Expanding…</>:<><span style={{fontSize:12}}>&#10024;</span> Expand with AI</>}
               </button>
             </div>
@@ -37,7 +37,7 @@ export function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hyp
             {!canAi&&form.hypothesis&&form.hypothesis.length>0&&form.hypothesis.length<60&&<div style={{fontSize:11,color:t.textMuted,marginTop:3,fontFamily:t.serif}}><span style={{fontFamily:t.mono}}>{60-form.hypothesis.length}</span> more chars to unlock AI expand</div>}
             {hypReview&&(
               <div style={{marginTop:10,padding:"12px 14px",borderRadius:6,background:dk?"#122a18":"#edfaf2",border:"1px solid "+(dk?"#2a7a40":"#7adca0")}}>
-                <div style={{fontSize:10,color:dk?"#60d080":"#1a7a48",letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:8}}>AI suggestion — review before accepting</div>
+                <div style={{fontSize:10,color:dk?"#60d080":"#1a7a48",letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:8}}>AI suggestion · review before accepting</div>
                 <p style={{margin:"0 0 12px",fontSize:13,color:t.text,lineHeight:1.7,fontStyle:"italic"}}>"{hypReview.proposed}"</p>
                 <div style={{display:"flex",gap:6}}>
                   <button onClick={onAcceptHyp} style={{...gG(t),fontSize:11,padding:"4px 11px"}}><span>&#10003;</span> Accept</button>
@@ -47,7 +47,7 @@ export function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hyp
             )}
           </div>
 
-          <FR label="🎯 Success metric — What KPI determines a win? *" t={t}>
+          <FR label="🎯 Success metric · What KPI determines a win? *" t={t}>
             <input style={gI(t)} value={form.successMetric||""} onChange={e=>f("successMetric",e.target.value)}
               placeholder="e.g. New-visitor CVR recovers to ≥1.76% on paid-social mobile within 3 weeks of rollback."/>
           </FR>
@@ -73,7 +73,7 @@ export function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hyp
           <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif}}>optional · powers data matching</span>
         </div>
         <p style={{fontSize:11.5,color:t.textSub,fontFamily:t.sans,lineHeight:1.5,margin:"0 0 12px"}}>
-          Tells Growth OS which metric, segment, and date window this initiative is judged on — so an imported CSV or feed can be matched to it. The window is the start/end dates below.
+          Tells Growth OS which metric, segment, and date window this initiative is judged on, so an imported CSV or feed can be matched to it. The window is the start/end dates below.
         </p>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
           <FR label="Metric measured" t={t}>
@@ -88,7 +88,7 @@ export function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hyp
         </div>
         <div style={{marginTop:10}}>
           <FR label="Tracking tag" t={t}>
-            <input style={{...gI(t),fontFamily:t.mono}} value={form.trackingTag||""} onChange={e=>f("trackingTag",e.target.value)} placeholder="optional — UTM campaign, discount code, or GA4 event for precise auto-match"/>
+            <input style={{...gI(t),fontFamily:t.mono}} value={form.trackingTag||""} onChange={e=>f("trackingTag",e.target.value)} placeholder="optional: UTM campaign, discount code, or GA4 event for precise auto-match"/>
           </FR>
           <div style={{fontSize:11,color:t.textMuted,fontFamily:t.sans,marginTop:5,lineHeight:1.5}}>
             Use this only when the test has a clean identifier (mostly paid campaigns). Most initiatives match on metric + window + scope alone.
@@ -110,14 +110,14 @@ export function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hyp
 
       <div style={gSc(t,dk)}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-          <div style={gSL(t)}>ICE Scoring — Impact &#183; Certainty &#183; Ease</div>
+          <div style={gSL(t)}>ICE Scoring: Impact &#183; Certainty &#183; Ease</div>
           <button style={{...gGh(t),fontSize:11,padding:"2px 9px",opacity:canIce?1:0.4}} onClick={onIceAssist} disabled={!canIce||iceLoad} title={canIce?"Suggest Impact + Certainty with AI":"Add title and hypothesis first"}>
             {iceLoad?<><span style={{display:"inline-block",animation:"spin 1s linear infinite"}}>&#8635;</span> Scoring…</>:<><span style={{fontSize:12}}>&#129302;</span> Suggest Impact + Certainty</>}
           </button>
         </div>
         {iceReview&&(
           <div style={{marginBottom:14,padding:"12px 14px",borderRadius:6,background:dk?"#2a2410":"#fdf8ee",border:"1px solid "+(dk?"#6a5818":"#e0c070")}}>
-            <div style={{fontSize:10,color:dk?"#d0a838":"#8a6010",letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:10}}>AI scoring suggestion — review and adjust before accepting</div>
+            <div style={{fontSize:10,color:dk?"#d0a838":"#8a6010",letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:10}}>AI scoring suggestion · review and adjust before accepting</div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
               {[{label:"Impact",score:iceReview.impact,rationale:iceReview.impact_rationale},{label:"Certainty",score:iceReview.certainty,rationale:iceReview.certainty_rationale}].map(d=>(
                 <div key={d.label}>
@@ -166,10 +166,10 @@ export function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hyp
 
       <div style={{...gSc(t,dk),border:"1px dashed "+t.border}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-          <div style={gSL(t)}>Data context <span style={{fontWeight:400,textTransform:"none",letterSpacing:0,color:t.textMuted}}>(optional — used by AI)</span></div>
+          <div style={gSL(t)}>Data context <span style={{fontWeight:400,textTransform:"none",letterSpacing:0,color:t.textMuted}}>(optional, used by AI)</span></div>
           <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,background:t.border,padding:"2px 6px",borderRadius:3}}>Placeholder</span>
         </div>
-        <textarea style={{...gTA(t),fontSize:12}} rows={3} value={dataCtx} onChange={e=>setDataCtx(e.target.value)} placeholder={"Paste relevant metrics here — CVR, ROAS, sessions, revenue trends, etc.\nExample: Paid social CVR last 4W: 0.42% vs prior 4W: 1.85%. ROAS: 0.24x.\nFuture: will connect to Google Sheets, GA4, Meta Ads."}/>
+        <textarea style={{...gTA(t),fontSize:12}} rows={3} value={dataCtx} onChange={e=>setDataCtx(e.target.value)} placeholder={"Paste relevant metrics here: CVR, ROAS, sessions, revenue trends, etc.\nExample: Paid social CVR last 4W: 0.42% vs prior 4W: 1.85%. ROAS: 0.24x.\nFuture: will connect to Google Sheets, GA4, Meta Ads."}/>
       </div>
 
       <FR label="Notes" t={t}><textarea style={gTA(t)} rows={2} value={form.notes||""} onChange={e=>f("notes",e.target.value)} placeholder="Sequencing logic, caveats, context"/></FR>

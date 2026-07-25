@@ -4,7 +4,7 @@ import { gG, gGh, gSL, gCd } from "../components/styles.js";
 import { Spark } from "../components/Spark.jsx";
 import { WeeklyStandupModal } from "../components/WeeklyStandupModal.jsx";
 import { buildCrossBrandTransfers } from "../services/portfolio.js";
-import { renderNums } from "../components/text.jsx";
+import { renderProse } from "../components/text.jsx";
 
 // -- Weekly Pulse --------------------------------------------------------------
 function WeeklyPulseSection({t, dk, settings, brands, weeklyMetrics, onLog, onImport}) {
@@ -77,7 +77,7 @@ function WeeklyPulseSection({t, dk, settings, brands, weeklyMetrics, onLog, onIm
           <span style={{fontSize:11,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono}}>Weekly Pulse</span>
           {!isEmpty && (
             <span style={{fontSize:10,padding:"2px 7px",borderRadius:3,background:stalenessBg,border:"1px solid "+stalenessBorder,color:stalenessColor,fontFamily:t.serif,fontWeight:600}}>
-              {renderNums(isStale ? `Last logged ${daysSince}d ago ⚠️` : `Updated ${daysSince===0?"today":daysSince+"d ago"}`, t, "stale")}
+              {renderProse(isStale ? `Last logged ${daysSince}d ago ⚠️` : `Updated ${daysSince===0?"today":daysSince+"d ago"}`)}
             </span>
           )}
         </div>
@@ -190,7 +190,7 @@ function FunnelCoverageMap({t, dk, items, cats, brands, activeBrand}) {
         <div>
           <div style={gSL(t)}>Funnel coverage</div>
           <div style={{fontSize:11.5,color:t.textSub,fontFamily:t.sans,lineHeight:1.5}}>
-            Where active work and revenue are concentrated across the funnel — and which stages are uncovered.
+            Where active work and revenue are concentrated across the funnel, and which stages are uncovered.
           </div>
         </div>
         <span style={{fontSize:12,fontWeight:600,color:t.gold,fontFamily:t.mono}}>{fmtK(totalRevInPlay)} in play</span>
@@ -318,7 +318,7 @@ function BusinessHealthPanel({ t, dk, settings, weeklyMetrics }) {
           <div>
             <span style={{fontSize:11,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono}}>Business Health</span>
             <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,marginTop:1}}>
-              Portfolio-level guardrail metrics — watch these when experiments are running
+              Portfolio-level guardrail metrics: watch these when experiments are running
             </div>
           </div>
         </div>
@@ -400,7 +400,7 @@ function ContributionView({t, dk, contribution, totals, dRange, activeBrand, bra
   const copyText = () => {
     const date = new Date().toLocaleDateString("en-CA",{month:"long",day:"numeric",year:"numeric"});
     const lines = [
-      "Contribution to Revenue — "+date,
+      "Contribution to Revenue · "+date,
       "Retailer: "+retailerLabel+" | Range: "+rangeLabel,
       "",
       "TOTALS",
@@ -409,7 +409,7 @@ function ContributionView({t, dk, contribution, totals, dRange, activeBrand, bra
       "Pipeline (draft, probability-weighted): "+fmtBig(totals.pipeline),
       ...(totals.realisedBackfilled>0 ? [
         "",
-        "Plus "+fmtBig(totals.realisedBackfilled)+" from backfilled history (self-reported estimates, not measured by the system — excluded from the totals above)."
+        "Plus "+fmtBig(totals.realisedBackfilled)+" from backfilled history (self-reported estimates, not measured by the system, excluded from the totals above)."
       ] : []),
       "",
       "BY CATEGORY",
@@ -435,7 +435,7 @@ function ContributionView({t, dk, contribution, totals, dRange, activeBrand, bra
           </div>
           {totalInView > 0 && (
             <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginTop:3}}>
-              {totalActualsCount} of {totalInView} initiatives use recorded actuals — remaining figures are team estimates
+              {totalActualsCount} of {totalInView} initiatives use recorded actuals; remaining figures are team estimates
             </div>
           )}
         </div>
@@ -594,7 +594,7 @@ function NextPlaysCard({ t, dk, recs, recsLoad, recsErr, brands, items, onGenera
             <span style={{fontSize:14,color:t.gold}}>◆</span>
             <span style={{fontSize:12,fontWeight:600,fontFamily:t.serif,color:t.text,letterSpacing:"0.02em"}}>Next Plays</span>
             <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif}}>
-              {renderNums(pending.length > 0 ? pending.length+" ready" : "all resolved", t, "pend")}
+              {renderProse(pending.length > 0 ? pending.length+" ready" : "all resolved")}
             </span>
             {weekLabel && (
               <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,opacity:0.7}}>
@@ -730,9 +730,9 @@ function NextPlaysCard({ t, dk, recs, recsLoad, recsErr, brands, items, onGenera
       {/* Empty state — first run */}
       {!recsLoad && !recsErr && (
         <div style={{padding:"14px 16px",background:dk?"#1a1a14":"#fafaf5",border:"1px dashed "+t.border,borderRadius:6,fontSize:12,color:t.textSub,fontFamily:t.serif,lineHeight:1.6}}>
-          {renderNums(closedCount === 0
-            ? "No experiments closed yet. Recommendations will be sharpest once you have a few logged learnings — but you can still generate from your current portfolio state."
-            : "Generate to see 3 grounded experiment recommendations, with hypothesis, ICE, and reasoning trace pre-filled. Based on your "+closedCount+" closed initiative"+(closedCount===1?"":"s")+" and current portfolio state.", t, "np")}
+          {renderProse(closedCount === 0
+            ? "No experiments closed yet. Recommendations will be sharpest once you have a few logged learnings, but you can still generate from your current portfolio state."
+            : "Generate to see 3 grounded experiment recommendations, with hypothesis, ICE, and reasoning trace pre-filled. Based on your "+closedCount+" closed initiative"+(closedCount===1?"":"s")+" and current portfolio state.")}
         </div>
       )}
 
@@ -920,30 +920,30 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
               ? fmtCur(dash.revImpacted)+" in measured revenue impact from completed work this period."
               : (dash.running+dash.pipeline)+" initiatives in motion; "+fmtCur(dash.revAtRisk)+" of revenue in play.";
             const text = [
-              "WEEKLY GROWTH UPDATE — "+retailerLabel,
+              "WEEKLY GROWTH UPDATE · "+retailerLabel,
               date,
               "",
               headline,
               "",
-              "— PORTFOLIO —",
+              "PORTFOLIO",
               "• "+dash.running+" running · "+dash.pipeline+" in draft · "+dash.completed+" completed this period",
               "• Revenue in play (running): "+fmtCur(dash.revAtRisk),
               "• Avg initiative quality (ICE): "+(dash.avgIce||"n/a"),
               "",
-              "— RESULTS —",
+              "RESULTS",
               "• Win rate: "+(dash.winRate!==null?dash.winRate+"% ("+dash.wins+" of "+dash.closed+" closed)":"no closed initiatives yet"),
               "• Projected Impact (completed): "+fmtCur(dash.revImpacted),
               "• ROI on closed work: "+(dash.closedROI!==null?dash.closedROI+"x return":"not yet measurable"),
               "• Avg time to close: "+(dash.avgDays?dash.avgDays+" days":"n/a"),
               "",
-              "— FORECAST —",
+              "FORECAST",
               "• Probability-weighted revenue in-flight: "+fmtCur(dash.contributionTotals.inflight),
               "• Probability-weighted pipeline: "+fmtCur(dash.contributionTotals.pipeline),
               "• Estimate accuracy to date: "+(dash.calibration!==null?dash.calibration+"%":"not yet measurable"),
               "",
               "Tracked in Growth OS · "+date,
             ].join("\n");
-            try { navigator.clipboard.writeText(text); showToast("Executive summary copied — ready to paste.", "success"); } catch { showToast("Couldn't copy to clipboard.", "error"); }
+            try { navigator.clipboard.writeText(text); showToast("Executive summary copied. Ready to paste.", "success"); } catch { showToast("Couldn't copy to clipboard.", "error"); }
           }}>
           &#128203; Copy executive summary
         </button>
@@ -1020,7 +1020,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
               return (
                 <div key={i} style={{fontSize:12,fontFamily:t.serif,color:t.textSub,lineHeight:1.5}}>
                   <span style={{fontWeight:700,color:t.text}}>{tr.category}:</span>{" "}
-                  proven at <span style={{color:t.gold}}>{tr.winningBrand}</span>{revStr} — not running at {tr.missingBrands.join(", ")}
+                  proven at <span style={{color:t.gold}}>{tr.winningBrand}</span>{revStr}, not running at {tr.missingBrands.join(", ")}
                 </div>
               );
             })}
@@ -1072,7 +1072,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
       {/* Velocity + Category + Type */}
       <div style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) minmax(0,1fr)",gap:12}}>
         <div style={gCd(t,dk)}>
-          <div style={gSL(t)}>Velocity — last 8 weeks</div>
+          <div style={gSL(t)}>Velocity · last 8 weeks</div>
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
             {[{label:"Started / week",vals:dash.vel.started,color:dk?"#5ad080":"#1a7a48"},{label:"Closed / week",vals:dash.vel.closed,color:dk?"#8080e0":"#4848b0"}].map(row=>(
               <div key={row.label}>
@@ -1130,7 +1130,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
 
       {/* Outcome breakdown */}
       <div style={gCd(t,dk)}>
-        <div style={gSL(t)}>Outcome breakdown — all closed</div>
+        <div style={gSL(t)}>Outcome breakdown · all closed</div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
           {OUTCOMES.map(o=>{const c=(dk?OD:OL)[o]||{};return(
             <div key={o} style={{background:c.bg||t.surfaceAlt,border:"1px solid "+(c.border||t.border),borderRadius:6,padding:"8px 14px",minWidth:80}}>

@@ -15,8 +15,8 @@ export const DEFAULT_BRAND_BRIEFS = {
     whatTheySell:  "Premium home décor and lifestyle products, $80–$300 AOV",
     categories:    "Home decor, Gifting, Candles, Textiles",
     icp:           "Women 28–48, considered purchase, gifting occasions and self-treat, high design sensitivity",
-    whyTheyWin:    "Strong visual brand identity, high repeat LTV, emotional purchase driver — aspiration over utility",
-    relationship:  "Own DTC brand — full control over pricing, creative, and customer experience",
+    whyTheyWin:    "Strong visual brand identity, high repeat LTV, emotional purchase driver: aspiration over utility",
+    relationship:  "Own DTC brand: full control over pricing, creative, and customer experience",
     constraint:    "CAC rising on paid social, creative refresh cadence is the primary ROAS lever",
   },
   "retailer 1": {
@@ -24,7 +24,7 @@ export const DEFAULT_BRAND_BRIEFS = {
     categories:    "Home accessories, Gifting, Candles, Seasonal",
     icp:           "Women 25–45, deal-aware but brand-loyal, mix of gifting and self-purchase",
     whyTheyWin:    "Strong loyalty base, broad SKU range, good replenishment behaviour on consumable SKUs",
-    relationship:  "Wholesale / retail partner — shared margin, limited creative control, strong buyer relationship",
+    relationship:  "Wholesale / retail partner: shared margin, limited creative control, strong buyer relationship",
     constraint:    "Margin compression from freight and promo dependency, free shipping threshold sensitivity",
   },
   "retailer 2": {
@@ -32,7 +32,7 @@ export const DEFAULT_BRAND_BRIEFS = {
     categories:    "Home decor, Accessories, Seasonal, Gifting",
     icp:           "Broad female demographic 24–50, price-conscious, discovery-driven, impulse and gifting",
     whyTheyWin:    "Wide reach, high traffic volume, good basket size when cross-sell is activated",
-    relationship:  "Wholesale / retail partner — high volume, lower margin, category manager relationship",
+    relationship:  "Wholesale / retail partner: high volume, lower margin, category manager relationship",
     constraint:    "Low CVR vs category benchmark, PDP experience needs improvement, limited personalisation capability",
   },
 };
@@ -276,11 +276,11 @@ export function parseMetricsCSV(text) {
     rawHeaders.forEach((_, j) => { obj[mapped[j]] = vals[j] || ""; });
 
     // Require at minimum: date
-    if (!obj.date) { errors.push(`Row ${i+1}: missing date — skipped`); continue; }
+    if (!obj.date) { errors.push(`Row ${i+1}: missing date, skipped`); continue; }
 
     // Normalise date to YYYY-MM-DD
     const d = new Date(obj.date+"T12:00:00");
-    if (isNaN(d)) { errors.push(`Row ${i+1}: unrecognised date "${obj.date}" — skipped`); continue; }
+    if (isNaN(d)) { errors.push(`Row ${i+1}: unrecognised date "${obj.date}", skipped`); continue; }
     obj.date = d.toISOString().slice(0,10);
 
     // Normalise numeric fields

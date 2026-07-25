@@ -1,6 +1,6 @@
 import { fmtCur, fmtDate, parseD } from "../constants.js";
 import { gG, gGh, gSL, gCd } from "../components/styles.js";
-import { renderNums } from "../components/text.jsx";
+import { renderProse } from "../components/text.jsx";
 
 // -- Triage View --------------------------------------------------------------
 export function TriageView({items, t, dk, cats, brands, activeBrand, onDetail, onStatus, onLogResults, onExtend, onActivate}) {
@@ -60,7 +60,7 @@ export function TriageView({items, t, dk, cats, brands, activeBrand, onDetail, o
       queue.push({
         id:e.id, kind:"blocked", urgency:55+moneyW,
         accent:dk?"#e08080":"#a03030", tag:"BLOCKED", title:e.title, brand:brandLabel(e),
-        reason:e.blocker+". Resolve the dependency or escalate — it's holding up "+(money>0?fmtCur(money)+" of impact.":"a live initiative."),
+        reason:e.blocker+". Resolve the dependency or escalate; it's holding up "+(money>0?fmtCur(money)+" of impact.":"a live initiative."),
         metric:e.primaryMetric, money,
         actions:[],
       });
@@ -86,7 +86,7 @@ export function TriageView({items, t, dk, cats, brands, activeBrand, onDetail, o
       queue.push({
         id:e.id, kind:"highstake", urgency:20+moneyW/4,
         accent:dk?"#8080e0":"#4848b0", tag:"HIGH STAKES", title:e.title, brand:brandLabel(e),
-        reason:fmtCur(money)+" of revenue riding on this. On track"+(e.endDate?" — ends "+fmtDate(e.endDate)+".":"."),
+        reason:fmtCur(money)+" of revenue riding on this. On track"+(e.endDate?", ends "+fmtDate(e.endDate)+".":"."),
         metric:e.primaryMetric, money,
         actions:[],
       });
@@ -128,7 +128,7 @@ export function TriageView({items, t, dk, cats, brands, activeBrand, onDetail, o
             {today.toLocaleDateString("en-CA",{weekday:"long",month:"long",day:"numeric"})}
           </div>
           <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>
-            {renderNums(totalAtRisk>0?fmtCur(totalAtRisk)+" at risk across "+running.length+" running":running.length+" running · "+draft.length+" in draft", t, "atr")}
+            {renderProse(totalAtRisk>0?fmtCur(totalAtRisk)+" at risk across "+running.length+" running":running.length+" running · "+draft.length+" in draft")}
           </div>
         </div>
         {topItem ? (
@@ -147,7 +147,7 @@ export function TriageView({items, t, dk, cats, brands, activeBrand, onDetail, o
           </div>
         ) : (
           <div style={{fontSize:13.5,color:dk?"#60d080":"#1a7a48",fontFamily:t.sans,fontWeight:500}}>
-            ✓ Queue clear — nothing needs a decision today. Good week to activate a draft or run the Signal debate.
+            ✓ Queue clear. Nothing needs a decision today. Good week to activate a draft or run the Signal debate.
           </div>
         )}
       </div>

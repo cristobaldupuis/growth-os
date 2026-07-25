@@ -4,6 +4,7 @@ export const KEY_THEME    = "gos_theme_v1";
 export const KEY_DEBATES  = "gos_debates_v1";
 export const KEY_METRICS  = "gos_metrics_v1";
 export const KEY_RECS     = "gos_recs_v1";
+export const KEY_LIB_VIEW = "gos_lib_view_v1";
 
 // Storage helper — works in Claude artifacts (window.storage), StackBlitz (localStorage), or memory
 export const store = (() => {
@@ -70,7 +71,7 @@ export const handleRestoreBackup = (file, showToast, setRestorePayload) => {
         : "unknown date";
       setRestorePayload({ parsed, counts, stamp });
     } catch (err) {
-      showToast("Couldn't read that backup file — it may be corrupted.", "error");
+      showToast("Couldn't read that backup file. It may be corrupted.", "error");
       console.error("Restore error:", err);
     }
   };

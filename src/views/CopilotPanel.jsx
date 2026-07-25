@@ -78,7 +78,7 @@ function IdeaCard({idea, idx, results, setResults, added, onAdd, t, dk, cats, ag
 
         {idea.csoRationale&&(
           <div style={{padding:"8px 12px",background:dk?"#1a1a2a":"#f4f4ff",border:"1px solid "+(dk?"#3a3a6a":"#c0c0e8"),borderRadius:5}}>
-            <div style={{fontSize:9,color:dk?"#8888cc":"#5555aa",fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>✦ CSO — Why we proceed</div>
+            <div style={{fontSize:9,color:dk?"#8888cc":"#5555aa",fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>✦ CSO · Why we proceed</div>
             <div style={{fontSize:11,color:dk?"#b0b0e0":"#333366",fontFamily:t.serif,lineHeight:1.5,fontWeight:600}}>{idea.csoRationale}</div>
           </div>
         )}
@@ -274,7 +274,7 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
       setResults(ideas);
       setPhase("done");
     } catch(e) {
-      setError("Debate failed — " + (e.message||"check your API key in Settings."));
+      setError("Debate failed: " + (e.message||"check your API key in Settings."));
       setPhase("input");
     }
     setRunning(false); setActiveAgent(null);
@@ -341,7 +341,7 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
             {/* Context input */}
             <div>
               <div style={{fontSize:10,letterSpacing:"0.10em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,marginBottom:5}}>
-                Situation context <span style={{fontWeight:400,textTransform:"none",letterSpacing:0}}>(optional — sharper with context)</span>
+                Situation context <span style={{fontWeight:400,textTransform:"none",letterSpacing:0}}>(optional, sharper with context)</span>
               </div>
               <textarea style={{...gTA(t),fontSize:12,minHeight:68,opacity:running?0.6:1}}
                 disabled={running} value={context}
@@ -473,7 +473,7 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
                   ))}
                 </div>
                 <div style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,lineHeight:1.8,maxWidth:380,margin:"0 auto"}}>
-                  Each exec has 8 live tools to query your portfolio data — win rates, blocked initiatives, coverage gaps, failure patterns, revenue gaps — before forming opinions.
+                  Each exec has 8 live tools to query your portfolio data (win rates, blocked initiatives, coverage gaps, failure patterns, revenue gaps) before forming opinions.
                   A Moderator routes the debate dynamically. The CSO synthesizes into 3 net-new initiatives with champion and dissenting voice.
                   <br/><br/>
                   <strong style={{color:t.textSub}}>Add situation context above for sharper results.</strong>

@@ -6,10 +6,11 @@ import { callAgentTurn } from "../services/ai/callAgentTurn.js";
 import { callModerator } from "../services/ai/callModerator.js";
 import { callDebateSynthesis } from "../services/ai/callDebateSynthesis.js";
 import { buildPortfolioTools, buildPortfolioContext } from "../services/portfolio.js";
+import { iceScore, iceColor } from "../constants.js";
 
 // -- Agentic Debate Panel v2 ---------------------------------------------------
 const MAX_TURNS = 8;
-const TOOL_LABEL = {
+const _TOOL_LABEL = {
   get_portfolio_summary:     "📋 reading portfolio summary",
   get_running_initiatives:   "🏃 checking running initiatives",
   get_category_coverage:     "🗺️ analysing category coverage",
@@ -22,8 +23,10 @@ const TOOL_LABEL = {
 
 function IdeaCard({idea, idx, results, setResults, added, onAdd, t, dk, cats, agents}) {
   const [isEditing, setEditing] = useState(false);
-  const iceS = ice => ice ? Math.round(((ice.impact||0)*(ice.certainty||0)*(ice.ease||0)/1000)*100) : null;
-  const iceC = s => s===null?t.textMuted:s>=60?t.gold:s>=30?"#c08820":"#a03030";
+  // Both of these used to be reimplemented here, and the colour thresholds had
+  // already drifted from the shared ones. Use the single definition instead.
+  const iceS = ice => iceScore(ice && ice.impact, ice && ice.certainty, ice && ice.ease);
+  const iceC = s => iceColor(s, t);
   const score = iceS(idea.ice);
   const isAdded = added[idx];
   const champAgent = agents.find(a => idea.championedBy?.toLowerCase().includes(a.label.toLowerCase()));
@@ -39,8 +42,8 @@ function IdeaCard({idea, idx, results, setResults, added, onAdd, t, dk, cats, ag
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
           <div style={{flex:1}}>
             <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center",marginBottom:6}}>
-              <CBdg cat={idea.category||cats[0]} cats={cats} dk={dk}/>
-              <TBdg type={idea.initType||"A/B Test"} dk={dk}/>
+              <CBdg cat={idea.category||cats[0]} cats={cats} dk={dk} t={t}/>
+              <TBdg type={idea.initType||"A/B Test"} dk={dk} t={t}/>
               <span style={{fontSize:10,fontWeight:600,color:t.textMuted,fontFamily:t.serif,
                 background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:3,padding:"1px 6px"}}>AI · Net New</span>
             </div>
@@ -69,17 +72,17 @@ function IdeaCard({idea, idx, results, setResults, added, onAdd, t, dk, cats, ag
             </div>
           )}
           {idea.dissentVoice&&(
-            <div style={{padding:"7px 10px",background:dk?"#2a1a1a":"#fdf5f5",border:"1px solid "+(dk?"#6a3030":"#e0b0b0"),borderRadius:5}}>
+            <div style={{padding:"7px 10px",background:t.redBg,border:"1px solid "+(t.red),borderRadius:5}}>
               <div style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>{dissentAgent?.icon} Risk / Dissent</div>
-              <div style={{fontSize:11,color:dk?"#e09090":"#a03030",fontFamily:t.serif,lineHeight:1.5}}>{idea.dissentVoice}</div>
+              <div style={{fontSize:11,color:t.red,fontFamily:t.serif,lineHeight:1.5}}>{idea.dissentVoice}</div>
             </div>
           )}
         </div>
 
         {idea.csoRationale&&(
-          <div style={{padding:"8px 12px",background:dk?"#1a1a2a":"#f4f4ff",border:"1px solid "+(dk?"#3a3a6a":"#c0c0e8"),borderRadius:5}}>
-            <div style={{fontSize:9,color:dk?"#8888cc":"#5555aa",fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>✦ CSO · Why we proceed</div>
-            <div style={{fontSize:11,color:dk?"#b0b0e0":"#333366",fontFamily:t.serif,lineHeight:1.5,fontWeight:600}}>{idea.csoRationale}</div>
+          <div style={{padding:"8px 12px",background:t.surfaceAlt,border:"1px solid "+(t.border),borderRadius:5}}>
+            <div style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>✦ CSO · Why we proceed</div>
+            <div style={{fontSize:11,color:t.textSub,fontFamily:t.serif,lineHeight:1.5,fontWeight:600}}>{idea.csoRationale}</div>
           </div>
         )}
 
@@ -257,7 +260,7 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
 
       // Synthesis
       setPhase("synthesising"); setActiveAgent(null);
-      const transcriptStr = fullTranscript.map(m=>`${m.icon} ${m.label}:\n${m.text}`).join("\n\n---\n\n");
+      const _transcriptStr = fullTranscript.map(m=>`${m.icon} ${m.label}:\n${m.text}`).join("\n\n---\n\n");
       const ideas = await callDebateSynthesis(portfolioCtx, context, fullTranscript, cats, settings, portfolioTools);
 
       // Save debate to history
@@ -346,12 +349,12 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
               <textarea style={{...gTA(t),fontSize:12,minHeight:68,opacity:running?0.6:1}}
                 disabled={running} value={context}
                 onChange={e=>setContext(e.target.value)}
-                onFocus={e=>{ if(!context && smartDefaultContext) setContext(smartDefaultContext); }}
+                onFocus={()=>{ if(!context && smartDefaultContext) setContext(smartDefaultContext); }}
                 placeholder={smartDefaultContext || "What should the C-Suite know right now?\n• Black Friday is 8 weeks out\n• Gross margin compressed 4pts this quarter\n• A competitor just launched a subscription tier"}/>
             </div>
 
             {/* Portfolio snapshot — collapsible */}
-            <details style={{...gSc(t,dk),background:t.surfaceAlt}}>
+            <details style={{...gSc(t),background:t.surfaceAlt}}>
               <summary style={{fontSize:11,fontWeight:600,color:t.textSub,fontFamily:t.serif,cursor:"pointer",listStyle:"none",display:"flex",justifyContent:"space-between"}}>
                 <span>📋 Portfolio the agents will read</span>
                 <span style={{color:t.textMuted,fontWeight:400}}>▼</span>
@@ -372,7 +375,7 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
             )}
 
             {error&&(
-              <div style={{padding:"10px 14px",background:dk?"#2a1010":"#fdf0f0",border:"1px solid "+(dk?"#6a2828":"#e09090"),borderRadius:6,fontSize:12,fontFamily:t.serif,color:dk?"#e08080":"#a03030"}}>
+              <div style={{padding:"10px 14px",background:t.redBg,border:"1px solid "+(t.red),borderRadius:6,fontSize:12,fontFamily:t.serif,color:t.red}}>
                 {error}
               </div>
             )}
@@ -386,7 +389,7 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
                 </div>
 
                 {transcript.map((msg,i)=>(
-                  <div key={i} style={{borderLeft:"3px solid "+msg.color,paddingLeft:12,paddingTop:7,paddingBottom:7,
+                  <div key={i} style={{paddingLeft:12,paddingTop:7,paddingBottom:7,
                     background:t.surfaceAlt,borderRadius:"0 6px 6px 0",
                     border:"1px solid "+t.border,borderLeft:"3px solid "+msg.color}}>
                     <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:5,flexWrap:"wrap"}}>
@@ -410,7 +413,7 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
                 {/* Moderator note */}
                 {modNote&&!running&&phase==="debating"&&(
                   <div style={{padding:"6px 10px",background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:5,
-                    fontSize:11,color:dk?"#d4b060":"#7a5800",fontFamily:t.serif,display:"flex",gap:6,alignItems:"center"}}>
+                    fontSize:11,color:t.warn,fontFamily:t.serif,display:"flex",gap:6,alignItems:"center"}}>
                     <span style={{fontWeight:700}}>🎙 Moderator:</span> {modNote}
                   </div>
                 )}
@@ -490,8 +493,8 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
                 <div style={{padding:"32px 16px",textAlign:"center",border:"1px dashed "+t.border,borderRadius:8,color:t.textMuted,fontFamily:t.serif,fontSize:12}}>
                   No saved debates yet. Run your first debate and it will appear here.
                 </div>
-              ):debates.map((d,i)=>(
-                <div key={d.id} style={{...gSc(t,dk)}}>
+              ):debates.map((d)=>(
+                <div key={d.id} style={{...gSc(t)}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
                     <div>
                       <div style={{fontSize:11,fontWeight:600,color:t.text,fontFamily:t.serif}}>

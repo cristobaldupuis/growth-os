@@ -202,14 +202,14 @@ function ScorecardSection({ t, dk, dash, weeklyMetrics, brands, activeBrand, set
 // ── Section 2: Learned ────────────────────────────────────────────────────────
 
 function LearnedSection({ t, dk, learned, onCopy }) {
-  const outcomeColor = (o, dk) => {
+  const _outcomeColor = (o) => {
     const map = {
-      Jackpot:      dk ? "#60d080" : "#1a7a48",
-      Success:      dk ? "#50c898" : "#1a6a50",
-      Failed:       dk ? "#e07070" : "#a03030",
-      Inconclusive: dk ? "#d0a838" : "#8a6010",
+      Jackpot:      t.teal,
+      Success:      t.teal,
+      Failed:       t.red,
+      Inconclusive: t.warn,
     };
-    return map[o] || (dk ? "#a0a080" : "#666");
+    return map[o] || (t.textMuted);
   };
 
   return (
@@ -261,13 +261,12 @@ function RunningSection({ t, dk, running, cats, onCopy }) {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {running.map(item => {
-            const ice = iceScore(item.ice?.impact, item.ice?.certainty, item.ice?.ease);
             return (
               <div key={item.id} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 14px", background: t.surfaceAlt, border: "1px solid " + t.border, borderRadius: 10 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13.5, fontWeight: 600, color: t.text, fontFamily: t.sans, lineHeight: 1.3, marginBottom: 6 }}>{item.title}</div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                    <CBdg cat={item.category} cats={cats} dk={dk} />
+                    <CBdg cat={item.category} cats={cats} dk={dk} t={t}/>
                     <ICEChip ice={item.ice} t={t} />
                     {item.startDate && <span style={{ fontSize: 10, color: t.textMuted, fontFamily: t.mono }}>Started {fmtDate(item.startDate)}</span>}
                   </div>
@@ -303,14 +302,13 @@ function NextSection({ t, dk, next, cats, onCopy }) {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {next.map(item => {
-            const ice = iceScore(item.ice?.impact, item.ice?.certainty, item.ice?.ease);
             const hyp = item.hypothesis ? (item.hypothesis.length > 120 ? item.hypothesis.slice(0, 120) + "…" : item.hypothesis) : null;
             return (
               <div key={item.id} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 14px", background: t.surfaceAlt, border: "1px solid " + t.border, borderRadius: 10 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13.5, fontWeight: 600, color: t.text, fontFamily: t.sans, lineHeight: 1.3, marginBottom: 6 }}>{item.title}</div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                    <CBdg cat={item.category} cats={cats} dk={dk} />
+                    <CBdg cat={item.category} cats={cats} dk={dk} t={t}/>
                     <ICEChip ice={item.ice} t={t} />
                   </div>
                   {hyp && (
@@ -347,9 +345,17 @@ export function ClientReadoutView({ t, dk, dash, items, brands, activeBrand, cat
     return { latestWeek: latest, weekLabel: latest ? fmtDate(latest.date) : "" };
   }, [weeklyMetrics, activeBrand, brands]);
 
-  // Section 2 — learnings in last 30 days
+  // Section 2 — learnings in last 30 days.
+  //
+  // The 30-day boundary is captured once per mount rather than read inside the
+  // memo. Calling Date.now() during render makes the memo impure — it can return
+  // a different result for identical inputs, so React is free to re-run it and
+  // get a different answer, and a readout being copied to a client could shift
+  // its own window mid-session. Pinning it to mount time also means the figures
+  // in a readout stay stable while someone is reading them.
+  const [readoutNow] = useState(() => Date.now());
   const learned = useMemo(() => {
-    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const cutoff = new Date(readoutNow - 30 * 24 * 60 * 60 * 1000);
     let closed = items.filter(e =>
       (e.status === "Completed" || e.status === "Killed") &&
       e.results?.keyLearning
@@ -367,7 +373,7 @@ export function ClientReadoutView({ t, dk, dash, items, brands, activeBrand, cat
         return db - da;
       })
       .slice(0, 5);
-  }, [items]);
+  }, [items, readoutNow]);
 
   // Section 3 — running
   const running = useMemo(() =>
@@ -395,7 +401,9 @@ export function ClientReadoutView({ t, dk, dash, items, brands, activeBrand, cat
 
   // Copy helpers
   const copyText = (text) => {
-    try { navigator.clipboard.writeText(text); } catch {}
+    // Clipboard access is denied in some embedded/insecure contexts; the
+    // readout is still on screen to copy by hand, so this is not worth an alert.
+    try { navigator.clipboard.writeText(text); } catch (err) { console.warn("Clipboard write blocked:", err); }
   };
 
   const scorecardText = buildScorecardText(dash, latestWeek, weekLabel, brands, activeBrand, settings);

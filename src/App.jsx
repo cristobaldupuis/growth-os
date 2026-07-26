@@ -1,17 +1,13 @@
 import { Analytics } from "@vercel/analytics/react";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
-  COMPANY_NAME, BUSINESS_MODEL,
-  NORTH_STAR_METRIC, NORTH_STAR_CURRENT, NORTH_STAR_TARGET,
   BRANDS as CONFIG_BRANDS,
-  CATEGORIES,
-  AGENTS as CONFIG_AGENTS,
   TEMPLATES,
   SEED,
   SEED_WEEKLY_METRICS,
 } from "./config.js";
 
-import { KEY_ITEMS, KEY_SETTINGS, KEY_DEBATES, KEY_METRICS, KEY_RECS, KEY_THEME, KEY_LIB_VIEW, store, handleDownloadBackup, handleRestoreBackup } from "./services/store.js";
+import { KEY_ITEMS, KEY_SETTINGS, KEY_DEBATES, KEY_METRICS, KEY_RECS, KEY_THEME, KEY_LIB_VIEW, store, onWriteError, handleDownloadBackup, handleRestoreBackup } from "./services/store.js";
 import {
   applyBrandBriefDefaults, DEFAULT_AGENTS, DEFAULT_SETTINGS,
   STATUSES, OUTCOMES, INIT_TYPES, METRIC_SOURCES,
@@ -123,21 +119,37 @@ const GUIDE_SECTIONS = [
 ];
 
 function GuideDrawer({ t, dk, openSection, onClose, onNavigate, nav }) {
-  const [expanded, setExpanded] = useState(() => {
-    const init = {};
-    GUIDE_SECTIONS.forEach(s => { init[s.id] = s.views.includes(nav); });
-    if (openSection && openSection !== true) init[openSection] = true;
-    return init;
-  });
+  // Which sections are open is *derived* from where the user is (`nav`) and what
+  // they clicked through from (`openSection`), overlaid with whatever they have
+  // since toggled by hand.
+  //
+  // This used to be one state object resynced by an effect that called setState
+  // during commit, which re-rendered the whole drawer a second time on every
+  // change of either prop — and quietly discarded the user's own toggles each
+  // time it fired. Deriving the base during render and keeping only the
+  // overrides in state removes the extra render and makes a manual toggle stick
+  // until the thing it was derived from actually changes.
+  const [overrides, setOverrides] = useState({});
+  const derivedKey = `${nav}|${openSection}`;
+  const [lastKey, setLastKey] = useState(derivedKey);
+  if (lastKey !== derivedKey) {
+    // Render-phase reset — React's documented pattern for "state that depends on
+    // props". Cheaper and more predictable than an effect: it happens before
+    // paint, so there is no intermediate frame showing the stale sections.
+    setLastKey(derivedKey);
+    setOverrides({});
+  }
 
-  useEffect(() => {
-    setExpanded(() => {
-      const next = {};
-      GUIDE_SECTIONS.forEach(s => { next[s.id] = s.views.includes(nav); });
-      if (openSection && openSection !== true) next[openSection] = true;
-      return next;
-    });
-  }, [nav, openSection]);
+  const expanded = {};
+  GUIDE_SECTIONS.forEach(s => { expanded[s.id] = s.views.includes(nav); });
+  if (openSection && openSection !== true) expanded[openSection] = true;
+  Object.assign(expanded, overrides);
+  const setExpanded = (fn) => setOverrides(prev => {
+    const base = {};
+    GUIDE_SECTIONS.forEach(s => { base[s.id] = s.views.includes(nav); });
+    if (openSection && openSection !== true) base[openSection] = true;
+    return fn({ ...base, ...prev });
+  });
 
   useEffect(() => {
     if (openSection && openSection !== true) {
@@ -213,7 +225,7 @@ function GuideDrawer({ t, dk, openSection, onClose, onNavigate, nav }) {
 }
 // -- App -----------------------------------------------------------------------
 // ── Onboarding Modal ────────────────────────────────────────────────────────
-function OnboardingModal({ t, dk, settings, onSave, onSkip }) {
+function OnboardingModal({ t, settings, onSave, onSkip }) {
   const [step, setStep]   = useState(0);
   const [data, setData]   = useState({
     companyName:      settings.companyName      || "",
@@ -382,7 +394,7 @@ function OnboardingModal({ t, dk, settings, onSave, onSkip }) {
         {/* Progress bar */}
         {step < STEPS.length - 1 && (
           <div style={{margin:"14px 24px 0",height:2,background:t.border,borderRadius:1}}>
-            <div style={{height:"100%",background:t.gold,borderRadius:1,width:progress+"%",transition:"width 0.3s ease"}}/>
+            <div style={{height:"100%",background:t.goldFill,borderRadius:1,width:progress+"%",transition:"width 0.3s ease"}}/>
           </div>
         )}
 
@@ -432,7 +444,6 @@ export default function App() {
   const [showTpl,   setShowTpl]   = useState(false);
   const [showSet,   setShowSet]   = useState(false);
   const [onboarding, setOnboarding] = useState(false);
-  const [showMenu,  setShowMenu]  = useState(false);
   const [showCapture, setShowCapture] = useState(false);
   const [captureText, setCaptureText] = useState("");
   const [captureLoad, setCaptureLoad] = useState(false);
@@ -462,12 +473,14 @@ export default function App() {
   const [showPulse, setShowPulse] = useState(false);
   const [showMetricsImport, setShowMetricsImport] = useState(false);
   const [toast, setToast] = useState(null); // {msg, type:"info"|"error"|"success"}
+  // Set when a durable write fails. Sticky — it stays until a backup is taken,
+  // because the consequence (silent loss of everything since) doesn't go away.
+  const [storageError, setStorageError] = useState(null);
   const showToast = (msg, type="info") => { setToast({msg,type}); setTimeout(()=>setToast(null), 3500); };
 
   // Restore confirm modal state
   const [restorePayload, setRestorePayload] = useState(null);
   // Backup nudge — fires at most once per session if the last backup is stale
-  const [backupNudged, setBackupNudged] = useState(false);
   const [libView,   setLibView]   = useState("list");   // library card layout: "list" | "grid"
 
   const t    = dk ? TD : TL;
@@ -475,6 +488,11 @@ export default function App() {
   const brands = settings.brands || DEFAULT_SETTINGS.brands || CONFIG_BRANDS;
 
   useEffect(()=>{
+    // A failed durable write means everything since it is tab-local and one
+    // reload from gone, so it gets a persistent banner rather than a toast that
+    // disappears after 3.5 seconds.
+    onWriteError(({ message }) => setStorageError(message));
+
     const load = async ()=>{
       try {
         const [ir,sr,dr,mr,rr,tr,lv] = await Promise.all([store.get(KEY_ITEMS),store.get(KEY_SETTINGS),store.get(KEY_DEBATES),store.get(KEY_METRICS),store.get(KEY_RECS),store.get(KEY_THEME),store.get(KEY_LIB_VIEW)]);
@@ -499,28 +517,38 @@ export default function App() {
         if(rr&&rr.value) setRecs(JSON.parse(rr.value));
       } catch { setItems(SEED); }
       setLoaded(true);
-      // Stale-backup nudge — once per session, if it's been >14 days since the last download
+      // Stale-backup nudge. This effect has an empty dependency array so it runs
+      // exactly once per mount, which already gives "once per session" — the
+      // `backupNudged` state it used to also check was unavoidably `false` here
+      // and only served to make the dependency list wrong.
       try {
         const lastBackup = localStorage.getItem("gos_last_backup");
-        if (lastBackup && !backupNudged) {
+        if (lastBackup) {
           const daysSince = (Date.now() - new Date(lastBackup).getTime()) / 86400000;
           if (daysSince > 14) {
             showToast("You haven't backed up in over 14 days. Consider downloading a backup.", "info");
-            setBackupNudged(true);
           }
         }
-      } catch {}
+      } catch (err) {
+        // Backup-staleness check is best effort; a browser that blocks
+        // localStorage reads should not stop the app from loading.
+        console.warn("Could not read last-backup timestamp:", err);
+      }
     };
     load();
   },[]);
 
-  const saveItems    = d => { const now = new Date().toISOString(); const stamped = d.map(item => ({ ...item, updatedAt: now })); setItems(stamped); try{store.set(KEY_ITEMS,JSON.stringify(stamped));}catch{} };
-  const saveSettings = s => { setSettings(s); try{store.set(KEY_SETTINGS,JSON.stringify(s));}catch{} };
-  const saveDebates  = d => { setDebates(d); try{store.set(KEY_DEBATES,JSON.stringify(d));}catch{} };
-  const saveMetrics  = m => { setWeeklyMetrics(m); try{store.set(KEY_METRICS,JSON.stringify(m));}catch{} };
-  const saveRecs     = r => { setRecs(r);          try{store.set(KEY_RECS,JSON.stringify(r));}catch{} };
-  const toggleDk     = ()=> { setDk(n => { const next=!n; try{store.set(KEY_THEME,next?"dark":"light");}catch{} return next; }); };
-  const saveLibView  = v => { setLibView(v); try{store.set(KEY_LIB_VIEW,v);}catch{} };
+  // `store.set` no longer throws — it resolves with `{ok, durable}` and reports
+  // failures through the handler registered in the load effect below, so these
+  // don't need their own try/catch. The old `catch{}` on each of these is exactly
+  // what made a full-storage browser look like a working one.
+  const saveItems    = d => { const now = new Date().toISOString(); const stamped = d.map(item => ({ ...item, updatedAt: now })); setItems(stamped); store.set(KEY_ITEMS,JSON.stringify(stamped)); };
+  const saveSettings = s => { setSettings(s); store.set(KEY_SETTINGS,JSON.stringify(s)); };
+  const saveDebates  = d => { setDebates(d); store.set(KEY_DEBATES,JSON.stringify(d)); };
+  const saveMetrics  = m => { setWeeklyMetrics(m); store.set(KEY_METRICS,JSON.stringify(m)); };
+  const saveRecs     = r => { setRecs(r); store.set(KEY_RECS,JSON.stringify(r)); };
+  const toggleDk     = ()=> { setDk(n => { const next=!n; store.set(KEY_THEME,next?"dark":"light"); return next; }); };
+  const saveLibView  = v => { setLibView(v); store.set(KEY_LIB_VIEW,v); };
 
   // -- Next Plays orchestrator -------------------------------------------------
   // Two-step: candidate generation then parallel expansion of the top 3. Keeps
@@ -596,12 +624,6 @@ export default function App() {
       // weekOf: Monday of the generation week (YYYY-MM-DD). Stable across same-week
       // regenerations so the diff always compares against a prior-week batch, not the
       // earlier generation from the same Monday session.
-      const _now = new Date();
-      const _day = _now.getDay();
-      const _mon = new Date(_now);
-      _mon.setDate(_now.getDate() + (_day === 0 ? -6 : 1 - _day));
-      const weekOf = _mon.toISOString().slice(0, 10);
-
       const now = new Date();
       const batch = {
         id: "recbatch-"+Date.now(),
@@ -695,15 +717,27 @@ export default function App() {
     return null;
   },[dRange,cFrom,cTo]);
 
-  const normBrandId = id => (!id||id==="default") ? (brands[0]&&brands[0].id||"default") : id;
-  const brandFilter = item => activeBrand==="all" || normBrandId(item.brandId)===normBrandId(activeBrand);
+  // Memoised so the `dash` and `filtered` useMemos below can list them as real
+  // dependencies. As plain function expressions they were new identities on every
+  // render, so including them would have defeated the memo entirely and omitting
+  // them (what the code did) meant those memos could serve stale results after a
+  // brand switch. useCallback makes the honest dependency list also the correct
+  // one.
+  const normBrandId = useCallback(
+    id => (!id||id==="default") ? (brands[0]&&brands[0].id||"default") : id,
+    [brands]
+  );
+  const brandFilter = useCallback(
+    item => activeBrand==="all" || normBrandId(item.brandId)===normBrandId(activeBrand),
+    [activeBrand, normBrandId]
+  );
 
-  const inRange = item=>{
+  const inRange = useCallback(item=>{
     if(!brandFilter(item)) return false;
     if(!bounds) return true;
     const d=parseD(item.endDate)||parseD(item.createdAt);
     return d&&d>=bounds.from&&d<=bounds.to;
-  };
+  }, [brandFilter, bounds]);
 
   const dash = useMemo(()=>{
     const ranged    = items.filter(inRange);
@@ -805,7 +839,7 @@ export default function App() {
     }),{realised:0,realisedBackfilled:0,inflight:0,pipeline:0});
 
     return {completed:completed.length,killed:killed.length,pipeline:pipeline.length,running:running.length,revImpacted,revImpactedProjected,revAtRisk,totalEstimated,totalActual,calibration,totalEstCost,totalActualCost,closedROI,winRate,wins:wins.length,closed:closed.length,avgDays,catCounts,typeCounts,outCounts,vel,avgIce,contribution,contributionTotals,_runningItems:running};
-  },[items,bounds,cats,activeBrand,brands]);
+  },[items,cats,inRange,brandFilter]);
 
   const filtered = useMemo(()=>{
     let list=items.filter(e=>activeBrand==="all"||normBrandId(e.brandId)===normBrandId(activeBrand));
@@ -820,7 +854,7 @@ export default function App() {
       return b.createdAt.localeCompare(a.createdAt);
     });
     return list;
-  },[items,fSt,fCat,fType,fOwn,sort,activeBrand,brands]);
+  },[items,fSt,fCat,fType,fOwn,sort,activeBrand,normBrandId]);
 
   const goDetail = (id, origin)=>{ if(origin) setDetailOrigin(origin); setSelId(id); setNav("detail"); };
   const goNew    = ()=>{ setShowTpl(true); };
@@ -935,8 +969,6 @@ export default function App() {
         if (isUpdate) rowErrs.push("Will update existing initiative " + r.initId);
 
         // Brand: match by name (trimmed), fall back to default
-        const matchedBrand = brands.find(b => b.name.trim().toLowerCase() === (r.brandId||"").trim().toLowerCase());
-        const resolvedBrandId = matchedBrand ? matchedBrand.id : (existingById?.brandId || "default");
 
         if (rowErrs.length) errs.push({ row: idx + 2, title: r.title || r.initId || "(no title)", issues: rowErrs, isUpdate });
 
@@ -969,17 +1001,22 @@ export default function App() {
   if(!loaded) return <div style={{background:t.bg,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{color:t.textMuted,fontFamily:t.serif}}>Loading Growth OS…</span></div>;
 
   const navBtn=(v,lbl)=>(
-    <button key={v} onClick={()=>setNav(v)} style={{fontSize:13,fontWeight:nav===v?600:500,padding:"6px 14px",borderRadius:8,cursor:"pointer",fontFamily:t.sans,background:nav===v?t.surface:"transparent",border:"none",color:nav===v?t.text:t.textSub,boxShadow:nav===v?t.shadow:"none",transition:"all .15s"}}>{lbl}</button>
+    <button key={v} onClick={()=>setNav(v)} style={{fontSize:13,fontWeight:nav===v?600:500,padding:"6px 14px",borderRadius:8,cursor:"pointer",fontFamily:t.sans,background:nav===v?t.surface:"transparent",border:"none",color:nav===v?t.text:t.textSub,boxShadow:nav===v?t.shadow:"none",transition:"all .15s",whiteSpace:"nowrap",flexShrink:0}}>{lbl}</button>
   );
 
   return (
     <div style={{background:t.bg,minHeight:"100vh",fontFamily:t.sans,color:t.text}}>
-      <style>{"@import url('https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css');*{box-sizing:border-box}@keyframes spin{to{transform:rotate(360deg)}}input[type=range]{accent-color:"+t.gold+"}@keyframes slideIn{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}"}</style>
+      {/* The Tabler icon webfont used to be @import-ed here from jsdelivr. Nothing
+        * in the app ever rendered a `ti ti-*` class, so it was a render-blocking
+        * third-party request buying nothing — and one more origin to justify if a
+        * client's security review asks. Every glyph on screen is either an HTML
+        * entity or an inline SVG. */}
+      <style>{"@keyframes spin{to{transform:rotate(360deg)}}input[type=range]{accent-color:"+t.goldFill+"}@keyframes slideIn{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}"}</style>
 
       {/* Onboarding — first run only */}
       {onboarding&&(
         <OnboardingModal
-          t={t} dk={dk} settings={settings}
+          t={t} settings={settings}
           onSave={(data,obBrands)=>{
             const mergedBrands = (settings.brands||[]).map(b=>{
               const ob = (obBrands||[]).find(ob=>ob.id===b.id);
@@ -998,9 +1035,9 @@ export default function App() {
       {/* Toast notifications */}
       {toast&&(
         <div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",zIndex:9999,
-          background:toast.type==="error"?(dk?"#3a1a1a":"#fff0f0"):toast.type==="success"?(dk?"#1a2a1a":"#f0faf2"):(dk?"#1a1a2a":"#f0f4ff"),
-          border:"1px solid "+(toast.type==="error"?(dk?"#7a3030":"#e09090"):toast.type==="success"?(dk?"#2a6a40":"#7adca0"):(dk?"#3a4a7a":"#a0b4e0")),
-          color:toast.type==="error"?(dk?"#f08080":"#a03030"):toast.type==="success"?(dk?"#60d080":"#1a7a48"):(dk?"#a0b4f0":"#2a3a8a"),
+          background:toast.type==="error"?t.redBg:toast.type==="success"?t.tealBg:t.surfaceAlt,
+          border:"1px solid "+(toast.type==="error"?(t.red):toast.type==="success"?(t.teal):(t.border)),
+          color:toast.type==="error"?(t.red):toast.type==="success"?(t.teal):(t.textSub),
           borderRadius:8,padding:"10px 18px",fontSize:13,fontFamily:t.serif,fontWeight:600,
           boxShadow:"0 4px 20px rgba(0,0,0,0.15)",animation:"slideIn 0.2s ease",whiteSpace:"nowrap",
           maxWidth:"90vw",textOverflow:"ellipsis",overflow:"hidden"}}>
@@ -1012,8 +1049,8 @@ export default function App() {
       {restorePayload&&(
         <Modal t={t} dk={dk} onClose={()=>setRestorePayload(null)} title="Restore from backup?">
           <div style={{display:"flex",flexDirection:"column",gap:14}}>
-            <div style={{padding:"10px 14px",background:dk?"#2a1a1a":"#fff8f0",border:"1px solid "+(dk?"#7a3030":"#e0a060"),borderRadius:6}}>
-              <div style={{fontSize:12,fontWeight:700,color:dk?"#e08060":"#a04010",fontFamily:t.mono,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.06em"}}>⚠ This will overwrite your current data</div>
+            <div style={{padding:"10px 14px",background:t.warnBg,border:"1px solid "+t.warnBorder,borderRadius:6}}>
+              <div style={{fontSize:12,fontWeight:700,color:t.warn,fontFamily:t.mono,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.06em"}}>⚠ This will overwrite your current data</div>
               <div style={{fontSize:12,color:t.textSub,fontFamily:t.serif,lineHeight:1.8}}>
                 <div>Exported: <strong style={{color:t.text}}>{restorePayload.stamp}</strong></div>
                 <div>Initiatives: <strong style={{color:t.text}}>{restorePayload.counts.items}</strong></div>
@@ -1025,7 +1062,7 @@ export default function App() {
             <div style={{fontSize:12,color:t.textMuted,fontFamily:t.serif}}>Your current initiatives, settings, and metrics will be replaced. This cannot be undone.</div>
             <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
               <button style={gGh(t)} onClick={()=>setRestorePayload(null)}>Cancel</button>
-              <button style={{...gG(t),background:"#c03030",border:"none"}} onClick={()=>{
+              <button style={{...gG(t),background:t.red,border:"none"}} onClick={()=>{
                 const {parsed} = restorePayload;
                 if (Array.isArray(parsed.items))         saveItems(parsed.items);
                 if (parsed.settings)                     saveSettings(parsed.settings);
@@ -1042,22 +1079,29 @@ export default function App() {
 
       {/* Header — single bar */}
       <div style={{background:t.headerBg,borderBottom:"1px solid "+t.border,position:"sticky",top:0,zIndex:100}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:14,padding:"10px 16px",flexWrap:"wrap"}}>
-          {/* Left: logo lockup (home) + tabs */}
-          <div style={{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:14,padding:"10px 16px",flexWrap:"wrap",width:"100%",maxWidth:1440,margin:"0 auto"}}>
+          {/* Left: logo lockup (home) + tabs. `minWidth:0` matters: without it this
+            * flex child refuses to shrink below its content width, and the tab
+            * strip pushes the document ~30px wider than a 390px viewport, which
+            * scrolls the whole page sideways on a phone. */}
+          <div style={{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap",minWidth:0,maxWidth:"100%"}}>
             <button onClick={()=>setNav("dashboard")} title="Back to Dashboard"
               style={{display:"flex",alignItems:"center",gap:9,padding:"5px 9px",borderRadius:10,cursor:"pointer",
                 background:"transparent",border:"1px solid transparent",transition:"background .15s, border-color .15s"}}
               onMouseEnter={e=>{e.currentTarget.style.background=t.goldBg;e.currentTarget.style.borderColor=t.goldBorder;}}
               onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.borderColor="transparent";}}>
-              <span style={{width:26,height:26,borderRadius:8,background:t.gold,color:t.goldText,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:600,fontSize:12,fontFamily:t.serif,letterSpacing:"-0.02em",flexShrink:0}}>GO</span>
+              <span style={{width:26,height:26,borderRadius:8,background:t.goldFill,color:t.goldText,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:600,fontSize:12,fontFamily:t.serif,letterSpacing:"-0.02em",flexShrink:0}}>GO</span>
               <span style={{display:"flex",flexDirection:"column",alignItems:"flex-start",lineHeight:1.15}}>
                 <span style={{fontSize:14,fontWeight:700,letterSpacing:"0.06em",color:t.text,fontFamily:t.sans,whiteSpace:"nowrap"}}>GROWTH OS</span>
                 <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,letterSpacing:"0.02em",whiteSpace:"nowrap"}}>{settings.companyName}</span>
               </span>
             </button>
-            <div style={{width:1,height:24,background:t.border}}/>
-            <div style={{display:"flex",gap:2,background:t.surfaceAlt,padding:3,borderRadius:10,border:"1px solid "+t.border}}>
+            <div style={{width:1,height:24,background:t.border,flexShrink:0}}/>
+            {/* Scrolls horizontally rather than clipping when the five tabs don't
+              * fit — on a 390px phone "Client Readout" was previously cut off at
+              * the viewport edge and unreachable. */}
+            <div style={{display:"flex",gap:2,background:t.surfaceAlt,padding:3,borderRadius:10,border:"1px solid "+t.border,
+              overflowX:"auto",maxWidth:"100%",scrollbarWidth:"none"}}>
               {navBtn("dashboard","Dashboard")}
               {navBtn("initiatives","Initiatives")}
               {navBtn("library","Library")}
@@ -1096,7 +1140,7 @@ export default function App() {
             </>)}
             <button onClick={()=>setShowCopilot(true)}
               style={{fontSize:12.5,padding:"7px 14px",borderRadius:9,cursor:"pointer",
-                background:t.gold,border:"1px solid "+t.gold,color:t.goldText,fontWeight:600,fontFamily:t.sans,
+                background:t.goldFill,border:"1px solid "+t.goldFill,color:t.goldText,fontWeight:600,fontFamily:t.sans,
                 display:"flex",alignItems:"center",gap:5,boxShadow:t.shadow}}>
               ✦ Signal
             </button>
@@ -1120,9 +1164,36 @@ export default function App() {
         </div>
       </div>
 
+      {/* Storage failure banner. Deliberately unmissable and not dismissible by
+        * clicking away: the state it describes is "your work is not being saved",
+        * and the only real remedy is taking a backup, so the backup action lives
+        * in the banner itself. */}
+      {storageError && (
+        <div role="alert" style={{background:t.redBg,borderBottom:"1px solid "+t.red,padding:"10px 16px"}}>
+          <div style={{maxWidth:1440,margin:"0 auto",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+            <span style={{fontSize:12.5,color:t.red,fontFamily:t.sans,fontWeight:600,flex:1,minWidth:220,lineHeight:1.5}}>
+              {storageError}
+            </span>
+            <button style={{...gG(t),fontSize:12,padding:"6px 13px",flexShrink:0}}
+              onClick={()=>{
+                handleDownloadBackup(items, settings, debates, weeklyMetrics, recs);
+                try { localStorage.setItem("gos_last_backup", new Date().toISOString()); } catch { /* the very failure being reported */ }
+                setStorageError(null);
+              }}>
+              Download backup
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Content column. `#root` used to be pinned to 1126px in index.css, which
+        * boxed the app on every monitor; now that it isn't, the measure has to be
+        * held here instead or the dashboard tables stretch to 2560px on an
+        * ultrawide. 1440 keeps line lengths readable and still gives the Weekly
+        * Pulse table room for all seven columns without scrolling. */}
+      <main style={{width:"100%",maxWidth:1440,margin:"0 auto",flex:1}}>
       {nav==="dashboard"&&<DashView t={t} dk={dk} dash={dash} cats={cats} settings={settings} brands={brands} activeBrand={activeBrand} weeklyMetrics={weeklyMetrics} onLog={()=>setShowPulse(true)} onImport={()=>setShowMetricsImport(true)} dRange={dRange} setDRange={setDRange} cFrom={cFrom} cTo={cTo} setCFrom={setCFrom} setCTo={setCTo} onGo={()=>setNav("initiatives")} recs={recs} recsLoad={recsLoad} recsErr={recsErr} items={items} onGenerateRecs={generateRecommendations} onOpenRec={(batchId,recId)=>setShowRecModal({batchId,recId})} showToast={showToast} onSaveItems={saveItems}/>}
       {nav==="triage"&&<TriageView items={items} t={t} dk={dk} cats={cats} brands={brands} activeBrand={activeBrand} onDetail={(id)=>goDetail(id,"triage")}
-        onStatus={(id,status)=>{const it=items.find(e=>e.id===id); if(it){setSelId(id); reqStatus(status);}}}
         onLogResults={(id)=>{const it=items.find(e=>e.id===id); if(it){setSelId(id); setRForm(it.results?{...it.results,actualRevenueImpact:it.results.actualRevenueImpact!=null?it.results.actualRevenueImpact:"",actualSpendCost:it.results.actualSpendCost!=null?it.results.actualSpendCost:"",actualResourceCost:it.results.actualResourceCost!=null?it.results.actualResourceCost:""}:{actualOutcome:"",keyLearning:"",outcomeClassification:"Success",decisionMade:"",outcomeCertainty:75,actualRevenueImpact:"",actualSpendCost:"",actualResourceCost:""}); setShowR(true);}}}
         onExtend={(id,days)=>{saveItems(items.map(e=>{if(e.id!==id)return e; const base=e.endDate?new Date(e.endDate+"T12:00:00"):new Date(); base.setDate(base.getDate()+days); return {...e,endDate:base.toISOString().slice(0,10)};})); showToast("Extended "+days+" days.","success");}}
         onActivate={(id)=>{saveItems(items.map(e=>e.id===id?withRunningSnapshot({...e,status:"Running",startDate:e.startDate||new Date().toISOString().slice(0,10)},"Running"):e)); showToast("Initiative activated. Now running.","success");}}
@@ -1165,7 +1236,7 @@ export default function App() {
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
             {filtered.length===0&&(
               items.filter(e=>activeBrand==="all"||normBrandId(e.brandId)===normBrandId(activeBrand)).length===0 ? (
-                <div style={{...gCd(t,dk),padding:"44px 24px",textAlign:"center"}}>
+                <div style={{...gCd(t),padding:"44px 24px",textAlign:"center"}}>
                   <div style={{fontSize:28,marginBottom:10,opacity:.5}}>&#9670;</div>
                   <div style={{fontSize:15,fontWeight:600,color:t.text,fontFamily:t.sans,marginBottom:6}}>No initiatives yet</div>
                   <div style={{fontSize:13,color:t.textSub,fontFamily:t.sans,lineHeight:1.55,maxWidth:380,margin:"0 auto 16px"}}>Start your growth portfolio: add an initiative, capture a quick idea, or generate a slate from Signal.</div>
@@ -1176,7 +1247,7 @@ export default function App() {
                   <button onClick={()=>setGuideSection(true)} style={{background:"none",border:"none",color:t.textMuted,fontSize:12,fontFamily:t.serif,cursor:"pointer",marginTop:14,textDecoration:"underline",textUnderlineOffset:3}}>New here? See everything Growth OS can do &#8594;</button>
                 </div>
               ) : (
-                <div style={{...gCd(t,dk),padding:"40px 24px",textAlign:"center"}}>
+                <div style={{...gCd(t),padding:"40px 24px",textAlign:"center"}}>
                   <div style={{fontSize:14,fontWeight:600,color:t.text,fontFamily:t.sans,marginBottom:5}}>No initiatives match your filters</div>
                   <div style={{fontSize:12.5,color:t.textSub,fontFamily:t.sans,marginBottom:14}}>Try widening the status, category, type, or owner filters.</div>
                   <button onClick={()=>{setFSt("All");setFCat("All");setFType("All");setFOwn("All");}} style={{...gGh(t),fontSize:12.5,padding:"7px 14px",margin:"0 auto",display:"inline-flex"}}>Clear all filters</button>
@@ -1184,7 +1255,7 @@ export default function App() {
               )
             )}
             {filtered.map(item=>(
-              <div key={item.id} onClick={()=>goDetail(item.id,"initiatives")} style={{...gCd(t,dk),cursor:"pointer",padding:"14px 16px",transition:"border-color .15s, box-shadow .15s"}}
+              <div key={item.id} onClick={()=>goDetail(item.id,"initiatives")} style={{...gCd(t),cursor:"pointer",padding:"14px 16px",transition:"border-color .15s, box-shadow .15s"}}
                 onMouseEnter={e=>{e.currentTarget.style.borderColor=t.goldBorder;e.currentTarget.style.boxShadow=t.shadowHi;}}
                 onMouseLeave={e=>{e.currentTarget.style.borderColor=t.border;e.currentTarget.style.boxShadow=t.shadow;}}>
                 {/* Row 1: title (lead) + ICE/revenue anchors */}
@@ -1204,12 +1275,12 @@ export default function App() {
                 </div>
                 {/* Row 2: quiet metadata strip */}
                 <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap",marginTop:10,paddingTop:9,borderTop:"1px solid "+t.borderSoft}}>
-                  <CBdg cat={item.category} cats={cats} dk={dk}/>
-                  <TBdg type={item.initType} dk={dk}/>
+                  <CBdg cat={item.category} cats={cats} dk={dk} t={t}/>
+                  <TBdg type={item.initType} dk={dk} t={t}/>
                   {brands&&brands.length>1&&activeBrand==="all"&&<Bdg label={brandName(item.brandId||"default",brands)} color={brandColor(item.brandId||"default",brands,dk)} bg={t.surfaceAlt} border={t.border} small/>}
                   {item.results&&<OBdg o={item.results.outcomeClassification} dk={dk}/>}
                   <EAlert endDate={item.endDate} status={item.status} t={t} dk={dk}/>
-                  <BlockerBadge blocker={item.blocker}/>
+                  <BlockerBadge blocker={item.blocker} t={t}/>
                   <span style={{marginLeft:"auto",display:"flex",gap:13,alignItems:"center",fontSize:11,color:t.textMuted,fontFamily:t.mono,flexWrap:"wrap"}}>
                     {item.results&&typeof item.results.actualRevenueImpact==="number"&&<span>actual {fmtCur(item.results.actualRevenueImpact)}</span>}
                     {item.status!=="Draft"&&item.endDate&&<span>end {fmtDate(item.endDate)}</span>}
@@ -1278,17 +1349,19 @@ export default function App() {
           </div>
         </Modal>
       )}
+      </main>
+
       {showTpl&&(
         <Modal t={t} dk={dk} onClose={()=>setShowTpl(false)} wide title="Start from a template">
           <p style={{fontSize:13,color:t.textSub,marginBottom:16,fontFamily:t.serif}}>Pick a template to pre-fill the form, or start blank.</p>
           <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:16}}>
             {TEMPLATES.map(tpl=>(
-              <div key={tpl.id} onClick={()=>startFromTemplate(tpl)} style={{...gCd(t,dk),cursor:"pointer",display:"flex",alignItems:"flex-start",gap:12}}>
+              <div key={tpl.id} onClick={()=>startFromTemplate(tpl)} style={{...gCd(t),cursor:"pointer",display:"flex",alignItems:"flex-start",gap:12}}>
                 <div style={{fontSize:20,color:t.gold,marginTop:1}}><span style={{fontSize:18}}>&#9670;</span></div>
                 <div>
                   <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:2}}>
                     <span style={{fontSize:13,fontWeight:700,color:t.text}}>{tpl.label}</span>
-                    <TBdg type={tpl.initType} dk={dk}/>
+                    <TBdg type={tpl.initType} dk={dk} t={t}/>
                   </div>
                   <div style={{fontSize:12,color:t.textMuted,fontFamily:t.serif}}>{tpl.description}</div>
                 </div>
@@ -1299,7 +1372,7 @@ export default function App() {
         </Modal>
       )}
 
-      {showSet&&<SettingsModal t={t} dk={dk} settings={settings} onSave={s=>{saveSettings(s);setShowSet(false);}} onClose={()=>setShowSet(false)} onDownloadBackup={() => { handleDownloadBackup(items, settings, debates, weeklyMetrics, recs); try { localStorage.setItem("gos_last_backup", new Date().toISOString()); } catch {} }} onRestoreBackup={(file) => handleRestoreBackup(file, showToast, setRestorePayload)} onResetDemo={handleResetDemoData}/>}
+      {showSet&&<SettingsModal t={t} dk={dk} settings={settings} onSave={s=>{saveSettings(s);setShowSet(false);}} onClose={()=>setShowSet(false)} onDownloadBackup={() => { handleDownloadBackup(items, settings, debates, weeklyMetrics, recs); try { localStorage.setItem("gos_last_backup", new Date().toISOString()); } catch { /* the backup itself succeeded; only the reminder timestamp failed */ } }} onRestoreBackup={(file) => handleRestoreBackup(file, showToast, setRestorePayload)} onResetDemo={handleResetDemoData}/>}
 
       {guideSection&&(
         <GuideDrawer t={t} dk={dk} openSection={guideSection} onClose={()=>setGuideSection(null)}
@@ -1347,14 +1420,14 @@ export default function App() {
               <>
                 <div style={{padding:"10px 14px",background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:6,display:"flex",gap:16,flexWrap:"wrap"}}>
                   <div><span style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>Rows parsed: </span><strong style={{color:t.text,fontFamily:t.serif}}>{importRows.length}</strong></div>
-                  <div><span style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>New: </span><strong style={{color:dk?"#60d080":"#1a7a48",fontFamily:t.serif}}>{importRows.filter(r=>!r._isUpdate).length}</strong></div>
-                  <div><span style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>Updates: </span><strong style={{color:dk?"#d0a838":"#8a6010",fontFamily:t.serif}}>{importRows.filter(r=>r._isUpdate).length}</strong></div>
-                  {importErrs.length>0&&<div><span style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>Warnings: </span><strong style={{color:dk?"#e08080":"#a03030",fontFamily:t.serif}}>{importErrs.length}</strong></div>}
+                  <div><span style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>New: </span><strong style={{color:t.teal,fontFamily:t.serif}}>{importRows.filter(r=>!r._isUpdate).length}</strong></div>
+                  <div><span style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>Updates: </span><strong style={{color:t.warn,fontFamily:t.serif}}>{importRows.filter(r=>r._isUpdate).length}</strong></div>
+                  {importErrs.length>0&&<div><span style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>Warnings: </span><strong style={{color:t.red,fontFamily:t.serif}}>{importErrs.length}</strong></div>}
                 </div>
                 {importErrs.length>0&&(
                   <div style={{maxHeight:120,overflowY:"auto",display:"flex",flexDirection:"column",gap:4}}>
                     {importErrs.map((e,i)=>(
-                      <div key={i} style={{fontSize:11,fontFamily:t.serif,padding:"5px 10px",background:dk?"#2a1212":"#fdf0f0",border:"1px solid "+(dk?"#6a2828":"#e09090"),borderRadius:4,color:dk?"#e08080":"#a03030"}}>
+                      <div key={i} style={{fontSize:11,fontFamily:t.serif,padding:"5px 10px",background:t.redBg,border:"1px solid "+(t.red),borderRadius:4,color:t.red}}>
                         Row {e.row} · <strong>{e.title}</strong>: {e.issues.join("; ")}
                       </div>
                     ))}
@@ -1366,7 +1439,7 @@ export default function App() {
                     return(
                       <div key={i} style={{display:"flex",gap:8,alignItems:"center",padding:"7px 10px",background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:5}}>
                         <span style={{fontSize:10,padding:"2px 7px",borderRadius:3,background:sc.bg,border:"1px solid "+sc.border,color:sc.text,fontFamily:t.serif,fontWeight:600,flexShrink:0}}>{row.status}</span>
-                        {row._isUpdate&&<span style={{fontSize:10,color:dk?"#d0a838":"#8a6010",fontFamily:t.serif,flexShrink:0}}>update</span>}
+                        {row._isUpdate&&<span style={{fontSize:10,color:t.warn,fontFamily:t.serif,flexShrink:0}}>update</span>}
                         <span style={{fontSize:12,color:t.text,fontFamily:t.serif,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{row.title}</span>
                         <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,flexShrink:0}}>{row.category}</span>
                       </div>
@@ -1394,7 +1467,7 @@ export default function App() {
           </FR>
           <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:18}}>
             <button style={gGh(t)} onClick={()=>{setShowSM(false);setPendS(null);}}>Cancel</button>
-            <button onClick={()=>applyStatus(pendS,confC)} style={{...gG(t),background:pendS==="Killed"?"#c03030":t.gold,border:"none"}}>Mark as {pendS}</button>
+            <button onClick={()=>applyStatus(pendS,confC)} style={{...gG(t),background:pendS==="Killed"?t.red:t.gold,border:"none"}}>Mark as {pendS}</button>
           </div>
         </Modal>
       )}
@@ -1427,7 +1500,7 @@ export default function App() {
             <FR label="Outcome classification" t={t}>
               <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                 {OUTCOMES.map(o=>{const c=(dk?OD:OL)[o]||{},act=rForm.outcomeClassification===o;return(
-                  <button key={o} onClick={()=>setRForm({...rForm,outcomeClassification:o})} style={{fontSize:12,padding:"5px 11px",borderRadius:4,cursor:"pointer",fontWeight:600,background:act?c.bg:(dk?"#1a1a14":"#f5f5f0"),border:"1px solid "+(act?c.border:t.border),color:act?c.text:t.textMuted}}>{o}</button>
+                  <button key={o} onClick={()=>setRForm({...rForm,outcomeClassification:o})} style={{fontSize:12,padding:"5px 11px",borderRadius:4,cursor:"pointer",fontWeight:600,background:act?c.bg:(t.surfaceAlt),border:"1px solid "+(act?c.border:t.border),color:act?c.text:t.textMuted}}>{o}</button>
                 );})}
               </div>
             </FR>
@@ -1441,7 +1514,7 @@ export default function App() {
                   const act=(rForm.durability||"tactical")===d.k;
                   return (
                     <button key={d.k} title={d.hint} onClick={()=>setRForm({...rForm,durability:d.k})}
-                      style={{fontSize:12,padding:"5px 11px",borderRadius:4,cursor:"pointer",fontWeight:600,background:act?t.goldBg:(dk?"#1a1a14":"#f5f5f0"),border:"1px solid "+(act?t.goldBorder:t.border),color:act?t.gold:t.textMuted}}>{d.label}</button>
+                      style={{fontSize:12,padding:"5px 11px",borderRadius:4,cursor:"pointer",fontWeight:600,background:act?t.goldBg:(t.surfaceAlt),border:"1px solid "+(act?t.goldBorder:t.border),color:act?t.gold:t.textMuted}}>{d.label}</button>
                   );
                 })}
               </div>
@@ -1531,7 +1604,7 @@ export default function App() {
 
 
 // Weekly metrics log modal — manual entry per brand, source-filtered fields
-function MetricsLogModal({t, dk, settings, brands, weeklyMetrics, onSave, onClose}) {
+function MetricsLogModal({t, dk, brands, weeklyMetrics, onSave, onClose}) {
   const today = new Date().toISOString().slice(0,10);
   const [date, setDate] = useState(today);
   const [rows, setRows] = useState(
@@ -1681,7 +1754,7 @@ function MetricsImportModal({t, dk, weeklyMetrics, onSave, onClose}) {
     <Modal t={t} dk={dk} onClose={onClose} wide title="Import metrics CSV">
       <div style={{display:"flex",flexDirection:"column",gap:12}}>
         {step==="done" && (
-          <div style={{padding:"24px",textAlign:"center",color:dk?"#60d080":"#1a7a48",fontFamily:t.serif,fontSize:13}}>
+          <div style={{padding:"24px",textAlign:"center",color:t.teal,fontFamily:t.serif,fontSize:13}}>
             ✓ Metrics imported successfully
           </div>
         )}
@@ -1696,7 +1769,7 @@ function MetricsImportModal({t, dk, weeklyMetrics, onSave, onClose}) {
               <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>Header-driven, so column order doesn't matter. See template for required columns.</div>
               <input id="metrics-csv-input" type="file" accept=".csv" style={{display:"none"}} onChange={handleFile}/>
             </div>
-            <div style={{background:dk?"#1a1a12":"#f5f5f0",borderRadius:6,padding:"10px 12px",fontSize:11,fontFamily:t.serif,color:t.textMuted,lineHeight:1.7}}>
+            <div style={{background:t.surfaceAlt,borderRadius:6,padding:"10px 12px",fontSize:11,fontFamily:t.serif,color:t.textMuted,lineHeight:1.7}}>
               <strong style={{color:t.textSub}}>Required columns:</strong> date, brand, source<br/>
               <strong style={{color:t.textSub}}>Common columns:</strong> revenue, spend, roas, cvr, cac, aov, traffic, conversions, impressions, clicks, cpm, ctr, notes<br/>
               <strong style={{color:t.textSub}}>Source values:</strong> manual, meta, ga4, google_ads<br/>
@@ -1710,14 +1783,14 @@ function MetricsImportModal({t, dk, weeklyMetrics, onSave, onClose}) {
             {parsed.errors.length > 0 && (
               <div style={{display:"flex",flexDirection:"column",gap:3,maxHeight:100,overflowY:"auto"}}>
                 {parsed.errors.map((e,i)=>(
-                  <div key={i} style={{fontSize:11,fontFamily:t.serif,padding:"4px 8px",background:dk?"#2a1212":"#fdf0f0",border:"1px solid "+(dk?"#6a2828":"#e09090"),borderRadius:4,color:dk?"#e08080":"#a03030"}}>{e}</div>
+                  <div key={i} style={{fontSize:11,fontFamily:t.serif,padding:"4px 8px",background:t.redBg,border:"1px solid "+(t.red),borderRadius:4,color:t.red}}>{e}</div>
                 ))}
               </div>
             )}
 
             <div style={{fontSize:12,fontFamily:t.serif,color:t.textSub}}>
               <span style={{fontFamily:t.mono}}>{parsed.rows.length}</span> row{parsed.rows.length!==1?"s":""} ready to import
-              {conflicts.length > 0 && <span style={{color:dk?"#d0a838":"#8a6010"}}> · {conflicts.length} conflict{conflicts.length!==1?"s":""} with existing data</span>}
+              {conflicts.length > 0 && <span style={{color:t.warn}}> · {conflicts.length} conflict{conflicts.length!==1?"s":""} with existing data</span>}
             </div>
 
             {conflicts.length > 0 && (
@@ -1738,15 +1811,15 @@ function MetricsImportModal({t, dk, weeklyMetrics, onSave, onClose}) {
                 const srcDef = METRIC_SOURCES.find(s=>s.id===row.source);
                 return (
                   <div key={i} style={{display:"flex",gap:8,alignItems:"center",padding:"6px 10px",
-                    background:isConflict?(dk?"#2a2410":"#fdf8ee"):t.surfaceAlt,
-                    border:"1px solid "+(isConflict?(dk?"#6a5818":"#e0c070"):t.border),borderRadius:4}}>
+                    background:isConflict?(t.warnBg):t.surfaceAlt,
+                    border:"1px solid "+(isConflict?(t.warnBorder):t.border),borderRadius:4}}>
                     <span style={{fontSize:10,fontFamily:t.mono,color:t.textMuted,minWidth:80,flexShrink:0}}>{row.date}</span>
                     <span style={{fontSize:11,fontFamily:t.serif,color:t.text,fontWeight:600,minWidth:80,flexShrink:0}}>{row.brand}</span>
                     <span style={{fontSize:10,fontFamily:t.serif,color:t.textMuted,minWidth:60,flexShrink:0}}>{srcDef?.label||row.source}</span>
                     <span style={{fontSize:10,fontFamily:t.mono,color:t.textMuted,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                       {Object.entries(row.metrics).filter(([k])=>k!=="notes").map(([k,v])=>`${k}: ${v}`).join(" · ")}
                     </span>
-                    {isConflict&&<span style={{fontSize:9,color:dk?"#d0a838":"#8a6010",fontFamily:t.serif,flexShrink:0}}>conflict</span>}
+                    {isConflict&&<span style={{fontSize:9,color:t.warn,fontFamily:t.serif,flexShrink:0}}>conflict</span>}
                   </div>
                 );
               })}
@@ -1770,6 +1843,13 @@ function MetricsImportModal({t, dk, weeklyMetrics, onSave, onClose}) {
 // Modal — full recommendation detail with hypothesis, ICE rationale, reasoning
 // trace, and cited learnings. Actions: Add to backlog | Dismiss.
 function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, cats, onAccept, onDismiss, onClose }) {
+  // Every hook must run before the first early return. `useState` used to sit
+  // below `if (!rec) return null`, so the hook count changed between renders the
+  // moment a recommendation stopped resolving (dismissed from another surface, a
+  // batch rotating out of the last-10 window, a restored backup) and React threw
+  // "rendered fewer hooks than expected", taking the whole dashboard down.
+  const [citeItem, setCiteItem] = useState(null);
+
   const batch = recs.find(b => b.id === batchId);
   const rec = batch ? batch.recommendations.find(r => r.id === recId) : null;
   if (!rec) return null;
@@ -1782,7 +1862,6 @@ function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, cats, onAc
   // Footnote map: each cited learning gets a stable superscript number, appended
   // to the reasoning trace as end-of-trace references. The prose stays clean; the
   // numbers tell you what fed the reasoning, and each is clickable.
-  const [citeItem, setCiteItem] = useState(null);
   const footnotes = citedLearnings.map((it, i) => ({ n: i+1, item: it }));
 
   const isResolved = rec.status !== "pending";
@@ -1799,9 +1878,9 @@ function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, cats, onAc
             <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,padding:"2px 8px",border:"1px solid "+t.border,borderRadius:3}}>{rec.initType}</span>
             {isResolved && (
               <span style={{fontSize:10,fontFamily:t.serif,padding:"2px 8px",borderRadius:3,fontWeight:600,
-                background: rec.status==="accepted"?(dk?"#1a3a1a":"#e8f5e8"):(dk?"#2a2a2a":"#f0f0f0"),
-                color: rec.status==="accepted"?(dk?"#8ad08a":"#2a7a2a"):t.textMuted,
-                border:"1px solid "+(rec.status==="accepted"?(dk?"#3a6a3a":"#a0d0a0"):t.border)}}>
+                background: rec.status==="accepted"?(t.tealBg):(t.surfaceAlt),
+                color: rec.status==="accepted"?(t.teal):t.textMuted,
+                border:"1px solid "+(rec.status==="accepted"?(t.teal):t.border)}}>
                 {rec.status==="accepted" ? "✓ Added to backlog" : "✕ Dismissed"}
               </span>
             )}
@@ -1822,7 +1901,7 @@ function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, cats, onAc
         {/* Reasoning trace — the trust-builder. Footnote superscripts map to the
             cited learnings below; prose stays clean, references are clickable. */}
         {rec.reasoningTrace && (
-          <div style={gSc(t,dk)}>
+          <div style={gSc(t)}>
             <div style={gSL(t)}>Why this, why now</div>
             <p style={{margin:0,color:t.textSub,lineHeight:1.6,fontSize:14,fontFamily:t.serif}}>
               {rec.reasoningTrace}
@@ -1851,7 +1930,7 @@ function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, cats, onAc
         )}
 
         {/* Hypothesis structure */}
-        <div style={gSc(t,dk)}>
+        <div style={gSc(t)}>
           <div style={gSL(t)}>Hypothesis framework</div>
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
             {rec.observation && (
@@ -1882,7 +1961,7 @@ function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, cats, onAc
         </div>
 
         {/* ICE with rationale */}
-        <div style={gSc(t,dk)}>
+        <div style={gSc(t)}>
           <div style={gSL(t)}>ICE scoring · AI suggested</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:14,alignItems:"center"}}>
             <div>
@@ -1912,11 +1991,11 @@ function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, cats, onAc
 
         {/* Cited source learnings — the grounding */}
         {citedLearnings.length > 0 && (
-          <div style={gSc(t,dk)}>
+          <div style={gSc(t)}>
             <div style={gSL(t)}>Source learnings · what this is grounded in</div>
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
               {citedLearnings.map(item => (
-                <div key={item.id} onClick={()=>setCiteItem(item)} style={{padding:"10px 12px",background:dk?"#1a1a14":"#fafaf5",borderLeft:"3px solid "+t.gold,borderRadius:"0 4px 4px 0",cursor:"pointer"}}>
+                <div key={item.id} onClick={()=>setCiteItem(item)} style={{padding:"10px 12px",background:t.surfaceAlt,borderLeft:"3px solid "+t.gold,borderRadius:"0 4px 4px 0",cursor:"pointer"}}>
                   <div style={{fontSize:12,fontWeight:600,color:t.text,fontFamily:t.serif,marginBottom:4}}>{item.title}</div>
                   <div style={{display:"flex",gap:6,marginBottom:6,flexWrap:"wrap"}}>
                     <span style={{fontSize:9,color:t.textMuted,fontFamily:t.serif,padding:"1px 6px",border:"1px solid "+t.border,borderRadius:3}}>
@@ -1978,7 +2057,7 @@ function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onRestoreB
           <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:10,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Categories</div>
           <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}}>
             {local.categories.map(c=>(
-              <span key={c} style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:12,fontWeight:600,color:catColor(c,local.categories,dk),background:dk?"#1e1e14":"#f8f7f2",border:"1px solid "+(dk?"#2a2820":"#ddd8c8"),borderRadius:4,padding:"3px 8px"}}>
+              <span key={c} style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:12,fontWeight:600,color:catColor(c,local.categories,dk),background:t.surfaceAlt,border:"1px solid "+(t.border),borderRadius:4,padding:"3px 8px"}}>
                 {c}<button onClick={()=>f("categories",local.categories.filter(x=>x!==c))} style={{background:"none",border:"none",color:"inherit",cursor:"pointer",padding:0,fontSize:12,lineHeight:1,opacity:0.6}}>&#215;</button>
               </span>
             ))}
@@ -2169,7 +2248,7 @@ function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onRestoreB
             <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,background:t.border,padding:"2px 6px",borderRadius:3}}>Placeholder · coming soon</span>
           </div>
           <p style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,lineHeight:1.6,margin:"0 0 8px"}}>Planned: Google Sheets (pulling from GA4, Looker, Meta Ads), BigQuery, direct GA4 and Meta Ads APIs. Paste data manually in the initiative form for now.</p>
-          <div style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,padding:"10px 12px",background:dk?"#1a1a12":"#f5f5f0",borderRadius:4,border:"1px dashed "+t.border}}>No data sources connected yet.</div>
+          <div style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,padding:"10px 12px",background:t.surfaceAlt,borderRadius:4,border:"1px dashed "+t.border}}>No data sources connected yet.</div>
         </div>
         <div style={{display:"flex",gap:8,justifyContent:"flex-end",paddingTop:4}}>
           <button style={gGh(t)} onClick={onClose}>Cancel</button>

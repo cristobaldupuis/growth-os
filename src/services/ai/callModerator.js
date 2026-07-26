@@ -1,4 +1,5 @@
-import { PROXY_URL, AI_HEADERS, safeParseJSON } from "./_shared.js";
+import { PROXY_URL, AI_HEADERS, safeParseJSON, proxyError } from "./_shared.js";
+import { MODELS, EFFORT, buildRequest } from "./models.js";
 
 // Moderator — decides what happens next after each agent turn
 export async function callModerator(portfolioCtx, userContext, transcript, agents, turnCount, maxTurns) {
@@ -30,10 +31,11 @@ Priority: favour "followup" over "continue" whenever there is an unresolved disa
   const resp = await fetch(PROXY_URL, {
     method:"POST", headers:AI_HEADERS(),
     body: JSON.stringify({
-      model:"claude-sonnet-4-6", max_tokens:300, system:sys,
+      ...buildRequest({model:MODELS.REASONING, maxTokens:300, system:sys, effort:EFFORT.LOW}),
       messages:[{role:"user", content:`Portfolio:\n${portfolioCtx}\n\nContext:\n${userContext||"none"}\n\nTranscript so far:\n${transcriptStr}\n\nDecide what happens next.`}],
     }),
   });
+  if (!resp.ok) throw new Error(await proxyError(resp));
   const data = await resp.json();
   if (data.error) throw new Error(data.error.message);
   const raw = data.content?.[0]?.text?.trim()||"{}";

@@ -1,4 +1,5 @@
-import { PROXY_URL, AI_HEADERS } from "./_shared.js";
+import { PROXY_URL, AI_HEADERS, proxyError } from "./_shared.js";
+import { MODELS, EFFORT, buildRequest } from "./models.js";
 
 // Single agent turn with tool use — agentic: agent decides what data to fetch
 export async function callAgentTurn(agent, portfolioCtx, userContext, messageHistory, portfolioTools, isFirstTurn) {
@@ -40,11 +41,12 @@ Max 180 words per turn. No filler. Speak like a real boardroom executive who has
     const resp = await fetch(PROXY_URL, {
       method:"POST", headers:AI_HEADERS(),
       body: JSON.stringify({
-        model:"claude-sonnet-4-6", max_tokens:600, system:sys,
-        tools: portfolioTools.definitions,
+        ...buildRequest({model:MODELS.REASONING, maxTokens:600, system:sys, effort:EFFORT.LOW, cacheSystem:true}),
+      tools: portfolioTools.definitions,
         messages: currentMessages,
       }),
     });
+    if (!resp.ok) throw new Error(await proxyError(resp));
     const data = await resp.json();
     if (data.error) throw new Error(data.error.message);
 
@@ -72,7 +74,7 @@ Max 180 words per turn. No filler. Speak like a real boardroom executive who has
       // Final text response
       const text = content.filter(b=>b.type==="text").map(b=>b.text).join("").trim();
       // Return text + the tool calls made (for transparency in UI)
-      const toolsUsed = content.filter(b=>b.type==="tool_use").map(b=>b.name);
+      const _toolsUsed = content.filter(b=>b.type==="tool_use").map(b=>b.name);
       // Also gather tool calls from the loop
       const allToolsUsed = currentMessages
         .flatMap(m => Array.isArray(m.content) ? m.content : [])

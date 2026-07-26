@@ -7,11 +7,10 @@ import { buildCrossBrandTransfers } from "../services/portfolio.js";
 import { renderProse } from "../components/text.jsx";
 
 // -- Weekly Pulse --------------------------------------------------------------
-function WeeklyPulseSection({t, dk, settings, brands, weeklyMetrics, onLog, onImport}) {
+function WeeklyPulseSection({t, brands, weeklyMetrics, onLog, onImport}) {
   const [expanded, setExpanded] = useState(true);
 
   const now = new Date();
-  const recentCutoff = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000); // 4 weeks
 
   // Latest entry across all brand+source combos
   const sorted = [...(weeklyMetrics||[])].sort((a,b)=>b.date.localeCompare(a.date));
@@ -56,18 +55,24 @@ function WeeklyPulseSection({t, dk, settings, brands, weeklyMetrics, onLog, onIm
     };
   });
 
+  // A brand with no logged week at all returns `{date:null, metrics:null}` above,
+  // so `revDelta`/`roasDelta` come through as `undefined`, not `null`. The old
+  // guard was `d === null`, which `undefined` walks straight past — the row then
+  // rendered "▼NaN%" in red next to an em dash, which reads to a client as a
+  // catastrophic decline rather than "we have never logged this brand".
+  // Non-finite covers null, undefined, and any divide-by-zero that slips through.
   const deltaEl = (d) => {
-    if (d === null) return null;
+    if (typeof d !== "number" || !isFinite(d)) return null;
     const pos = d >= 0;
-    return <span style={{fontSize:10,fontWeight:600,fontFamily:t.mono,color:pos?"#2a8a50":"#c03030",marginLeft:3}}>{pos?"▲":"▼"}{Math.abs(d).toFixed(1)}%</span>;
+    return <span style={{fontSize:10,fontWeight:600,fontFamily:t.mono,color:pos?t.teal:t.red,marginLeft:3}}>{pos?"▲":"▼"}{Math.abs(d).toFixed(1)}%</span>;
   };
 
-  const stalenessColor = isStale ? (dk?"#d0a838":"#8a6010") : (dk?"#5ad080":"#1a7a48");
-  const stalenessBg   = isStale ? (dk?"#2a2410":"#fdf8ee") : (dk?"#122a18":"#edfaf2");
-  const stalenessBorder = isStale ? (dk?"#6a5818":"#e0c070") : (dk?"#2a7a40":"#7adca0");
+  const stalenessColor  = isStale ? t.warn : t.teal;
+  const stalenessBg     = isStale ? t.warnBg : t.tealBg;
+  const stalenessBorder = isStale ? t.warnBorder : t.teal;
 
   return (
-    <div style={{...gCd(t,dk),border:"1px solid "+t.border}}>
+    <div style={{...gCd(t),border:"1px solid "+t.border}}>
       {/* Header row */}
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -180,12 +185,11 @@ function FunnelCoverageMap({t, dk, items, cats, brands, activeBrand}) {
   });
 
   const maxCount = Math.max(...stages.map(s=>s.count),1);
-  const maxRev   = Math.max(...stages.map(s=>s.revInPlay),1);
   const gaps     = stages.filter(s=>s.active===0);
   const totalRevInPlay = stages.reduce((s,r)=>s+r.revInPlay,0);
 
   return (
-    <div style={{...gCd(t,dk)}}>
+    <div style={{...gCd(t)}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8,flexWrap:"wrap",marginBottom:6}}>
         <div>
           <div style={gSL(t)}>Funnel coverage</div>
@@ -197,7 +201,7 @@ function FunnelCoverageMap({t, dk, items, cats, brands, activeBrand}) {
       </div>
 
       {gaps.length>0 && (
-        <div style={{display:"flex",alignItems:"flex-start",gap:8,padding:"9px 12px",borderRadius:9,background:t.redBg,border:"1px solid "+(dk?"#5a2a1e":"#f0cabf"),margin:"10px 0 14px"}}>
+        <div style={{display:"flex",alignItems:"flex-start",gap:8,padding:"9px 12px",borderRadius:9,background:t.redBg,border:"1px solid "+t.red,margin:"10px 0 14px"}}>
           <span style={{color:t.red,fontSize:13,lineHeight:1.4,flexShrink:0}}>&#9888;</span>
           <span style={{fontSize:12,color:t.red,fontFamily:t.sans,lineHeight:1.45}}>
             <strong style={{fontWeight:600}}>{gaps.length} stage{gaps.length>1?"s":""} with no active work:</strong> {gaps.map(g=>g.cat).join(", ")}. These are coverage gaps worth a hypothesis.
@@ -244,7 +248,7 @@ function FunnelCoverageMap({t, dk, items, cats, brands, activeBrand}) {
 
 
 // -- Business Health Panel -----------------------------------------------------
-function BusinessHealthPanel({ t, dk, settings, weeklyMetrics }) {
+function BusinessHealthPanel({ t, settings, weeklyMetrics }) {
   const [expanded, setExpanded] = useState(true);
 
   const allEntries = weeklyMetrics || [];
@@ -259,27 +263,44 @@ function BusinessHealthPanel({ t, dk, settings, weeklyMetrics }) {
     return vals.length > 0 ? vals.reduce((s,v) => s+v, 0) : null;
   };
 
-  const calcCurrent = (metric) => {
+  // `registrations` and `return_rate` are both defined as importable fields in
+  // METRIC_SOURCES and accepted by the CSV alias map, but nothing ever read them
+  // into the health panel — so a workspace that had dutifully imported them still
+  // showed "Configure in Settings" on those tiles. They're computed here now.
+  //
+  // Return rate is averaged weighted by order volume rather than as a flat mean
+  // across brands: a 20% return rate on 40 orders and 5% on 900 is not a 12.5%
+  // portfolio return rate.
+  //
+  // This was also two near-identical functions differing only in which entry set
+  // they closed over. One function, parameterised.
+  const calcFor = (metric, entries) => {
     if (!metric.isCalculated) return null;
-    if (metric.key === "orders")      return sumField(latestEntries, "conversions");
-    if (metric.key === "blended_cac") {
-      const spend = sumField(latestEntries, "spend");
-      const conv  = sumField(latestEntries, "conversions");
-      return (spend != null && conv != null && conv > 0) ? spend / conv : null;
+    switch (metric.key) {
+      case "orders":
+        return sumField(entries, "conversions");
+      case "registrations":
+        return sumField(entries, "registrations");
+      case "blended_cac": {
+        const spend = sumField(entries, "spend");
+        const conv  = sumField(entries, "conversions");
+        return (spend != null && conv != null && conv > 0) ? spend / conv : null;
+      }
+      case "return_rate": {
+        const weighted = entries.reduce((acc, m) => {
+          const rate = m.metrics.return_rate, orders = m.metrics.conversions;
+          if (rate == null || orders == null) return acc;
+          return { num: acc.num + rate * orders, den: acc.den + orders };
+        }, { num: 0, den: 0 });
+        return weighted.den > 0 ? weighted.num / weighted.den : null;
+      }
+      default:
+        return null;
     }
-    return null;
   };
 
-  const calcPrior = (metric) => {
-    if (!metric.isCalculated) return null;
-    if (metric.key === "orders")      return sumField(priorEntries, "conversions");
-    if (metric.key === "blended_cac") {
-      const spend = sumField(priorEntries, "spend");
-      const conv  = sumField(priorEntries, "conversions");
-      return (spend != null && conv != null && conv > 0) ? spend / conv : null;
-    }
-    return null;
-  };
+  const calcCurrent = (metric) => calcFor(metric, latestEntries);
+  const calcPrior   = (metric) => calcFor(metric, priorEntries);
 
   const fmtVal = (metric, val) => {
     if (val === null || val === undefined) return null;
@@ -309,7 +330,7 @@ function BusinessHealthPanel({ t, dk, settings, weeklyMetrics }) {
   if (healthMetrics.length === 0) return null;
 
   return (
-    <div style={{...gCd(t,dk),border:"1px solid "+t.border}}>
+    <div style={{...gCd(t),border:"1px solid "+t.border}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           <button onClick={()=>setExpanded(e=>!e)} style={{background:"none",border:"none",cursor:"pointer",color:t.textMuted,fontSize:13,padding:0,lineHeight:1}}>
@@ -369,7 +390,7 @@ function BusinessHealthPanel({ t, dk, settings, weeklyMetrics }) {
 }
 
 
-function ContributionView({t, dk, contribution, totals, dRange, activeBrand, brands, showToast}) {
+function ContributionView({t, contribution, totals, dRange, activeBrand, brands, showToast}) {
   const rangeLabel = dRange==="thisMonth"?"this month":dRange==="lastMonth"?"last month":"selected range";
   const retailerLabel = activeBrand==="all" ? "All retailers" : brandName(activeBrand, brands);
   const grand = totals.realised + totals.inflight + totals.pipeline;
@@ -378,7 +399,7 @@ function ContributionView({t, dk, contribution, totals, dRange, activeBrand, bra
   // Empty state — no data at all
   if (grandWithBackfill === 0) {
     return (
-      <div style={{...gCd(t,dk)}}>
+      <div style={{...gCd(t)}}>
         <div style={gSL(t)}>Contribution to revenue</div>
         <div style={{padding:"24px 12px",textAlign:"center",color:t.textMuted,fontFamily:t.serif,fontSize:12,lineHeight:1.7}}>
           No revenue contribution recorded for {rangeLabel}.<br/>
@@ -394,8 +415,8 @@ function ContributionView({t, dk, contribution, totals, dRange, activeBrand, bra
 
   // Tones: realised = gold (the defensible number), inflight = mid amber, pipeline = muted
   const colorRealised = t.gold;
-  const colorInflight = dk ? "#c08820" : "#c08820";
-  const colorPipeline = dk ? "#7a6438" : "#a89060";
+  const colorInflight = t.warn;
+  const colorPipeline = t.textMuted;
 
   const copyText = () => {
     const date = new Date().toLocaleDateString("en-CA",{month:"long",day:"numeric",year:"numeric"});
@@ -426,7 +447,7 @@ function ContributionView({t, dk, contribution, totals, dRange, activeBrand, bra
   const totalInView = totalActualsCount + totalEstimatesCount;
 
   return (
-    <div style={{...gCd(t,dk)}}>
+    <div style={{...gCd(t)}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8,flexWrap:"wrap",marginBottom:14}}>
         <div>
           <div style={gSL(t)}>Contribution to revenue</div>
@@ -543,7 +564,7 @@ function recWeekState(recs, today) {
 
 // Card that lives on the Dashboard. Shows the latest batch of recommendations
 // or a generate CTA if none exist yet. Clicking a rec opens the detail modal.
-function NextPlaysCard({ t, dk, recs, recsLoad, recsErr, brands, items, onGenerate, onOpenRec }) {
+function NextPlaysCard({ t, recs, recsLoad, recsErr, items, onGenerate, onOpenRec }) {
   const [diffExpanded, setDiffExpanded] = useState(false);
 
   const latest   = recs && recs.length > 0 ? recs[0] : null;
@@ -580,11 +601,16 @@ function NextPlaysCard({ t, dk, recs, recsLoad, recsErr, brands, items, onGenera
   // opens the detail modal directly (Option 2 — skip the intermediate list).
   if (latest && !recsLoad) {
     return (
-      <div style={{...gCd(t,dk),display:"flex",flexDirection:"column",gap:8,border:"1px solid "+t.goldBorder,padding:"10px 14px"}}>
+      <div style={{...gCd(t),display:"flex",flexDirection:"column",gap:8,border:"1px solid "+t.goldBorder,padding:"10px 14px"}}>
         {/* Staleness nudge — shown when the current week has no slate yet */}
-        {weekState === "stale" && (
+        {/* Says which slate you're looking at rather than that none exists — the
+          * old copy read "This week's plays haven't been generated yet" directly
+          * above a header saying "3 ready · Jun 8", which is a flat contradiction
+          * from the reader's point of view. Both statements were true; only one
+          * of them was useful. */}
+        {weekState === "stale" && weekLabel && (
           <div style={{padding:"6px 10px",background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:4,fontSize:11,color:t.textSub,fontFamily:t.serif}}>
-            This week's plays haven't been generated yet
+            Showing the slate from {weekLabel}. Regenerate for this week.
           </div>
         )}
 
@@ -620,7 +646,7 @@ function NextPlaysCard({ t, dk, recs, recsLoad, recsErr, brands, items, onGenera
 
         {/* Error inline (rare — usually cleared by next successful gen) */}
         {recsErr && (
-          <div style={{padding:"6px 10px",background:dk?"#3a1010":"#fff0f0",border:"1px solid "+(dk?"#6a2020":"#e09090"),borderRadius:4,fontSize:11,color:dk?"#e08080":"#a03030",fontFamily:t.serif}}>
+          <div style={{padding:"6px 10px",background:t.redBg,border:"1px solid "+t.red,borderRadius:4,fontSize:11,color:t.red,fontFamily:t.serif}}>
             {recsErr}
           </div>
         )}
@@ -710,7 +736,7 @@ function NextPlaysCard({ t, dk, recs, recsLoad, recsErr, brands, items, onGenera
   // -- FULL MODE — empty state or loading. Earns the click; once recs exist, --
   // -- this collapses to the compact strip above. -----------------------------
   return (
-    <div style={{...gCd(t,dk),display:"flex",flexDirection:"column",gap:12,border:"1px solid "+t.goldBorder}}>
+    <div style={{...gCd(t),display:"flex",flexDirection:"column",gap:12,border:"1px solid "+t.goldBorder}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           <span style={{fontSize:18,color:t.gold}}>◆</span>
@@ -729,7 +755,7 @@ function NextPlaysCard({ t, dk, recs, recsLoad, recsErr, brands, items, onGenera
 
       {/* Empty state — first run */}
       {!recsLoad && !recsErr && (
-        <div style={{padding:"14px 16px",background:dk?"#1a1a14":"#fafaf5",border:"1px dashed "+t.border,borderRadius:6,fontSize:12,color:t.textSub,fontFamily:t.serif,lineHeight:1.6}}>
+        <div style={{padding:"14px 16px",background:t.surfaceAlt,border:"1px dashed "+t.border,borderRadius:6,fontSize:12,color:t.textSub,fontFamily:t.serif,lineHeight:1.6}}>
           {renderProse(closedCount === 0
             ? "No experiments closed yet. Recommendations will be sharpest once you have a few logged learnings, but you can still generate from your current portfolio state."
             : "Generate to see 3 grounded experiment recommendations, with hypothesis, ICE, and reasoning trace pre-filled. Based on your "+closedCount+" closed initiative"+(closedCount===1?"":"s")+" and current portfolio state.")}
@@ -738,7 +764,7 @@ function NextPlaysCard({ t, dk, recs, recsLoad, recsErr, brands, items, onGenera
 
       {/* Error state */}
       {recsErr && !recsLoad && (
-        <div style={{padding:"10px 14px",background:dk?"#3a1010":"#fff0f0",border:"1px solid "+(dk?"#6a2020":"#e09090"),borderRadius:6,fontSize:12,color:dk?"#e08080":"#a03030",fontFamily:t.serif}}>
+        <div style={{padding:"10px 14px",background:t.redBg,border:"1px solid "+t.red,borderRadius:6,fontSize:12,color:t.red,fontFamily:t.serif}}>
           {recsErr}
         </div>
       )}
@@ -747,7 +773,7 @@ function NextPlaysCard({ t, dk, recs, recsLoad, recsErr, brands, items, onGenera
       {recsLoad && (
         <div style={{display:"flex",flexDirection:"column",gap:4}}>
           {[0,1,2].map(i => (
-            <div key={i} style={{padding:"8px 10px",background:dk?"#1a1a14":"#fafaf5",border:"1px solid "+t.border,borderRadius:4,opacity:0.6,display:"flex",alignItems:"center",gap:10}}>
+            <div key={i} style={{padding:"8px 10px",background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:4,opacity:0.6,display:"flex",alignItems:"center",gap:10}}>
               <div style={{height:10,flex:1,background:t.border,borderRadius:3}}/>
               <div style={{height:10,width:50,background:t.border,borderRadius:3,opacity:0.5}}/>
             </div>
@@ -780,17 +806,36 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
   const maxType = Math.max(...Object.values(dash.typeCounts),1);
   const [showStandup, setShowStandup] = useState(false);
 
-  // Gap coverage: what % of (target - current) does the probability-weighted
-  // portfolio cover? Uses the same totals already computed for ContributionView.
+  // Forward pipeline against the north-star gap.
+  //
+  // This used to render as "Portfolio covers N% of gap" and was wrong twice over.
+  // It divided realised + inflight + pipeline by (target - current), so:
+  //
+  //   1. Realised revenue was in the numerator. That revenue has already landed,
+  //      which means it is already inside `current` — counting it again as
+  //      progress toward closing the gap between current and target is a straight
+  //      double-count, and it grew every time an initiative closed.
+  //   2. The two sides aren't the same unit. A north star is written per period
+  //      ("$1.1M/mo"), while `revenueImpact` is an absolute estimate over an
+  //      initiative's own run length with no period attached. Dividing one by the
+  //      other produces a number with no meaning; a demo portfolio was showing
+  //      230%, which invites exactly one question from a client and there is no
+  //      good answer to it.
+  //
+  // Both sides are now shown as absolute dollars and never divided. The numerator
+  // is forward-looking only (probability-weighted in-flight + pipeline), the gap
+  // is labelled with its own period, and the two sit next to each other so the
+  // reader does the comparison knowing what they're comparing.
   const nsCurrentNum = parseNorthStarValue(settings.northStarCurrent);
   const nsTargetNum  = parseNorthStarValue(settings.northStarTarget);
   const nsGap = (nsCurrentNum !== null && nsTargetNum !== null && nsTargetNum > nsCurrentNum)
     ? nsTargetNum - nsCurrentNum : null;
-  const portfolioCoverage = (dash.contributionTotals.realised || 0)
-    + (dash.contributionTotals.inflight || 0)
+  const forwardPipeline = (dash.contributionTotals.inflight || 0)
     + (dash.contributionTotals.pipeline || 0);
-  const gapCovPct = (nsGap !== null && nsGap > 0 && portfolioCoverage > 0)
-    ? Math.min(Math.round((portfolioCoverage / nsGap) * 100), 999) : null;
+  // The period suffix the user wrote on the north star ("/mo", "/qtr", …), reused
+  // verbatim so the gap is never presented as a bare, period-less number.
+  const nsPeriod = (settings.northStarTarget || "").match(/\/\s*(\w+)/);
+  const nsPeriodLabel = nsPeriod ? "/" + nsPeriod[1] : "";
 
   // Cross-brand transfer opportunities — top 3, only shown if >= 2 exist.
   const transfers = buildCrossBrandTransfers(items, brands).slice(0, 3);
@@ -798,7 +843,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
   return (
     <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:14}}>
       {/* North star */}
-      <div style={{...gCd(t,dk),background:t.goldBg,border:"1px solid "+t.goldBorder,display:"flex",alignItems:"center",gap:24,flexWrap:"wrap"}}>
+      <div style={{...gCd(t),background:t.goldBg,border:"1px solid "+t.goldBorder,display:"flex",alignItems:"center",gap:24,flexWrap:"wrap"}}>
         <div>
           <div style={{fontSize:10,letterSpacing:"0.10em",textTransform:"uppercase",color:t.gold,fontFamily:t.mono,marginBottom:4}}>North star</div>
           <div style={{fontSize:15,fontWeight:600,color:t.text,fontFamily:t.serif}}>{settings.northStarMetric}</div>
@@ -808,9 +853,11 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
           <div style={{fontSize:20,color:t.textMuted,alignSelf:"center"}}>&#8594;</div>
           <div><div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginBottom:2}}>Target</div><div style={{fontSize:26,fontWeight:600,color:t.text,fontFamily:t.serif,letterSpacing:"-0.02em"}}>{settings.northStarTarget}</div></div>
         </div>
-        {gapCovPct !== null && (
-          <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>
-            Portfolio covers <strong style={{color:t.gold}}>{gapCovPct}%</strong> of gap
+        {nsGap !== null && (
+          <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,lineHeight:1.5}}
+            title="Weighted pipeline is the sum of estimated revenue on running and draft initiatives, each multiplied by its category win rate. It is an absolute figure over each initiative's own run length, so it is shown alongside the gap rather than divided into it.">
+            <div>Gap to target <strong style={{color:t.text,fontFamily:t.mono}}>{fmtCur(nsGap)}</strong>{nsPeriodLabel}</div>
+            <div>Weighted pipeline <strong style={{color:t.gold,fontFamily:t.mono}}>{fmtCur(forwardPipeline)}</strong></div>
           </div>
         )}
         <div style={{marginLeft:"auto",fontSize:11,color:t.textMuted,fontFamily:t.serif,textAlign:"right"}}>
@@ -839,10 +886,10 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
         const hasNudges = nudges.length>0;
         return (
           <div style={hasNudges
-            ? {padding:"10px 14px",background:dk?"#2a2010":"#fffbf0",border:"1px solid "+(dk?"#6a5010":"#e0c060"),borderRadius:6}
+            ? {padding:"10px 14px",background:t.warnBg,border:"1px solid "+t.warnBorder,borderRadius:6}
             : {padding:"10px 14px",background:t.surface,border:"1px solid "+t.border,borderRadius:6}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:hasNudges?8:0}}>
-              <div style={{fontSize:10,fontWeight:700,color:hasNudges?(dk?"#d4a830":"#8a6000"):t.textMuted,fontFamily:t.mono,letterSpacing:"0.08em",textTransform:"uppercase"}}>
+              <div style={{fontSize:10,fontWeight:700,color:hasNudges?t.warn:t.textMuted,fontFamily:t.mono,letterSpacing:"0.08em",textTransform:"uppercase"}}>
                 {hasNudges ? `⚡ ${nudges.length} initiative${nudges.length!==1?"s":""} need attention` : "⚡ This week's focus"}
               </div>
               <button onClick={()=>setShowStandup(true)} style={{...gGh(t),fontSize:11,padding:"3px 10px"}}>Weekly standup</button>
@@ -856,9 +903,9 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
                   return (
                     <div key={i} style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
                       <span style={{fontSize:10,fontWeight:600,fontFamily:t.serif,
-                        color:type==="expiring"?(dk?"#e09040":"#a04000"):(dk?"#e08080":"#a03030"),
-                        background:type==="expiring"?(dk?"#3a2010":"#fff0e0"):(dk?"#3a1010":"#fff0f0"),
-                        border:"1px solid "+(type==="expiring"?(dk?"#7a4010":"#e09060"):(dk?"#7a2020":"#e09090")),
+                        color:type==="expiring"?t.warn:t.red,
+                        background:type==="expiring"?t.warnBg:t.redBg,
+                        border:"1px solid "+(type==="expiring"?t.warnBorder:t.red),
                         borderRadius:3,padding:"1px 6px",flexShrink:0}}>
                         {type==="expiring" ? `ends in ${days}d` : `running ${days}d`}
                       </span>
@@ -898,8 +945,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
 
       {/* Weekly Pulse */}
       <WeeklyPulseSection
-        t={t} dk={dk}
-        settings={settings}
+        t={t}
         brands={brands}
         weeklyMetrics={weeklyMetrics}
         onLog={onLog}
@@ -907,7 +953,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
       />
 
       {/* Business Health */}
-      <BusinessHealthPanel t={t} dk={dk} settings={settings} weeklyMetrics={weeklyMetrics}/>
+      <BusinessHealthPanel t={t} settings={settings} weeklyMetrics={weeklyMetrics}/>
 
       {/* Executive summary */}
       <div style={{display:"flex",justifyContent:"flex-end"}}>
@@ -915,7 +961,6 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
           onClick={()=>{
             const retailerLabel = activeBrand==="all"?"All retailers":brandName(activeBrand,brands);
             const date = new Date().toLocaleDateString("en-CA",{month:"long",day:"numeric",year:"numeric"});
-            const ns = settings.northStarMetric ? settings.northStarMetric : "North Star";
             const headline = dash.revImpacted>0
               ? fmtCur(dash.revImpacted)+" in measured revenue impact from completed work this period."
               : (dash.running+dash.pipeline)+" initiatives in motion; "+fmtCur(dash.revAtRisk)+" of revenue in play.";
@@ -1007,7 +1052,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
 
       {/* Transfer Opportunities — only render when >= 2 gaps exist */}
       {transfers.length >= 2 && (
-        <div style={{...gCd(t,dk)}}>
+        <div style={{...gCd(t)}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8,flexWrap:"wrap",marginBottom:10}}>
             <div style={gSL(t)}>Transfer opportunities</div>
             <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif}}>proven at one brand, not yet running at another</span>
@@ -1029,7 +1074,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
       )}
 
       {/* Calibration card */}
-      <div style={{...gCd(t,dk),border:"1px solid "+(dash.calibration!==null?(dash.calibration>=80?t.goldBorder:dash.calibration>=50?"#c0a030":t.border):t.border)}}>
+      <div style={{...gCd(t),border:"1px solid "+(dash.calibration!==null?(dash.calibration>=80?t.goldBorder:dash.calibration>=50?t.warnBorder:t.border):t.border)}}>
         <div style={gSL(t)}>Revenue estimate calibration</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16,alignItems:"center",marginBottom:dash.totalEstCost>0?12:0}}>
           <div>
@@ -1042,7 +1087,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
           </div>
           <div>
             <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginBottom:2}}>Accuracy</div>
-            <div style={{fontSize:24,fontWeight:700,fontFamily:t.mono,color:dash.calibration===null?t.textMuted:dash.calibration>=80?t.gold:dash.calibration>=50?"#c08820":"#c04040"}}>
+            <div style={{fontSize:24,fontWeight:700,fontFamily:t.mono,color:dash.calibration===null?t.textMuted:dash.calibration>=80?t.gold:dash.calibration>=50?t.warn:t.red}}>
               {dash.calibration!==null?dash.calibration+"%":"—"}
             </div>
             {dash.calibration!==null&&<div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,marginTop:2}}>{dash.calibration>=80?"Well calibrated":dash.calibration>=50?"Moderate accuracy":"Overestimating"}</div>}
@@ -1060,7 +1105,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
             </div>
             <div>
               <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginBottom:2}}>Closed ROI</div>
-              <div style={{fontSize:22,fontWeight:700,fontFamily:t.mono,color:dash.closedROI===null?t.textMuted:dash.closedROI>=2?t.gold:dash.closedROI>=1?"#c08820":"#c04040"}}>
+              <div style={{fontSize:22,fontWeight:700,fontFamily:t.mono,color:dash.closedROI===null?t.textMuted:dash.closedROI>=2?t.gold:dash.closedROI>=1?t.warn:t.red}}>
                 {dash.closedROI!==null?dash.closedROI+"x":"—"}
               </div>
               {dash.closedROI!==null&&<div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,marginTop:2}}>{dash.closedROI>=3?"Strong return":dash.closedROI>=1?"Positive":"Negative"}</div>}
@@ -1071,10 +1116,10 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
 
       {/* Velocity + Category + Type */}
       <div style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) minmax(0,1fr)",gap:12}}>
-        <div style={gCd(t,dk)}>
+        <div style={gCd(t)}>
           <div style={gSL(t)}>Velocity · last 8 weeks</div>
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
-            {[{label:"Started / week",vals:dash.vel.started,color:dk?"#5ad080":"#1a7a48"},{label:"Closed / week",vals:dash.vel.closed,color:dk?"#8080e0":"#4848b0"}].map(row=>(
+            {[{label:"Started / week",vals:dash.vel.started,color:t.teal},{label:"Closed / week",vals:dash.vel.closed,color:t.gold}].map(row=>(
               <div key={row.label}>
                 <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,marginBottom:4}}>{row.label}</div>
                 <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -1085,7 +1130,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
             ))}
           </div>
         </div>
-        <div style={gCd(t,dk)}>
+        <div style={gCd(t)}>
           <div style={gSL(t)}>By category</div>
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             {cats.map(cat=>{
@@ -1107,7 +1152,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
       </div>
 
       {/* Type breakdown */}
-      <div style={gCd(t,dk)}>
+      <div style={gCd(t)}>
         <div style={gSL(t)}>By initiative type</div>
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           {INIT_TYPES.map(tp=>{
@@ -1129,7 +1174,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
       </div>
 
       {/* Outcome breakdown */}
-      <div style={gCd(t,dk)}>
+      <div style={gCd(t)}>
         <div style={gSL(t)}>Outcome breakdown · all closed</div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
           {OUTCOMES.map(o=>{const c=(dk?OD:OL)[o]||{};return(

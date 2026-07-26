@@ -1,4 +1,5 @@
-import { PROXY_URL, AI_HEADERS } from "./_shared.js";
+import { PROXY_URL, AI_HEADERS, proxyError } from "./_shared.js";
+import { MODELS, EFFORT, buildRequest } from "./models.js";
 
 // Natural-language query over the learnings library. The query IS the hypothesis:
 // "have we tried creative angles for subscription retention?" returns whether the
@@ -25,9 +26,10 @@ export async function callAskLibrary(question, corpus, settings) {
   ].join(" ");
   const resp = await fetch(PROXY_URL, {
     method:"POST", headers:AI_HEADERS(),
-    body:JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:1100, system:sys,
+    body:JSON.stringify({ ...buildRequest({model:MODELS.REASONING, maxTokens:1100, system:sys, effort:EFFORT.LOW}),
       messages:[{role:"user", content:"QUESTION: "+question+"\n\nCLOSED-INITIATIVE RECORD:\n"+lines}] }),
   });
+  if (!resp.ok) throw new Error(await proxyError(resp));
   const data = await resp.json();
   return data.content && data.content[0] ? data.content[0].text.trim() : "";
 }

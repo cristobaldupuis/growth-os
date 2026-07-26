@@ -1,4 +1,5 @@
-import { PROXY_URL, AI_HEADERS, safeParseJSON } from "./_shared.js";
+import { PROXY_URL, AI_HEADERS, safeParseJSON, proxyError } from "./_shared.js";
+import { MODELS, EFFORT, buildRequest } from "./models.js";
 
 // Step 2: expand one selected candidate into a full recommendation. Run in
 // parallel for the top 3 so a single failure doesn't sink the whole batch.
@@ -63,9 +64,10 @@ export async function callExpandRecommendation(candidate, portfolioCtx, learning
 
   const resp = await fetch(PROXY_URL, {
     method:"POST", headers:AI_HEADERS(),
-    body:JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:1200, system:sys,
+    body:JSON.stringify({ ...buildRequest({model:MODELS.STRUCTURED, maxTokens:1200, system:sys, effort:EFFORT.LOW, cacheSystem:true}),
       messages:[{role:"user", content:user}] }),
   });
+  if (!resp.ok) throw new Error(await proxyError(resp));
   const data = await resp.json();
   const raw = data.content && data.content[0] ? data.content[0].text.trim() : "{}";
   const parsed = safeParseJSON(raw, false);

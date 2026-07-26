@@ -66,9 +66,9 @@ export const DEFAULT_SETTINGS = {
   healthMetrics: [
     { key:"new_customer_cvr",  label:"New Customer CVR (%)",          enabled:true, isCalculated:false, calculationNote:"",                                                                                                                                     manualValue:null, target:null, higherIsBetter:true  },
     { key:"orders",            label:"Orders",                         enabled:true, isCalculated:true,  calculationNote:"Auto-calculated from weekly pulse: sum of conversions across all sources for the latest week",                                        manualValue:null, target:null, higherIsBetter:true  },
-    { key:"registrations",     label:"Registrations / New Accounts",   enabled:true, isCalculated:false, calculationNote:"",                                                                                                                                     manualValue:null, target:null, higherIsBetter:true  },
+    { key:"registrations",     label:"Registrations / New Accounts",   enabled:true, isCalculated:true,  calculationNote:"Auto-calculated from weekly pulse: sum of registrations across all sources for the latest week. Falls back to manual if not logged.",   manualValue:null, target:null, higherIsBetter:true  },
     { key:"blended_cac",       label:"Blended CAC ($)",                enabled:true, isCalculated:true,  calculationNote:"Auto-calculated from weekly pulse: total spend ÷ total conversions across all sources for the latest week. Falls back to manual if spend data is absent.", manualValue:null, target:null, higherIsBetter:false },
-    { key:"return_rate",       label:"Return Rate (%)",                enabled:true, isCalculated:false, calculationNote:"",                                                                                                                                     manualValue:null, target:null, higherIsBetter:false },
+    { key:"return_rate",       label:"Return Rate (%)",                enabled:true, isCalculated:true,  calculationNote:"Auto-calculated from weekly pulse: return rate across sources for the latest week, weighted by order volume. Falls back to manual if not logged.", manualValue:null, target:null, higherIsBetter:false },
   ],
 };
 
@@ -159,8 +159,6 @@ export const METRIC_CSV_ALIASES = {
   // traffic
   "traffic":"traffic","sessions":"sessions","users":"traffic","visitors":"traffic",
   "total_users":"traffic",
-  // sessions (ga4 specific — keep separate)
-  "sessions":"sessions",
   // conversions
   "conversions":"conversions","transactions":"conversions","purchases":"conversions",
   "conv.":"conversions",
@@ -190,37 +188,62 @@ export const FONT_MONO  = "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Monac
 // Weights are capped at 500 (default) / 600 (emphasis). Loaded in index.html.
 export const FONT_SERIF = "'Lora', ui-serif, Georgia, 'Times New Roman', serif";
 
+// -- Theme tokens --------------------------------------------------------------
+// Two rules govern this palette, and both exist because the first version broke
+// them:
+//
+// 1. `gold` is an INK value — it is what you set `color:` to. In light mode that
+//    means it has to survive a contrast check against white, so it is a deep
+//    ochre, not the bright brassy gold. `goldFill` is the separate bright value
+//    used ONLY as a background behind `goldText`. Setting `color:t.goldFill` on
+//    a light surface is a bug; that was the old `gold` and it measured 2.4:1.
+//
+// 2. Dark surfaces are cool neutrals, not warm browns. Gold sitting on a warm
+//    brown surface reads as mud because the accent and the surface share a hue;
+//    on a cool charcoal the same gold separates and reads as metal. The old dark
+//    surfaces had R-B of +4 and +11 (brown); these are -7 and -9.
+//
+// Every pairing below is checked against WCAG AA (4.5:1) — see `npm run
+// check:contrast`, which fails the build if a pairing regresses.
 export const TL = {
-  bg:"#EBE8E1", surface:"#FFFFFF", surfaceAlt:"#F6F4EE",
-  border:"#E2DFD6", borderSoft:"#ECEAE3",
-  text:"#1A1815", textSub:"#5C5A52", textMuted:"#979488",
-  gold:"#C9A227", goldSoft:"#D8B94E", goldText:"#1A1815", goldBg:"#FBF7EA", goldBorder:"#EBDCA8",
-  teal:"#1D8F6E", tealBg:"#E4F4EE", red:"#C0492F", redBg:"#FBEDE9",
-  headerBg:"#FFFFFF", inputBg:"#FFFFFF", inputBorder:"#DCD9D2",
+  bg:"#EDEAE3", surface:"#FFFFFF", surfaceAlt:"#F7F5EF",
+  border:"#E0DCD2", borderSoft:"#EDEAE3",
+  text:"#1A1815", textSub:"#57554E", textMuted:"#74716A",
+  gold:"#856310", goldFill:"#C9A227", goldSoft:"#D8B94E", goldText:"#1A1815",
+  goldBg:"#FBF6E7", goldBorder:"#E3D08F",
+  teal:"#0F7A5A", tealBg:"#E2F2EC", red:"#B23A20", redBg:"#FBEAE5",
+  warn:"#8A5A0B", warnBg:"#FDF4E3", warnBorder:"#E0C176",
+  headerBg:"#FFFFFF", inputBg:"#FFFFFF", inputBorder:"#D8D4CA",
   shadow:"0 1px 2px rgba(40,38,30,0.04), 0 4px 14px rgba(40,38,30,0.06)",
   shadowHi:"0 2px 6px rgba(40,38,30,0.06), 0 12px 30px rgba(40,38,30,0.10)",
   mono:FONT_MONO, sans:FONT_SANS, serif:FONT_SERIF,
 };
 export const TD = {
-  bg:"#100F0D", surface:"#1A1916", surfaceAlt:"#232118",
-  border:"#322F26", borderSoft:"#262420",
-  text:"#F3F1EA", textSub:"#ABA89C", textMuted:"#807D72",
-  gold:"#E1C261", goldSoft:"#EBD588", goldText:"#100F0D", goldBg:"#241F12", goldBorder:"#5A4D24",
-  teal:"#4FC79A", tealBg:"#14271F", red:"#E27A63", redBg:"#2A1813",
-  headerBg:"#100F0D", inputBg:"#1A1916", inputBorder:"#322F26",
+  bg:"#0E0F12", surface:"#16181D", surfaceAlt:"#1D2026",
+  border:"#2C303A", borderSoft:"#232730",
+  text:"#F2F3F5", textSub:"#A8ADB8", textMuted:"#868C99",
+  gold:"#E8C765", goldFill:"#E8C765", goldSoft:"#F0D68C", goldText:"#0E0F12",
+  goldBg:"#221E14", goldBorder:"#5C4E28",
+  teal:"#43C79A", tealBg:"#10241E", red:"#E8836B", redBg:"#2A1512",
+  warn:"#E0B155", warnBg:"#241D10", warnBorder:"#5A4820",
+  headerBg:"#0E0F12", inputBg:"#16181D", inputBorder:"#2C303A",
   shadow:"0 1px 2px rgba(0,0,0,0.4), 0 4px 16px rgba(0,0,0,0.35)",
   shadowHi:"0 2px 8px rgba(0,0,0,0.5), 0 14px 36px rgba(0,0,0,0.5)",
   mono:FONT_MONO, sans:FONT_SANS, serif:FONT_SERIF,
 };
 
-export const SL = { Draft:{bg:"#f4f4ee",border:"#c8c4a8",text:"#666440"}, Running:{bg:"#edfaf2",border:"#7adca0",text:"#1a7a48"}, Completed:{bg:"#eef0fd",border:"#9090e0",text:"#3a3aa0"}, Killed:{bg:"#fdf0f0",border:"#e09090",text:"#a03030"} };
-export const SD = { Draft:{bg:"#2a2a1e",border:"#4a4838",text:"#a0a080"}, Running:{bg:"#122a1a",border:"#2a6a40",text:"#5ad080"}, Completed:{bg:"#14142a",border:"#3a3a80",text:"#8080e0"}, Killed:{bg:"#2a1212",border:"#6a2828",text:"#e08080"} };
-export const OL = { Jackpot:{bg:"#edfaf2",border:"#7adca0",text:"#1a7a48"}, Success:{bg:"#edfaf6",border:"#7ad4b0",text:"#1a6a50"}, Failed:{bg:"#fdf0f0",border:"#e09090",text:"#a03030"}, Inconclusive:{bg:"#fdf8ee",border:"#e0c070",text:"#8a6010"} };
-export const OD = { Jackpot:{bg:"#122a18",border:"#2a7a40",text:"#60d080"}, Success:{bg:"#122820",border:"#2a6a50",text:"#50c898"}, Failed:{bg:"#2a1010",border:"#6a2020",text:"#e07070"}, Inconclusive:{bg:"#2a2410",border:"#6a5818",text:"#d0a838"} };
+// Status / outcome badges. The dark variants use cool-neutral tint bases to sit
+// on the new charcoal surfaces — the previous olive/brown tints read as dirt
+// against anything that isn't itself brown.
+export const SL = { Draft:{bg:"#F1F0EC",border:"#C4C0B4",text:"#5C5A4E"}, Running:{bg:"#E6F5EC",border:"#7ACB9C",text:"#136B41"}, Completed:{bg:"#EDEFFB",border:"#8C8CD8",text:"#35359A"}, Killed:{bg:"#FBEDEB",border:"#DE8C7C",text:"#9B3320"} };
+export const SD = { Draft:{bg:"#22252C",border:"#3B404B",text:"#A3A9B5"}, Running:{bg:"#102520",border:"#276B4E",text:"#54CE93"}, Completed:{bg:"#191B33",border:"#3E3E8C",text:"#9091EC"}, Killed:{bg:"#2A1512",border:"#6E2E22",text:"#E8836B"} };
+export const OL = { Jackpot:{bg:"#E6F5EC",border:"#7ACB9C",text:"#136B41"}, Success:{bg:"#E5F4EF",border:"#79C9AE",text:"#125F4C"}, Failed:{bg:"#FBEDEB",border:"#DE8C7C",text:"#9B3320"}, Inconclusive:{bg:"#FDF4E3",border:"#E0C176",text:"#8A5A0B"} };
+export const OD = { Jackpot:{bg:"#102520",border:"#277048",text:"#5AD48C"}, Success:{bg:"#102421",border:"#276352",text:"#48CBA0"}, Failed:{bg:"#2A1512",border:"#6E2E22",text:"#E8836B"}, Inconclusive:{bg:"#241D10",border:"#5A4820",text:"#E0B155"} };
 
-// Type badge colors - fixed palette
-export const TYPE_L = { "A/B Test":"#2878a0", Campaign:"#a04828", Process:"#4848b0", Research:"#6a4090", Infrastructure:"#208050" };
-export const TYPE_D = { "A/B Test":"#50a8d8", Campaign:"#d07050", Process:"#8080e0", Research:"#a870d0", Infrastructure:"#40c880" };
+// Type badge colours — fixed hue per initiative type, tuned so each clears AA
+// against its own theme's alt surface (see scripts/check-contrast.mjs).
+export const TYPE_L = { "A/B Test":"#20698D", Campaign:"#9A4526", Process:"#4444AC", Research:"#653C8B", Infrastructure:"#1C784A" };
+export const TYPE_D = { "A/B Test":"#5FB4E0", Campaign:"#DC7C5C", Process:"#8E8EEA", Research:"#B27FD8", Infrastructure:"#4ACF8C" };
 
 export const CAT_L = ["#b07818","#187860","#4848b0","#b03838","#a04828","#2878a0","#6a4090","#208050"];
 export const CAT_D = ["#d4a83a","#3acca0","#8080e0","#e08080","#d07050","#50a8d8","#a870d0","#40c880"];
@@ -237,7 +260,24 @@ export const brandName = (brandId, brands) => {
   return (brands.find(b=>b.id===brandId)||{name:brandId}).name;
 };
 export const iceScore = (i, c, e) => (!i && !c && !e) ? null : Math.round(((i||0)*(c||0)*(e||0)/1000)*100);
-export const iceColor = (s, t) => s === null ? t.textMuted : s >= 60 ? t.gold : s >= 30 ? "#c08820" : "#a03030";
+
+// ICE is a product of three 1-10 inputs, so its distribution is heavily bottom
+// weighted: across all 1000 possible combinations the median is 11 and the 85th
+// percentile is 34. The old thresholds (60 / 30) were written as if the score
+// were uniform over 0-100, which painted 82% of all reachable scores alarm-red —
+// including 8/8/8. Everything looked like it was failing, so the colour carried
+// no information.
+//
+// These cut points are the 85th and 50th percentile of the actual distribution,
+// so the bands mean "top sixth of the backlog / middle / bottom half". Red is
+// deliberately not used: a low ICE is a deprioritised idea, not an error. Red is
+// reserved for blockers and failed outcomes, where it still means something.
+export const ICE_STRONG = 34;
+export const ICE_MODERATE = 11;
+export const iceColor = (s, t) =>
+  s === null ? t.textMuted : s >= ICE_STRONG ? t.gold : s >= ICE_MODERATE ? t.textSub : t.textMuted;
+export const iceBand = (s) =>
+  s === null ? "unscored" : s >= ICE_STRONG ? "high" : s >= ICE_MODERATE ? "medium" : "low";
 
 export const fmtCur = (n) => {
   if (n === 0) return "—";

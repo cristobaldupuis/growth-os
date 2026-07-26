@@ -26,12 +26,12 @@ export function CitationModal({ item, t, dk, cats, brands, onClose }) {
           </div>
           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
             {r.outcomeClassification && <OBdg o={r.outcomeClassification} dk={dk}/>}
-            {item.category && <CBdg cat={item.category} cats={cats||[]} dk={dk}/>}
-            {item.initType && <TBdg type={item.initType} dk={dk}/>}
-            {brands && brands.length>1 && <Bdg label={brandName(item.brandId||"default",brands)} color={brandColor(item.brandId||"default",brands,dk)} bg={dk?"#1e1e14":"#f8f7f2"} border={dk?"#2a2820":"#ddd8c8"}/>}
+            {item.category && <CBdg cat={item.category} cats={cats||[]} dk={dk} t={t}/>}
+            {item.initType && <TBdg type={item.initType} dk={dk} t={t}/>}
+            {brands && brands.length>1 && <Bdg label={brandName(item.brandId||"default",brands)} color={brandColor(item.brandId||"default",brands,dk)} bg={t.surfaceAlt} border={t.border}/>}
             {(r.durability==="structural")
-              ? <Bdg label="Structural" color={dk?"#7fb8ff":"#1a5fb4"} bg={dk?"#16243a":"#eaf2ff"} border={dk?"#27425f":"#b8d4f0"}/>
-              : (r.keyLearning ? <Bdg label="Tactical" color={t.textMuted} bg={dk?"#1e1e14":"#f4f3ee"} border={t.border}/> : null)}
+              ? <Bdg label="Structural" color={t.teal} bg={t.tealBg} border={t.teal}/>
+              : (r.keyLearning ? <Bdg label="Tactical" color={t.textMuted} bg={t.surfaceAlt} border={t.border}/> : null)}
             {item.endDate && <span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,marginLeft:"auto"}}>closed {fmtDate(item.endDate)}</span>}
           </div>
         </div>
@@ -74,7 +74,7 @@ export function CitationModal({ item, t, dk, cats, brands, onClose }) {
           const deltaColor = beat ? "#4a7c59" : "#a24b4b";
           const pct = pe.predictedRevenue ? Math.round((pe.revenueDelta / Math.abs(pe.predictedRevenue)) * 100) : null;
           return (
-            <div style={{marginTop:4,padding:"10px 12px",borderRadius:6,border:"1px solid "+t.border,background:dk?"#15150f":"#faf9f4"}}>
+            <div style={{marginTop:4,padding:"10px 12px",borderRadius:6,border:"1px solid "+t.border,background:t.surfaceAlt}}>
               <div style={{fontSize:9,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:6}}>
                 Calibration · frozen at launch {pe.snapshotDate ? "("+pe.snapshotDate+")" : ""}
               </div>

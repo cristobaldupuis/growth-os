@@ -1,9 +1,8 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { COMPANY_NAME, BUSINESS_MODEL, NORTH_STAR_METRIC } from "../config.js";
 import { INIT_TYPES, OL, OD, brandColor, brandName, fmtCur, fmtDate } from "../constants.js";
 import { gG, gGh, gI, gSl, gSc } from "../components/styles.js";
 import { Bdg, OBdg, CBdg, TBdg } from "../components/badges.jsx";
-import { Modal } from "../components/Modal.jsx";
 import { CitationModal } from "../components/citation.jsx";
 import { renderCitedText, renderProse } from "../components/text.jsx";
 import { callSynthesizeLearnings } from "../services/ai/callSynthesizeLearnings.js";
@@ -37,8 +36,11 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
   const [askVisible, setAskVisible] = useState(false);
   const [citeItem,   setCiteItem]   = useState(null);
 
-  const normB = id => (!id||id==="default") ? (brands&&brands[0]&&brands[0].id||"default") : id;
-  const closed = useMemo(()=>items.filter(e=>(e.status==="Completed"||e.status==="Killed")&&e.results&&e.results.keyLearning&&(activeBrand==="all"||normB(e.brandId)===normB(activeBrand))),[items,activeBrand,brands]);
+  const normB = useCallback(
+    id => (!id||id==="default") ? (brands&&brands[0]&&brands[0].id||"default") : id,
+    [brands]
+  );
+  const closed = useMemo(()=>items.filter(e=>(e.status==="Completed"||e.status==="Killed")&&e.results&&e.results.keyLearning&&(activeBrand==="all"||normB(e.brandId)===normB(activeBrand))),[items,activeBrand,normB]);
 
   const counts = useMemo(()=>{
     const c={};
@@ -98,7 +100,7 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
     <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:16}}>
 
       {/* Ask the library: natural-language retrieval over the full closed record */}
-      <div style={{...gSc(t,dk),background:t.goldBg,border:"1px solid "+t.goldBorder}}>
+      <div style={{...gSc(t),background:t.goldBg,border:"1px solid "+t.goldBorder}}>
         <div style={{fontSize:11,fontWeight:700,color:t.gold,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:8}}>Ask the library</div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"flex-start"}}>
           <input style={{...gI(t),flex:1,minWidth:200}} value={ask} onChange={e=>setAsk(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")runAsk();}} placeholder={String.fromCharCode(34)+"Have we tried creative angles for retention?"+String.fromCharCode(34)+"  ·  "+String.fromCharCode(34)+"What worked for us at BFCM?"+String.fromCharCode(34)}/>
@@ -196,16 +198,16 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
 
       {/* Synthesis panel */}
       {synthVisible&&(
-        <div style={{...gSc(t,dk),background:dk?"#1a2a18":"#f0faf2",border:"1px solid "+(dk?"#2a6a40":"#7adca0")}}>
+        <div style={{...gSc(t),background:t.tealBg,border:"1px solid "+(t.teal)}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-            <div style={{fontSize:11,fontWeight:700,color:dk?"#60d080":"#1a7a48",fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>AI Synthesis · {filtered.length} learnings</div>
+            <div style={{fontSize:11,fontWeight:700,color:t.teal,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>AI Synthesis · {filtered.length} learnings</div>
             <button onClick={()=>setSynthVisible(false)} style={{background:"none",border:"none",color:t.textMuted,cursor:"pointer",fontSize:14}}>&#10005;</button>
           </div>
           {synthLoad
             ?<div style={{fontSize:13,color:t.textMuted,fontFamily:t.serif}}>Analysing learnings…</div>
             :synthesis
               ?<div style={{fontSize:13,color:t.textSub,lineHeight:1.8,whiteSpace:"pre-wrap",fontFamily:t.serif}}>{renderProse(synthesis)}</div>
-              :<div style={{fontSize:12,color:dk?"#e08080":"#a03030",fontFamily:t.serif}}>Synthesis failed. Check that your API proxy is deployed and the API key is configured.</div>
+              :<div style={{fontSize:12,color:t.red,fontFamily:t.serif}}>Synthesis failed. Check that your API proxy is deployed and the API key is configured.</div>
           }
         </div>
       )}
@@ -232,12 +234,12 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
                 {/* Badges row */}
                 <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center",marginBottom:6}}>
                   <OBdg o={item.results.outcomeClassification} dk={dk}/>
-                  <CBdg cat={item.category} cats={cats} dk={dk}/>
-                  <TBdg type={item.initType} dk={dk}/>
+                  <CBdg cat={item.category} cats={cats} dk={dk} t={t}/>
+                  <TBdg type={item.initType} dk={dk} t={t}/>
                   {(item.results.durability==="structural")
-                    ? <Bdg label="Structural" color={dk?"#7fb8ff":"#1a5fb4"} bg={dk?"#16243a":"#eaf2ff"} border={dk?"#27425f":"#b8d4f0"} small/>
-                    : <Bdg label="Tactical" color={t.textMuted} bg={dk?"#1e1e14":"#f4f3ee"} border={t.border} small/>}
-                  {brands&&brands.length>1&&<Bdg label={brandName(item.brandId||"default",brands)} color={brandColor(item.brandId||"default",brands,dk)} bg={dk?"#1e1e14":"#f8f7f2"} border={dk?"#2a2820":"#ddd8c8"} small/>}
+                    ? <Bdg label="Structural" color={t.teal} bg={t.tealBg} border={t.teal} small/>
+                    : <Bdg label="Tactical" color={t.textMuted} bg={t.surfaceAlt} border={t.border} small/>}
+                  {brands&&brands.length>1&&<Bdg label={brandName(item.brandId||"default",brands)} color={brandColor(item.brandId||"default",brands,dk)} bg={t.surfaceAlt} border={t.border} small/>}
                   {item.endDate&&<span style={{fontSize:10.5,color:t.textMuted,fontFamily:t.mono,marginLeft:"auto"}}>{fmtDate(item.endDate)}</span>}
                 </div>
 

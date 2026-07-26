@@ -12,6 +12,11 @@ Built to demonstrate how a Director of Growth thinks about velocity, incremental
 
 ## What's new
 
+- **Model tiering** — reasoning calls (debate, synthesis, candidate generation) run on `claude-sonnet-5`; schema-shaped transformations (quick capture, hypothesis expansion, ICE assist) run on `claude-haiku-4-5`. Adaptive thinking throughout, prompt caching on the flows that reuse a system prefix
+- **Accessible palette, enforced** — light-mode gold now passes WCAG AA (it previously measured 2.42:1 on white, applied to the dashboard's largest figures); dark surfaces moved from warm brown to cool charcoal so the accent reads as gold rather than mud. `npm run check:contrast` fails CI on regression
+- **No browser-held API credential** — the proxy authorises on origin and bounds cost by request shape instead of a `VITE_`-prefixed secret that shipped inside the bundle
+- **Storage failures are visible** — a full browser store used to produce saves that silently vanished on reload; it now raises a persistent banner with a one-click backup
+- **Self-refreshing demo data** — the seeded portfolio rebases onto the current week at load, so the app never opens on a staleness warning
 - **Brand briefs** — each retailer now carries a structured brief (ICP, categories, why they win, current constraint) that is injected into every AI call, making recommendations specific to your business rather than generic
 - **Two-voice learning synthesis** — the library synthesises closed initiatives across four sections: Patterns, Gaps (proven at one retailer, missing at another), Lessons, and Do Next with direct `[Retailer] → [Action] → [Why now]` recommendations
 - **Agent mandates** — C-Suite agents now have non-negotiable positions (CMO argues for investment, CFO challenges every spend assumption) creating genuine tension in the debate rather than coordinated agreement
@@ -105,7 +110,7 @@ Fully editable in Settings — icon, label, strategic lens, and known blindspot.
 Custom configurations persist in settings — a retail deployment might use "Category Manager" and "Buyer Relations" instead.
 
 ### Approximate API cost
-$0.25–0.35 per debate (claude-sonnet-4-6, ~40,000 tokens across 8 agent turns, moderator calls, and synthesis).
+Roughly 40,000 tokens across 8 agent turns, moderator calls and synthesis, on `claude-sonnet-5` with prompt caching on the repeated system prefix. Sonnet 5 uses a newer tokenizer that counts about 30% more tokens for the same text than Sonnet 4.6 did, so measure against your own portfolio rather than carrying over a previous per-debate figure.
 
 ---
 
@@ -144,9 +149,9 @@ This is what makes recommendations specific — instead of "test SMS cart recove
 |---|---|
 | Runtime | React 18 / Vite |
 | Hosting | Vercel (frontend + serverless API proxy) |
-| Design | Sand/charcoal enterprise palette; serif body; monospace for all financial figures, dates, and tags; light and dark mode |
-| State persistence | Environment-agnostic: `localStorage` (production), in-memory fallback for sandboxed environments |
-| AI | Anthropic Claude API via server-side proxy — `claude-sonnet-4-6` for all features; agentic tool-calling loop for Signal AI (up to 4 tool iterations per agent turn); ~$0.25–0.35 per full debate |
+| Design | Sand/gold light theme, cool-charcoal dark theme; serif for prose, monospace for figures, dates and tags. All 66 themed colour pairings are checked against WCAG AA in CI |
+| State persistence | Environment-agnostic: `localStorage` (production), in-memory fallback for sandboxed environments. Write failures surface a persistent banner rather than failing silently |
+| AI | Anthropic Claude API via server-side proxy. Two tiers: `claude-sonnet-5` for reasoning (debate, synthesis, candidate generation), `claude-haiku-4-5` for schema-shaped transformation (quick capture, hypothesis expansion, ICE assist). Adaptive thinking throughout; prompt caching on the repeated-prefix flows |
 | Data I/O | CSV import/export; JSON backup/restore; Google Sheets template |
 
 ---
@@ -157,14 +162,22 @@ This is what makes recommendations specific — instead of "test SMS cart recove
 
 ```
 src/
-  App.jsx              # Orchestration layer (~1,580 lines post-refactor)
+  App.jsx              # Orchestration layer
   config.js            # Per-client deployment context — brands, agents, categories, seed data
-  views/               # DashView, BacklogView, LearningsView, MetricsView, ContributionView, etc.
-  components/          # Shared UI components
-  services/            # store.js, ai.js, backup.js
-  prompts/             # LLM prompt definitions
+  constants.js         # Theme tokens, status/outcome palettes, ICE scoring, formatters
+  views/               # DashView, TriageView, LearningLibrary, DetailView, ClientReadoutView, CopilotPanel
+  components/          # Shared UI atoms
+  services/
+    store.js           # Backend-agnostic persistence with explicit write-failure reporting
+    portfolio.js       # Portfolio context + tool definitions passed to the agents
+    csv.js             # Import/export and record normalisation
+    ai/
+      models.js        # Model tier selection, effort, prompt-cache policy
+      call*.js         # One file per AI feature
 api/
-  proxy.js             # Serverless Anthropic proxy — shared secret auth, per-IP rate limiting
+  proxy.js             # Serverless Anthropic proxy — origin allowlist, request-shape bounds, durable rate limiting
+scripts/
+  check-contrast.mjs   # Fails the build if any themed pairing drops below WCAG AA
 ```
 
 ### Key design decisions
@@ -173,7 +186,7 @@ api/
 
 **localStorage with a backend-agnostic store abstraction.** All state persists via `store.get` / `store.set`. The abstraction is backend-agnostic by design — migrating to Postgres is a layer swap when a real client constraint demands it, not a rewrite. The operational overhead of a backend is not justified before that trigger exists.
 
-**Serverless proxy, no browser-side API key.** All Anthropic calls route through `api/proxy.js`, which validates a shared secret header, enforces per-IP rate limiting at 50 requests/hour, and locks CORS to the production domain.
+**Serverless proxy, no browser-side credential of any kind.** All Anthropic calls route through `api/proxy.js`. It authorises on Origin/Referer against an allowlist, and bounds cost per request with a model allowlist, a `max_tokens` ceiling, a body-size limit and a system-prompt cap. Rate limiting is durable across instances via Upstash Redis and fails closed if the limiter is unreachable. An earlier version shipped a `VITE_`-prefixed shared secret, which Vite inlines into the browser bundle — see DECISIONS.md.
 
 **No router, no state management library.** Keeps the app portable and the full state shape visible in one place — a deliberate tradeoff that favours legibility and AI-assisted development over framework convention. Both are addable later without structural changes.
 
@@ -205,17 +218,32 @@ npm install
 npm run dev
 ```
 
+Before pushing, run the same checks CI runs:
+
+```bash
+npm run verify     # lint + tests + WCAG AA contrast + build
+```
+
 Open `http://localhost:5173/`. Click ⚙ Settings to configure your workspace, add your Anthropic API key, and fill in your brand briefs to activate context-aware AI recommendations.
 
 Requires a `.env` file with:
 
 ```
 ANTHROPIC_API_KEY=your_key
-VITE_GOS_SECRET=your_secret
-GOS_SECRET=your_secret        # Must match VITE_GOS_SECRET
+
+# Optional. Comma-separated origins the proxy will accept. Defaults to the
+# canonical deployment, so a missing value fails closed rather than opening up.
+ALLOWED_ORIGINS=https://your-deployment.vercel.app
+
+# Optional but strongly recommended in production. Without these the proxy
+# falls back to an in-memory rate limiter, which on serverless is per-instance
+# and resets on cold start — i.e. effectively no limit at all.
+UPSTASH_REDIS_REST_URL=...
+UPSTASH_REDIS_REST_TOKEN=...
 ```
 
-The proxy validates `x-gos-secret` on every AI call. Without a matching secret, all AI features return 401.
+Note there is deliberately no client-side secret. Anything prefixed `VITE_` is
+compiled into the browser bundle and is not a secret.
 
 ---
 

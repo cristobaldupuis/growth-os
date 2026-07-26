@@ -50,15 +50,41 @@ These decisions were made deliberately and constrain the roadmap.
 
 *Phase 1 complete — June 2026.*
 
+### Phase 1.5 — Audit remediation (July 2026)
+
+A pre-sale audit surfaced four blocking issues and a set of credibility gaps. All are closed; the reasoning behind each is in DECISIONS.md.
+
+- [x] **Remove the browser-held proxy credential.** `VITE_GOS_SECRET` was inlined into the production bundle by Vite, so the "secret" guarding the Anthropic proxy was readable from devtools. Replaced with an origin allowlist plus request-shape bounds (model allowlist, `max_tokens` ceiling, body size, system-prompt cap) and durable cross-instance rate limiting that fails closed.
+- [x] **Stop silent data loss.** `store.set` swallowed quota errors and fell through to memory, so saves appeared to succeed and vanished on reload. Write outcomes are now reported and raise a persistent banner with a one-click backup.
+- [x] **Fix a latent crash.** `useState` was called after an early return in `NextPlaysModal` — a rules-of-hooks violation that would throw whenever a recommendation stopped resolving while its modal was open.
+- [x] **Fix the metrics that were wrong.** The "portfolio covers N% of gap" tile divided an absolute dollar figure by a per-period one *and* double-counted already-realised revenue; it now shows both sides as dollars without dividing them. Weekly Pulse rendered `▼NaN%` for any brand with no logged week. ICE colour thresholds painted 82% of all reachable scores alarm-red, including 8/8/8 — recalibrated to the metric's actual distribution.
+- [x] **Fix light-mode contrast.** Gold text measured 2.42:1 on white (AA needs 4.5:1) while the same token measured 10.12:1 in dark mode — the palette had been tuned in dark only. Split into an ink token and a fill token, and added `scripts/check-contrast.mjs` to CI so all 66 themed pairings are checked on every push.
+- [x] **Recolour dark mode.** Warm brown surfaces made the gold accent read as mud; surfaces moved to cool charcoal. See DECISIONS.md for why the accent itself was kept.
+- [x] **Remove the 1126px layout cap.** `src/index.css` was Vite starter boilerplate from an unrelated project: a purple palette, an 18px root size, and `#root { width: 1126px; border-inline: 1px solid }`, which boxed the dashboard on every monitor. Also removed an unused Tabler icon webfont loaded from a CDN.
+- [x] **Fix mobile.** The nav row pushed the document 30px wider than a 390px viewport; the tab strip now scrolls and no width overflows.
+- [x] **Make the demo self-refreshing.** Seed dates rebase onto the current week at load, so the app no longer opens on "Last logged 68d ago ⚠️". Spend, ROAS, CVR, registrations and return rate are derived from the authored series so the Weekly Pulse and Business Health panels are fully populated, and CAC was calibrated to a believable ROAS band.
+- [x] **Model tiering.** One `MODELS` constant replaces eleven hardcoded model IDs; reasoning and transformation calls now run on different tiers with adaptive thinking and prompt caching.
+- [x] **Engineering hygiene.** Lint errors 63 → 0 (including two duplicate object keys that silently discarded a style), `npm test` wired to the existing test file, `npm run verify` added, and a GitHub Actions workflow running lint, tests, contrast and build on every push.
+
 ---
 
 ## Phase 2 — The Data Moat
 
 **Target:** Replace manual CSV data entry with live API connections to ground the Prediction Ledger in authoritative numbers.
 
+### Persistence — Supabase
+
+Prerequisite for everything else in this phase, and for selling to anyone who asks where their data lives. Postgres for the relational queries the dashboard already runs (win rate by category, cross-brand gaps, contribution), RLS for tenant isolation, and Supabase Auth for the session token the proxy needs. Schema draft is in `supabase/migrations/0001_init.sql`.
+
+Be honest about the cost: `store.js` stores one JSON blob per key, and that model does not survive contact with a relational schema. The read paths are real work, not an adapter swap.
+
+**Trigger:** the first client who needs a second user, a second device, or who asks where their data is stored.
+
 ### Normalisation contract
 
 Extend `normalizeInitiativeRecord` to accept client-specific RegEx configurations and explicit platform ID mappings. This allows the system to attribute messy, legacy ad campaigns without touching live performance data — the API adapters in subsequent steps all share this contract.
+
+**Sequencing note:** connectors ship one at a time behind this contract, ordered by value over integration pain — Shopify, then GA4, then Meta/Google Ads only on explicit request. CSV import is permanent regardless: it is the only path that works for an unsupported platform or a client whose IT won't grant API access. Reasoning in DECISIONS.md.
 
 ### Shopify integration
 
@@ -68,9 +94,11 @@ Build a serverless function adapter pulling real order and revenue data from a S
 
 Connect the GA4 Data API to auto-populate funnel context. The recommendation engine currently targets estimated drop-off points; GA4 replaces those with actuals. The FunnelCoverageMap gap detection becomes genuinely diagnostic rather than illustrative.
 
-### Proxy hardening
+### Proxy hardening — per-user auth
 
-Transition `api/proxy.js` from shared-secret demo mode to authenticated per-client routes before live client API tokens are processed. The existing shared-secret and rate-limiting infrastructure is a valid scaffold; this step adds per-client credential isolation.
+The shared-secret model is gone (Phase 1.5); what remains is real per-user accountability. The proxy currently authorises on origin and caps cost by request shape, which is adequate for single-tenant demo and early client work but attributes nothing to a person.
+
+This step verifies a session token issued by the same auth that gates the app and rate limits per user rather than per IP. **It is the same piece of work as the Supabase migration below** — the token has to come from somewhere — and should not be attempted separately.
 
 - [ ] **Health Metric Anomaly Flagging:** When a designated health metric moves beyond a configurable threshold in a week where experiments are active, surface a passive contextual flag in the Business Health Panel. Requires live data connections to be meaningful at scale.
 

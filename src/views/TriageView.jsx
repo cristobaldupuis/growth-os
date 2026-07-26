@@ -1,9 +1,8 @@
-import { fmtCur, fmtDate, parseD } from "../constants.js";
 import { gG, gGh, gSL, gCd } from "../components/styles.js";
 import { renderProse } from "../components/text.jsx";
 
 // -- Triage View --------------------------------------------------------------
-export function TriageView({items, t, dk, cats, brands, activeBrand, onDetail, onStatus, onLogResults, onExtend, onActivate}) {
+export function TriageView({items, t, brands, activeBrand, onDetail, onLogResults, onExtend, onActivate}) {
   const today = new Date();
   const parseD = d => d ? new Date(d+"T12:00:00") : null;
   const fmtDate = d => d ? new Date(d+"T12:00:00").toLocaleDateString("en-CA",{month:"short",day:"numeric"}) : "—";
@@ -45,7 +44,7 @@ export function TriageView({items, t, dk, cats, brands, activeBrand, onDetail, o
     if (dleft!==null && dleft<=3) {
       queue.push({
         id:e.id, kind:"ending", urgency:70+moneyW,
-        accent:dk?"#d0a838":"#b07d10", tag:dleft===0?"DUE TODAY":"ENDS IN "+dleft+"D", title:e.title, brand:brandLabel(e),
+        accent:t.warn, tag:dleft===0?"DUE TODAY":"ENDS IN "+dleft+"D", title:e.title, brand:brandLabel(e),
         reason:"Window closes "+fmtDate(e.endDate)+". Prepare to read results, or extend if the test needs more data.",
         metric:e.primaryMetric, money,
         actions:[
@@ -59,7 +58,7 @@ export function TriageView({items, t, dk, cats, brands, activeBrand, onDetail, o
     if (e.blocker && e.blocker!=="None") {
       queue.push({
         id:e.id, kind:"blocked", urgency:55+moneyW,
-        accent:dk?"#e08080":"#a03030", tag:"BLOCKED", title:e.title, brand:brandLabel(e),
+        accent:t.red, tag:"BLOCKED", title:e.title, brand:brandLabel(e),
         reason:e.blocker+". Resolve the dependency or escalate; it's holding up "+(money>0?fmtCur(money)+" of impact.":"a live initiative."),
         metric:e.primaryMetric, money,
         actions:[],
@@ -85,7 +84,7 @@ export function TriageView({items, t, dk, cats, brands, activeBrand, onDetail, o
     if (money>=50000) {
       queue.push({
         id:e.id, kind:"highstake", urgency:20+moneyW/4,
-        accent:dk?"#8080e0":"#4848b0", tag:"HIGH STAKES", title:e.title, brand:brandLabel(e),
+        accent:t.gold, tag:"HIGH STAKES", title:e.title, brand:brandLabel(e),
         reason:fmtCur(money)+" of revenue riding on this. On track"+(e.endDate?", ends "+fmtDate(e.endDate)+".":"."),
         metric:e.primaryMetric, money,
         actions:[],
@@ -114,15 +113,14 @@ export function TriageView({items, t, dk, cats, brands, activeBrand, onDetail, o
   // Stat strip
   const overdueCount = queue.filter(q=>q.kind==="overdue").length;
   const endingCount  = queue.filter(q=>q.kind==="ending").length;
-  const attentionCount = queue.filter(q=>["overdue","ending","blocked","incomplete"].includes(q.kind)).length;
 
   return (
     <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:14}}>
 
       {/* Lead banner — the single most pressing call, framed as a decision */}
-      <div style={{...gCd(t,dk), borderLeft:"3px solid "+(topItem?topItem.accent:t.teal),
-        background: topItem?t.surface:(dk?"#122a18":"#edfaf2"),
-        border:"1px solid "+(topItem?t.border:(dk?"#2a7a40":"#7adca0"))}}>
+      <div style={{...gCd(t), borderLeft:"3px solid "+(topItem?topItem.accent:t.teal),
+        background: topItem?t.surface:t.tealBg,
+        border:"1px solid "+(topItem?t.border:t.teal)}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8,flexWrap:"wrap",marginBottom:topItem?12:4}}>
           <div style={{fontSize:10,letterSpacing:"0.11em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,fontWeight:600}}>
             {today.toLocaleDateString("en-CA",{weekday:"long",month:"long",day:"numeric"})}
@@ -146,7 +144,7 @@ export function TriageView({items, t, dk, cats, brands, activeBrand, onDetail, o
             </div>
           </div>
         ) : (
-          <div style={{fontSize:13.5,color:dk?"#60d080":"#1a7a48",fontFamily:t.sans,fontWeight:500}}>
+          <div style={{fontSize:13.5,color:t.teal,fontFamily:t.sans,fontWeight:500}}>
             ✓ Queue clear. Nothing needs a decision today. Good week to activate a draft or run the Signal debate.
           </div>
         )}
@@ -175,15 +173,15 @@ export function TriageView({items, t, dk, cats, brands, activeBrand, onDetail, o
         </div>
 
         {queue.length===0 && (
-          <div style={{...gCd(t,dk),padding:"40px 24px",textAlign:"center"}}>
+          <div style={{...gCd(t),padding:"40px 24px",textAlign:"center"}}>
             <div style={{fontSize:24,marginBottom:8,opacity:.5}}>✓</div>
             <div style={{fontSize:14,fontWeight:600,color:t.text,fontFamily:t.sans,marginBottom:5}}>Nothing in the queue</div>
             <div style={{fontSize:12.5,color:t.textSub,fontFamily:t.sans,maxWidth:360,margin:"0 auto"}}>No running initiatives need a decision and no strong drafts are waiting. Log new metrics or generate a Signal slate to fill the pipeline.</div>
           </div>
         )}
 
-        {queue.map((q,idx)=>(
-          <div key={q.id+"-"+q.kind} style={{...gCd(t,dk),padding:0,overflow:"hidden",display:"flex"}}>
+        {queue.map((q)=>(
+          <div key={q.id+"-"+q.kind} style={{...gCd(t),padding:0,overflow:"hidden",display:"flex"}}>
             <div style={{width:3,background:q.accent,flexShrink:0}}/>
             <div style={{flex:1,minWidth:0,padding:"13px 16px"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,marginBottom:6}}>

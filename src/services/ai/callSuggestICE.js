@@ -1,4 +1,5 @@
-import { PROXY_URL, AI_HEADERS, safeParseJSON } from "./_shared.js";
+import { PROXY_URL, AI_HEADERS, safeParseJSON, proxyError } from "./_shared.js";
+import { MODELS, EFFORT, buildRequest } from "./models.js";
 
 export async function callSuggestICE(form, settings, dataCtx) {
 
@@ -23,10 +24,10 @@ export async function callSuggestICE(form, settings, dataCtx) {
   ].join(". ");
   const resp = await fetch(PROXY_URL, {
     method:"POST", headers:AI_HEADERS(),
-    body:JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:400, system:sys,
+    body:JSON.stringify({ ...buildRequest({model:MODELS.STRUCTURED, maxTokens:400, system:sys, effort:EFFORT.LOW}),
       messages:[{role:"user", content:user}] }),
   });
-  if (!resp.ok) throw new Error("AI request failed ("+resp.status+"). The service may be rate-limited or unavailable — try again shortly.");
+  if (!resp.ok) throw new Error(await proxyError(resp));
   const data = await resp.json();
   if (data.error) throw new Error(data.error.message || "The AI service returned an error.");
   const raw   = data.content && data.content[0] ? data.content[0].text.trim() : "{}";

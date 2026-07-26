@@ -15,7 +15,7 @@ export function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hyp
 
       <FR label="Title *" t={t}><input style={gI(t)} value={form.title} onChange={e=>f("title",e.target.value)} placeholder="e.g. Homepage hero A/B: lifestyle vs product-first creative"/></FR>
 
-      <div style={gSc(t,dk)}>
+      <div style={gSc(t)}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
           <div style={gSL(t)}>Hypothesis framework</div>
         </div>
@@ -36,8 +36,8 @@ export function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hyp
             <textarea style={gTA(t)} rows={3} value={form.hypothesis} onChange={e=>f("hypothesis",e.target.value)} placeholder="We believe that [specific change] will result in [measurable outcome] for [context], because [evidence-based reason]."/>
             {!canAi&&form.hypothesis&&form.hypothesis.length>0&&form.hypothesis.length<60&&<div style={{fontSize:11,color:t.textMuted,marginTop:3,fontFamily:t.serif}}><span style={{fontFamily:t.mono}}>{60-form.hypothesis.length}</span> more chars to unlock AI expand</div>}
             {hypReview&&(
-              <div style={{marginTop:10,padding:"12px 14px",borderRadius:6,background:dk?"#122a18":"#edfaf2",border:"1px solid "+(dk?"#2a7a40":"#7adca0")}}>
-                <div style={{fontSize:10,color:dk?"#60d080":"#1a7a48",letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:8}}>AI suggestion · review before accepting</div>
+              <div style={{marginTop:10,padding:"12px 14px",borderRadius:6,background:t.tealBg,border:"1px solid "+t.teal}}>
+                <div style={{fontSize:10,color:t.teal,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:8}}>AI suggestion · review before accepting</div>
                 <p style={{margin:"0 0 12px",fontSize:13,color:t.text,lineHeight:1.7,fontStyle:"italic"}}>"{hypReview.proposed}"</p>
                 <div style={{display:"flex",gap:6}}>
                   <button onClick={onAcceptHyp} style={{...gG(t),fontSize:11,padding:"4px 11px"}}><span>&#10003;</span> Accept</button>
@@ -67,7 +67,7 @@ export function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hyp
       </div>
 
       {/* Measurement & attribution — how imported data maps back to this initiative */}
-      <div style={gSc(t,dk)}>
+      <div style={gSc(t)}>
         <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:4}}>
           <div style={gSL(t)}>Measurement &amp; attribution</div>
           <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif}}>optional · powers data matching</span>
@@ -97,18 +97,18 @@ export function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hyp
       </div>
 
       <FR label="⚠️ Blocker" t={t}>
-        <select style={{...gSl(t), ...(form.blocker&&form.blocker!=="None"?{borderColor:"#ffd700",background:dk?"#1a1400":"#fffbe6",color:dk?"#ffd700":"#7a5800",fontWeight:700}:{})}}
+        <select style={{...gSl(t), ...(form.blocker&&form.blocker!=="None"?{borderColor:t.warnBorder,background:t.warnBg,color:t.warn,fontWeight:700}:{})}}
           value={form.blocker||"None"} onChange={e=>f("blocker",e.target.value)}>
           {BLOCKERS.map(b=><option key={b}>{b}</option>)}
         </select>
         {form.blocker&&form.blocker!=="None"&&(
-          <div style={{marginTop:4,fontSize:11,color:dk?"#ffd700":"#8a6000",fontFamily:t.serif,fontWeight:600}}>
+          <div style={{marginTop:4,fontSize:11,color:t.warn,fontFamily:t.serif,fontWeight:600}}>
             ⚠️ This initiative is flagged as blocked. It will display a warning badge in all views.
           </div>
         )}
       </FR>
 
-      <div style={gSc(t,dk)}>
+      <div style={gSc(t)}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
           <div style={gSL(t)}>ICE Scoring: Impact &#183; Certainty &#183; Ease</div>
           <button style={{...gGh(t),fontSize:11,padding:"2px 9px",opacity:canIce?1:0.4}} onClick={onIceAssist} disabled={!canIce||iceLoad} title={canIce?"Suggest Impact + Certainty with AI":"Add title and hypothesis first"}>
@@ -116,8 +116,8 @@ export function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hyp
           </button>
         </div>
         {iceReview&&(
-          <div style={{marginBottom:14,padding:"12px 14px",borderRadius:6,background:dk?"#2a2410":"#fdf8ee",border:"1px solid "+(dk?"#6a5818":"#e0c070")}}>
-            <div style={{fontSize:10,color:dk?"#d0a838":"#8a6010",letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:10}}>AI scoring suggestion · review and adjust before accepting</div>
+          <div style={{marginBottom:14,padding:"12px 14px",borderRadius:6,background:t.warnBg,border:"1px solid "+t.warnBorder}}>
+            <div style={{fontSize:10,color:t.warn,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:10}}>AI scoring suggestion · review and adjust before accepting</div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
               {[{label:"Impact",score:iceReview.impact,rationale:iceReview.impact_rationale},{label:"Certainty",score:iceReview.certainty,rationale:iceReview.certainty_rationale}].map(d=>(
                 <div key={d.label}>
@@ -149,7 +149,7 @@ export function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hyp
         <FR label="Sample size" t={t}><input style={gI(t)} value={form.sampleSize||""} onChange={e=>f("sampleSize",e.target.value)}/></FR>
         <FR label="Duration" t={t}><input style={gI(t)} value={form.duration||""} onChange={e=>f("duration",e.target.value)}/></FR>
       </div>
-      <div style={{...gSc(t,dk)}}>
+      <div style={{...gSc(t)}}>
         <div style={gSL(t)}>Investment & return</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
           <FR label="Est. media / spend cost ($)" t={t}><input style={gI(t)} type="number" value={form.spendCost||0} onChange={e=>f("spendCost",parseInt(e.target.value)||0)} placeholder="0"/></FR>
@@ -164,7 +164,7 @@ export function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hyp
         )}
       </div>
 
-      <div style={{...gSc(t,dk),border:"1px dashed "+t.border}}>
+      <div style={{...gSc(t),border:"1px dashed "+t.border}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
           <div style={gSL(t)}>Data context <span style={{fontWeight:400,textTransform:"none",letterSpacing:0,color:t.textMuted}}>(optional, used by AI)</span></div>
           <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,background:t.border,padding:"2px 6px",borderRadius:3}}>Placeholder</span>
@@ -213,7 +213,7 @@ function LinkedInitiativePicker({form, setForm, items, t, dk}) {
       {linkedItems.length>0&&(
         <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
           {linkedItems.map(e=>(
-            <span key={e.id} style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:11,padding:"3px 9px",borderRadius:4,background:dk?"#122a18":"#edfaf2",border:"1px solid "+(dk?"#2a7a40":"#7adca0"),color:dk?"#60d080":"#1a7a48",fontFamily:t.serif}}>
+            <span key={e.id} style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:11,padding:"3px 9px",borderRadius:4,background:t.tealBg,border:"1px solid "+t.teal,color:t.teal,fontFamily:t.serif}}>
               {e.initId&&<span style={{opacity:0.7}}>{e.initId}</span>}
               {e.title.slice(0,32)}{e.title.length>32?"…":""}
               <button onClick={()=>toggle(e.id)} style={{background:"none",border:"none",color:"inherit",cursor:"pointer",padding:"0 0 0 2px",fontSize:12,lineHeight:1}}>&#10005;</button>
@@ -239,12 +239,12 @@ function LinkedInitiativePicker({form, setForm, items, t, dk}) {
               return (
                 <div key={e.id} onMouseDown={()=>toggle(e.id)}
                   style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",cursor:"pointer",
-                    background:isLinked?(dk?"#122a18":"#edfaf2"):t.surface,
+                    background:isLinked?t.tealBg:t.surface,
                     borderBottom:"1px solid "+t.border}}>
                   <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,minWidth:52,flexShrink:0}}>{e.initId||"—"}</span>
                   <span style={{fontSize:12,color:t.text,flex:1,fontFamily:t.serif}}>{e.title.slice(0,50)}{e.title.length>50?"…":""}</span>
                   <span style={{fontSize:10,fontWeight:600,color:c.text,background:c.bg,border:"1px solid "+c.border,borderRadius:3,padding:"1px 5px",flexShrink:0}}>{e.status}</span>
-                  {isLinked&&<span style={{fontSize:11,color:dk?"#60d080":"#1a7a48"}}>&#10003;</span>}
+                  {isLinked&&<span style={{fontSize:11,color:t.teal}}>&#10003;</span>}
                 </div>
               );
             })}

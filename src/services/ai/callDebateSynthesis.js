@@ -1,4 +1,5 @@
-import { PROXY_URL, AI_HEADERS, safeParseJSON } from "./_shared.js";
+import { PROXY_URL, AI_HEADERS, safeParseJSON, proxyError } from "./_shared.js";
+import { MODELS, EFFORT, buildRequest } from "./models.js";
 import { INIT_TYPES } from "../../constants.js";
 
 // Final synthesis — reads full debate + tool outputs, returns 3 structured initiatives
@@ -44,12 +45,13 @@ Return ONLY a valid JSON array of exactly 3 objects. No markdown, no preamble:
   const resp = await fetch(PROXY_URL, {
     method:"POST", headers:AI_HEADERS(),
     body: JSON.stringify({
-      model:"claude-sonnet-4-6", max_tokens:3500, system:sys,
+      ...buildRequest({model:MODELS.REASONING, maxTokens:3500, system:sys, effort:EFFORT.HIGH}),
       messages:[{role:"user", content:
         `Portfolio:\n${portfolioCtx}${dataAppendix}\n\nContext:\n${userContext||"None."}\n\nDebate:\n${transcriptStr}\n\nSynthesize the 3 highest-impact net-new initiatives.`
       }],
     }),
   });
+  if (!resp.ok) throw new Error(await proxyError(resp));
   const data = await resp.json();
   if (data.error) throw new Error(data.error.message);
   const raw = data.content?.[0]?.text?.trim()||"[]";

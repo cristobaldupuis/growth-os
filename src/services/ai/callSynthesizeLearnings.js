@@ -1,4 +1,5 @@
-import { PROXY_URL, AI_HEADERS } from "./_shared.js";
+import { PROXY_URL, AI_HEADERS, proxyError } from "./_shared.js";
+import { MODELS, EFFORT, buildRequest } from "./models.js";
 
 export async function callSynthesizeLearnings(learnings, settings) {
   const lines = learnings.map((l,i)=>String(i+1)+". ["+l.outcome+"]["+l.category+"]["+l.retailer+"] "+l.learning).join("\n");
@@ -24,9 +25,10 @@ export async function callSynthesizeLearnings(learnings, settings) {
   ].join(" ");
   const resp = await fetch(PROXY_URL, {
     method:"POST", headers:AI_HEADERS(),
-    body:JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:1200, system:sys,
+    body:JSON.stringify({ ...buildRequest({model:MODELS.REASONING, maxTokens:1200, system:sys, effort:EFFORT.LOW}),
       messages:[{role:"user", content:"Learnings to synthesize:\n"+lines}] }),
   });
+  if (!resp.ok) throw new Error(await proxyError(resp));
   const data = await resp.json();
   return data.content && data.content[0] ? data.content[0].text.trim() : "";
 }

@@ -1,4 +1,5 @@
-import { PROXY_URL, AI_HEADERS, safeParseJSON } from "./_shared.js";
+import { PROXY_URL, AI_HEADERS, safeParseJSON, proxyError } from "./_shared.js";
+import { MODELS, EFFORT, buildRequest } from "./models.js";
 
 // -- Next Plays (Recommendation Engine) ---------------------------------------
 // Two-step pattern: (1) cheap candidate generation across portfolio state and
@@ -54,9 +55,10 @@ export async function callGenerateCandidates(portfolioCtx, learningsIndex, setti
 
   const resp = await fetch(PROXY_URL, {
     method:"POST", headers:AI_HEADERS(),
-    body:JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:2200, system:sys,
+    body:JSON.stringify({ ...buildRequest({model:MODELS.REASONING, maxTokens:2200, system:sys, effort:EFFORT.HIGH, cacheSystem:true}),
       messages:[{role:"user", content:user}] }),
   });
+  if (!resp.ok) throw new Error(await proxyError(resp));
   const data = await resp.json();
   const raw = data.content && data.content[0] ? data.content[0].text.trim() : "[]";
   const parsed = safeParseJSON(raw, true);

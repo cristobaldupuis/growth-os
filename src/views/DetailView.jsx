@@ -14,13 +14,13 @@ export function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResu
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
         <div style={{flex:1}}>
           <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:10}}>
-            <CBdg cat={item.category} cats={cats} dk={dk}/>
-            <TBdg type={item.initType} dk={dk}/>
+            <CBdg cat={item.category} cats={cats} dk={dk} t={t}/>
+            <TBdg type={item.initType} dk={dk} t={t}/>
             <SBdg s={item.status} dk={dk}/>
             {item.results&&<OBdg o={item.results.outcomeClassification} dk={dk}/>}
             <ICEChip ice={item.ice} t={t}/>
             <EAlert endDate={item.endDate} status={item.status} t={t} dk={dk}/>
-            <BlockerBadge blocker={item.blocker}/>
+            <BlockerBadge blocker={item.blocker} t={t}/>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:2}}>
             {item.initId&&<span style={{fontSize:11,fontWeight:700,color:t.gold,fontFamily:t.mono,background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:3,padding:"2px 8px",flexShrink:0}}>{item.initId}</span>}
@@ -30,16 +30,16 @@ export function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResu
         </div>
         <div style={{display:"flex",gap:6}}>
           <button style={gGh(t)} onClick={onEdit}><span style={{fontSize:12}}>&#9998;</span> Edit</button>
-          <button style={{...gGh(t),color:"#c03030",borderColor:dk?"#6a2828":"#e09090"}} onClick={()=>{if(confirm("Delete this initiative?"))onDelete();}}><span style={{fontSize:12}}>&#128465;</span></button>
+          <button style={{...gGh(t),color:t.red,borderColor:t.red}} onClick={()=>{if(confirm("Delete this initiative?"))onDelete();}}><span style={{fontSize:12}}>&#128465;</span></button>
         </div>
       </div>
 
       {/* Status */}
-      <div style={{...gSc(t,dk),background:t.surfaceAlt}}>
+      <div style={{...gSc(t),background:t.surfaceAlt}}>
         <div style={gSL(t)}>Status</div>
         <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
           {STATUSES.map(s=>{const c=(dk?SD:SL)[s]||{},act=item.status===s;return(
-            <button key={s} onClick={()=>onStatus(s)} style={{fontSize:12,padding:"5px 13px",borderRadius:4,cursor:"pointer",fontWeight:600,background:act?c.bg:(dk?"#1a1a14":"#f5f5f0"),border:"1px solid "+(act?c.border:t.border),color:act?c.text:t.textMuted}}>{s}</button>
+            <button key={s} onClick={()=>onStatus(s)} style={{fontSize:12,padding:"5px 13px",borderRadius:4,cursor:"pointer",fontWeight:600,background:act?c.bg:(t.surfaceAlt),border:"1px solid "+(act?c.border:t.border),color:act?c.text:t.textMuted}}>{s}</button>
           );})}
           {(item.status==="Completed"||item.status==="Killed")&&(
             <button style={gG(t)} onClick={onResults}><span style={{fontSize:12}}>&#128203;</span> {item.results?"Edit results":"Log results"}</button>
@@ -49,16 +49,16 @@ export function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResu
 
       {/* Blocker warning — full-width attention strip */}
       {item.blocker&&item.blocker!=="None"&&(
-        <div style={{background:dk?"#1a1400":"#fffbe6",border:"2px solid #ffd700",borderRadius:6,padding:"10px 16px",display:"flex",alignItems:"center",gap:10,boxShadow:"0 0 0 1px #b8a000"}}>
+        <div style={{background:t.warnBg,border:"2px solid "+t.warnBorder,borderRadius:6,padding:"10px 16px",display:"flex",alignItems:"center",gap:10}}>
           <span style={{fontSize:20,flexShrink:0}}>⚠️</span>
           <div>
-            <div style={{fontSize:12,fontWeight:800,color:dk?"#ffd700":"#7a5800",letterSpacing:"0.04em",fontFamily:t.mono,textTransform:"uppercase"}}>BLOCKED</div>
-            <div style={{fontSize:14,fontWeight:600,color:dk?"#ffd700":"#5a4000",fontFamily:t.serif}}>{item.blocker}</div>
+            <div style={{fontSize:12,fontWeight:800,color:t.warn,letterSpacing:"0.04em",fontFamily:t.mono,textTransform:"uppercase"}}>BLOCKED</div>
+            <div style={{fontSize:14,fontWeight:600,color:t.warn,fontFamily:t.serif}}>{item.blocker}</div>
           </div>
         </div>
       )}
 
-      <div style={gSc(t,dk)}>
+      <div style={gSc(t)}>
         <div style={gSL(t)}>Hypothesis framework</div>
         {/* Backwards compatibility: show legacy description if structured fields absent */}
         {(item.observation||item.hypothesis||item.successMetric) ? (
@@ -92,7 +92,7 @@ export function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResu
       </div>
 
       {item.ice&&(
-        <div style={gSc(t,dk)}>
+        <div style={gSc(t)}>
           <div style={gSL(t)}>ICE scoring</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr) auto",gap:12,alignItems:"center"}}>
             {[["Impact",item.ice.impact],["Certainty",item.ice.certainty],["Ease",item.ice.ease]].map(([l,v])=>(
@@ -113,7 +113,7 @@ export function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResu
 
       {/* Investment & return */}
       {(item.revenueImpact!==0||(item.spendCost||0)>0||(item.resourceCost||0)>0||item.results?.actualRevenueImpact!=null)&&(
-        <div style={gSc(t,dk)}>
+        <div style={gSc(t)}>
           <div style={gSL(t)}>Investment and return</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:12}}>
             {(item.spendCost||0)>0&&<div>
@@ -158,7 +158,7 @@ export function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResu
                   const actRev=item.results.actualRevenueImpact||0;
                   if(!actCost) return null;
                   const roi=(actRev/actCost).toFixed(1);
-                  const color=parseFloat(roi)>=2?t.gold:parseFloat(roi)>=1?"#c08820":"#c04040";
+                  const color=parseFloat(roi)>=2?t.gold:parseFloat(roi)>=1?t.warn:t.red;
                   return <div>
                     <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginBottom:2}}>Actual ROI</div>
                     <div style={{fontSize:20,fontWeight:700,color,fontFamily:t.mono}}>{roi}x</div>
@@ -173,7 +173,7 @@ export function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResu
           {item.results?.predictionError && item.results.predictionError.revenueDelta != null && (()=>{
             const pe = item.results.predictionError;
             const beat = pe.revenueDelta >= 0;
-            const deltaColor = beat ? t.gold : "#c04040";
+            const deltaColor = beat ? t.gold : t.red;
             const pct = pe.predictedRevenue ? Math.round((pe.revenueDelta/Math.abs(pe.predictedRevenue))*100) : null;
             const certCol = pe.predictedCertainty!=null ? pe.predictedCertainty : null;
             return (
@@ -216,8 +216,8 @@ export function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResu
         </div>
       )}
 
-      {item.killCriteria&&item.status!=="Draft"&&<div style={gSc(t,dk)}><div style={gSL(t)}>Kill criteria</div><p style={{margin:0,color:t.textSub,lineHeight:1.6,fontSize:13}}>{item.killCriteria}</p></div>}
-      {item.notes&&<div style={gSc(t,dk)}><div style={gSL(t)}>Notes</div><p style={{margin:0,color:t.textSub,lineHeight:1.6,fontSize:13}}>{item.notes}</p></div>}
+      {item.killCriteria&&item.status!=="Draft"&&<div style={gSc(t)}><div style={gSL(t)}>Kill criteria</div><p style={{margin:0,color:t.textSub,lineHeight:1.6,fontSize:13}}>{item.killCriteria}</p></div>}
+      {item.notes&&<div style={gSc(t)}><div style={gSL(t)}>Notes</div><p style={{margin:0,color:t.textSub,lineHeight:1.6,fontSize:13}}>{item.notes}</p></div>}
 
       {(item.status==="Running"||item.status==="Completed"||item.status==="Killed")&&(
         <TestValidityPanel key={item.id} item={item} t={t} dk={dk} onSaveTestValidity={onSaveTestValidity}/>
@@ -226,7 +226,7 @@ export function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResu
       {item.results&&(()=>{
         const c=(dk?OD:OL)[item.results.outcomeClassification]||{};
         return (
-          <div style={{...gSc(t,dk),background:c.bg,border:"1px solid "+c.border}}>
+          <div style={{...gSc(t),background:c.bg,border:"1px solid "+c.border}}>
             <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:12}}>
               <div style={gSL(t)}>Results</div>
               <OBdg o={item.results.outcomeClassification} dk={dk}/>
@@ -236,7 +236,7 @@ export function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResu
               {item.results.actualOutcome&&<div><div style={{fontSize:10,color:c.text,opacity:0.7,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:4,fontFamily:t.mono}}>Actual outcome</div><p style={{margin:0,color:t.textSub,fontSize:13,lineHeight:1.6}}>{item.results.actualOutcome}</p></div>}
               <div style={{borderLeft:"3px solid "+t.gold,paddingLeft:12}}>
                 <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:3,fontFamily:t.mono}}>Key learning</div>
-                <p style={{margin:0,color:dk?"#d4b870":"#6a4a10",fontSize:14,fontWeight:600}}>"{renderProse(item.results.keyLearning)}"</p>
+                <p style={{margin:0,color:t.warn,fontSize:14,fontWeight:600}}>"{renderProse(item.results.keyLearning)}"</p>
               </div>
               {item.results.decisionMade&&<div><div style={{fontSize:10,color:c.text,opacity:0.7,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:4,fontFamily:t.mono}}>Decision made</div><p style={{margin:0,color:t.textSub,fontSize:13,lineHeight:1.6}}>{renderProse(item.results.decisionMade)}</p></div>}
             </div>
@@ -245,12 +245,12 @@ export function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResu
       })()}
 
       {linked.length>0&&(
-        <div style={gSc(t,dk)}>
+        <div style={gSc(t)}>
           <div style={gSL(t)}>Linked initiatives</div>
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
             {linked.map(l=>(
               <div key={l.id} onClick={()=>onLink(l.id)} style={{background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:6,padding:"10px 14px",cursor:"pointer"}}>
-                <div style={{display:"flex",gap:5,marginBottom:4}}><CBdg cat={l.category} cats={cats} dk={dk}/><TBdg type={l.initType} dk={dk}/><SBdg s={l.status} dk={dk}/>{l.results&&<OBdg o={l.results.outcomeClassification} dk={dk}/>}<ICEChip ice={l.ice} t={t}/></div>
+                <div style={{display:"flex",gap:5,marginBottom:4}}><CBdg cat={l.category} cats={cats} dk={dk} t={t}/><TBdg type={l.initType} dk={dk} t={t}/><SBdg s={l.status} dk={dk}/>{l.results&&<OBdg o={l.results.outcomeClassification} dk={dk}/>}<ICEChip ice={l.ice} t={t}/></div>
                 <div style={{fontSize:13,color:t.text,fontWeight:600}}>{l.title}</div>
                 {l.results&&l.results.keyLearning&&<div style={{fontSize:12,color:t.textMuted,marginTop:3}}>"{renderProse(l.results.keyLearning)}"</div>}
               </div>
@@ -298,7 +298,7 @@ function zToConfidence(z) {
   return Math.min(1, Math.max(0, phi * 2 - 1));
 }
 
-function TestValidityPanel({ item, t, dk, onSaveTestValidity }) {
+function TestValidityPanel({ item, t, onSaveTestValidity }) {
   const [baseRate, setBaseRate] = useState(item.testValidity?.baseRate ?? 2);
   const [mde,      setMde]      = useState(item.testValidity?.mde ?? 10);
   const [sigAlpha, setSigAlpha] = useState(item.testValidity?.sigAlpha ?? 0.05);
@@ -334,21 +334,21 @@ function TestValidityPanel({ item, t, dk, onSaveTestValidity }) {
       counterfactual: item.testValidity?.counterfactual ?? "",
     });
 
-  const sigColor = conf95 ? (dk ? "#60d080" : "#1a7a48")
-                 : conf90 ? (dk ? "#d0a838" : "#8a6010")
-                 : (dk ? "#e08080" : "#a03030");
-  const sigBg    = conf95 ? (dk ? "#122a18" : "#edfaf2")
-                 : conf90 ? (dk ? "#2a2410" : "#fdf8ee")
-                 : (dk ? "#2a1212" : "#fdf0f0");
-  const sigBorder= conf95 ? (dk ? "#2a7a40" : "#7adca0")
-                 : conf90 ? (dk ? "#6a5818" : "#e0c070")
-                 : (dk ? "#6a2828" : "#e09090");
+  const sigColor = conf95 ? (t.teal)
+                 : conf90 ? (t.warn)
+                 : (t.red);
+  const sigBg    = conf95 ? t.tealBg
+                 : conf90 ? (t.warnBg)
+                 : (t.redBg);
+  const sigBorder= conf95 ? t.teal
+                 : conf90 ? (t.warnBorder)
+                 : (t.red);
 
   const labelStyle = {fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:3};
   const numStyle   = {fontSize:20,fontWeight:700,fontFamily:t.mono};
 
   return (
-    <div style={{...gSc(t,dk),border:"1px solid "+(dk?"#3a3010":"#ddd090"),background:dk?"#1e1c0a":"#fffef5"}}>
+    <div style={{...gSc(t),border:"1px solid "+t.warnBorder,background:t.warnBg}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
         <div style={{...gSL(t),marginBottom:0}}>Test Validity</div>
         {dirty&&(
@@ -439,20 +439,20 @@ function TestValidityPanel({ item, t, dk, onSaveTestValidity }) {
               {uplift !== null && (
                 <div>
                   <div style={labelStyle}>Observed uplift</div>
-                  <div style={{...numStyle,fontSize:16,color:parseFloat(uplift)>=0?(dk?"#60d080":"#1a7a48"):(dk?"#e08080":"#a03030")}}>
+                  <div style={{...numStyle,fontSize:16,color:parseFloat(uplift)>=0?(t.teal):(t.red)}}>
                     {parseFloat(uplift)>=0?"+":""}{uplift}%
                   </div>
                 </div>
               )}
               <div style={{marginLeft:"auto",display:"flex",flexDirection:"column",gap:4}}>
                 <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                  <div style={{width:8,height:8,borderRadius:"50%",background:conf95?"#4caf50":"#ccc"}}/>
+                  <div style={{width:8,height:8,borderRadius:"50%",background:conf95?t.teal:t.border}}/>
                   <span style={{fontSize:11,fontFamily:t.mono,color:conf95?sigColor:t.textMuted}}>
                     {conf95 ? "95% confidence reached" : "95% not yet reached"}
                   </span>
                 </div>
                 <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                  <div style={{width:8,height:8,borderRadius:"50%",background:conf90?"#c08820":"#ccc"}}/>
+                  <div style={{width:8,height:8,borderRadius:"50%",background:conf90?t.warn:t.border}}/>
                   <span style={{fontSize:11,fontFamily:t.mono,color:conf90?sigColor:t.textMuted}}>
                     {conf90 ? "90% confidence reached" : "90% not yet reached"}
                   </span>
@@ -485,12 +485,12 @@ function TestValidityPanel({ item, t, dk, onSaveTestValidity }) {
           onChange={e=>setCounterfactual(e.target.value)}
           placeholder={"e.g. Without this test, paid social would have continued driving traffic into a 1.2% CVR funnel. At current spend, that's approx. $80k/mo in lost revenue vs the 1.76% baseline."}/>
         {item.status==="Completed" && !counterfactual && (
-          <div style={{marginTop:6,padding:"6px 10px",background:dk?"#2a1212":"#fdf0f0",border:"1px solid "+(dk?"#6a2828":"#e09090"),borderRadius:4,fontSize:11,color:dk?"#e08080":"#a03030",fontFamily:t.serif}}>
+          <div style={{marginTop:6,padding:"6px 10px",background:t.redBg,border:"1px solid "+(t.red),borderRadius:4,fontSize:11,color:t.red,fontFamily:t.serif}}>
             &#9888; Counterfactual is required for Completed initiatives. Define what success would look like vs the null scenario.
           </div>
         )}
         {counterfactual && (
-          <div style={{marginTop:6,fontSize:11,color:dk?"#60d080":"#1a7a48",fontFamily:t.serif}}>
+          <div style={{marginTop:6,fontSize:11,color:t.teal,fontFamily:t.serif}}>
             &#10003; Counterfactual defined. Incrementality claim is documented.
           </div>
         )}

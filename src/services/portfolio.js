@@ -285,7 +285,7 @@ export function buildPortfolioContext(items, settings, brands, activeBrand, week
   const crossBrandStr = crossBrandLines.length>0 ? crossBrandLines.join("\n") : "  (no clear cross-brand transfer gaps detected)";
 
   // Build live metrics block
-  let metricsBlock = "";
+  let metricsBlock;
   if (weeklyMetrics && weeklyMetrics.length > 0) {
     const now = new Date();
     const recentCutoff = new Date(now.getTime() - 35 * 24 * 60 * 60 * 1000); // last 5 weeks

@@ -52,8 +52,8 @@ export function WeeklyStandupModal({ t, dk, items, brands, onCommit, onClose, sh
   };
 
   const reasonColor = (reason) => reason === "Missing post-mortem"
-    ? { fg: dk ? "#e08080" : "#a03030", bg: dk ? "#2a1212" : "#fdf0f0", bd: dk ? "#6a2828" : "#e09090" }
-    : { fg: dk ? "#e09040" : "#a04000", bg: dk ? "#3a2010" : "#fff0e0", bd: dk ? "#7a4010" : "#e09060" };
+    ? { fg: t.red, bg: t.redBg, bd: t.red }
+    : { fg: t.warn, bg: t.warnBg, bd: t.warnBorder };
 
   return (
     <Modal t={t} dk={dk} onClose={onClose} title="Weekly standup" wide>

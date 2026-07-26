@@ -1,5 +1,5 @@
 export function CBar({pct,t}) {
-  const col = pct>=80?t.gold:pct>=60?"#c08820":"#c04040";
+  const col = pct>=80?t.gold:pct>=60?t.warn:t.red;
   return (
     <div style={{display:"flex",alignItems:"center",gap:8}}>
       <div style={{flex:1,height:4,background:t.border,borderRadius:2}}>

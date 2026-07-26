@@ -426,7 +426,12 @@ export function ClientReadoutView({ t, dk, dash, items, brands, activeBrand, cat
   ].join("\n");
 
   return (
-    <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 14, maxWidth: 900 }}>
+    // The 900px measure is deliberate — this view is a document meant to be read
+    // and copied into a client email, not a dashboard to be scanned, and long
+    // prose lines at full width are hard to read. It was left-aligned though,
+    // which on a wide monitor reads as a layout bug rather than a choice, so it
+    // is now centred in whatever width it is given.
+    <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 14, maxWidth: 900, margin: "0 auto", width: "100%" }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div>

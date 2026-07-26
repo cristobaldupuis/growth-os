@@ -47,12 +47,12 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "https://growth-os-iota-
 
 // Only models this app actually calls. An allowlist means a leaked request can't
 // be edited to invoke something with a different cost profile.
-const ALLOWED_MODELS = new Set([
+export const ALLOWED_MODELS = new Set([
   "claude-sonnet-5",
   "claude-haiku-4-5",
 ]);
 
-const MAX_TOKENS_CEILING = 4000;   // highest max_tokens any feature legitimately needs
+export const MAX_TOKENS_CEILING = 4000;   // highest max_tokens any feature legitimately needs
 const MAX_BODY_BYTES     = 512 * 1024;
 const MAX_SYSTEM_CHARS   = 60000;
 
@@ -105,7 +105,9 @@ function originAllowed(req) {
 }
 
 // Returns an error string, or null when the body is acceptable.
-function validateBody(body) {
+// Exported so the request-shape test can assert against the real rules rather
+// than a copy of them that can drift.
+export function validateBody(body) {
   if (!body || typeof body !== "object") return "Malformed request body.";
   if (!ALLOWED_MODELS.has(body.model)) return "Unsupported model.";
 

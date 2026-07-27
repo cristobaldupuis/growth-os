@@ -10,7 +10,7 @@ import {
 import { KEY_ITEMS, KEY_SETTINGS, KEY_DEBATES, KEY_METRICS, KEY_RECS, KEY_THEME, KEY_LIB_VIEW, store, onWriteError, handleDownloadBackup, handleRestoreBackup } from "./services/store.js";
 import {
   applyBrandBriefDefaults, DEFAULT_AGENTS, DEFAULT_SETTINGS,
-  STATUSES, OUTCOMES, INIT_TYPES, METRIC_SOURCES,
+  STATUSES, STATUS_GROUP_ORDER, OUTCOMES, INIT_TYPES, METRIC_SOURCES,
   TL, TD, SL, SD, OL, OD,
   catColor, brandColor, brandName, iceScore, iceColor,
   fmtCur, fmtDate, parseD, somM, eomM, mondayOf,
@@ -430,7 +430,9 @@ export default function App() {
   const [nav,       setNav]       = useState("dashboard");
   const [detailOrigin, setDetailOrigin] = useState("initiatives");
   const [selId,     setSelId]     = useState(null);
-  const [fSt,       setFSt]       = useState("All");
+  // Multi-select status filter. Defaults to Running + Draft rather than "All" —
+  // Completed/Killed stay fully reachable via the chips, just not pre-selected.
+  const [fSt,       setFSt]       = useState(() => new Set(["Running","Draft"]));
   const [fCat,      setFCat]      = useState("All");
   const [fType,     setFType]     = useState("All");
   const [fOwn,      setFOwn]      = useState("All");
@@ -843,7 +845,7 @@ export default function App() {
 
   const filtered = useMemo(()=>{
     let list=items.filter(e=>activeBrand==="all"||normBrandId(e.brandId)===normBrandId(activeBrand));
-    if(fSt!=="All")   list=list.filter(e=>e.status===fSt);
+    list=list.filter(e=>fSt.has(e.status));
     if(fCat!=="All")  list=list.filter(e=>e.category===fCat);
     if(fType!=="All") list=list.filter(e=>e.initType===fType);
     if(fOwn!=="All")  list=list.filter(e=>e.owner&&e.owner.includes(fOwn));
@@ -859,6 +861,56 @@ export default function App() {
   const goDetail = (id, origin)=>{ if(origin) setDetailOrigin(origin); setSelId(id); setNav("detail"); };
   const goNew    = ()=>{ setShowTpl(true); };
   const goEdit   = item=>{setForm({...item});setNav("form");};
+
+  // When more than one status is active in the filter (the default Running+Draft,
+  // "All", or any other multi-status combination), the flat list is grouped into
+  // per-status sections in a fixed order. `filtered` is already sorted by the
+  // active sort, so slicing it per status preserves that order within each
+  // section without re-sorting.
+  const groupedSections = useMemo(()=>{
+    if(fSt.size<=1) return null;
+    return STATUS_GROUP_ORDER
+      .filter(s=>fSt.has(s))
+      .map(s=>({status:s, items:filtered.filter(e=>e.status===s)}))
+      .filter(g=>g.items.length>0);
+  },[filtered,fSt]);
+
+  const renderInitiativeCard = (item)=>(
+    <div key={item.id} onClick={()=>goDetail(item.id,"initiatives")} style={{...gCd(t),cursor:"pointer",padding:"14px 16px",transition:"border-color .15s, box-shadow .15s"}}
+      onMouseEnter={e=>{e.currentTarget.style.borderColor=t.goldBorder;e.currentTarget.style.boxShadow=t.shadowHi;}}
+      onMouseLeave={e=>{e.currentTarget.style.borderColor=t.border;e.currentTarget.style.boxShadow=t.shadow;}}>
+      {/* Row 1: title (lead) + ICE/revenue anchors */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
+        <div style={{flex:"1 1 auto",minWidth:0}}>
+          <div style={{display:"flex",alignItems:"baseline",gap:7,marginBottom:item.hypothesis?3:0}}>
+            {item.initId&&<span style={{fontSize:10,fontWeight:600,color:t.textMuted,fontFamily:t.mono,flexShrink:0}}>{item.initId}</span>}
+            <span style={{fontSize:14.5,fontWeight:600,color:t.text,lineHeight:1.3,fontFamily:t.sans,textAlign:"left"}}>{item.title}</span>
+            <SBdg s={item.status} dk={dk}/>
+          </div>
+          {item.hypothesis&&<div style={{fontSize:12.5,color:t.textSub,lineHeight:1.5,fontFamily:t.sans,textAlign:"left"}}>{item.hypothesis.slice(0,128)}{item.hypothesis.length>128?"…":""}</div>}
+        </div>
+        <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4,flexShrink:0}}>
+          {item.revenueImpact!==0&&<span style={{fontSize:18,fontWeight:700,color:t.gold,fontFamily:t.mono,letterSpacing:"-0.02em",lineHeight:1}}>{fmtCur(item.revenueImpact)}</span>}
+          <ICEChip ice={item.ice} t={t}/>
+        </div>
+      </div>
+      {/* Row 2: quiet metadata strip */}
+      <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap",marginTop:10,paddingTop:9,borderTop:"1px solid "+t.borderSoft}}>
+        <CBdg cat={item.category} cats={cats} dk={dk} t={t}/>
+        <TBdg type={item.initType} dk={dk} t={t}/>
+        {brands&&brands.length>1&&activeBrand==="all"&&<Bdg label={brandName(item.brandId||"default",brands)} color={brandColor(item.brandId||"default",brands,dk)} bg={t.surfaceAlt} border={t.border} small/>}
+        {item.results&&<OBdg o={item.results.outcomeClassification} dk={dk}/>}
+        <EAlert endDate={item.endDate} status={item.status} t={t} dk={dk}/>
+        <BlockerBadge blocker={item.blocker} t={t}/>
+        <span style={{marginLeft:"auto",display:"flex",gap:13,alignItems:"center",fontSize:11,color:t.textMuted,fontFamily:t.mono,flexWrap:"wrap"}}>
+          {item.results&&typeof item.results.actualRevenueImpact==="number"&&<span>actual {fmtCur(item.results.actualRevenueImpact)}</span>}
+          {item.status!=="Draft"&&item.endDate&&<span>end {fmtDate(item.endDate)}</span>}
+          {item.linkedIds&&item.linkedIds.length>0&&<span>{item.linkedIds.length} linked</span>}
+          {item.owner&&<span>{item.owner.split(" (")[0].split("+")[0].trim()}</span>}
+        </span>
+      </div>
+    </div>
+  );
 
   const startFromTemplate = tpl=>{
     const base=mkDefault(cats, activeBrand);
@@ -1106,7 +1158,7 @@ export default function App() {
               {navBtn("initiatives","Initiatives")}
               {navBtn("library","Library")}
               {navBtn("triage","Triage")}
-              {navBtn("readout","Client Readout")}
+              {navBtn("readout","Summary")}
             </div>
             {(nav==="detail"||nav==="form")&&(
               <button onClick={()=>setNav(nav==="detail"?detailOrigin:"initiatives")} style={{...gGh(t),padding:"6px 12px",fontSize:12}}>
@@ -1198,16 +1250,22 @@ export default function App() {
         onExtend={(id,days)=>{saveItems(items.map(e=>{if(e.id!==id)return e; const base=e.endDate?new Date(e.endDate+"T12:00:00"):new Date(); base.setDate(base.getDate()+days); return {...e,endDate:base.toISOString().slice(0,10)};})); showToast("Extended "+days+" days.","success");}}
         onActivate={(id)=>{saveItems(items.map(e=>e.id===id?withRunningSnapshot({...e,status:"Running",startDate:e.startDate||new Date().toISOString().slice(0,10)},"Running"):e)); showToast("Initiative activated. Now running.","success");}}
       />}
-      {nav==="library"&&<LearningLibrary items={items} t={t} dk={dk} cats={cats} brands={brands} activeBrand={activeBrand} settings={settings} view={libView} onView={saveLibView} onReplicate={(item)=>{const base=mkDefault(cats,activeBrand);setForm({...base,title:"[Replicate] "+item.title,hypothesis:"Based on learning from: "+item.title+". Original: "+item.hypothesis,category:item.category,initType:item.initType,ice:{...item.ice},revenueImpact:item.revenueImpact,notes:"Replicated from initiative "+item.id+". Original learning: "+item.results.keyLearning});setNav("form");}}/>}
+      {nav==="library"&&<LearningLibrary items={items} t={t} dk={dk} cats={cats} brands={brands} activeBrand={activeBrand} settings={settings} view={libView} onView={saveLibView} onViewInitiative={(id)=>goDetail(id,"library")} onReplicate={(item)=>{const base=mkDefault(cats,activeBrand);setForm({...base,title:"[Replicate] "+item.title,hypothesis:"Based on learning from: "+item.title+". Original: "+item.hypothesis,category:item.category,initType:item.initType,ice:{...item.ice},revenueImpact:item.revenueImpact,notes:"Replicated from initiative "+item.id+". Original learning: "+item.results.keyLearning});setNav("form");}}/>}
       {nav==="readout"&&<ClientReadoutView t={t} dk={dk} dash={dash} items={items} brands={brands} activeBrand={activeBrand} cats={cats} weeklyMetrics={weeklyMetrics} settings={settings}/>}
 
       {nav==="initiatives"&&(
         <div style={{padding:"16px 20px"}}>
           <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
             <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-              {["All",...STATUSES].map(s=>(
-                <button key={s} onClick={()=>setFSt(s)} style={{fontSize:12,padding:"4px 10px",borderRadius:4,cursor:"pointer",fontFamily:t.serif,background:fSt===s?t.gold:"transparent",border:"1px solid "+(fSt===s?t.gold:t.border),color:fSt===s?t.goldText:t.textMuted}}>{s}</button>
-              ))}
+              {["All",...STATUSES].map(s=>{
+                const active = s==="All" ? fSt.size===STATUSES.length : fSt.has(s);
+                return (
+                  <button key={s} onClick={()=>{
+                    if(s==="All") setFSt(new Set(STATUSES));
+                    else setFSt(prev=>{const next=new Set(prev); if(next.has(s)) next.delete(s); else next.add(s); return next;});
+                  }} style={{fontSize:12,padding:"4px 10px",borderRadius:4,cursor:"pointer",fontFamily:t.serif,background:active?t.gold:"transparent",border:"1px solid "+(active?t.gold:t.border),color:active?t.goldText:t.textMuted}}>{s}</button>
+                );
+              })}
             </div>
             <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
@@ -1250,46 +1308,22 @@ export default function App() {
                 <div style={{...gCd(t),padding:"40px 24px",textAlign:"center"}}>
                   <div style={{fontSize:14,fontWeight:600,color:t.text,fontFamily:t.sans,marginBottom:5}}>No initiatives match your filters</div>
                   <div style={{fontSize:12.5,color:t.textSub,fontFamily:t.sans,marginBottom:14}}>Try widening the status, category, type, or owner filters.</div>
-                  <button onClick={()=>{setFSt("All");setFCat("All");setFType("All");setFOwn("All");}} style={{...gGh(t),fontSize:12.5,padding:"7px 14px",margin:"0 auto",display:"inline-flex"}}>Clear all filters</button>
+                  <button onClick={()=>{setFSt(new Set(STATUSES));setFCat("All");setFType("All");setFOwn("All");}} style={{...gGh(t),fontSize:12.5,padding:"7px 14px",margin:"0 auto",display:"inline-flex"}}>Clear all filters</button>
                 </div>
               )
             )}
-            {filtered.map(item=>(
-              <div key={item.id} onClick={()=>goDetail(item.id,"initiatives")} style={{...gCd(t),cursor:"pointer",padding:"14px 16px",transition:"border-color .15s, box-shadow .15s"}}
-                onMouseEnter={e=>{e.currentTarget.style.borderColor=t.goldBorder;e.currentTarget.style.boxShadow=t.shadowHi;}}
-                onMouseLeave={e=>{e.currentTarget.style.borderColor=t.border;e.currentTarget.style.boxShadow=t.shadow;}}>
-                {/* Row 1: title (lead) + ICE/revenue anchors */}
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
-                  <div style={{flex:"1 1 auto",minWidth:0}}>
-                    <div style={{display:"flex",alignItems:"baseline",gap:7,marginBottom:item.hypothesis?3:0}}>
-                      {item.initId&&<span style={{fontSize:10,fontWeight:600,color:t.textMuted,fontFamily:t.mono,flexShrink:0}}>{item.initId}</span>}
-                      <span style={{fontSize:14.5,fontWeight:600,color:t.text,lineHeight:1.3,fontFamily:t.sans,textAlign:"left"}}>{item.title}</span>
-                      <SBdg s={item.status} dk={dk}/>
-                    </div>
-                    {item.hypothesis&&<div style={{fontSize:12.5,color:t.textSub,lineHeight:1.5,fontFamily:t.sans,textAlign:"left"}}>{item.hypothesis.slice(0,128)}{item.hypothesis.length>128?"…":""}</div>}
+            {groupedSections ? (
+              groupedSections.map((g,gi)=>(
+                <div key={g.status} style={{display:"flex",flexDirection:"column",gap:6,marginTop:gi>0?10:0}}>
+                  <div style={{fontSize:11,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,padding:"2px 2px"}}>
+                    {g.status} <span style={{color:t.textMuted}}>&middot; {g.items.length}</span>
                   </div>
-                  <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4,flexShrink:0}}>
-                    {item.revenueImpact!==0&&<span style={{fontSize:18,fontWeight:700,color:t.gold,fontFamily:t.mono,letterSpacing:"-0.02em",lineHeight:1}}>{fmtCur(item.revenueImpact)}</span>}
-                    <ICEChip ice={item.ice} t={t}/>
-                  </div>
+                  {g.items.map(renderInitiativeCard)}
                 </div>
-                {/* Row 2: quiet metadata strip */}
-                <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap",marginTop:10,paddingTop:9,borderTop:"1px solid "+t.borderSoft}}>
-                  <CBdg cat={item.category} cats={cats} dk={dk} t={t}/>
-                  <TBdg type={item.initType} dk={dk} t={t}/>
-                  {brands&&brands.length>1&&activeBrand==="all"&&<Bdg label={brandName(item.brandId||"default",brands)} color={brandColor(item.brandId||"default",brands,dk)} bg={t.surfaceAlt} border={t.border} small/>}
-                  {item.results&&<OBdg o={item.results.outcomeClassification} dk={dk}/>}
-                  <EAlert endDate={item.endDate} status={item.status} t={t} dk={dk}/>
-                  <BlockerBadge blocker={item.blocker} t={t}/>
-                  <span style={{marginLeft:"auto",display:"flex",gap:13,alignItems:"center",fontSize:11,color:t.textMuted,fontFamily:t.mono,flexWrap:"wrap"}}>
-                    {item.results&&typeof item.results.actualRevenueImpact==="number"&&<span>actual {fmtCur(item.results.actualRevenueImpact)}</span>}
-                    {item.status!=="Draft"&&item.endDate&&<span>end {fmtDate(item.endDate)}</span>}
-                    {item.linkedIds&&item.linkedIds.length>0&&<span>{item.linkedIds.length} linked</span>}
-                    {item.owner&&<span>{item.owner.split(" (")[0].split("+")[0].trim()}</span>}
-                  </span>
-                </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              filtered.map(renderInitiativeCard)
+            )}
           </div>
         </div>
       )}

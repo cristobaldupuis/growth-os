@@ -22,7 +22,7 @@ const IconGrid = ({size=13}) => (
 );
 
 // -- Learning Library ---------------------------------------------------------
-export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onReplicate, settings, view="list", onView}) {
+export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onReplicate, onViewInitiative, settings, view="list", onView}) {
   const [activeOutcomes, setActiveOutcomes] = useState(["Jackpot","Success"]);
   const [fCat,  setFCat]  = useState("All");
   const [fType, setFType] = useState("All");
@@ -224,13 +224,13 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
       {/* Learning cards. Grid columns are minmax(0,...) so a long unbroken
           learning cannot push a column past its share. */}
       <div style={view==="grid"
-        ? {display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10,alignItems:"start"}
+        ? {display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10,alignItems:"stretch"}
         : {display:"flex",flexDirection:"column",gap:10}}>
         {filtered.map(item=>{
           const isWin=item.results.outcomeClassification==="Jackpot"||item.results.outcomeClassification==="Success";
           return (
-            <div key={item.id} style={{background:t.surface,border:"1px solid "+t.border,borderRadius:8,overflow:"hidden"}}>
-              <div style={{padding:"10px 14px"}}>
+            <div key={item.id} style={{background:t.surface,border:"1px solid "+t.border,borderRadius:8,overflow:"hidden",display:"flex",flexDirection:"column",height:"100%"}}>
+              <div style={{padding:"10px 14px",flex:"1 1 auto",display:"flex",flexDirection:"column"}}>
                 {/* Badges row */}
                 <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center",marginBottom:6}}>
                   <OBdg o={item.results.outcomeClassification} dk={dk}/>
@@ -263,25 +263,34 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
                   </div>
                 )}
 
-                {/* Est / Actual stay on one inline row, and the action rides
-                    the same row rather than claiming a block of its own. */}
-                {(item.revenueImpact!==0||isWin)&&(
-                  <div style={{...cLine(t),display:"flex",gap:14,flexWrap:"wrap",alignItems:"baseline"}}>
-                    {item.revenueImpact!==0&&(
-                      <span><span style={cLbl(t)}>Est</span><strong style={{color:t.text,fontFamily:t.mono,fontWeight:600}}>{fmtCur(item.revenueImpact)}</strong></span>
-                    )}
-                    {item.revenueImpact!==0&&item.results.actualRevenueImpact!=null&&(
-                      <span><span style={cLbl(t)}>Actual</span><strong style={{color:t.gold,fontFamily:t.mono,fontWeight:600}}>{fmtCur(item.results.actualRevenueImpact)}</strong></span>
-                    )}
-                    {isWin&&(
-                      <button onClick={()=>onReplicate(item)}
-                        style={{marginLeft:"auto",padding:0,background:"none",border:"none",cursor:"pointer",
-                          fontSize:11,fontWeight:600,fontFamily:t.sans,color:t.gold,textDecoration:"underline",textUnderlineOffset:2}}>
-                        &#8635; Replicate this initiative
-                      </button>
-                    )}
-                  </div>
-                )}
+                {/* Footer pinned to the bottom via marginTop:auto — on a grid card
+                    stretched taller than its content, the extra room shows up here
+                    as whitespace above the actions rather than leaving the card
+                    looking cut short next to a taller neighbour. */}
+                <div style={{marginTop:"auto",paddingTop:8,display:"flex",flexDirection:"column",gap:6,alignItems:"flex-end"}}>
+                  {(item.revenueImpact!==0||isWin)&&(
+                    <div style={{...cLine(t),marginTop:0,alignSelf:"stretch",display:"flex",gap:14,flexWrap:"wrap",alignItems:"baseline"}}>
+                      {item.revenueImpact!==0&&(
+                        <span><span style={cLbl(t)}>Est</span><strong style={{color:t.text,fontFamily:t.mono,fontWeight:600}}>{fmtCur(item.revenueImpact)}</strong></span>
+                      )}
+                      {item.revenueImpact!==0&&item.results.actualRevenueImpact!=null&&(
+                        <span><span style={cLbl(t)}>Actual</span><strong style={{color:t.gold,fontFamily:t.mono,fontWeight:600}}>{fmtCur(item.results.actualRevenueImpact)}</strong></span>
+                      )}
+                    </div>
+                  )}
+                  <button onClick={()=>onViewInitiative&&onViewInitiative(item.id)}
+                    style={{padding:0,background:"none",border:"none",cursor:"pointer",
+                      fontSize:11,fontWeight:600,fontFamily:t.sans,color:t.textSub,textDecoration:"underline",textUnderlineOffset:2}}>
+                    See initiative &#8594;
+                  </button>
+                  {isWin&&(
+                    <button onClick={()=>onReplicate(item)}
+                      style={{padding:0,background:"none",border:"none",cursor:"pointer",
+                        fontSize:11,fontWeight:600,fontFamily:t.sans,color:t.gold,textDecoration:"underline",textUnderlineOffset:2}}>
+                      &#8635; Replicate this initiative
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           );

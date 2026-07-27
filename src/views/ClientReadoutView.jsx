@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { brandName, iceScore, fmtCur, fmtDate, parseD } from "../constants.js";
+import { brandName, iceScore, fmtCur, fmtDate, parseD, somM, eomM } from "../constants.js";
 import { gG, gGh, gCd, gSL } from "../components/styles.js";
 import { OBdg, CBdg, ICEChip } from "../components/badges.jsx";
 import { renderProse } from "../components/text.jsx";
@@ -12,6 +12,12 @@ function normBrandId(id, brands) {
 
 function brandFilter(item, activeBrand, brands) {
   return activeBrand === "all" || normBrandId(item.brandId, brands) === normBrandId(activeBrand, brands);
+}
+
+// A closed initiative's close date — endDate first, falling back to a date
+// recorded on results, matching how the rest of the app treats "when this closed".
+function closeDateOf(e) {
+  return parseD(e.endDate) || parseD(e.results?.endDate);
 }
 
 function CopyBtn({ t, onClick, label = "Copy section" }) {
@@ -59,9 +65,11 @@ function buildScorecardText(dash, latestWeek, weekLabel, brands, activeBrand, se
   return lines.join("\n");
 }
 
-function buildLearnedText(learned) {
-  if (learned.length === 0) return "WHAT WE LEARNED THIS PERIOD\n\nNo completed or closed initiatives with learnings in the last 30 days.";
-  const lines = ["WHAT WE LEARNED THIS PERIOD", ""];
+function buildLearnedText(learned, isFallback, rangeLabel) {
+  if (learned.length === 0) return "WHAT WE LEARNED THIS PERIOD\n\nNo completed or closed initiatives with learnings yet.";
+  const lines = isFallback
+    ? ["WHAT WE LEARNED THIS PERIOD", "", "There are no learnings available for " + rangeLabel + ". Here are the 5 most recent initiatives available.", ""]
+    : ["WHAT WE LEARNED THIS PERIOD · " + rangeLabel, ""];
   learned.forEach((item, i) => {
     lines.push((i + 1) + ". " + item.title);
     lines.push("Outcome: " + (item.results?.outcomeClassification || "—"));
@@ -201,7 +209,7 @@ function ScorecardSection({ t, dk, dash, weeklyMetrics, brands, activeBrand, set
 
 // ── Section 2: Learned ────────────────────────────────────────────────────────
 
-function LearnedSection({ t, dk, learned, onCopy }) {
+function LearnedSection({ t, dk, learned, isFallback, rangeLabel, onCopy }) {
   const _outcomeColor = (o) => {
     const map = {
       Jackpot:      t.teal,
@@ -214,17 +222,37 @@ function LearnedSection({ t, dk, learned, onCopy }) {
 
   return (
     <Section t={t} dk={dk} title="What we learned this period" onCopy={onCopy}>
+      <div style={{ fontSize: 11, color: t.textMuted, fontFamily: t.serif, marginTop: -8 }}>{rangeLabel}</div>
+
+      {/* Fallback notice — deliberately its own banner, not a caption swap, so
+          data from outside the selected range can never be mistaken for
+          in-range results at a glance. */}
+      {isFallback && (
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "10px 12px", borderRadius: 8, background: t.warnBg, border: "1px solid " + t.warnBorder }}>
+          <span style={{ color: t.warn, fontSize: 14, lineHeight: 1.3, flexShrink: 0 }}>&#9888;</span>
+          <span style={{ fontSize: 12, color: t.warn, fontFamily: t.sans, lineHeight: 1.5, fontWeight: 600 }}>
+            There are no learnings available for these dates. Here are the 5 most recent initiatives available.
+          </span>
+        </div>
+      )}
+
       {learned.length === 0 ? (
         <div style={{ padding: "18px 12px", textAlign: "center", border: "1px dashed " + t.border, borderRadius: 8, color: t.textMuted, fontFamily: t.serif, fontSize: 12 }}>
-          No completed or closed initiatives with learnings in the last 30 days.
+          No completed or closed initiatives with learnings yet.
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {learned.map(item => (
-            <div key={item.id} style={{ background: t.surfaceAlt, border: "1px solid " + t.border, borderRadius: 10, padding: "13px 16px", display: "flex", flexDirection: "column", gap: 7 }}>
+            <div key={item.id} style={{
+              background: isFallback ? t.surface : t.surfaceAlt,
+              border: isFallback ? "1px dashed " + t.textMuted : "1px solid " + t.border,
+              borderRadius: 10, padding: "13px 16px", display: "flex", flexDirection: "column", gap: 7,
+              opacity: isFallback ? 0.85 : 1,
+            }}>
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
                 <div style={{ fontSize: 13.5, fontWeight: 600, color: t.text, fontFamily: t.sans, lineHeight: 1.3, flex: 1, minWidth: 0 }}>{item.title}</div>
                 <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
+                  {isFallback && <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: t.warn, fontFamily: t.mono, padding: "2px 6px", border: "1px solid " + t.warnBorder, borderRadius: 4 }}>Prior period</span>}
                   <OBdg o={item.results?.outcomeClassification} dk={dk} />
                   {item.endDate && <span style={{ fontSize: 10, color: t.textMuted, fontFamily: t.mono }}>{fmtDate(item.endDate)}</span>}
                 </div>
@@ -345,35 +373,50 @@ export function ClientReadoutView({ t, dk, dash, items, brands, activeBrand, cat
     return { latestWeek: latest, weekLabel: latest ? fmtDate(latest.date) : "" };
   }, [weeklyMetrics, activeBrand, brands]);
 
-  // Section 2 — learnings in last 30 days.
-  //
-  // The 30-day boundary is captured once per mount rather than read inside the
-  // memo. Calling Date.now() during render makes the memo impure — it can return
-  // a different result for identical inputs, so React is free to re-run it and
-  // get a different answer, and a readout being copied to a client could shift
-  // its own window mid-session. Pinning it to mount time also means the figures
-  // in a readout stay stable while someone is reading them.
-  const [readoutNow] = useState(() => Date.now());
-  const learned = useMemo(() => {
-    const cutoff = new Date(readoutNow - 30 * 24 * 60 * 60 * 1000);
-    let closed = items.filter(e =>
-      (e.status === "Completed" || e.status === "Killed") &&
-      e.results?.keyLearning
-    );
-    // Try date-filtered first; fall back to all with learnings if empty
-    const dated = closed.filter(e => {
-      const d = parseD(e.endDate) || parseD(e.results?.endDate);
-      return d && d >= cutoff;
-    });
-    const pool = dated.length > 0 ? dated : closed;
-    return [...pool]
-      .sort((a, b) => {
-        const da = parseD(a.endDate) || parseD(a.results?.endDate) || new Date(0);
-        const db = parseD(b.endDate) || parseD(b.results?.endDate) || new Date(0);
-        return db - da;
-      })
+  // Section 2 — learnings in the selected date range, defaulting to the
+  // current calendar month. Mirrors the Dashboard's own range picker (This
+  // month / Last month / Custom) rather than the old fixed 30-day lookback.
+  const [dRange, setDRange] = useState("thisMonth");
+  const [cFrom,  setCFrom]  = useState("");
+  const [cTo,    setCTo]    = useState("");
+
+  const bounds = useMemo(() => {
+    const now = new Date();
+    if (dRange === "lastMonth") { const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1); return { from: somM(lm), to: eomM(lm) }; }
+    if (dRange === "custom" && cFrom && cTo) return { from: new Date(cFrom + "T00:00:00"), to: new Date(cTo + "T23:59:59") };
+    return { from: somM(now), to: eomM(now) };
+  }, [dRange, cFrom, cTo]);
+
+  const rangeLabel = useMemo(() => {
+    const fmt = (d) => d.toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" });
+    return fmt(bounds.from) + " – " + fmt(bounds.to);
+  }, [bounds]);
+
+  const closedWithLearnings = useMemo(() => items.filter(e =>
+    (e.status === "Completed" || e.status === "Killed") && e.results?.keyLearning
+  ), [items]);
+
+  // In-range results are the normal path. Only when the selected range has
+  // nothing do we fall back to the most recent prior initiatives — and that
+  // fallback is flagged so the UI can never present it as "this period" data.
+  const learnedInRange = useMemo(() =>
+    closedWithLearnings
+      .filter(e => { const d = closeDateOf(e); return d && d >= bounds.from && d <= bounds.to; })
+      .sort((a, b) => closeDateOf(b) - closeDateOf(a))
+      .slice(0, 5),
+    [closedWithLearnings, bounds]
+  );
+
+  const learnedFallback = useMemo(() => {
+    if (learnedInRange.length > 0) return [];
+    return closedWithLearnings
+      .filter(e => { const d = closeDateOf(e); return d && d < bounds.from; })
+      .sort((a, b) => closeDateOf(b) - closeDateOf(a))
       .slice(0, 5);
-  }, [items, readoutNow]);
+  }, [closedWithLearnings, bounds, learnedInRange.length]);
+
+  const isFallback = learnedInRange.length === 0 && learnedFallback.length > 0;
+  const learned = isFallback ? learnedFallback : learnedInRange;
 
   // Section 3 — running
   const running = useMemo(() =>
@@ -407,12 +450,12 @@ export function ClientReadoutView({ t, dk, dash, items, brands, activeBrand, cat
   };
 
   const scorecardText = buildScorecardText(dash, latestWeek, weekLabel, brands, activeBrand, settings);
-  const learnedText   = buildLearnedText(learned);
+  const learnedText   = buildLearnedText(learned, isFallback, rangeLabel);
   const runningText   = buildRunningText(running);
   const nextText      = buildNextText(next);
 
   const fullText = [
-    "GROWTH OS CLIENT READOUT",
+    "GROWTH OS SUMMARY",
     "Generated: " + new Date().toLocaleDateString("en-CA", { month: "long", day: "numeric", year: "numeric" }),
     "Portfolio: " + (activeBrand === "all" ? "All brands" : brandName(activeBrand, brands)),
     "",
@@ -435,17 +478,35 @@ export function ClientReadoutView({ t, dk, dash, items, brands, activeBrand, cat
       {/* Header */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div>
-          <div style={{ fontSize: 10, letterSpacing: "0.10em", textTransform: "uppercase", color: t.gold, fontFamily: t.mono, fontWeight: 700, marginBottom: 4 }}>Client Readout</div>
+          <div style={{ fontSize: 10, letterSpacing: "0.10em", textTransform: "uppercase", color: t.gold, fontFamily: t.mono, fontWeight: 700, marginBottom: 4 }}>Summary</div>
           <div style={{ fontSize: 18, fontWeight: 700, color: t.text, fontFamily: t.sans, lineHeight: 1.2 }}>
             Weekly summary · {activeBrand === "all" ? "All brands" : brandName(activeBrand, brands)}
           </div>
           <div style={{ fontSize: 12, color: t.textMuted, fontFamily: t.serif, marginTop: 3 }}>
-            Read-only view. Use "Copy section" buttons or copy the full readout to share with clients.
+            Read-only view. Use "Copy section" buttons or copy the full summary to share with clients.
           </div>
         </div>
         <button onClick={() => copyText(fullText)} style={{ ...gG(t), fontSize: 12, padding: "7px 14px", flexShrink: 0 }}>
-          Copy full readout
+          Copy full summary
         </button>
+      </div>
+
+      {/* Date range — scopes the "What we learned" section below to a specific
+          window, defaulting to the current calendar month. */}
+      <div style={{ ...gCd(t, dk), display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ ...gSL(t), marginBottom: 0 }}>Learnings date range</div>
+        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 2, background: t.surfaceAlt, padding: 3, borderRadius: 9, border: "1px solid " + t.border }}>
+            {[["thisMonth", "This month"], ["lastMonth", "Last month"], ["custom", "Custom"]].map(([v, l]) => (
+              <button key={v} onClick={() => setDRange(v)} style={{ fontSize: 12, padding: "5px 12px", borderRadius: 6, cursor: "pointer", fontFamily: t.sans, fontWeight: dRange === v ? 600 : 500, background: dRange === v ? t.gold : "transparent", border: "none", color: dRange === v ? t.goldText : t.textSub }}>{l}</button>
+            ))}
+          </div>
+          {dRange === "custom" && <>
+            <input type="date" value={cFrom} onChange={e => setCFrom(e.target.value)} style={{ fontSize: 12, padding: "6px 9px", borderRadius: 9, border: "1px solid " + t.border, background: t.inputBg, color: t.text, fontFamily: t.mono }} />
+            <span style={{ color: t.textMuted, fontSize: 12 }}>to</span>
+            <input type="date" value={cTo} onChange={e => setCTo(e.target.value)} style={{ fontSize: 12, padding: "6px 9px", borderRadius: 9, border: "1px solid " + t.border, background: t.inputBg, color: t.text, fontFamily: t.mono }} />
+          </>}
+        </div>
       </div>
 
       <ScorecardSection
@@ -460,6 +521,8 @@ export function ClientReadoutView({ t, dk, dash, items, brands, activeBrand, cat
       <LearnedSection
         t={t} dk={dk}
         learned={learned}
+        isFallback={isFallback}
+        rangeLabel={rangeLabel}
         onCopy={() => copyText(learnedText)}
       />
 

@@ -73,6 +73,9 @@ export const DEFAULT_SETTINGS = {
 };
 
 export const STATUSES  = ["Draft","Running","Completed","Killed"];
+// Section order for the grouped Initiatives view (All-statuses / multi-select),
+// distinct from STATUSES (which orders the filter chips themselves).
+export const STATUS_GROUP_ORDER = ["Running","Draft","Completed","Killed"];
 export const OUTCOMES  = ["Jackpot","Success","Failed","Inconclusive"];
 export const INIT_TYPES = ["A/B Test","Campaign","Process","Research","Infrastructure"];
 export const BLOCKERS  = ["None","Waiting on Engineering","Waiting on Creative","Waiting on Merch/Inventory","Waiting on Legal","Waiting on Finance","Waiting on Leadership"];

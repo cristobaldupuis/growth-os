@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { OUTCOMES, INIT_TYPES, METRIC_SOURCES, OL, OD, TYPE_L, TYPE_D, DEFAULT_SETTINGS, catColor, brandName, iceScore, iceColor, fmtCur, fmtDate, mondayOf } from "../constants.js";
+import { OUTCOMES, INIT_TYPES, METRIC_SOURCES, OL, OD, TYPE_L, TYPE_D, DEFAULT_SETTINGS, catColor, brandName, iceScore, iceColor, fmtCur, fmtDate, mondayOf, parseNorthStarValue, resolveNorthStar } from "../constants.js";
 import { gG, gGh, gSL, gCd } from "../components/styles.js";
 import { Spark } from "../components/Spark.jsx";
 import { WeeklyStandupModal } from "../components/WeeklyStandupModal.jsx";
@@ -248,10 +248,13 @@ function FunnelCoverageMap({t, dk, items, cats, brands, activeBrand}) {
 
 
 // -- Business Health Panel -----------------------------------------------------
-function BusinessHealthPanel({ t, settings, weeklyMetrics }) {
+function BusinessHealthPanel({ t, settings, weeklyMetrics, activeBrand, brands }) {
   const [expanded, setExpanded] = useState(true);
 
-  const allEntries = weeklyMetrics || [];
+  // Scoped to the active brand so the tiles read that brand's own guardrails
+  // rather than a portfolio blend when one is selected — same "all" convention
+  // as the rest of the dashboard (dash, contribution, funnel coverage).
+  const allEntries = (weeklyMetrics || []).filter(m => !activeBrand || activeBrand === "all" || m.brand === activeBrand);
   const sorted = [...allEntries].sort((a,b) => b.date.localeCompare(a.date));
   const latestDate = sorted[0]?.date || null;
   const priorDate  = latestDate ? (sorted.find(m => m.date < latestDate)?.date || null) : null;
@@ -339,7 +342,9 @@ function BusinessHealthPanel({ t, settings, weeklyMetrics }) {
           <div>
             <span style={{fontSize:11,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono}}>Business Health</span>
             <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,marginTop:1}}>
-              Portfolio-level guardrail metrics: watch these when experiments are running
+              {(!activeBrand||activeBrand==="all")
+                ? "Portfolio-level guardrail metrics: watch these when experiments are running"
+                : brandName(activeBrand,brands)+"'s guardrail metrics: watch these when experiments are running"}
             </div>
           </div>
         </div>
@@ -787,19 +792,6 @@ function NextPlaysCard({ t, recs, recsLoad, recsErr, items, onGenerate, onOpenRe
 // Modal — full recommendation detail with hypothesis, ICE rationale, reasoning
 // trace, and cited learnings. Actions: Add to backlog | Dismiss.
 
-// Parse a north star display string (e.g. "$1.4M/mo", "$320k", "42000") into a
-// raw number so gap coverage can be computed. Returns null if unparseable.
-function parseNorthStarValue(str) {
-  if (!str) return null;
-  const s = String(str).replace(/[$,\s]/g, "").toLowerCase();
-  const m = s.match(/^([\d.]+)(m|k)?(?:\/.*)?$/);
-  if (!m) return null;
-  const num = parseFloat(m[1]);
-  if (isNaN(num)) return null;
-  if (m[2] === "m") return num * 1_000_000;
-  if (m[2] === "k") return num * 1_000;
-  return num;
-}
 
 export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetrics,onLog,onImport,dRange,setDRange,cFrom,cTo,setCFrom,setCTo,onGo,recs,recsLoad,recsErr,items,onGenerateRecs,onOpenRec,showToast,onSaveItems}) {
   const maxCat  = Math.max(...Object.values(dash.catCounts),1);
@@ -826,15 +818,19 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
   // is forward-looking only (probability-weighted in-flight + pipeline), the gap
   // is labelled with its own period, and the two sit next to each other so the
   // reader does the comparison knowing what they're comparing.
-  const nsCurrentNum = parseNorthStarValue(settings.northStarCurrent);
-  const nsTargetNum  = parseNorthStarValue(settings.northStarTarget);
+  // Resolved for the active scope: a brand's own northStar when the config
+  // defines one and a brand is selected, the computed roll-up for "all", and
+  // the portfolio setting as the fallback either way (see resolveNorthStar).
+  const ns = resolveNorthStar(activeBrand, brands, settings, weeklyMetrics);
+  const nsCurrentNum = parseNorthStarValue(ns.current);
+  const nsTargetNum  = parseNorthStarValue(ns.target);
   const nsGap = (nsCurrentNum !== null && nsTargetNum !== null && nsTargetNum > nsCurrentNum)
     ? nsTargetNum - nsCurrentNum : null;
   const forwardPipeline = (dash.contributionTotals.inflight || 0)
     + (dash.contributionTotals.pipeline || 0);
-  // The period suffix the user wrote on the north star ("/mo", "/qtr", …), reused
-  // verbatim so the gap is never presented as a bare, period-less number.
-  const nsPeriod = (settings.northStarTarget || "").match(/\/\s*(\w+)/);
+  // The period suffix on the north star ("/mo", "/qtr", …), reused verbatim so
+  // the gap is never presented as a bare, period-less number.
+  const nsPeriod = (ns.target || "").match(/\/\s*(\w+)/);
   const nsPeriodLabel = nsPeriod ? "/" + nsPeriod[1] : "";
 
   // Cross-brand transfer opportunities — top 3, only shown if >= 2 exist.
@@ -846,12 +842,12 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
       <div style={{...gCd(t),background:t.goldBg,border:"1px solid "+t.goldBorder,display:"flex",alignItems:"center",gap:24,flexWrap:"wrap"}}>
         <div>
           <div style={{fontSize:10,letterSpacing:"0.10em",textTransform:"uppercase",color:t.gold,fontFamily:t.mono,marginBottom:4}}>North star</div>
-          <div style={{fontSize:15,fontWeight:600,color:t.text,fontFamily:t.serif}}>{settings.northStarMetric}</div>
+          <div style={{fontSize:15,fontWeight:600,color:t.text,fontFamily:t.serif}}>{ns.metric}</div>
         </div>
         <div style={{display:"flex",gap:20,flexWrap:"wrap"}}>
-          <div><div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginBottom:2}}>Current</div><div style={{fontSize:26,fontWeight:600,color:t.gold,fontFamily:t.serif,letterSpacing:"-0.02em"}}>{settings.northStarCurrent}</div></div>
+          <div><div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginBottom:2}}>Current</div><div style={{fontSize:26,fontWeight:600,color:t.gold,fontFamily:t.serif,letterSpacing:"-0.02em"}}>{ns.current}</div></div>
           <div style={{fontSize:20,color:t.textMuted,alignSelf:"center"}}>&#8594;</div>
-          <div><div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginBottom:2}}>Target</div><div style={{fontSize:26,fontWeight:600,color:t.text,fontFamily:t.serif,letterSpacing:"-0.02em"}}>{settings.northStarTarget}</div></div>
+          <div><div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginBottom:2}}>Target</div><div style={{fontSize:26,fontWeight:600,color:t.text,fontFamily:t.serif,letterSpacing:"-0.02em"}}>{ns.target}</div></div>
         </div>
         {nsGap !== null && (
           <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,lineHeight:1.5}}
@@ -953,7 +949,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
       />
 
       {/* Business Health */}
-      <BusinessHealthPanel t={t} settings={settings} weeklyMetrics={weeklyMetrics}/>
+      <BusinessHealthPanel t={t} settings={settings} weeklyMetrics={weeklyMetrics} activeBrand={activeBrand} brands={brands}/>
 
       {/* Executive summary */}
       <div style={{display:"flex",justifyContent:"flex-end"}}>

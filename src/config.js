@@ -5,10 +5,13 @@
 // To create a new instance (e.g. for a different client):
 //   1. Copy this file to config.[clientname].js
 //   2. Fill in the values below
-//   3. Import it in App.jsx instead of this file
+//   3. Point src/activeConfig.js at config.[clientname].js instead of this file
 //   4. Deploy
 //
-// App logic lives in App.jsx and never needs to change between clients.
+// App logic never imports a config.*.js file directly — every app-logic file
+// imports from src/activeConfig.js, a one-line re-export barrel. That barrel
+// is the single switch point between clients; app logic itself never needs
+// to change between clients.
 // =============================================================================
 
 // -----------------------------------------------------------------------------

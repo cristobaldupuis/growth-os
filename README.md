@@ -163,7 +163,9 @@ This is what makes recommendations specific — instead of "test SMS cart recove
 ```
 src/
   App.jsx              # Orchestration layer
-  config.js            # Per-client deployment context — brands, agents, categories, seed data
+  activeConfig.js      # Re-export barrel — the one line that switches which config.*.js is live
+  config.js            # Generic deployment context — brands, agents, categories, seed data
+  config.[client].js   # Per-client copy of config.js (e.g. config.csc.js)
   constants.js         # Theme tokens, status/outcome palettes, ICE scoring, formatters
   views/               # DashView, TriageView, LearningLibrary, DetailView, ClientReadoutView, CopilotPanel
   components/          # Shared UI atoms
@@ -182,7 +184,7 @@ scripts/
 
 ### Key design decisions
 
-**Config-first per-client deployment.** Client context lives in `config.js`, isolated from app logic. Each client gets a separate Vercel project with a single file swap — no auth layer, no shared database, no cross-client data risk. Multi-tenant architecture is a planned future phase, triggered when managing per-client deployments becomes the operational constraint.
+**Config-first per-client deployment.** Client context lives in a `config.[client].js` file, isolated from app logic. App logic never imports a config file directly — every app-logic file imports from `src/activeConfig.js`, a one-line re-export barrel (`export * from "./config.[client].js"`). Switching clients, or standing up a new one, is a single-line edit to that barrel — no auth layer, no shared database, no cross-client data risk. Multi-tenant architecture is a planned future phase, triggered when managing per-client deployments becomes the operational constraint.
 
 **localStorage with a backend-agnostic store abstraction.** All state persists via `store.get` / `store.set`. The abstraction is backend-agnostic by design — migrating to Postgres is a layer swap when a real client constraint demands it, not a rewrite. The operational overhead of a backend is not justified before that trigger exists.
 

@@ -62,6 +62,16 @@ CSV stays regardless of how many connectors ship: it is the only path that works
 
 ---
 
+## Config indirection: a re-export barrel closes the single-file-swap gap
+
+**Decision:** No app-logic file imports a `config.*.js` file directly. `src/App.jsx`, `src/constants.js`, `src/services/csv.js`, and `src/views/LearningLibrary.jsx` all import from `src/activeConfig.js`, a barrel that does nothing but `export * from "./config.[client].js"`. Switching which client is live is a one-line edit to that single file.
+
+**Why:** The decision above ("Config-first per-client deployment") already claimed a single-file swap, and `config.js`'s own header comment said the same thing — but by the time a second client config existed, four separate files were importing `config.js` (or the client config) directly, each hand-edited during the last client swap. The claim was true when there was one config-importing file; it silently stopped being true as the app grew import sites, and nothing would have caught the drift except noticing the same edit four times. A barrel makes the single-file-swap property structural rather than a convention every future edit has to remember.
+
+**Forcing condition:** None — this closes a gap in an existing decision rather than opening a new tradeoff. Revisit only if a future app-logic file has a genuine reason to bypass the active config (it shouldn't).
+
+---
+
 ## Proxy authentication: shape and origin, not a browser-held secret
 
 **Superseded:** the original decision here was a shared secret header (`x-gos-secret`) sourced from `VITE_GOS_SECRET`, with per-IP rate limiting at 50/hour.

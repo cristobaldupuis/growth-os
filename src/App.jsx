@@ -1131,7 +1131,7 @@ export default function App() {
       {showResetConfirm&&(
         <Modal t={t} dk={dk} title="Reset demo data?" onClose={()=>setShowResetConfirm(false)}>
           <div style={{fontSize:13,color:t.textSub,fontFamily:t.serif,lineHeight:1.6,marginBottom:18}}>
-            This clears initiatives, settings, debates, and recommendations, then restores the seed portfolio. An incognito window gets you the same result, so there's nothing at stake beyond your current session.
+            This clears initiatives, settings, debates, and recommendations, then restores the seed portfolio. Any data you have added in this or past sessions will be deleted.
           </div>
           <div style={{display:"flex",justifyContent:"flex-end",gap:8}}>
             <button onClick={()=>setShowResetConfirm(false)} style={{...gGh(t),fontSize:12.5}}>Cancel</button>

@@ -15,6 +15,14 @@
 // =============================================================================
 
 // -----------------------------------------------------------------------------
+// DEPLOYMENT MODE
+// DEMO_MODE=true skips the onboarding wizard on first visit (a cold visitor
+// gets the pre-loaded seed portfolio instead of a config form) and enables
+// the guided tour, the "Demo data" indicator, and the reset-demo control.
+// -----------------------------------------------------------------------------
+export const DEMO_MODE = true;
+
+// -----------------------------------------------------------------------------
 // COMPANY
 // -----------------------------------------------------------------------------
 export const COMPANY_NAME     = "Growth OS";

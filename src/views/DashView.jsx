@@ -839,7 +839,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
   return (
     <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:14}}>
       {/* North star */}
-      <div style={{...gCd(t),background:t.goldBg,border:"1px solid "+t.goldBorder,display:"flex",alignItems:"center",gap:24,flexWrap:"wrap"}}>
+      <div data-tour="northstar" style={{...gCd(t),background:t.goldBg,border:"1px solid "+t.goldBorder,display:"flex",alignItems:"center",gap:24,flexWrap:"wrap"}}>
         <div>
           <div style={{fontSize:10,letterSpacing:"0.10em",textTransform:"uppercase",color:t.gold,fontFamily:t.mono,marginBottom:4}}>North star</div>
           <div style={{fontSize:15,fontWeight:600,color:t.text,fontFamily:t.serif}}>{ns.metric}</div>

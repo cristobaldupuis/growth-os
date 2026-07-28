@@ -5,6 +5,7 @@ export const KEY_DEBATES  = "gos_debates_v1";
 export const KEY_METRICS  = "gos_metrics_v1";
 export const KEY_RECS     = "gos_recs_v1";
 export const KEY_LIB_VIEW = "gos_lib_view_v1";
+export const KEY_TOUR_SEEN = "gos_tour_seen_v1";
 
 // Storage helper — works in Claude artifacts (window.storage), StackBlitz
 // (localStorage), or memory.

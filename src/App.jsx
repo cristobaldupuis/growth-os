@@ -5,9 +5,10 @@ import {
   TEMPLATES,
   SEED,
   SEED_WEEKLY_METRICS,
+  DEMO_MODE,
 } from "./activeConfig.js";
 
-import { KEY_ITEMS, KEY_SETTINGS, KEY_DEBATES, KEY_METRICS, KEY_RECS, KEY_THEME, KEY_LIB_VIEW, store, onWriteError, handleDownloadBackup, handleRestoreBackup } from "./services/store.js";
+import { KEY_ITEMS, KEY_SETTINGS, KEY_DEBATES, KEY_METRICS, KEY_RECS, KEY_THEME, KEY_LIB_VIEW, KEY_TOUR_SEEN, store, onWriteError, handleDownloadBackup, handleRestoreBackup } from "./services/store.js";
 import {
   applyBrandBriefDefaults, DEFAULT_AGENTS, DEFAULT_SETTINGS,
   STATUSES, STATUS_GROUP_ORDER, OUTCOMES, INIT_TYPES, METRIC_SOURCES,
@@ -27,6 +28,8 @@ import { gG, gGh, gI, gTA, gSl, gSc, gSL, gCd } from "./components/styles.js";
 import { Bdg, SBdg, OBdg, CBdg, TBdg, BlockerBadge, ICEChip } from "./components/badges.jsx";
 import { renderProse } from "./components/text.jsx";
 import { Modal } from "./components/Modal.jsx";
+import { GuidedTour } from "./components/GuidedTour.jsx";
+import { TOUR_STEPS } from "./components/tourSteps.js";
 import { CBar } from "./components/CBar.jsx";
 import { EAlert } from "./components/EAlert.jsx";
 import { FR } from "./components/FR.jsx";
@@ -485,6 +488,11 @@ export default function App() {
   // Backup nudge — fires at most once per session if the last backup is stale
   const [libView,   setLibView]   = useState("list");   // library card layout: "list" | "grid"
 
+  // Guided tour (demo mode only) — see components/GuidedTour.jsx
+  const [showTour,   setShowTour]   = useState(false);
+  const [tourStep,   setTourStep]   = useState(0);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+
   const t    = dk ? TD : TL;
   const cats   = settings.categories || DEFAULT_SETTINGS.categories;
   const brands = settings.brands || DEFAULT_SETTINGS.brands || CONFIG_BRANDS;
@@ -497,13 +505,14 @@ export default function App() {
 
     const load = async ()=>{
       try {
-        const [ir,sr,dr,mr,rr,tr,lv] = await Promise.all([store.get(KEY_ITEMS),store.get(KEY_SETTINGS),store.get(KEY_DEBATES),store.get(KEY_METRICS),store.get(KEY_RECS),store.get(KEY_THEME),store.get(KEY_LIB_VIEW)]);
+        const [ir,sr,dr,mr,rr,tr,lv,ts] = await Promise.all([store.get(KEY_ITEMS),store.get(KEY_SETTINGS),store.get(KEY_DEBATES),store.get(KEY_METRICS),store.get(KEY_RECS),store.get(KEY_THEME),store.get(KEY_LIB_VIEW),store.get(KEY_TOUR_SEEN)]);
         // Read theme from the resolved store before first render (gated on `loaded`),
         // so the persisted choice applies without an async flash.
         if(tr&&tr.value) setDk(tr.value==="dark");
         if(lv&&lv.value==="grid") setLibView("grid");
         setItems(ir&&ir.value?JSON.parse(ir.value):SEED);
         if(!ir||!ir.value) store.set(KEY_ITEMS,JSON.stringify(SEED));
+        const isFirstVisit = !sr || !sr.value;
         if(sr&&sr.value) {
           const saved = JSON.parse(sr.value);
           // Backfill brand brief defaults for any brand that's missing them
@@ -512,7 +521,11 @@ export default function App() {
           }
           setSettings(saved);
         }
-        else { setOnboarding(true); }
+        // Demo mode: skip the config-collection wizard for a cold visitor —
+        // they get the pre-loaded portfolio and the guided tour instead. A real
+        // client deployment (DEMO_MODE false) still gets onboarding as before.
+        else if (!DEMO_MODE) { setOnboarding(true); }
+        if (DEMO_MODE && isFirstVisit && !(ts&&ts.value)) { setShowTour(true); }
         if(dr&&dr.value) setDebates(JSON.parse(dr.value));
         if(mr&&mr.value) setWeeklyMetrics(JSON.parse(mr.value));
         else { setWeeklyMetrics(SEED_WEEKLY_METRICS); store.set(KEY_METRICS,JSON.stringify(SEED_WEEKLY_METRICS)); }
@@ -703,6 +716,21 @@ export default function App() {
     saveItems(SEED);
     saveMetrics(SEED_WEEKLY_METRICS);
     showToast(`Demo data restored: ${SEED.length} initiatives and ${SEED_WEEKLY_METRICS.length} weeks of metrics loaded.`, "success");
+  };
+
+  // Demo-mode header control — a stronger reset than the Settings-modal one
+  // above. A self-serve visitor can edit settings, clear debates, or empty the
+  // recs list while exploring; "cannot leave the app broken" means all of
+  // that comes back too, not just initiatives and weekly metrics.
+  const dismissTour = () => { setShowTour(false); store.set(KEY_TOUR_SEEN, "1"); };
+  const handleResetDemo = () => {
+    saveItems(SEED);
+    saveMetrics(SEED_WEEKLY_METRICS);
+    saveSettings(DEFAULT_SETTINGS);
+    saveDebates([]);
+    saveRecs([]);
+    setShowResetConfirm(false);
+    showToast("Demo reset — everything is back to the original seed state.", "success");
   };
 
 
@@ -1084,6 +1112,34 @@ export default function App() {
         />
       )}
 
+      {/* Guided tour — demo mode only, first load or replayed from the header */}
+      {showTour&&(
+        <GuidedTour
+          t={t} dk={dk}
+          stepIndex={tourStep}
+          currentNav={nav}
+          onNavigate={setNav}
+          onNext={()=>setTourStep(s=>Math.min(s+1,TOUR_STEPS.length-1))}
+          onBack={()=>setTourStep(s=>Math.max(s-1,0))}
+          onSkip={dismissTour}
+          onDone={dismissTour}
+        />
+      )}
+
+      {/* Reset demo confirmation — in-app, not a native confirm(), matching the
+        * restore-backup pattern: a destructive action names what it overwrites. */}
+      {showResetConfirm&&(
+        <Modal t={t} dk={dk} title="Reset demo data?" onClose={()=>setShowResetConfirm(false)}>
+          <div style={{fontSize:13,color:t.textSub,fontFamily:t.serif,lineHeight:1.6,marginBottom:18}}>
+            This clears every change made in this workspace — initiatives, settings, debates, and recommendations — and restores the original seed portfolio. This can't be undone.
+          </div>
+          <div style={{display:"flex",justifyContent:"flex-end",gap:8}}>
+            <button onClick={()=>setShowResetConfirm(false)} style={{...gGh(t),fontSize:12.5}}>Cancel</button>
+            <button onClick={handleResetDemo} style={{...gG(t),fontSize:12.5}}>Reset demo</button>
+          </div>
+        </Modal>
+      )}
+
       {/* Toast notifications */}
       {toast&&(
         <div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",zIndex:9999,
@@ -1137,7 +1193,7 @@ export default function App() {
             * strip pushes the document ~30px wider than a 390px viewport, which
             * scrolls the whole page sideways on a phone. */}
           <div style={{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap",minWidth:0,maxWidth:"100%"}}>
-            <button onClick={()=>setNav("dashboard")} title="Back to Dashboard"
+            <button onClick={()=>setNav("dashboard")} title="Back to Dashboard" data-tour="logo"
               style={{display:"flex",alignItems:"center",gap:9,padding:"5px 9px",borderRadius:10,cursor:"pointer",
                 background:"transparent",border:"1px solid transparent",transition:"background .15s, border-color .15s"}}
               onMouseEnter={e=>{e.currentTarget.style.background=t.goldBg;e.currentTarget.style.borderColor=t.goldBorder;}}
@@ -1169,8 +1225,25 @@ export default function App() {
 
           {/* Right: retailer + contextual actions + utilities */}
           <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+            {DEMO_MODE&&(
+              <div style={{display:"flex",alignItems:"center",gap:4}}>
+                <span title="This workspace runs on seeded demo data — nothing here is a real customer's numbers."
+                  style={{display:"flex",alignItems:"center",gap:5,fontSize:10.5,fontWeight:600,letterSpacing:"0.04em",color:t.textMuted,fontFamily:t.mono,background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:20,padding:"4px 10px",whiteSpace:"nowrap"}}>
+                  <span style={{width:6,height:6,borderRadius:"50%",background:t.gold,flexShrink:0}}/>
+                  Demo data
+                </span>
+                <button onClick={()=>setShowResetConfirm(true)} title="Reset demo — clears everything back to the seed portfolio"
+                  style={{width:26,height:26,borderRadius:8,cursor:"pointer",background:"transparent",border:"1px solid "+t.border,color:t.textMuted,fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                  <span dangerouslySetInnerHTML={{__html:"&#8635;"}}/>
+                </button>
+                <button onClick={()=>{setTourStep(0);setShowTour(true);}} title="Replay the guided tour"
+                  style={{height:26,padding:"0 9px",borderRadius:8,cursor:"pointer",background:"transparent",border:"1px solid "+t.border,color:t.textMuted,fontSize:10.5,fontWeight:600,fontFamily:t.sans,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,whiteSpace:"nowrap"}}>
+                  Tour
+                </button>
+              </div>
+            )}
             {brands.length>1&&(
-              <select value={activeBrand} onChange={e=>setActiveBrand(e.target.value)}
+              <select value={activeBrand} onChange={e=>setActiveBrand(e.target.value)} data-tour="brand-select"
                 style={{fontSize:12,padding:"6px 11px",borderRadius:9,border:"1px solid "+(activeBrand==="all"?t.border:t.goldBorder),background:activeBrand==="all"?t.surfaceAlt:t.goldBg,color:activeBrand==="all"?t.textSub:t.gold,fontFamily:t.serif,cursor:"pointer",maxWidth:150}}>
                 <option value="all">All retailers</option>
                 {brands.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
@@ -1190,7 +1263,7 @@ export default function App() {
                 + New
               </button>
             </>)}
-            <button onClick={()=>setShowCopilot(true)}
+            <button onClick={()=>setShowCopilot(true)} data-tour="signal-button"
               style={{fontSize:12.5,padding:"7px 14px",borderRadius:9,cursor:"pointer",
                 background:t.goldFill,border:"1px solid "+t.goldFill,color:t.goldText,fontWeight:600,fontFamily:t.sans,
                 display:"flex",alignItems:"center",gap:5,boxShadow:t.shadow}}>

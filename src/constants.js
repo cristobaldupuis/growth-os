@@ -4,7 +4,7 @@ import {
   BRANDS as CONFIG_BRANDS,
   CATEGORIES,
   AGENTS as CONFIG_AGENTS,
-} from "./config.csc.js";
+} from "./activeConfig.js";
 
 export const DEFAULT_AGENTS = CONFIG_AGENTS;
 
@@ -304,6 +304,77 @@ export const fmtCur = (n) => {
   const s = abs >= 1000000 ? "$"+(abs/1000000).toFixed(1)+"M" : abs >= 1000 ? "$"+Math.round(abs/1000)+"k" : "$"+abs;
   return n < 0 ? "-"+s : s;
 };
+
+// Parse a north star display string (e.g. "$1.4M/mo", "$320k", "42000") into a
+// raw number. Returns null if unparseable.
+export function parseNorthStarValue(str) {
+  if (!str) return null;
+  const s = String(str).replace(/[$,\s]/g, "").toLowerCase();
+  const m = s.match(/^([\d.]+)(m|k)?(?:\/.*)?$/);
+  if (!m) return null;
+  const num = parseFloat(m[1]);
+  if (isNaN(num)) return null;
+  if (m[2] === "m") return num * 1_000_000;
+  if (m[2] === "k") return num * 1_000;
+  return num;
+}
+
+// Sum of logged revenue across a brand's (or, for "all", every brand's) most
+// recent 4 logged weeks — a trailing-month proxy read from the same rows
+// Weekly Pulse displays, so it can never drift the way a hand-maintained
+// figure could.
+function deriveTrailingRevenue(weeklyMetrics, brandId) {
+  const scoped = (weeklyMetrics || []).filter(m => brandId === "all" || m.brand === brandId);
+  const byDate = {};
+  scoped.forEach(m => { byDate[m.date] = (byDate[m.date] || 0) + (m.metrics?.revenue || 0); });
+  const dates = Object.keys(byDate).sort().reverse().slice(0, 4);
+  return dates.length > 0 ? dates.reduce((s, d) => s + byDate[d], 0) : null;
+}
+
+// North star {metric, current, target} for the active scope — a brand id, or
+// "all"/falsy for the portfolio roll-up.
+//
+// `current` is always derived from logged weekly revenue when any exists for
+// the scope, in preference to a hand-maintained figure that can silently drift
+// from what Weekly Pulse actually shows. `metric` and `target` are goals, not
+// measurements — nothing in the weekly data can derive them — so they read
+// from the brand's own config when set and fall back to the portfolio-level
+// setting otherwise. That fallback is what keeps config.js working unchanged
+// with no per-brand northStar values defined: every brand there resolves to
+// the portfolio metric/current/target exactly as before this existed.
+//
+// The portfolio target is rolled up from brand targets only when every brand
+// defines one — summing a partial set would silently under-count the brands
+// that don't, which is worse than the authored fallback.
+export function resolveNorthStar(activeBrand, brands, settings, weeklyMetrics) {
+  const periodMatch = (settings.northStarTarget || "").match(/\/\s*(\w+)/);
+  const period = periodMatch ? "/" + periodMatch[1] : "";
+  const withPeriod = (n) => fmtCur(n) + period;
+
+  if (!activeBrand || activeBrand === "all") {
+    const list = brands || [];
+    const derived = deriveTrailingRevenue(weeklyMetrics, "all");
+    const brandsWithTarget = list.filter(b => b.northStar?.target);
+    const target = (brandsWithTarget.length > 0 && brandsWithTarget.length === list.length)
+      ? withPeriod(brandsWithTarget.reduce((s, b) => s + (parseNorthStarValue(b.northStar.target) || 0), 0))
+      : settings.northStarTarget;
+    return {
+      metric:  settings.northStarMetric,
+      current: derived != null ? withPeriod(derived) : settings.northStarCurrent,
+      target,
+    };
+  }
+
+  const brand = (brands || []).find(b => b.id === activeBrand);
+  const ns = brand?.northStar;
+  const derived = deriveTrailingRevenue(weeklyMetrics, activeBrand);
+  return {
+    metric:  ns?.metric  || settings.northStarMetric,
+    current: derived != null ? withPeriod(derived) : (ns?.current || settings.northStarCurrent),
+    target:  ns?.target  || settings.northStarTarget,
+  };
+}
+
 export const fmtDate = (d) => d ? new Date(d+"T12:00:00").toLocaleDateString("en-CA",{month:"short",day:"numeric",year:"numeric"}) : "—";
 export const parseD  = (d) => d ? new Date(d+"T12:00:00") : null;
 export const somM    = (d) => new Date(d.getFullYear(), d.getMonth(), 1);

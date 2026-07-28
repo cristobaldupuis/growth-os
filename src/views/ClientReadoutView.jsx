@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { brandName, iceScore, fmtCur, fmtDate, parseD, somM, eomM } from "../constants.js";
+import { brandName, iceScore, fmtCur, fmtDate, parseD, somM, eomM, resolveNorthStar } from "../constants.js";
 import { gG, gGh, gCd, gSL } from "../components/styles.js";
 import { OBdg, CBdg, ICEChip } from "../components/badges.jsx";
 import { renderProse } from "../components/text.jsx";
@@ -36,12 +36,13 @@ function CopyBtn({ t, onClick, label = "Copy section" }) {
 
 // ── Plain-text builders ────────────────────────────────────────────────────────
 
-function buildScorecardText(dash, latestWeek, weekLabel, brands, activeBrand, settings) {
+function buildScorecardText(dash, latestWeek, weekLabel, brands, activeBrand, settings, weeklyMetrics) {
   const retailer = activeBrand === "all" ? "All brands" : brandName(activeBrand, brands);
+  const ns = resolveNorthStar(activeBrand, brands, settings, weeklyMetrics);
   const lines = [
     "SCORECARD",
     "Brand / portfolio: " + retailer,
-    "North star: " + (settings.northStarMetric || "—") + "  Current: " + (settings.northStarCurrent || "—") + "  Target: " + (settings.northStarTarget || "—"),
+    "North star: " + (ns.metric || "—") + "  Current: " + (ns.current || "—") + "  Target: " + (ns.target || "—"),
     "",
     "Projected impact from completed work: " + fmtCur(dash.revImpacted) + (dash.revImpactedProjected ? " (includes projected estimates)" : ""),
     "Revenue at risk / in-flight: " + fmtCur(dash.revAtRisk),
@@ -159,15 +160,17 @@ function ScorecardSection({ t, dk, dash, weeklyMetrics, brands, activeBrand, set
     m.cac         != null ? { label: "CAC",         value: fmtCur(m.cac) }               : null,
   ].filter(Boolean) : [];
 
+  const ns = resolveNorthStar(activeBrand, brands, settings, weeklyMetrics);
+
   return (
     <Section t={t} dk={dk} title="Scorecard" onCopy={onCopy}>
       {/* North star strip */}
       {settings.northStarMetric && (
         <div style={{ display: "flex", gap: 20, padding: "10px 14px", background: t.goldBg, border: "1px solid " + t.goldBorder, borderRadius: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <div style={{ fontSize: 11, color: t.gold, fontFamily: t.mono, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", flexShrink: 0 }}>{settings.northStarMetric}</div>
+          <div style={{ fontSize: 11, color: t.gold, fontFamily: t.mono, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", flexShrink: 0 }}>{ns.metric}</div>
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 11, color: t.textMuted, fontFamily: t.mono }}>Current <strong style={{ color: t.gold }}>{settings.northStarCurrent || "—"}</strong></span>
-            <span style={{ fontSize: 11, color: t.textMuted, fontFamily: t.mono }}>&#8594; Target <strong style={{ color: t.text }}>{settings.northStarTarget || "—"}</strong></span>
+            <span style={{ fontSize: 11, color: t.textMuted, fontFamily: t.mono }}>Current <strong style={{ color: t.gold }}>{ns.current || "—"}</strong></span>
+            <span style={{ fontSize: 11, color: t.textMuted, fontFamily: t.mono }}>&#8594; Target <strong style={{ color: t.text }}>{ns.target || "—"}</strong></span>
           </div>
         </div>
       )}
@@ -449,7 +452,7 @@ export function ClientReadoutView({ t, dk, dash, items, brands, activeBrand, cat
     try { navigator.clipboard.writeText(text); } catch (err) { console.warn("Clipboard write blocked:", err); }
   };
 
-  const scorecardText = buildScorecardText(dash, latestWeek, weekLabel, brands, activeBrand, settings);
+  const scorecardText = buildScorecardText(dash, latestWeek, weekLabel, brands, activeBrand, settings, weeklyMetrics);
   const learnedText   = buildLearnedText(learned, isFallback, rangeLabel);
   const runningText   = buildRunningText(running);
   const nextText      = buildNextText(next);

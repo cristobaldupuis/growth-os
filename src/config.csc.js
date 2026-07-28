@@ -5,11 +5,22 @@
 // To create a new instance (e.g. for a different client):
 //   1. Copy this file to config.[clientname].js
 //   2. Fill in the values below
-//   3. Import it in App.jsx instead of this file
+//   3. Point src/activeConfig.js at config.[clientname].js instead of this file
 //   4. Deploy
 //
-// App logic lives in App.jsx and never needs to change between clients.
+// App logic never imports a config.*.js file directly — every app-logic file
+// imports from src/activeConfig.js, a one-line re-export barrel. That barrel
+// is the single switch point between clients; app logic itself never needs
+// to change between clients.
 // =============================================================================
+
+// -----------------------------------------------------------------------------
+// DEPLOYMENT MODE
+// DEMO_MODE=true skips the onboarding wizard on first visit (a cold visitor
+// gets the pre-loaded seed portfolio instead of a config form) and enables
+// the guided tour, the "Demo data" indicator, and the reset-demo control.
+// -----------------------------------------------------------------------------
+export const DEMO_MODE = true;
 
 // -----------------------------------------------------------------------------
 // COMPANY
@@ -30,10 +41,18 @@ export const NORTH_STAR_TARGET  = "$1.4M/mo";
 // used as the prefix for initiative IDs (e.g. "NH" → NH-001).
 // The first brand in the array is treated as the primary / default.
 // -----------------------------------------------------------------------------
+// northStar is optional per brand — see resolveNorthStar() in constants.js.
+// "current" here is a fallback only: at runtime it is superseded by the
+// trailing-4-week revenue actually logged for that brand in
+// SEED_WEEKLY_METRICS, so it can't drift from Weekly Pulse. It's set to match
+// that derivation now so the fallback and the derived figure never disagree.
 export const BRANDS = [
-  { id: "default", name: "Northcove Home",  code: "NH" },
-  { id: "r1",      name: "Grounds Control", code: "GC" },
-  { id: "r2",      name: "Peak Season",     code: "PS" },
+  { id: "default", name: "Northcove Home",  code: "NH",
+    northStar: { metric: "Northcove Home Revenue",  current: "$1.2M/mo", target: "$1.5M/mo" } },
+  { id: "r1",      name: "Grounds Control", code: "GC",
+    northStar: { metric: "Grounds Control Revenue", current: "$641k/mo", target: "$820k/mo" } },
+  { id: "r2",      name: "Peak Season",     code: "PS",
+    northStar: { metric: "Peak Season Revenue",     current: "$581k/mo", target: "$750k/mo" } },
 ];
 
 // -----------------------------------------------------------------------------

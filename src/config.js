@@ -5,11 +5,23 @@
 // To create a new instance (e.g. for a different client):
 //   1. Copy this file to config.[clientname].js
 //   2. Fill in the values below
-//   3. Import it in App.jsx instead of this file
+//   3. Point src/activeConfig.js at config.[clientname].js instead of this file
 //   4. Deploy
 //
-// App logic lives in App.jsx and never needs to change between clients.
+// App logic never imports a config.*.js file directly — every app-logic file
+// imports from src/activeConfig.js, a one-line re-export barrel. That barrel
+// is the single switch point between clients; app logic itself never needs
+// to change between clients.
 // =============================================================================
+
+// -----------------------------------------------------------------------------
+// DEPLOYMENT MODE
+// DEMO_MODE=true skips the onboarding wizard on first visit (a cold visitor
+// gets the pre-loaded seed portfolio instead of a config form) and enables
+// the guided tour, the "Demo data" indicator, and the reset-demo control.
+// Leave false for a real client deployment — they still want onboarding.
+// -----------------------------------------------------------------------------
+export const DEMO_MODE = false;
 
 // -----------------------------------------------------------------------------
 // COMPANY

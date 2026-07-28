@@ -62,6 +62,26 @@ CSV stays regardless of how many connectors ship: it is the only path that works
 
 ---
 
+## Config indirection: a re-export barrel closes the single-file-swap gap
+
+**Decision:** No app-logic file imports a `config.*.js` file directly. `src/App.jsx`, `src/constants.js`, `src/services/csv.js`, and `src/views/LearningLibrary.jsx` all import from `src/activeConfig.js`, a barrel that does nothing but `export * from "./config.[client].js"`. Switching which client is live is a one-line edit to that single file.
+
+**Why:** The decision above ("Config-first per-client deployment") already claimed a single-file swap, and `config.js`'s own header comment said the same thing — but by the time a second client config existed, four separate files were importing `config.js` (or the client config) directly, each hand-edited during the last client swap. The claim was true when there was one config-importing file; it silently stopped being true as the app grew import sites, and nothing would have caught the drift except noticing the same edit four times. A barrel makes the single-file-swap property structural rather than a convention every future edit has to remember.
+
+**Forcing condition:** None — this closes a gap in an existing decision rather than opening a new tradeoff. Revisit only if a future app-logic file has a genuine reason to bypass the active config (it shouldn't).
+
+---
+
+## Per-brand North Star: optional override with fallback, not a required field
+
+**Decision:** Each entry in `BRANDS` can carry an optional `northStar: { metric, current, target }`. When a brand defines one, selecting that brand switches the dashboard's North Star card and Business Health tiles to it; when it doesn't, both fall back to the existing portfolio-level `settings.northStarMetric/Current/Target` unchanged. `current` is further overridden at runtime by a trailing-4-week revenue sum derived from that brand's own rows in `SEED_WEEKLY_METRICS` whenever any exist, in preference to either the brand's or the portfolio's hand-maintained string — a measured figure beats an authored one whenever both exist. The portfolio view's `current` is a live sum of all brands' derived figures rather than a separately maintained number; its `target` sums brand targets only when every brand defines one, and otherwise keeps the authored portfolio figure.
+
+**Why:** The alternative was requiring every brand to define `northStar`, which reads cleaner (no fallback branches, one code path) but fails the one property this config layer exists to guarantee: `config.js`, which predates per-brand North Star entirely, would need every one of its brands retrofitted before it built or ran again. That inverts the actual dependency — the generic config is the one deployment nothing else should be able to break, and a client-specific feature should never be able to reach back and impose a requirement on it. Optional-with-fallback means `config.js`'s three brands resolve to the portfolio figure exactly as they did before this existed, with zero edits, while `config.csc.js` opts in per brand. That is the same shape as the `activeConfig.js` decision above: backward compatibility with the generic config is the constraint every config-shape change gets measured against, not a nice-to-have.
+
+**Forcing condition:** If a third config ever needs per-brand North Star values that aren't revenue (a metric with no natural weekly-metrics derivation), the `current` override logic needs a second path; the `metric`/`target` fallback shape already accommodates it unchanged.
+
+---
+
 ## Proxy authentication: shape and origin, not a browser-held secret
 
 **Superseded:** the original decision here was a shared secret header (`x-gos-secret`) sourced from `VITE_GOS_SECRET`, with per-IP rate limiting at 50/hour.

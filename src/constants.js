@@ -4,7 +4,7 @@ import {
   BRANDS as CONFIG_BRANDS,
   CATEGORIES,
   AGENTS as CONFIG_AGENTS,
-} from "./config.js";
+} from "./config.csc.js";
 
 export const DEFAULT_AGENTS = CONFIG_AGENTS;
 
@@ -34,6 +34,22 @@ export const DEFAULT_BRAND_BRIEFS = {
     whyTheyWin:    "Wide reach, high traffic volume, good basket size when cross-sell is activated",
     relationship:  "Wholesale / retail partner: high volume, lower margin, category manager relationship",
     constraint:    "Low CVR vs category benchmark, PDP experience needs improvement, limited personalisation capability",
+  },
+  "grounds control": {
+    whatTheySell:  "Whole-bean and ground specialty coffee, brewing equipment, and a roast subscription program, $20–$120 AOV",
+    categories:    "Whole Bean, Ground Coffee, Brewing Equipment, Subscriptions",
+    icp:           "Home brewing enthusiasts 25–45 graduating from pod machines to manual methods, high LTV once grind and roast preference is captured",
+    whyTheyWin:    "Roast-date transparency and freshness that grocery-shelf competitors can't match; subscription cadence tuned to real reorder behaviour, not a fixed calendar",
+    relationship:  "Own DTC brand; wholesale accounts (cafes, offices) are a secondary channel",
+    constraint:    "Wholesale accounts close easily and inflate topline, but run at roughly half of DTC subscription margin — growth is over-indexed on the channel that doesn't compound",
+  },
+  "peak season": {
+    whatTheySell:  "Technical outdoor apparel and gear — insulated layers, waterproof shells, packs — $70–$380 AOV",
+    categories:    "Outerwear, Base/Mid Layers, Footwear, Packs & Accessories",
+    icp:           "Active outdoor consumers 22–50 buying for a specific trip or season, ranging from weekend hikers to serious backcountry users, high research intensity before purchase",
+    whyTheyWin:    "Category expertise — technical spec depth and honest use-case guidance that big-box retailers can't match at the point of sale",
+    relationship:  "Own DTC brand",
+    constraint:    "Roughly 55% of annual revenue lands in two 8-week pre-season windows (spring hiking, fall/winter); missing the inventory or paid-media timing in either window can't be recovered later in the season",
   },
 };
 

@@ -5,7 +5,7 @@ import {
   TEMPLATES,
   SEED,
   SEED_WEEKLY_METRICS,
-} from "./config.js";
+} from "./config.csc.js";
 
 import { KEY_ITEMS, KEY_SETTINGS, KEY_DEBATES, KEY_METRICS, KEY_RECS, KEY_THEME, KEY_LIB_VIEW, store, onWriteError, handleDownloadBackup, handleRestoreBackup } from "./services/store.js";
 import {

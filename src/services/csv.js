@@ -1,5 +1,5 @@
 import { brandName, generateInitId, INIT_TYPES, STATUSES, withRunningSnapshot } from "../constants.js";
-import { ATTRIBUTION_CONFIG } from "../config.js";
+import { ATTRIBUTION_CONFIG } from "../config.csc.js";
 
 export const CSV_COLS = [
   "initId","title","initType","category","status","brandId","owner",

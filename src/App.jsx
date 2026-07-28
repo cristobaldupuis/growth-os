@@ -488,7 +488,7 @@ export default function App() {
   // Backup nudge — fires at most once per session if the last backup is stale
   const [libView,   setLibView]   = useState("list");   // library card layout: "list" | "grid"
 
-  // Guided tour (demo mode only) — see components/GuidedTour.jsx
+  // Guided tour (demo mode only). See components/GuidedTour.jsx
   const [showTour,   setShowTour]   = useState(false);
   const [tourStep,   setTourStep]   = useState(0);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -521,8 +521,8 @@ export default function App() {
           }
           setSettings(saved);
         }
-        // Demo mode: skip the config-collection wizard for a cold visitor —
-        // they get the pre-loaded portfolio and the guided tour instead. A real
+        // Demo mode: skip the config-collection wizard for a cold visitor.
+        // They get the pre-loaded portfolio and the guided tour instead. A real
         // client deployment (DEMO_MODE false) still gets onboarding as before.
         else if (!DEMO_MODE) { setOnboarding(true); }
         if (DEMO_MODE && isFirstVisit && !(ts&&ts.value)) { setShowTour(true); }
@@ -718,8 +718,8 @@ export default function App() {
     showToast(`Demo data restored: ${SEED.length} initiatives and ${SEED_WEEKLY_METRICS.length} weeks of metrics loaded.`, "success");
   };
 
-  // Demo-mode header control — a stronger reset than the Settings-modal one
-  // above. A self-serve visitor can edit settings, clear debates, or empty the
+  // Demo-mode header control. A stronger reset than the Settings-modal one
+  // above: a self-serve visitor can edit settings, clear debates, or empty the
   // recs list while exploring; "cannot leave the app broken" means all of
   // that comes back too, not just initiatives and weekly metrics.
   const dismissTour = () => { setShowTour(false); store.set(KEY_TOUR_SEEN, "1"); };
@@ -730,7 +730,7 @@ export default function App() {
     saveDebates([]);
     saveRecs([]);
     setShowResetConfirm(false);
-    showToast("Demo reset — everything is back to the original seed state.", "success");
+    showToast("Demo reset. Everything is back to the original seed state.", "success");
   };
 
 
@@ -1112,7 +1112,7 @@ export default function App() {
         />
       )}
 
-      {/* Guided tour — demo mode only, first load or replayed from the header */}
+      {/* Guided tour, demo mode only: first load or replayed from the header */}
       {showTour&&(
         <GuidedTour
           t={t} dk={dk}
@@ -1126,12 +1126,12 @@ export default function App() {
         />
       )}
 
-      {/* Reset demo confirmation — in-app, not a native confirm(), matching the
-        * restore-backup pattern: a destructive action names what it overwrites. */}
+      {/* Reset demo confirmation, in-app rather than a native confirm(), matching
+        * the restore-backup pattern: a destructive action names what it overwrites. */}
       {showResetConfirm&&(
         <Modal t={t} dk={dk} title="Reset demo data?" onClose={()=>setShowResetConfirm(false)}>
           <div style={{fontSize:13,color:t.textSub,fontFamily:t.serif,lineHeight:1.6,marginBottom:18}}>
-            This clears every change made in this workspace — initiatives, settings, debates, and recommendations — and restores the original seed portfolio. This can't be undone.
+            This clears initiatives, settings, debates, and recommendations, then restores the seed portfolio. An incognito window gets you the same result, so there's nothing at stake beyond your current session.
           </div>
           <div style={{display:"flex",justifyContent:"flex-end",gap:8}}>
             <button onClick={()=>setShowResetConfirm(false)} style={{...gGh(t),fontSize:12.5}}>Cancel</button>
@@ -1227,12 +1227,12 @@ export default function App() {
           <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
             {DEMO_MODE&&(
               <div style={{display:"flex",alignItems:"center",gap:4}}>
-                <span title="This workspace runs on seeded demo data — nothing here is a real customer's numbers."
+                <span title="This workspace runs on seeded demo data. Nothing here is a real customer's numbers."
                   style={{display:"flex",alignItems:"center",gap:5,fontSize:10.5,fontWeight:600,letterSpacing:"0.04em",color:t.textMuted,fontFamily:t.mono,background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:20,padding:"4px 10px",whiteSpace:"nowrap"}}>
                   <span style={{width:6,height:6,borderRadius:"50%",background:t.gold,flexShrink:0}}/>
                   Demo data
                 </span>
-                <button onClick={()=>setShowResetConfirm(true)} title="Reset demo — clears everything back to the seed portfolio"
+                <button onClick={()=>setShowResetConfirm(true)} title="Resets everything back to the seed portfolio"
                   style={{width:26,height:26,borderRadius:8,cursor:"pointer",background:"transparent",border:"1px solid "+t.border,color:t.textMuted,fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                   <span dangerouslySetInnerHTML={{__html:"&#8635;"}}/>
                 </button>

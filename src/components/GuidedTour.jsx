@@ -7,7 +7,7 @@ const CARD_W = 320;
 
 // Measures one step's target element and reports its rect (or null if it
 // can't be found). Keyed by the parent on stepIndex so a step change remounts
-// this fresh — state starts at null for free, with no reset inside the effect
+// this fresh, so state starts at null for free with no reset inside the effect
 // itself, which is what set-state-in-effect wants to see.
 function useTargetRect(selector) {
   const [rect, setRect] = useState(null);
@@ -22,7 +22,7 @@ function useTargetRect(selector) {
         return;
       }
       // The view this selector lives in may still be switching in (a nav
-      // change triggered by this same step) — poll briefly before giving up.
+      // change triggered by this same step). Poll briefly before giving up.
       if (tries++ < 40) { raf = requestAnimationFrame(measure); }
     };
     raf = requestAnimationFrame(measure);
@@ -58,7 +58,7 @@ function TourSpotlight({ t, dk, stepIndex, step, isLast, onBack, onNext, onSkip,
   return (
     <>
       {/* Click-blocking scrim. The spotlight cutout below is purely visual
-        * (box-shadow) — this full-viewport layer is what actually stops
+        * (box-shadow). This full-viewport layer is what actually stops
         * interaction with the app underneath while the tour is active. */}
       <div style={{position:"fixed",inset:0,zIndex:400,background:scrim}}/>
 

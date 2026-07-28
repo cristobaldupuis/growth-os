@@ -4,7 +4,7 @@ import {
   BRANDS as CONFIG_BRANDS,
   CATEGORIES,
   AGENTS as CONFIG_AGENTS,
-} from "./config.csc.js";
+} from "./activeConfig.js";
 
 export const DEFAULT_AGENTS = CONFIG_AGENTS;
 

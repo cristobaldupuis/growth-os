@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
-import { COMPANY_NAME, BUSINESS_MODEL, NORTH_STAR_METRIC } from "../config.csc.js";
+import { COMPANY_NAME, BUSINESS_MODEL, NORTH_STAR_METRIC } from "../activeConfig.js";
 import { INIT_TYPES, OL, OD, brandColor, brandName, fmtCur, fmtDate } from "../constants.js";
 import { gG, gGh, gI, gSl, gSc } from "../components/styles.js";
 import { Bdg, OBdg, CBdg, TBdg } from "../components/badges.jsx";

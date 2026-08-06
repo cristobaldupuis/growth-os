@@ -8,7 +8,8 @@ import {
   DEMO_MODE,
 } from "./activeConfig.js";
 
-import { KEY_ITEMS, KEY_SETTINGS, KEY_DEBATES, KEY_METRICS, KEY_RECS, KEY_THEME, KEY_LIB_VIEW, KEY_TOUR_SEEN, store, onWriteError, handleDownloadBackup, handleRestoreBackup } from "./services/store.js";
+import { KEY_ITEMS, KEY_SETTINGS, KEY_DEBATES, KEY_METRICS, KEY_RECS, KEY_CREATIVE, KEY_THEME, KEY_LIB_VIEW, KEY_TOUR_SEEN, store, onWriteError, handleDownloadBackup, handleRestoreBackup } from "./services/store.js";
+import { CreativeStudio } from "./views/CreativeStudio.jsx";
 import {
   applyBrandBriefDefaults, DEFAULT_AGENTS, DEFAULT_SETTINGS,
   STATUSES, STATUS_GROUP_ORDER, OUTCOMES, INIT_TYPES, METRIC_SOURCES,
@@ -474,6 +475,7 @@ export default function App() {
   const [recsErr,   setRecsErr]   = useState("");
   const [showRecModal, setShowRecModal] = useState(null); // {batchId, recId} or null
   const [pendingRecAccept, setPendingRecAccept] = useState(null); // {batchId, recId} — rec awaiting a successful save before its status flips
+  const [creative,  setCreative]  = useState([]); // [{initiativeId, generatedAt, brief, variants:[...]}]
   const [weeklyMetrics, setWeeklyMetrics] = useState([]);
   const [showPulse, setShowPulse] = useState(false);
   const [showMetricsImport, setShowMetricsImport] = useState(false);
@@ -505,7 +507,7 @@ export default function App() {
 
     const load = async ()=>{
       try {
-        const [ir,sr,dr,mr,rr,tr,lv,ts] = await Promise.all([store.get(KEY_ITEMS),store.get(KEY_SETTINGS),store.get(KEY_DEBATES),store.get(KEY_METRICS),store.get(KEY_RECS),store.get(KEY_THEME),store.get(KEY_LIB_VIEW),store.get(KEY_TOUR_SEEN)]);
+        const [ir,sr,dr,mr,rr,tr,lv,ts,cr] = await Promise.all([store.get(KEY_ITEMS),store.get(KEY_SETTINGS),store.get(KEY_DEBATES),store.get(KEY_METRICS),store.get(KEY_RECS),store.get(KEY_THEME),store.get(KEY_LIB_VIEW),store.get(KEY_TOUR_SEEN),store.get(KEY_CREATIVE)]);
         // Read theme from the resolved store before first render (gated on `loaded`),
         // so the persisted choice applies without an async flash.
         if(tr&&tr.value) setDk(tr.value==="dark");
@@ -530,6 +532,7 @@ export default function App() {
         if(mr&&mr.value) setWeeklyMetrics(JSON.parse(mr.value));
         else { setWeeklyMetrics(SEED_WEEKLY_METRICS); store.set(KEY_METRICS,JSON.stringify(SEED_WEEKLY_METRICS)); }
         if(rr&&rr.value) setRecs(JSON.parse(rr.value));
+        if(cr&&cr.value) setCreative(JSON.parse(cr.value));
       } catch { setItems(SEED); }
       setLoaded(true);
       // Stale-backup nudge. This effect has an empty dependency array so it runs
@@ -562,6 +565,7 @@ export default function App() {
   const saveDebates  = d => { setDebates(d); store.set(KEY_DEBATES,JSON.stringify(d)); };
   const saveMetrics  = m => { setWeeklyMetrics(m); store.set(KEY_METRICS,JSON.stringify(m)); };
   const saveRecs     = r => { setRecs(r); store.set(KEY_RECS,JSON.stringify(r)); };
+  const saveCreative = c => { setCreative(c); store.set(KEY_CREATIVE,JSON.stringify(c)); };
   const toggleDk     = ()=> { setDk(n => { const next=!n; store.set(KEY_THEME,next?"dark":"light"); return next; }); };
   const saveLibView  = v => { setLibView(v); store.set(KEY_LIB_VIEW,v); };
 
@@ -729,6 +733,11 @@ export default function App() {
     saveSettings(DEFAULT_SETTINGS);
     saveDebates([]);
     saveRecs([]);
+    // Creative records key off initiative ids, so leaving them behind after the
+    // items are reseeded would strand briefs against initiatives that no longer
+    // exist — which is exactly the "app left broken" case this reset promises
+    // not to produce.
+    saveCreative([]);
     setShowResetConfirm(false);
     showToast("Demo reset. Everything is back to the original seed state.", "success");
   };
@@ -1165,6 +1174,7 @@ export default function App() {
                 <div>Debates: <strong style={{color:t.text}}>{restorePayload.counts.debates}</strong></div>
                 <div>Weekly metrics: <strong style={{color:t.text}}>{restorePayload.counts.metrics}</strong></div>
                 <div>Next Plays: <strong style={{color:t.text}}>{restorePayload.counts.recs}</strong></div>
+                <div>Creative briefs: <strong style={{color:t.text}}>{restorePayload.counts.creative}</strong></div>
               </div>
             </div>
             <div style={{fontSize:12,color:t.textMuted,fontFamily:t.serif}}>Your current initiatives, settings, and metrics will be replaced. This cannot be undone.</div>
@@ -1177,6 +1187,7 @@ export default function App() {
                 if (Array.isArray(parsed.debates))       saveDebates(parsed.debates);
                 if (Array.isArray(parsed.weeklyMetrics)) saveMetrics(parsed.weeklyMetrics);
                 if (Array.isArray(parsed.recs))          saveRecs(parsed.recs);
+                if (Array.isArray(parsed.creative))      saveCreative(parsed.creative);
                 setRestorePayload(null);
                 showToast("Backup restored successfully.", "success");
               }}>Restore backup</button>
@@ -1213,6 +1224,7 @@ export default function App() {
               {navBtn("dashboard","Dashboard")}
               {navBtn("initiatives","Initiatives")}
               {navBtn("library","Library")}
+              {navBtn("creative","Creative")}
               {navBtn("triage","Triage")}
               {navBtn("readout","Summary")}
             </div>
@@ -1301,7 +1313,7 @@ export default function App() {
             </span>
             <button style={{...gG(t),fontSize:12,padding:"6px 13px",flexShrink:0}}
               onClick={()=>{
-                handleDownloadBackup(items, settings, debates, weeklyMetrics, recs);
+                handleDownloadBackup(items, settings, debates, weeklyMetrics, recs, creative);
                 try { localStorage.setItem("gos_last_backup", new Date().toISOString()); } catch { /* the very failure being reported */ }
                 setStorageError(null);
               }}>
@@ -1324,6 +1336,8 @@ export default function App() {
         onActivate={(id)=>{saveItems(items.map(e=>e.id===id?withRunningSnapshot({...e,status:"Running",startDate:e.startDate||new Date().toISOString().slice(0,10)},"Running"):e)); showToast("Initiative activated. Now running.","success");}}
       />}
       {nav==="library"&&<LearningLibrary items={items} t={t} dk={dk} cats={cats} brands={brands} activeBrand={activeBrand} settings={settings} view={libView} onView={saveLibView} onViewInitiative={(id)=>goDetail(id,"library")} onReplicate={(item)=>{const base=mkDefault(cats,activeBrand);setForm({...base,title:"[Replicate] "+item.title,hypothesis:"Based on learning from: "+item.title+". Original: "+item.hypothesis,category:item.category,initType:item.initType,ice:{...item.ice},revenueImpact:item.revenueImpact,notes:"Replicated from initiative "+item.id+". Original learning: "+item.results.keyLearning});setNav("form");}}/>}
+      {nav==="creative"&&<CreativeStudio t={t} dk={dk} items={items} brands={brands} activeBrand={activeBrand} settings={settings}
+        creative={creative} onSaveCreative={saveCreative} onSaveItems={saveItems} showToast={showToast}/>}
       {nav==="readout"&&<ClientReadoutView t={t} dk={dk} dash={dash} items={items} brands={brands} activeBrand={activeBrand} cats={cats} weeklyMetrics={weeklyMetrics} settings={settings}/>}
 
       {nav==="initiatives"&&(
@@ -1479,7 +1493,7 @@ export default function App() {
         </Modal>
       )}
 
-      {showSet&&<SettingsModal t={t} dk={dk} settings={settings} onSave={s=>{saveSettings(s);setShowSet(false);}} onClose={()=>setShowSet(false)} onDownloadBackup={() => { handleDownloadBackup(items, settings, debates, weeklyMetrics, recs); try { localStorage.setItem("gos_last_backup", new Date().toISOString()); } catch { /* the backup itself succeeded; only the reminder timestamp failed */ } }} onRestoreBackup={(file) => handleRestoreBackup(file, showToast, setRestorePayload)} onResetDemo={handleResetDemoData}/>}
+      {showSet&&<SettingsModal t={t} dk={dk} settings={settings} onSave={s=>{saveSettings(s);setShowSet(false);}} onClose={()=>setShowSet(false)} onDownloadBackup={() => { handleDownloadBackup(items, settings, debates, weeklyMetrics, recs, creative); try { localStorage.setItem("gos_last_backup", new Date().toISOString()); } catch { /* the backup itself succeeded; only the reminder timestamp failed */ } }} onRestoreBackup={(file) => handleRestoreBackup(file, showToast, setRestorePayload)} onResetDemo={handleResetDemoData}/>}
 
       {guideSection&&(
         <GuideDrawer t={t} dk={dk} openSection={guideSection} onClose={()=>setGuideSection(null)}

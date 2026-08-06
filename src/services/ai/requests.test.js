@@ -26,6 +26,9 @@ import { callAskLibrary } from "./callAskLibrary.js";
 import { callGenerateCandidates } from "./callGenerateCandidates.js";
 import { callExpandRecommendation } from "./callExpandRecommendation.js";
 import { callDebateSynthesis } from "./callDebateSynthesis.js";
+import { callCreativeBrief } from "./callCreativeBrief.js";
+import { callCreativeVariants } from "./callCreativeVariants.js";
+import { DEFAULT_NAMING_SCHEMA } from "../naming.js";
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -53,6 +56,26 @@ const ITEM = {
   observation: "Observed a drop.", successMetric: "CVR",
   ice: { impact: 7, certainty: 6, ease: 5 }, revenueImpact: 10000, status: "Draft",
   results: { keyLearning: "Learned something", outcomeClassification: "Success", actualRevenueImpact: 9000 },
+};
+
+// The creative loop reads a brand brief and, for variants, an already-approved
+// brief object. Both are interpolated into the system prompt, so they need the
+// fields those call sites actually read.
+const BRAND = {
+  id: "default", name: "Test Brand",
+  whatTheySell: "Premium widgets, $80-$300 AOV", categories: "Widgets, Gifting",
+  icp: "Women 28-48, considered purchase", whyTheyWin: "Design-led",
+  relationship: "Own DTC brand", constraint: "Rising CAC on paid social",
+};
+const BRIEF = {
+  insight: "Buyers distrust before-and-after imagery.",
+  promise: "See the product used unedited.",
+  proof: ["single unbroken take", "no post-production"],
+  formatGuidance: "Vertical, 25-35s, captions burned in.",
+  angles: [
+    { slug:"TimeSaver", label:"Time saver", theory:"They buy back minutes.", execution:"Handheld, morning setting.", openingBeat:"Presenter checks the clock." },
+    { slug:"MacroMath", label:"Macro math", theory:"They buy the numbers.", execution:"On-screen macro overlay.", openingBeat:"Label held to camera." },
+  ],
 };
 
 /** Stub fetch, run `fn`, return every request body it attempted to send. */
@@ -108,6 +131,8 @@ const CASES = [
   ["Next Plays — candidates", () => callGenerateCandidates("portfolio ctx", [{ id: "e1", title: "t" }], SETTINGS, SETTINGS.categories)],
   ["Next Plays — expansion",  () => callExpandRecommendation({ title: "t", category: "Conversion", rationale: "r" }, "portfolio ctx", [], SETTINGS)],
   ["Debate synthesis",        () => callDebateSynthesis("portfolio ctx", "user ctx", TRANSCRIPT, SETTINGS.categories, SETTINGS, PORTFOLIO_TOOLS)],
+  ["Creative brief",          () => callCreativeBrief(ITEM, BRAND, [{ id:"e1", title:"t", learning:"l", outcome:"Success", category:"Conversion" }], SETTINGS, DEFAULT_NAMING_SCHEMA)],
+  ["Creative variants",       () => callCreativeVariants(BRIEF, ITEM, BRAND, DEFAULT_NAMING_SCHEMA, { perAngle: 2 })],
 ];
 
 console.log("Request shapes accepted by the proxy:\n");

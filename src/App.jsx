@@ -11,7 +11,9 @@ import {
 import { KEY_ITEMS, KEY_SETTINGS, KEY_DEBATES, KEY_METRICS, KEY_RECS, KEY_CREATIVE, KEY_THEME, KEY_LIB_VIEW, KEY_TOUR_SEEN, store, onWriteError, handleDownloadBackup, handleRestoreBackup } from "./services/store.js";
 import { CreativeStudio } from "./views/CreativeStudio.jsx";
 import { Sidebar } from "./components/Sidebar.jsx";
-import { navName } from "./components/navSections.js";
+import { CadenceRail, CadenceLegend } from "./components/CadenceRail.jsx";
+import { cadenceWindow, cadenceFor, windowLabel, groupRollup } from "./services/cadence.js";
+import { navName, navLab } from "./components/navSections.js";
 import {
   applyBrandBriefDefaults, DEFAULT_AGENTS, DEFAULT_SETTINGS,
   STATUSES, STATUS_GROUP_ORDER, OUTCOMES, INIT_TYPES, METRIC_SOURCES,
@@ -69,7 +71,7 @@ const GUIDE_SECTIONS = [
     feature: "Next Plays: weekly recommendations",
     what: "Proactive experiment suggestions with the hypothesis pre-written and ICE pre-scored, drawn from your portfolio, learnings library, brand briefs, and latest metrics.",
     why: "Removes the blank-page problem every week. You walk into the standup with three grounded plays already framed and prioritized.",
-    cta: "Go to Observatory",
+    cta: "Go to Dashboard",
     action: "dashboard",
   },
   {
@@ -79,37 +81,37 @@ const GUIDE_SECTIONS = [
     feature: "Contribution-to-revenue view",
     what: "A three-layer revenue picture (realised, probability-weighted in-flight, and probability-weighted pipeline) broken down by category, with one-click copy for client emails.",
     why: "This is the answer to \"what did this engagement actually drive?\" It's the artifact that justifies renewals.",
-    cta: "Go to Observatory",
+    cta: "Go to Dashboard",
     action: "dashboard",
   },
   {
     id: "library",
     views: ["library"],
     label: "Never re-run a dead experiment",
-    feature: "Archive: the learnings library",
+    feature: "Learnings library",
     what: "Every closed initiative becomes a searchable learning, tagged by outcome, category, and type. Filter, synthesize across them with AI, or replicate a winner in one click.",
     why: "Institutional memory that compounds. The longer the engagement runs, the smarter every recommendation gets.",
-    cta: "Open Archive",
+    cta: "Open Library",
     action: "library",
   },
   {
     id: "initiatives",
     views: ["initiatives","detail","form"],
     label: "Track & prioritize the portfolio",
-    feature: "Register: the initiative pipeline, ICE scored",
+    feature: "Initiatives + ICE scoring",
     what: "The full initiative pipeline with ICE scoring, status tracking, blockers, owners, multi-retailer support, CSV import/export, and quick capture for half-formed ideas.",
     why: "One ranked, shared source of truth for what's running, what's queued, and what it's worth.",
-    cta: "Open Register",
+    cta: "Open Initiatives",
     action: "initiatives",
   },
   {
     id: "triage",
     views: ["triage"],
     label: "Run the weekly review",
-    feature: "Quarantine: the weekly decision queue",
+    feature: "Triage",
     what: "Surfaces initiatives that need a decision this week (overdue, awaiting results, or blocked) so nothing stalls silently.",
     why: "Keeps the portfolio moving and gives the standup its agenda.",
-    cta: "Open Quarantine",
+    cta: "Open Triage",
     action: "triage",
   },
   {
@@ -443,6 +445,8 @@ export default function App() {
   const [fType,     setFType]     = useState("All");
   const [fOwn,      setFOwn]      = useState("All");
   const [sort,      setSort]      = useState("ice");
+  const [groupBy,   setGroupBy]   = useState("category"); // category | status
+  const [hoverId,   setHoverId]   = useState(null);
   const [form,      setForm]      = useState(null);
   const [rForm,     setRForm]     = useState(null);
   const [showR,     setShowR]     = useState(false);
@@ -911,18 +915,34 @@ export default function App() {
   // per-status sections in a fixed order. `filtered` is already sorted by the
   // active sort, so slicing it per status preserves that order within each
   // section without re-sorting.
+  //
+  // Grouping by category is the default because it answers the question the
+  // list is usually opened with — "what are we doing about acquisition?" —
+  // whereas status is a property you can already read off every card. Status
+  // grouping stays available and behaves exactly as it did.
   const groupedSections = useMemo(()=>{
-    if(fSt.size<=1) return null;
+    if(groupBy==="category"){
+      const order = [...cats, "Uncategorised"];
+      return order
+        .map(c=>({key:c, label:c, items:filtered.filter(e=>(e.category||"Uncategorised")===c)}))
+        .filter(g=>g.items.length>0);
+    }
+    if(groupBy==="none" || fSt.size<=1) return null;
     return STATUS_GROUP_ORDER
       .filter(s=>fSt.has(s))
-      .map(s=>({status:s, items:filtered.filter(e=>e.status===s)}))
+      .map(s=>({key:s, label:s, items:filtered.filter(e=>e.status===s)}))
       .filter(g=>g.items.length>0);
-  },[filtered,fSt]);
+  },[filtered,fSt,groupBy,cats]);
+
+  // One window shared by every rail on screen, so the strips are comparable
+  // down the column rather than each being individually full.
+  const cadWindow = useMemo(()=>cadenceWindow(14),[]);
+  const cadLabel  = useMemo(()=>windowLabel(cadWindow),[cadWindow]);
 
   const renderInitiativeCard = (item)=>(
-    <div key={item.id} onClick={()=>goDetail(item.id,"initiatives")} style={{...gCd(t),cursor:"pointer",padding:"14px 16px",transition:"border-color .15s, box-shadow .15s"}}
-      onMouseEnter={e=>{e.currentTarget.style.borderColor=t.goldBorder;e.currentTarget.style.boxShadow=t.shadowHi;}}
-      onMouseLeave={e=>{e.currentTarget.style.borderColor=t.border;e.currentTarget.style.boxShadow=t.shadow;}}>
+    <div key={item.id} onClick={()=>goDetail(item.id,"initiatives")} style={{...gCd(t),cursor:"pointer",padding:"14px 16px",transition:"border-color .15s, box-shadow .15s, transform .15s"}}
+      onMouseEnter={e=>{setHoverId(item.id);e.currentTarget.style.borderColor=t.goldBorder;e.currentTarget.style.boxShadow=t.shadowHi;e.currentTarget.style.transform="translateY(-1px)";}}
+      onMouseLeave={e=>{setHoverId(null);e.currentTarget.style.borderColor=t.border;e.currentTarget.style.boxShadow=t.shadow;e.currentTarget.style.transform="none";}}>
       {/* Row 1: title (lead) + ICE/revenue anchors */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
         <div style={{flex:"1 1 auto",minWidth:0}}>
@@ -951,6 +971,14 @@ export default function App() {
           {item.status!=="Draft"&&item.endDate&&<span>end {fmtDate(item.endDate)}</span>}
           {item.linkedIds&&item.linkedIds.length>0&&<span>{item.linkedIds.length} linked</span>}
           {item.owner&&<span>{item.owner.split(" (")[0].split("+")[0].trim()}</span>}
+        </span>
+        {/* Fixed-width, right-pinned so every rail starts at the same x. A rail
+            that floats after variable-length metadata cannot be compared down
+            the column, which is the only reason the window is shared at all.
+            It magnifies on hover rather than appearing on it, so the strip is
+            still readable while scanning. */}
+        <span style={{width:92,flexShrink:0,display:"flex",justifyContent:"flex-end",alignItems:"center"}}>
+          <CadenceRail rail={cadenceFor(item,cadWindow)} t={t} expanded={hoverId===item.id} windowLabel={cadLabel}/>
         </span>
       </div>
     </div>
@@ -1269,7 +1297,14 @@ export default function App() {
                 </button>
               ):(
                 <div style={{minWidth:0}}>
-                  <div style={{fontFamily:t.serif,fontSize:17,fontWeight:600,color:t.text,lineHeight:1.2}}>{navName(nav)}</div>
+                  <div style={{display:"flex",alignItems:"baseline",gap:8,flexWrap:"wrap"}}>
+                    <span style={{fontFamily:t.serif,fontSize:17,fontWeight:600,color:t.text,lineHeight:1.2}}>{navName(nav)}</span>
+                    {navLab(nav)&&(
+                      <span style={{fontFamily:t.mono,fontSize:9.5,letterSpacing:"0.1em",textTransform:"uppercase",color:t.textMuted}}>
+                        {navLab(nav)}
+                      </span>
+                    )}
+                  </div>
                   <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>{settings.companyName}</div>
                 </div>
               )}
@@ -1369,6 +1404,14 @@ export default function App() {
                   <option value="newest">Newest</option>
                 </select>
               </div>
+              <div style={{display:"flex",flexDirection:"column",gap:2}}>
+                <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Group by</label>
+                <select value={groupBy} onChange={e=>setGroupBy(e.target.value)} style={{...gSl(t),minWidth:104}}>
+                  <option value="category">Category</option>
+                  <option value="status">Status</option>
+                  <option value="none">Nothing</option>
+                </select>
+              </div>
             </div>
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
@@ -1393,16 +1436,41 @@ export default function App() {
               )
             )}
             {groupedSections ? (
-              groupedSections.map((g,gi)=>(
-                <div key={g.status} style={{display:"flex",flexDirection:"column",gap:6,marginTop:gi>0?10:0}}>
-                  <div style={{fontSize:11,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,padding:"2px 2px"}}>
-                    {g.status} <span style={{color:t.textMuted}}>&middot; {g.items.length}</span>
+              groupedSections.map((g,gi)=>{
+                const roll = groupRollup(g.items);
+                return (
+                <div key={g.key} style={{display:"flex",flexDirection:"column",gap:6,marginTop:gi>0?16:0}}>
+                  {/* Group header. Realised and at-risk revenue are reported
+                      separately rather than summed — one happened and one is a
+                      forecast, and blending them is what makes a portfolio
+                      number impossible to defend in a client meeting. */}
+                  <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:12,flexWrap:"wrap",
+                    padding:"5px 2px 6px",borderBottom:"1px solid "+t.borderSoft}}>
+                    <div style={{display:"flex",alignItems:"baseline",gap:9,minWidth:0}}>
+                      <span style={{width:3,height:13,borderRadius:2,background:groupBy==="category"?catColor(g.key,cats,dk):t.gold,flexShrink:0,alignSelf:"center"}}/>
+                      <span style={{fontFamily:t.serif,fontSize:14.5,fontWeight:600,color:t.text}}>{g.label}</span>
+                      <span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>
+                        {roll.total} experiment{roll.total!==1?"s":""}{roll.running>0?" · "+roll.running+" running":""}
+                      </span>
+                    </div>
+                    <div style={{display:"flex",alignItems:"baseline",gap:14,fontSize:11,fontFamily:t.mono,color:t.textMuted}}>
+                      {roll.winRate!=null&&<span>{roll.winRate}% win rate</span>}
+                      {roll.realised!==0&&<span>realised <span style={{color:t.teal,fontWeight:700}}>{fmtCur(roll.realised)}</span></span>}
+                      {roll.atRisk>0&&<span>at risk <span style={{color:t.gold,fontWeight:700}}>{fmtCur(roll.atRisk)}</span></span>}
+                    </div>
                   </div>
                   {g.items.map(renderInitiativeCard)}
                 </div>
-              ))
+                );
+              })
             ) : (
               filtered.map(renderInitiativeCard)
+            )}
+            {filtered.length>0&&(
+              <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginTop:14,paddingTop:11,borderTop:"1px solid "+t.borderSoft}}>
+                <span style={{fontSize:10,fontFamily:t.mono,letterSpacing:"0.09em",textTransform:"uppercase",color:t.textMuted}}>Cadence · {cadLabel}</span>
+                <CadenceLegend t={t}/>
+              </div>
             )}
           </div>
         </div>

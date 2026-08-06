@@ -87,7 +87,8 @@ Select a Draft or Running initiative and the studio produces a creative brief gr
 - **Briefs must be falsifiable.** Every brief states what result would prove the direction wrong. One that can't be wrong can't teach anything.
 - **Unsupported claims are quarantined.** Anything the creative wants to say that the brand brief doesn't support goes into `claimsToVerify` for the operator to clear, rather than being asserted in a script.
 - **Names are assembled, not typed.** The model returns segment values; `buildName` validates them against the schema. The initiative segment is stamped from the initiative's own tracking tag — the model is never told it and never asked to invent one.
-- **Output is portable.** Copy the ad names, or export the full variant set as CSV.
+- **Key frames.** Each variant can generate its opening beat as an image (Gemini image models, "Nano Banana"). The prompt is composed from the approved brief — insight, promise, proof, the variant's opening beat — and is inspectable before you spend. Two exclusions are hard-coded: no rendered text, and nothing from the brief's `claimsToVerify`, so a generated frame can't launder an unverified claim into something that looks settled.
+- **Output is portable.** Copy the ad names, export the full variant set as CSV, or download a frame. Generated images are held for the session only and are never written to browser storage — a base64 PNG would exhaust the quota and take the portfolio with it.
 
 ### CSV import / export
 Row-by-row preview before writing. Matched on `initId` for non-destructive updates. Handles date format normalisation, case-insensitive brand matching, and ICE clamping. Google Sheets template included.
@@ -265,6 +266,11 @@ Requires a `.env` file with:
 
 ```
 ANTHROPIC_API_KEY=your_key
+
+# Optional. Enables image generation in the Creative Studio (Gemini image
+# models, "Nano Banana"). Without it the app runs normally and image generation
+# returns a clear "not configured" error rather than failing obscurely.
+GEMINI_API_KEY=your_key
 
 # Optional. Comma-separated origins the proxy will accept. Defaults to the
 # canonical deployment, so a missing value fails closed rather than opening up.

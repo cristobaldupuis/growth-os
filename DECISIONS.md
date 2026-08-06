@@ -100,6 +100,34 @@ CSV stays regardless of how many connectors ship: it is the only path that works
 
 ---
 
+## Generated images are session-only, and the second provider gets its own endpoint
+
+**Decision:** Image generation runs through `api/image.js` — a separate serverless function from the Anthropic proxy, with its own model allowlist, its own rate-limit namespace, and a much lower ceiling. Generated images are held in React state for the session and never written to `store`. The operator downloads what is worth keeping.
+
+**Why a second endpoint rather than a branch:** `api/proxy.js`'s `validateBody` requires `model`, `max_tokens` and `messages`. A Gemini image request has none of those. Making one function serve both would mean loosening the exact validation that *is* the Anthropic path's security control, to accommodate a request shape it will never see. Two endpoints, two tight contracts, is cheaper than one permissive one.
+
+The client also sends `{model, prompt, aspectRatio}` rather than a provider-shaped body, and the endpoint constructs the upstream request itself. A caller therefore cannot smuggle through fields the endpoint doesn't know about — extra response modalities, tool declarations, or a `candidateCount` that multiplies the bill.
+
+**Why the bounds are stricter than the text proxy's:** text is metered in fractions of a cent and bounded by `max_tokens`. An image is a fixed, much larger unit of spend with no equivalent dial — you cannot ask for a cheaper one. So the control is on count: one image per request, 25 per hour per IP against the text proxy's 60, and a separate Redis key namespace so image spend cannot exhaust or be exhausted by text calls.
+
+**Why images are not persisted:** a 1024px PNG is comfortably over a megabyte base64-encoded, and `localStorage` caps around 5MB. Persisting two or three would exhaust the quota — reproducing precisely the silent data-loss failure `store.js` was rewritten to prevent, except this time it would take the entire portfolio down with it rather than one save. Session-only is not a limitation reluctantly accepted here; it is the only correct behaviour until there is somewhere else to put them.
+
+**Forcing condition:** the first operator who needs a generated frame to survive a reload. The fix is blob storage (Supabase Storage or Vercel Blob) with the record holding a URL, not a bigger JSON blob — and it arrives with the Supabase migration rather than before it.
+
+---
+
+## Generated images may not carry text, and may not depict unverified claims
+
+**Decision:** `buildImagePrompt` composes the prompt from the approved brief rather than a free-text box, and hard-codes two exclusions: no rendered text of any kind, and nothing from the brief's `claimsToVerify`.
+
+**Why no text:** image models mangle typography, but the real problem is not aesthetic. Words a model invents become an unreviewed product claim sitting on an asset that looks finished, and the more convincing the render the less likely anyone re-reads it. Copy belongs in the ad tool, where it passes the same review as every other line.
+
+**Why the claims exclusion:** `claimsToVerify` is the brief's list of things the creative wants to say that the brand brief does not support. Rendering one visually is the highest-risk failure mode available to AI creative — it launders an open question into something that looks settled, because it was drawn convincingly. The claims are named explicitly in the prompt as things not to imply, rather than merely omitted, since omission is not an instruction.
+
+**Why the prompt is inspectable before generating:** an image call costs a fixed few cents where a text call costs a fraction of one, so "see prompt" is not a debugging affordance — it is the operator checking what they are about to buy.
+
+---
+
 ## Write access to ad platforms goes through a proposal gate, never a direct tool call
 
 **Decision:** No AI path writes to Meta or Google Ads directly. Every mutation — create campaign, change budget, pause ad set — is produced as a *proposed change*, rendered as a diff against current live state, approved by a human, and then executed by a separate applier that writes an audit record. The proposer and the applier are different code paths with different credentials.

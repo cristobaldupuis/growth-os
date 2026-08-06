@@ -31,16 +31,28 @@ import { MODELS, EFFORT, buildRequest } from "./models.js";
 
 export async function callCreativeVariants(brief, initiative, brand, schema, opts) {
   const perAngle = (opts && opts.perAngle) || 2;
+  const channel  = (opts && opts.channel) || "meta";
 
-  // Only controlled segments are offered to the model, and only the free-text
-  // ones it can genuinely author. The initiative segment is excluded entirely —
-  // see the note above.
-  const fillable = (schema.segments || []).filter(s => s.role !== "initiative");
-  const segmentSpec = fillable.map(s => {
-    const allowed = s.vocab
-      ? "one of: " + s.vocab.join(" | ")
+  // Creative lives at the ad level, so the model is asked for exactly the
+  // dimensions that channel's ad template consumes — no more. Asking for the
+  // full registry would have it invent values for slots this channel does not
+  // name, which is work spent producing something the builder discards.
+  //
+  // The initiative dimension is excluded entirely: the caller stamps it from the
+  // initiative's own trackingTag. See the note above.
+  const adLevel = (schema.channels || []).find(c => c.id === channel)?.levels
+    ?.find(l => l.key === "ad" || l.key === "message");
+  const dims = new Map((schema.dimensions || []).map(d => [d.key, d]));
+  const fillable = (adLevel?.template || [])
+    .filter(k => k !== schema.initiativeDimension)
+    .map(k => dims.get(k))
+    .filter(Boolean);
+
+  const segmentSpec = fillable.map(d => {
+    const allowed = d.vocab
+      ? "one of: " + d.vocab.join(" | ")
       : "free text, CamelCase, no spaces, no \"" + schema.delimiter + "\"";
-    return `  ${s.key} (${s.label}) — ${allowed}. ${s.hint || ""}`.trimEnd();
+    return `  ${d.key} (${d.label}) — ${allowed}. ${d.hint || ""}`.trimEnd();
   }).join("\n");
 
   const brandBlock = brand ? [
@@ -60,11 +72,11 @@ export async function callCreativeVariants(brief, initiative, brand, schema, opt
     "  • `hook` is the literal first line spoken or shown. Write the words, not a description of them.",
     "  • `script` is a short beat-by-beat, 3-5 beats, each beat one line. For static formats describe the frames instead.",
     "  • Do not invent product claims, ingredients, prices, certifications or results beyond what the brand brief and the brief's `proof` support. If a variant needs an unsupported claim to work, drop the variant.",
-    "  • Every variant must set `naming` using the segment definitions below. Use the controlled vocabulary exactly as written — these values are validated and a value outside the list will be rejected.",
-    "  • Set the `angle` naming segment to the slug of the brief angle the variant belongs to.",
-    "  • Where a segment genuinely does not apply, use \"" + (schema.placeholder || "NA") + "\". Never leave a segment empty.",
+    "  • Every variant must set `naming` using the slot definitions below. Use the controlled vocabulary exactly as written — these values are validated and a value outside the list will be rejected.",
+    "  • Set the `angle` slot to the slug of the brief angle the variant belongs to.",
+    "  • Where a slot genuinely does not apply, use \"" + (schema.placeholder || "NA") + "\". Never leave a slot empty.",
     "",
-    "AD NAME SEGMENTS you must fill:",
+    "AD NAME SLOTS you must fill (" + channel + ", ad level):",
     segmentSpec,
     "",
     "Return ONLY a JSON array of variant objects, each with these keys exactly:",

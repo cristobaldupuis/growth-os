@@ -3,7 +3,7 @@ import { gG, gGh, gSL, gCd, gI, gSl } from "../components/styles.js";
 import { renderProse } from "../components/text.jsx";
 import { SBdg, CBdg } from "../components/badges.jsx";
 import { fmtDate } from "../constants.js";
-import { resolveSchema, buildName, initiativeSegment, suggestTrackingTag, NA } from "../services/naming.js";
+import { resolveSchema, buildNameSet, templateFor, listChannels, listLevels, suggestTrackingTag, NA } from "../services/naming.js";
 import { callCreativeBrief } from "../services/ai/callCreativeBrief.js";
 import { callCreativeVariants } from "../services/ai/callCreativeVariants.js";
 
@@ -29,8 +29,9 @@ const StatBlock = ({ t, label, children }) => (
 export function CreativeStudio({
   t, dk, items, brands, activeBrand, settings, creative, onSaveCreative, onSaveItems, showToast,
 }) {
-  const schema = resolveSchema(settings);
-  const initSeg = initiativeSegment(schema);
+  const schema   = resolveSchema(settings);
+  const channels = listChannels(schema);
+  const initKey  = schema.initiativeDimension;
 
   const brandFilter = e => activeBrand === "all" || (e.brandId || "default") === activeBrand;
   // Creative is briefed for work that is still ahead of you. A closed initiative
@@ -46,7 +47,14 @@ export function CreativeStudio({
   const [busy, setBusy]         = useState("");     // "" | "brief" | "variants"
   const [err, setErr]           = useState("");
   const [perAngle, setPerAngle] = useState(2);
-  const [edits, setEdits]       = useState({});     // {variantIdx: {segKey: value}}
+  const [channel, setChannel]   = useState(channels[0]?.id || "meta");
+  const [edits, setEdits]       = useState({});     // {variantIdx: {dimKey: value}}
+
+  // Creative is produced at the ad level (message, for a channel with no ad
+  // level), so that is the template the editors render.
+  const adLevelKey = (schema.channels || []).find(c => c.id === channel)?.levels
+    ?.find(l => l.key === "ad" || l.key === "message")?.key || "ad";
+  const adTemplate = templateFor(schema, channel, adLevelKey);
 
   const sel     = items.find(e => e.id === selId) || null;
   const brand   = sel ? (brands.find(b => b.id === (sel.brandId || "default")) || brands[0]) : null;
@@ -85,7 +93,7 @@ export function CreativeStudio({
     if (!sel || !brief) return;
     setBusy("variants"); setErr("");
     try {
-      const result = await callCreativeVariants(brief, sel, brand, schema, { perAngle });
+      const result = await callCreativeVariants(brief, sel, brand, schema, { perAngle, channel });
       saveRecord({ brief, variants: result });
       setEdits({});
       showToast(result.length + " variants generated.", "success");
@@ -98,11 +106,19 @@ export function CreativeStudio({
   // marks the asset as untracked rather than inventing a link that joins to
   // nothing.
   const tag = sel?.trackingTag ? String(sel.trackingTag).trim() : "";
-  const nameFor = (variant, idx) => {
+
+  const valuesFor = (variant, idx) => {
     const values = { ...(variant.naming || {}), ...(edits[idx] || {}) };
-    if (initSeg) values[initSeg.key] = tag || (schema.placeholder || NA);
-    return buildName(values, schema);
+    if (initKey) values[initKey] = tag || (schema.placeholder || NA);
+    return values;
   };
+
+  // One dimension record projects into every level of the channel at once, so
+  // the campaign and ad set names are guaranteed consistent with the ad name
+  // rather than being three strings typed on three different days.
+  const nameSetFor = (variant, idx) => buildNameSet(valuesFor(variant, idx), schema, channel);
+  const nameFor    = (variant, idx) =>
+    nameSetFor(variant, idx).find(n => n.level === adLevelKey) || { name: "", errors: [] };
 
   const assignTag = () => {
     const suggested = suggestTrackingTag(sel, schema);
@@ -120,21 +136,31 @@ export function CreativeStudio({
       .catch(() => showToast("Could not copy to clipboard.", "error"));
   };
 
+  // Exports every level's name, not just the ad's — the campaign and ad set rows
+  // are what someone actually needs when building the structure in the platform.
   const exportCSV = () => {
-    const cols = ["label", "angleSlug", "varies", "hook", "cta", ...schema.segments.map(s => s.key), "adName"];
+    const levels = listLevels(schema, channel);
+    const cols = [
+      "label", "angleSlug", "varies", "hook", "cta",
+      ...adTemplate.map(d => d.key),
+      ...levels.map(l => l.key + "Name"),
+    ];
     const esc = v => `"${String(v == null ? "" : v).replace(/"/g, '""')}"`;
     const rows = variants.map((v, i) => {
-      const { name } = nameFor(v, i);
-      const values = { ...(v.naming || {}), ...(edits[i] || {}) };
-      if (initSeg) values[initSeg.key] = tag || (schema.placeholder || NA);
-      return [v.label, v.angleSlug, v.varies, v.hook, v.cta, ...schema.segments.map(s => values[s.key] || ""), name].map(esc).join(",");
+      const values = valuesFor(v, i);
+      const set = nameSetFor(v, i);
+      return [
+        v.label, v.angleSlug, v.varies, v.hook, v.cta,
+        ...adTemplate.map(d => values[d.key] || ""),
+        ...levels.map(l => set.find(s => s.level === l.key)?.name || ""),
+      ].map(esc).join(",");
     });
     const csv = [cols.join(","), ...rows].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `creative_${(sel.initId || sel.id)}_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `creative_${(sel.initId || sel.id)}_${channel}_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -284,6 +310,10 @@ export function CreativeStudio({
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
             <div style={{ ...gSL(t), marginBottom: 0 }}>Variants</div>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <label style={{ fontSize: 12, color: t.textSub }}>Channel</label>
+              <select value={channel} onChange={e => { setChannel(e.target.value); setEdits({}); }} style={{ ...gSl(t), width: 118, padding: "6px 8px" }}>
+                {channels.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+              </select>
               <label style={{ fontSize: 12, color: t.textSub }}>Per angle</label>
               <select value={perAngle} onChange={e => setPerAngle(Number(e.target.value))} style={{ ...gSl(t), width: 62, padding: "6px 8px" }}>
                 {[1, 2, 3].map(n => <option key={n} value={n}>{n}</option>)}
@@ -304,8 +334,8 @@ export function CreativeStudio({
 
           <div style={{ display: "grid", gap: 14 }}>
             {variants.map((v, i) => {
-              const { name, errors } = nameFor(v, i);
-              const values = { ...(v.naming || {}), ...(edits[i] || {}) };
+              const nameSet = nameSetFor(v, i);
+              const values  = valuesFor(v, i);
               return (
                 <div key={i} style={{ border: "1px solid " + t.border, borderRadius: 12, padding: "14px 16px", background: t.surfaceAlt }}>
 
@@ -332,14 +362,14 @@ export function CreativeStudio({
                   {v.cta && <div style={{ fontSize: 12.5, color: t.textSub, marginBottom: 4 }}><strong style={{ color: t.text }}>CTA.</strong> {v.cta}</div>}
                   {v.rationale && <div style={{ fontSize: 12, color: t.textMuted, lineHeight: 1.55, marginBottom: 12 }}>{v.rationale}</div>}
 
-                  {/* Segment editors. Controlled segments render as selects so an
+                  {/* Slot editors. Controlled dimensions render as selects so an
                       off-vocabulary value cannot be introduced by hand; the
-                      initiative segment is read-only because it comes from the
+                      initiative slot is read-only because it comes from the
                       initiative, not from this form. */}
-                  <div style={{ ...gSL(t), marginTop: 6 }}>Ad name</div>
+                  <div style={{ ...gSL(t), marginTop: 6 }}>Naming slots</div>
                   <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit,minmax(132px,1fr))", marginBottom: 10 }}>
-                    {schema.segments.map(seg => {
-                      const isInit = initSeg && seg.key === initSeg.key;
+                    {adTemplate.map(seg => {
+                      const isInit = initKey && seg.key === initKey;
                       const value = isInit ? (tag || (schema.placeholder || NA)) : (values[seg.key] || "");
                       return (
                         <div key={seg.key}>
@@ -365,17 +395,32 @@ export function CreativeStudio({
                     })}
                   </div>
 
-                  <div style={{
-                    fontFamily: t.mono, fontSize: 11.5, wordBreak: "break-all", padding: "9px 11px", borderRadius: 8,
-                    background: t.surface, border: "1px solid " + (errors.length ? t.warnBorder : t.border), color: t.text,
-                  }}>
-                    {name}
+                  {/* Every level of the channel, projected from the one record
+                      above. Showing them together is the point: it is how you
+                      see that the campaign, ad set and ad names agree. */}
+                  <div style={{ display: "grid", gap: 7 }}>
+                    {nameSet.map(n => (
+                      <div key={n.level}>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                          <div style={{ fontFamily: t.mono, fontSize: 9.5, letterSpacing: "0.09em", textTransform: "uppercase", color: t.textMuted, minWidth: 62 }}>
+                            {n.label}
+                          </div>
+                          <div style={{
+                            flex: 1, fontFamily: t.mono, fontSize: 11.5, wordBreak: "break-all",
+                            padding: "8px 10px", borderRadius: 8, background: t.surface,
+                            border: "1px solid " + (n.errors.length ? t.warnBorder : t.border), color: t.text,
+                          }}>
+                            {n.name}
+                          </div>
+                        </div>
+                        {n.errors.length > 0 && (
+                          <ul style={{ margin: "5px 0 0 70px", paddingLeft: 16, fontSize: 11.5, color: t.warn, lineHeight: 1.5 }}>
+                            {n.errors.map((e, j) => <li key={j}>{e}</li>)}
+                          </ul>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                  {errors.length > 0 && (
-                    <ul style={{ margin: "7px 0 0", paddingLeft: 18, fontSize: 11.5, color: t.warn, lineHeight: 1.5 }}>
-                      {errors.map((e, j) => <li key={j}>{e}</li>)}
-                    </ul>
-                  )}
                 </div>
               );
             })}

@@ -10,12 +10,12 @@ export const TOUR_STEPS = [
   {
     selector: '[data-tour="northstar"]', nav: "dashboard",
     title: "One number everything ladders up to",
-    body: "The dashboard answers a single question: are we on track? North Star current vs. target, what's driving revenue right now, and what's still in flight, all above the fold.",
+    body: "The Observatory answers a single question: are we on track? North Star current vs. target, what's driving revenue right now, and what's still in flight, all above the fold.",
   },
   {
     selector: '[data-tour="brand-select"]', nav: "dashboard",
     title: "One portfolio, several brands",
-    body: "This switches every view (dashboard, initiatives, learnings) from the blended portfolio down to a single brand's own numbers. Try one any time. Nothing here is destructive.",
+    body: "This switches every view (Observatory, Register, Archive) from the blended portfolio down to a single brand's own numbers. Try one any time. Nothing here is destructive.",
   },
   {
     selector: '[data-tour="learning-card"]', nav: "library",

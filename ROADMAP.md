@@ -91,6 +91,11 @@ and does not wait on Supabase.
   naming segments and are assembled into ad names in code, then exported as CSV
   or copied for paste into the ad platform.
 
+- [x] **Key-frame generation.** Gemini image models ("Nano Banana") behind
+  `api/image.js`, prompted from the approved brief rather than a free-text box.
+  Session-only by design — see DECISIONS.md for why persisting them needs blob
+  storage rather than a bigger JSON blob.
+
 ### Next in this slice
 
 - [ ] **Performance import keyed on ad name.** Extend the metrics importer to

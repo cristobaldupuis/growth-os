@@ -6,6 +6,7 @@ import { fmtDate } from "../constants.js";
 import { resolveSchema, buildNameSet, templateFor, listChannels, listLevels, suggestTrackingTag, NA } from "../services/naming.js";
 import { callCreativeBrief } from "../services/ai/callCreativeBrief.js";
 import { callCreativeVariants } from "../services/ai/callCreativeVariants.js";
+import { callGenerateImage, buildImagePrompt, IMAGE_ASPECTS, IMAGE_MODELS } from "../services/ai/callGenerateImage.js";
 
 // -- Creative Studio -----------------------------------------------------------
 //
@@ -49,6 +50,20 @@ export function CreativeStudio({
   const [perAngle, setPerAngle] = useState(2);
   const [channel, setChannel]   = useState(channels[0]?.id || "meta");
   const [edits, setEdits]       = useState({});     // {variantIdx: {dimKey: value}}
+
+  // Generated frames are held HERE, in component state, and are deliberately
+  // never passed to onSaveCreative. A 1024px PNG is well over a megabyte once
+  // base64-encoded and localStorage caps around 5MB, so persisting two or three
+  // would exhaust the quota — reproducing exactly the silent data-loss failure
+  // store.js was rewritten to prevent, except this time it would take the whole
+  // portfolio down with it. They survive until reload; the operator downloads
+  // what is worth keeping. Persisting these needs blob storage, not a bigger
+  // JSON blob (see DECISIONS.md).
+  const [images, setImages]     = useState({});     // {variantIdx: {mimeType, data, aspect}}
+  const [imgBusy, setImgBusy]   = useState(null);   // variantIdx currently generating
+  const [imgErr, setImgErr]     = useState({});     // {variantIdx: message}
+  const [aspect, setAspect]     = useState("4:5");
+  const [promptPreview, setPromptPreview] = useState(null); // {idx, text}
 
   // Creative is produced at the ad level (message, for a channel with no ad
   // level), so that is the template the editors render.
@@ -119,6 +134,28 @@ export function CreativeStudio({
   const nameSetFor = (variant, idx) => buildNameSet(valuesFor(variant, idx), schema, channel);
   const nameFor    = (variant, idx) =>
     nameSetFor(variant, idx).find(n => n.level === adLevelKey) || { name: "", errors: [] };
+
+  const genImage = async (variant, idx) => {
+    setImgBusy(idx);
+    setImgErr({ ...imgErr, [idx]: "" });
+    try {
+      const prompt = buildImagePrompt(brief, variant, brand);
+      const img = await callGenerateImage({ prompt, aspectRatio: aspect, model: IMAGE_MODELS.FAST });
+      setImages({ ...images, [idx]: { ...img, aspect } });
+    } catch (e) {
+      setImgErr({ ...imgErr, [idx]: e.message || "Could not generate an image." });
+    } finally { setImgBusy(null); }
+  };
+
+  const downloadImage = (variant, idx) => {
+    const img = images[idx];
+    if (!img) return;
+    const ext = (img.mimeType || "image/png").split("/")[1] || "png";
+    const a = document.createElement("a");
+    a.href = `data:${img.mimeType};base64,${img.data}`;
+    a.download = `${(sel.initId || sel.id)}_${(variant.label || "variant").replace(/\s+/g, "-")}_${img.aspect.replace(":", "x")}.${ext}`;
+    a.click();
+  };
 
   const assignTag = () => {
     const suggested = suggestTrackingTag(sel, schema);
@@ -310,6 +347,10 @@ export function CreativeStudio({
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
             <div style={{ ...gSL(t), marginBottom: 0 }}>Variants</div>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <label style={{ fontSize: 12, color: t.textSub }}>Frame</label>
+              <select value={aspect} onChange={e => setAspect(e.target.value)} style={{ ...gSl(t), width: 132, padding: "6px 8px" }}>
+                {IMAGE_ASPECTS.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}
+              </select>
               <label style={{ fontSize: 12, color: t.textSub }}>Channel</label>
               <select value={channel} onChange={e => { setChannel(e.target.value); setEdits({}); }} style={{ ...gSl(t), width: 118, padding: "6px 8px" }}>
                 {channels.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
@@ -361,6 +402,54 @@ export function CreativeStudio({
 
                   {v.cta && <div style={{ fontSize: 12.5, color: t.textSub, marginBottom: 4 }}><strong style={{ color: t.text }}>CTA.</strong> {v.cta}</div>}
                   {v.rationale && <div style={{ fontSize: 12, color: t.textMuted, lineHeight: 1.55, marginBottom: 12 }}>{v.rationale}</div>}
+
+                  {/* Key frame. The prompt is assembled from the approved brief
+                      rather than typed, and is inspectable before spending —
+                      an image call is a fixed few cents, unlike a text call. */}
+                  <div style={{ margin:"12px 0", padding:"11px 12px", background:t.surface, border:"1px solid "+t.borderSoft, borderRadius:10 }}>
+                    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:9, flexWrap:"wrap" }}>
+                      <div style={{ ...gSL(t), marginBottom:0 }}>Key frame</div>
+                      <div style={{ display:"flex", gap:7, alignItems:"center", flexWrap:"wrap" }}>
+                        <button onClick={() => setPromptPreview(promptPreview?.idx === i ? null : { idx:i, text:buildImagePrompt(brief, v, brand) })}
+                          style={{ ...gGh(t), padding:"5px 9px", fontSize:11 }}>
+                          {promptPreview?.idx === i ? "Hide prompt" : "See prompt"}
+                        </button>
+                        {images[i] && (
+                          <button onClick={() => downloadImage(v, i)} style={{ ...gGh(t), padding:"5px 9px", fontSize:11 }}>Download</button>
+                        )}
+                        <button onClick={() => genImage(v, i)} disabled={imgBusy !== null}
+                          style={{ ...(images[i] ? gGh(t) : gG(t)), padding:"5px 11px", fontSize:11.5, opacity: imgBusy !== null ? 0.55 : 1 }}>
+                          {imgBusy === i ? "Generating…" : images[i] ? "Regenerate" : "Generate image"}
+                        </button>
+                      </div>
+                    </div>
+
+                    {promptPreview?.idx === i && (
+                      <pre style={{ margin:"9px 0 0", padding:"9px 10px", background:t.surfaceAlt, border:"1px solid "+t.border,
+                        borderRadius:8, fontSize:11, fontFamily:t.mono, color:t.textSub, whiteSpace:"pre-wrap", lineHeight:1.5, maxHeight:210, overflowY:"auto" }}>
+                        {promptPreview.text}
+                      </pre>
+                    )}
+
+                    {imgErr[i] && (
+                      <div style={{ marginTop:9, fontSize:11.5, color:t.red, lineHeight:1.5 }}>{imgErr[i]}</div>
+                    )}
+
+                    {images[i] ? (
+                      <div style={{ marginTop:10 }}>
+                        <img src={`data:${images[i].mimeType};base64,${images[i].data}`} alt={"Generated key frame for " + v.label}
+                          style={{ maxWidth:"100%", width:260, borderRadius:9, border:"1px solid "+t.border, display:"block" }}/>
+                        <div style={{ fontSize:10.5, color:t.textMuted, fontFamily:t.mono, marginTop:6 }}>
+                          {images[i].aspect} · held for this session only — download to keep it
+                        </div>
+                      </div>
+                    ) : !imgErr[i] && (
+                      <div style={{ marginTop:8, fontSize:11.5, color:t.textMuted, fontFamily:t.serif, lineHeight:1.5 }}>
+                        Generates the opening beat as a single frame, grounded in this brief. Text and unverified claims are
+                        excluded from the image by construction — copy belongs in the ad tool, where it gets reviewed.
+                      </div>
+                    )}
+                  </div>
 
                   {/* Slot editors. Controlled dimensions render as selects so an
                       off-vocabulary value cannot be introduced by hand; the

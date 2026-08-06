@@ -5,6 +5,7 @@ import {
   CATEGORIES,
   AGENTS as CONFIG_AGENTS,
 } from "./activeConfig.js";
+import { DEFAULT_NAMING_SCHEMA } from "./services/naming.js";
 
 export const DEFAULT_AGENTS = CONFIG_AGENTS;
 
@@ -69,7 +70,14 @@ export function applyBrandBriefDefaults(brand) {
   };
 }
 
+// The campaign naming convention is settings data, not code, so an operator can
+// edit vocabularies without a deploy and a future multi-tenant deployment stores
+// one per tenant rather than one per build. Settings saved before this existed
+// have no `namingSchema` key; `resolveSchema` falls back to the shipped default
+// rather than requiring a migration — the same optional-with-fallback shape the
+// per-brand North Star uses, for the same reason.
 export const DEFAULT_SETTINGS = {
+  namingSchema:     DEFAULT_NAMING_SCHEMA,
   companyName:      COMPANY_NAME,
   businessModel:    BUSINESS_MODEL,
   northStarMetric:  NORTH_STAR_METRIC,

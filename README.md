@@ -12,6 +12,8 @@ Built to demonstrate how a Director of Growth thinks about velocity, incremental
 
 ## What's new
 
+- **Creative Studio** — brief and produce creative against an initiative, so every asset is born attached to a hypothesis. Briefs are grounded in the brand brief and closed learnings and must state what result would falsify the direction; anything the brand brief doesn't support is routed to `claimsToVerify` rather than asserted. Variants come back as validated naming segments, and ad names are assembled in code
+- **Campaign nomenclature engine** — the ad naming convention lives in settings as an ordered segment list with controlled vocabularies. `src/services/naming.js` builds, parses and validates against it, and its trailing `Initiative` segment carries an initiative's `trackingTag` — which is how a performance row finds its way back to the experiment that produced it
 - **Model tiering** — reasoning calls (debate, synthesis, candidate generation) run on `claude-sonnet-5`; schema-shaped transformations (quick capture, hypothesis expansion, ICE assist) run on `claude-haiku-4-5`. Adaptive thinking throughout, prompt caching on the flows that reuse a system prefix
 - **Accessible palette, enforced** — light-mode gold now passes WCAG AA (it previously measured 2.42:1 on white, applied to the dashboard's largest figures); dark surfaces moved from warm brown to cool charcoal so the accent reads as gold rather than mud. `npm run check:contrast` fails CI on regression
 - **No browser-held API credential** — the proxy authorises on origin and bounds cost by request shape instead of a `VITE_`-prefixed secret that shipped inside the bundle
@@ -60,6 +62,32 @@ Built into every running or completed initiative:
 - **Statistical significance** — live z-statistic, confidence level, and observed uplift as you enter control/variant conversion and session counts
 - **Incrementality / counterfactual** — required free-text field before a test can be marked Complete; defines what would have happened without the intervention
 - **Calibration** — at close-out, prediction error (estimated vs actual revenue) is computed from the frozen prediction snapshot taken at launch, and displayed on the initiative card and in the learning library
+
+### Campaign nomenclature
+
+The naming convention is data, not code — an ordered list of segments with controlled vocabularies, stored in settings so vocabularies change without a deploy. The shipped default is a live Meta convention:
+
+```
+Channel_Handle_Asset_Campaign_Gender_Theme_Angle_Category_Flavor_Format_Initiative
+Meta_Col_EmmaBrune_R3_F_Fitness_Gym_Pastry_Chocolate_35s-Raw_NA
+```
+
+Three properties make it safe to parse positionally, and all three are enforced:
+
+- **Segments are never omitted.** An absent value is the literal `NA`. A blank would shift every following segment and mis-attribute the row — a failure that produces wrong data rather than an error.
+- **The delimiter never appears inside a segment.** Multi-word values are CamelCase.
+- **A wrong segment count is refused, not guessed.** Any alignment would be a coin flip, and a mis-parsed row enters the analysis silently while an unparsed one gets counted and reported.
+
+The trailing `Initiative` segment is the bridge: it carries an initiative's `trackingTag`, so `matchNamesToInitiatives` can join performance rows back to experiments — and can separate untagged business-as-usual spend from a tag that resolves to nothing.
+
+### Creative Studio
+
+Select a Draft or Running initiative and the studio produces a creative brief grounded in that brand's brief and the portfolio's closed learnings, then turns each angle into shootable, named variants.
+
+- **Briefs must be falsifiable.** Every brief states what result would prove the direction wrong. One that can't be wrong can't teach anything.
+- **Unsupported claims are quarantined.** Anything the creative wants to say that the brand brief doesn't support goes into `claimsToVerify` for the operator to clear, rather than being asserted in a script.
+- **Names are assembled, not typed.** The model returns segment values; `buildName` validates them against the schema. The initiative segment is stamped from the initiative's own tracking tag — the model is never told it and never asked to invent one.
+- **Output is portable.** Copy the ad names, or export the full variant set as CSV.
 
 ### CSV import / export
 Row-by-row preview before writing. Matched on `initId` for non-destructive updates. Handles date format normalisation, case-insensitive brand matching, and ICE clamping. Google Sheets template included.
@@ -120,6 +148,8 @@ All AI features run through a server-side proxy — your API key is never expose
 
 | Feature | What it does |
 |---|---|
+| Creative Brief | Turns an initiative's hypothesis into shootable creative direction, grounded in brand brief and closed learnings |
+| Creative Variants | Turns brief angles into named, scripted ad variants carrying the initiative's tracking tag |
 | Quick Capture | Converts a rough plain-language idea into a fully structured initiative |
 | Hypothesis Expansion | Rewrites a draft hypothesis to the structured format; requires review before accepting |
 | ICE Scoring Assist | Suggests Impact and Certainty scores with written rationales |
@@ -167,11 +197,12 @@ src/
   config.js            # Generic deployment context — brands, agents, categories, seed data
   config.[client].js   # Per-client copy of config.js (e.g. config.csc.js)
   constants.js         # Theme tokens, status/outcome palettes, ICE scoring, formatters
-  views/               # DashView, TriageView, LearningLibrary, DetailView, ClientReadoutView, CopilotPanel
+  views/               # DashView, TriageView, LearningLibrary, DetailView, ClientReadoutView, CreativeStudio, CopilotPanel
   components/          # Shared UI atoms
   services/
     store.js           # Backend-agnostic persistence with explicit write-failure reporting
     portfolio.js       # Portfolio context + tool definitions passed to the agents
+    naming.js          # Campaign nomenclature — build/parse/validate, and the initiative bridge
     csv.js             # Import/export and record normalisation
     ai/
       models.js        # Model tier selection, effort, prompt-cache policy
@@ -203,9 +234,11 @@ For the full rationale behind each decision, including forcing conditions for wh
 See [ROADMAP.md](./ROADMAP.md) for the full phase breakdown.
 
 - **Phase 1 (complete):** Modularisation, bug sweep, weekly standup mode
+- **Phase 1.6 (complete):** Campaign nomenclature engine, Creative Studio, the initiative↔ad-name bridge
 - **Phase 2:** Live data ingestion — Shopify adapter, GA4 funnel, normalisation contract
 - **Phase 3:** Autonomous orchestration — background execution, Zod output validation, prompt versioning, continuous audit loop
 - **Phase 4:** Multi-tenant platform — Supabase RLS, federated knowledge base (pgvector), cross-customer anonymised benchmarking
+- **Phase 5 — Marketers Lab:** learning agenda layer, kill-criteria gate, campaign fact model, Meta/Google connectors, campaign execution behind a proposal gate, creative production
 
 ---
 

@@ -68,6 +68,43 @@ A pre-sale audit surfaced four blocking issues and a set of credibility gaps. Al
 
 ---
 
+## Phase 1.6 — Creative loop and campaign nomenclature (August 2026)
+
+The first slice of the Marketers Lab expansion, chosen because it is the only part
+of that scope with no backend dependency — it ships against `localStorage` today
+and does not wait on Supabase.
+
+- [x] **Naming convention as data.** `settings.namingSchema` holds an ordered
+  segment list with controlled vocabularies; `src/services/naming.js` builds,
+  parses and validates against it. Ships with the operator's live Meta convention
+  (`Channel_Handle_Asset_Campaign_Gender_Theme_Angle_Category_Flavor_Format_Initiative`)
+  as the default. Parsing refuses to guess on a segment-count mismatch and
+  reports unparsed rows in every breakdown rather than dropping them.
+- [x] **The initiative bridge.** The convention's trailing `Initiative` segment
+  carries an initiative's `trackingTag`, which is the attribution socket that has
+  been on every initiative record since the CSV work. `matchNamesToInitiatives`
+  separates untagged spend (normal) from a tag that resolves to nothing (a broken
+  link worth surfacing).
+- [x] **Creative Studio.** Brief → variants against a selected Draft or Running
+  initiative. Briefs are grounded in the brand brief and closed learnings, and
+  carry `wouldFalsify` and `claimsToVerify`. Variants come back as validated
+  naming segments and are assembled into ad names in code, then exported as CSV
+  or copied for paste into the ad platform.
+
+### Next in this slice
+
+- [ ] **Performance import keyed on ad name.** Extend the metrics importer to
+  accept a campaign-level export, parse each `name` through `naming.js`, and
+  attach rows to initiatives via the tag. This is what turns the Test Validity
+  panel's hand-entered control/variant counts into real ones.
+- [ ] **Breakdown view.** `breakdownBySegment` already returns the shape; it
+  needs a view that pivots spend and conversions by any segment, with the
+  unparsed count shown rather than hidden.
+- [ ] **Naming schema editor.** The schema is editable data with no editor yet —
+  changing a vocabulary currently means editing the settings blob.
+
+---
+
 ## Phase 2 — The Data Moat
 
 **Target:** Replace manual CSV data entry with live API connections to ground the Prediction Ledger in authoritative numbers.
@@ -143,3 +180,106 @@ Automatically sanitise closed initiatives — stripping identifying brand data �
 Aggregate de-identified outcome data across clients to produce category-level benchmarks (e.g. median ICE accuracy by experiment type, win rate by funnel stage, average time-to-result by category). Feed these benchmarks into the candidate generation pass of Next Plays and into the Signal debate context. This is the feature that creates compounding value with each additional client — each new data point improves recommendations for the entire network.
 
 > Implementation note: this phase requires explicit contract language around data usage and anonymisation before any cross-client data flows are introduced.
+
+---
+
+## Phase 5 — Marketers Lab
+
+The expansion from a decision engine into an experimentation platform that also
+executes. Sequenced by dependency, not by appeal: everything below Phase 5.1
+needs a backend, and pretending otherwise is how this stalls.
+
+Positioning is **practice-first, product-shaped** — built for the operator's own
+consulting work, with schema decisions made multi-tenant-safe from the first
+migration so productising is a policy change rather than a rewrite. See
+DECISIONS.md.
+
+### 5.1 — The learning agenda layer
+
+Today the hierarchy is flat: initiatives. The layer above them is what turns a
+backlog into a research programme.
+
+**Learning Agenda → Experiments → Campaigns/ad entities → Metrics**
+
+A learning agenda item is a question the business needs answered ("does creator
+authority beat product demonstration for cold traffic?"). Experiments ladder up
+to it. This unlocks backward test design — name the learning, and derive what to
+hold constant, what to vary, the sample size, the duration, and the result that
+would falsify it — and it makes "which of our campaigns actually taught us
+anything" answerable for the first time.
+
+App-layer work on the existing data model. No backend dependency.
+
+### 5.2 — Pre-registration and kill criteria as an enforced gate
+
+Harvested from the Biosphere design prototype, which got this right:
+
+> Nothing leaves quarantine until its kill criteria are confirmed. Set before
+> launch, not after.
+
+`killCriteria` exists on every initiative today as free text with no gate and no
+tracking. This makes it structural: a Draft cannot move to Running until kill
+criteria are set, and a Running initiative shows live distance to its kill line.
+Also from that prototype and worth adopting: a **Franchise / Loonshot** risk
+taxonomy, so a portfolio can be read for whether it is taking any real swings.
+
+### 5.3 — Campaign fact model *(requires Supabase)*
+
+The weekly-metrics contract is one row per week per brand per source. Campaign
+analysis needs facts at campaign/adset/ad × day, with nomenclature segments
+parsed into typed dimensions, so that every "break performance down by X" is a
+`GROUP BY` rather than a bespoke view.
+
+The link table is what makes campaign↔experiment work in both directions with
+one shape:
+
+```
+initiative_campaigns(initiative_id, platform, entity_type, entity_id, role)
+role ∈ control | variant | holdout
+```
+
+Assign campaigns to an experiment, or promote a set of campaigns into one —
+same table, two entry points.
+
+**Prerequisite:** Supabase (Phase 2). The JSON-blob-per-key model does not
+survive a relational fact table; this is the read-path work DECISIONS.md warns
+is real rather than an adapter swap.
+
+### 5.4 — Read connectors: Meta and Google Ads *(requires Supabase)*
+
+Ships behind the existing normalisation contract, one at a time, per the
+ingestion decision. Note this reorders the original sequencing: Meta and Google
+were last because their marginal value over a two-minute weekly CSV was low.
+Under Marketers Lab they carry the campaign fact model, so the value is no longer
+marginal. Shopify and GA4 keep their original priority for the metrics they
+uniquely own.
+
+**Hard prerequisite:** OAuth refresh tokens cannot live in a browser. This is the
+forcing condition for Supabase, arriving whether or not a client ever asks where
+their data is stored.
+
+### 5.5 — Campaign execution behind a proposal gate *(requires 5.4)*
+
+Create, budget, pause. Every mutation is a proposed change, diffed against live
+state, human-approved, then applied by a separate path that writes an audit
+record. No auto-approval at any spend level. Full reasoning in DECISIONS.md — this
+is the one part of the scope where getting it wrong costs money rather than
+credibility.
+
+### 5.6 — Creative production
+
+Extends the Creative Studio from direction to assets: brief → variant set →
+generated or templated creative → tagged with the initiative → matched back
+through the naming convention when performance lands. Closes the loop that
+5.1–5.5 opens.
+
+### Open question — naming and identity
+
+`marketerslab.com` is held, and the Biosphere prototype carries a different
+visual identity (green/oklch, sidebar IA, Instrument Sans) and a strong
+vocabulary: Observatory, Quarantine, Vivarium, Laboratory, Microscope.
+DECISIONS.md defends the current sand-gold editorial palette on the grounds that
+this is a client-facing advisory artifact rather than an internal ops console.
+Both positions are coherent; they describe different products. This is a
+positioning decision to make deliberately, not a side effect of whichever view
+gets built next.

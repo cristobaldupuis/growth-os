@@ -4,6 +4,54 @@ Architecture decisions worth remembering. The bar for this file is a real tradeo
 
 ---
 
+## Marketers Lab is an expansion of Growth OS, not a second product
+
+**Decision:** The Marketers Lab scope — tool integrations, campaign execution, creative direction, nomenclature-driven performance analysis, and campaign↔experiment linking — is built on this codebase and this data model. No new repository, no rewrite.
+
+**Why:** The thing that would justify a rewrite is a wrong spine, and the spine is right. `initiative → hypothesis → predictionSnapshot (frozen at launch) → results → computePredictionError → learning library` is an experiment ledger with calibration already in it, and every item on the expansion list hangs off it rather than replacing it. Two pieces of the bridge were already built before the expansion was scoped: `measurementMetric` / `measurementScope` / `trackingTag` on every initiative (`mkDefault` in constants.js, commented "attribution socket"), and the ingestion decision below that normalises every source into one contract. Discarding that to start again would cost months and buy a worse version of what exists.
+
+**What the expansion genuinely breaks, stated up front:**
+
+1. **localStorage.** Running campaigns means Meta and Google OAuth, which means refresh tokens, which cannot live in a browser. This is not the soft forcing condition recorded below ("a client asks where their data lives") — it is a hard one that arrives with the first write-capable connector. Supabase stops being a later phase and becomes a prerequisite.
+2. **The weekly-metrics contract.** `{date, brand, source, metrics:{}}` is one row per week per brand per source. Campaign analysis needs facts at campaign/adset/ad × day with parsed nomenclature dimensions. That is a new table, not a new field — and per the note below, the JSON-blob-per-key model does not survive it.
+3. **Read versus write risk.** Every connector shipped so far reads. A bad read is a wrong chart; a bad write spends money. Write access is a different risk class and gets its own gate, recorded separately below.
+
+**Positioning:** practice-first, product-shaped. Built for the operator's own consulting use, with every schema decision made multi-tenant-safe (tenant scoping present from the first migration, RLS policies written alongside the tables) so productising later is a policy change rather than a migration. The roughly 15% additional cost now is deliberately paid to avoid a rewrite at the point of highest inconvenience.
+
+**Forcing condition:** none for the direction. If a genuinely different data model is ever needed — an entity that cannot be expressed as an initiative, a campaign, or a fact row — revisit before adding a fourth concept.
+
+---
+
+## Ad naming convention is data, and it is enforced in code rather than by prompt
+
+**Decision:** The campaign nomenclature lives in `settings.namingSchema` as a list of segment definitions with controlled vocabularies. `src/services/naming.js` owns building, parsing, and validating names against it. AI calls that produce creative return segment *values*; the name string is always assembled by `buildName`.
+
+**Why the schema is data:** an operator changing "add SweetRolls to the category list" should not be a deploy, and a multi-tenant deployment needs one schema per tenant rather than one per build. Making it a settings field gets both. Settings saved before the field existed resolve to the shipped default through `resolveSchema` rather than requiring a migration — the same optional-with-fallback shape as the per-brand North Star, chosen for the same reason.
+
+**Why the model never writes the name:** a convention maintained by asking a model nicely holds until the one generation where it doesn't, and a single malformed name silently mis-attributes every performance row it produces. The failure is not a parse error the operator would notice; it is wrong data that looks right. Assembling the name in code from validated segments makes that class of failure unreachable. For the same reason the model is never given the initiative's `trackingTag` and never asked to produce one — the caller stamps it. The source spec sheet says it directly: "never invent one." An invented tag is worse than an absent one, because it looks like a tracked experiment and joins to nothing.
+
+**Why positional parsing refuses rather than guesses:** a name with the wrong segment count cannot be aligned, and any alignment picked would be a coin flip. `parseName` returns no values at all in that case. A wrong-but-plausible parse is worse than an unparsed row, because the unparsed row is counted and reported while the mis-parsed one enters the analysis silently. The same principle governs `breakdownBySegment`, which reports `unparsed` alongside the groups — a breakdown that quietly excludes a third of spend is worse than one that admits it.
+
+**One finding worth recording:** the source spec sheet's declared Campaign vocabulary (`R1–R5, Evergreen, Generic, Promo`) does not cover its own rows, which also use `Donuts` and `FreeSample` as launch buckets. The shipped default encodes what is actually in use rather than what was written down, because validating live correct data as broken on first run is how a validation layer gets turned off.
+
+**Forcing condition:** when a second channel with a materially different entity hierarchy is added (Google's campaign → ad group → ad, versus Meta's campaign → ad set → ad), the schema needs a level dimension so one convention can describe names at three levels. The segment list shape already accommodates it; the resolution logic does not yet.
+
+---
+
+## Creative direction is briefed against an initiative, never standalone
+
+**Decision:** The Creative Studio requires an initiative before it will brief anything, and only offers Draft or Running ones. Generated briefs carry `wouldFalsify` and `claimsToVerify` as required fields.
+
+**Why:** creative generated without a hypothesis attached is the thing this product exists to replace. The value is not that a model can write ad scripts — everything can write ad scripts. It is that each round of assets is born attached to a question, carries the tracking tag that will let performance answer it, and states in advance what result would prove the direction wrong. A brief that cannot be wrong cannot teach anything, and a creative round that teaches nothing is indistinguishable from spend.
+
+`claimsToVerify` exists because the highest-risk failure of AI-generated marketing copy is a confident unsupported product claim. The brief is instructed to route anything the brand brief does not support into that field instead of asserting it, which turns a compliance risk into a checklist the operator clears before shooting.
+
+**Tier split, deliberately not uniform:** the brief runs on the reasoning tier and the variants on the structured tier. The brief has to decide which closed learnings genuinely bear on this hypothesis and which are superficially similar, which is evidence-weighing. The variants take fixed angles and fixed direction and turn them into scripts against a schema, which is transformation. This is the same test applied in the model-tiering decision below, not an exception to it.
+
+**Forcing condition:** if creative production (actual asset generation, not direction) is added, the brief becomes an input to an external service and needs a stable versioned contract rather than a free-shaped object.
+
+---
+
 ## localStorage over backend persistence (Postgres / Supabase)
 
 **Decision:** All state persists in `localStorage` under versioned keys, with a memory fallback for sandboxed environments. No database, no backend persistence layer.
@@ -49,6 +97,20 @@ Sequence, by ratio of value to integration pain:
 CSV stays regardless of how many connectors ship: it is the only path that works for a platform nobody has built a connector for, for a client whose IT won't grant API access, and for the operator pasting a number from a spreadsheet during a call.
 
 **Forcing condition for each connector:** a client is manually exporting that specific source every week and says so. Not before.
+
+---
+
+## Write access to ad platforms goes through a proposal gate, never a direct tool call
+
+**Decision:** No AI path writes to Meta or Google Ads directly. Every mutation — create campaign, change budget, pause ad set — is produced as a *proposed change*, rendered as a diff against current live state, approved by a human, and then executed by a separate applier that writes an audit record. The proposer and the applier are different code paths with different credentials.
+
+**Why:** every connector in the roadmap before this one reads. A bad read renders a wrong chart and the operator notices within a day. A bad write spends money immediately, at a rate bounded only by the account's daily cap, and is not reversible by editing the code that caused it. Those are different risk classes and collapsing them into "the agent has a tool" is how an experimentation tool becomes an incident.
+
+The diff requirement is the substantive part, not the approval click. An approval prompt showing "Claude wants to update campaign 12345" carries no information; one showing `daily_budget: $400 → $1,200` and `status: PAUSED → ACTIVE` is a decision a human can actually make. Auto-approval is deliberately not offered at any spend level, because the threshold below which a wrong write is acceptable is not a number this system can know.
+
+**What this costs:** the loop is slower than a direct tool call and it is more code — a proposal store, a differ against live state, an applier, an audit log. That is the intended trade. It is also the same shape that makes the feature sellable: an agency handing this to a client can show exactly what was changed, by whom, and what it was before.
+
+**Forcing condition:** none that removes the gate. If proposal volume ever makes per-change approval impractical, the answer is batching approvals over a reviewed plan, not lowering the bar to auto-execution.
 
 ---
 

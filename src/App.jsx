@@ -10,6 +10,8 @@ import {
 
 import { KEY_ITEMS, KEY_SETTINGS, KEY_DEBATES, KEY_METRICS, KEY_RECS, KEY_CREATIVE, KEY_THEME, KEY_LIB_VIEW, KEY_TOUR_SEEN, store, onWriteError, handleDownloadBackup, handleRestoreBackup } from "./services/store.js";
 import { CreativeStudio } from "./views/CreativeStudio.jsx";
+import { Sidebar } from "./components/Sidebar.jsx";
+import { navName } from "./components/navSections.js";
 import {
   applyBrandBriefDefaults, DEFAULT_AGENTS, DEFAULT_SETTINGS,
   STATUSES, STATUS_GROUP_ORDER, OUTCOMES, INIT_TYPES, METRIC_SOURCES,
@@ -67,7 +69,7 @@ const GUIDE_SECTIONS = [
     feature: "Next Plays: weekly recommendations",
     what: "Proactive experiment suggestions with the hypothesis pre-written and ICE pre-scored, drawn from your portfolio, learnings library, brand briefs, and latest metrics.",
     why: "Removes the blank-page problem every week. You walk into the standup with three grounded plays already framed and prioritized.",
-    cta: "Go to Dashboard",
+    cta: "Go to Observatory",
     action: "dashboard",
   },
   {
@@ -77,37 +79,37 @@ const GUIDE_SECTIONS = [
     feature: "Contribution-to-revenue view",
     what: "A three-layer revenue picture (realised, probability-weighted in-flight, and probability-weighted pipeline) broken down by category, with one-click copy for client emails.",
     why: "This is the answer to \"what did this engagement actually drive?\" It's the artifact that justifies renewals.",
-    cta: "Go to Dashboard",
+    cta: "Go to Observatory",
     action: "dashboard",
   },
   {
     id: "library",
     views: ["library"],
     label: "Never re-run a dead experiment",
-    feature: "Learnings library",
+    feature: "Archive: the learnings library",
     what: "Every closed initiative becomes a searchable learning, tagged by outcome, category, and type. Filter, synthesize across them with AI, or replicate a winner in one click.",
     why: "Institutional memory that compounds. The longer the engagement runs, the smarter every recommendation gets.",
-    cta: "Open Library",
+    cta: "Open Archive",
     action: "library",
   },
   {
     id: "initiatives",
     views: ["initiatives","detail","form"],
     label: "Track & prioritize the portfolio",
-    feature: "Initiatives + ICE scoring",
+    feature: "Register: the initiative pipeline, ICE scored",
     what: "The full initiative pipeline with ICE scoring, status tracking, blockers, owners, multi-retailer support, CSV import/export, and quick capture for half-formed ideas.",
     why: "One ranked, shared source of truth for what's running, what's queued, and what it's worth.",
-    cta: "Open Initiatives",
+    cta: "Open Register",
     action: "initiatives",
   },
   {
     id: "triage",
     views: ["triage"],
     label: "Run the weekly review",
-    feature: "Triage",
+    feature: "Quarantine: the weekly decision queue",
     what: "Surfaces initiatives that need a decision this week (overdue, awaiting results, or blocked) so nothing stalls silently.",
     why: "Keeps the portfolio moving and gives the standup its agenda.",
-    cta: "Open Triage",
+    cta: "Open Quarantine",
     action: "triage",
   },
   {
@@ -494,6 +496,11 @@ export default function App() {
   const [showTour,   setShowTour]   = useState(false);
   const [tourStep,   setTourStep]   = useState(0);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  // Mobile only. The sidebar is a permanent column above 900px and a drawer
+  // below it — the previous top strip overflowed a 390px viewport, and a fixed
+  // 216px column would do the same, so on narrow screens it slides over rather
+  // than taking width from the content.
+  const [navOpen, setNavOpen] = useState(false);
 
   const t    = dk ? TD : TL;
   const cats   = settings.categories || DEFAULT_SETTINGS.categories;
@@ -1089,9 +1096,19 @@ export default function App() {
 
   if(!loaded) return <div style={{background:t.bg,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{color:t.textMuted,fontFamily:t.serif}}>Loading Growth OS…</span></div>;
 
-  const navBtn=(v,lbl)=>(
-    <button key={v} onClick={()=>setNav(v)} style={{fontSize:13,fontWeight:nav===v?600:500,padding:"6px 14px",borderRadius:8,cursor:"pointer",fontFamily:t.sans,background:nav===v?t.surface:"transparent",border:"none",color:nav===v?t.text:t.textSub,boxShadow:nav===v?t.shadow:"none",transition:"all .15s",whiteSpace:"nowrap",flexShrink:0}}>{lbl}</button>
-  );
+  // Counts shown against each nav item. Deliberately only where a number means
+  // "there is work here" — a count on Observatory or Readout would be decoration,
+  // and a badge that never means anything trains you to stop reading badges.
+  const inScope = e => activeBrand==="all" || (e.brandId||"default")===activeBrand;
+  const navCounts = {
+    initiatives: items.filter(e=>inScope(e)&&(e.status==="Draft"||e.status==="Running")).length,
+    library:     items.filter(e=>inScope(e)&&(e.status==="Completed"||e.status==="Killed")&&e.results?.keyLearning).length,
+    triage:      items.filter(e=>inScope(e)&&e.status==="Running"&&(
+                   (e.blocker&&e.blocker!=="None") ||
+                   (e.endDate&&new Date(e.endDate+"T12:00:00")<new Date())
+                 )).length,
+    creative:    (creative||[]).filter(c=>items.some(e=>e.id===c.initiativeId&&inScope(e))).length,
+  };
 
   return (
     <div style={{background:t.bg,minHeight:"100vh",fontFamily:t.sans,color:t.text}}>
@@ -1100,7 +1117,14 @@ export default function App() {
         * third-party request buying nothing — and one more origin to justify if a
         * client's security review asks. Every glyph on screen is either an HTML
         * entity or an inline SVG. */}
-      <style>{"@keyframes spin{to{transform:rotate(360deg)}}input[type=range]{accent-color:"+t.goldFill+"}@keyframes slideIn{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}"}</style>
+      {/* The rail/burger swap is the one piece of layout that cannot be done with
+        * inline styles, since it needs a media query. Below 900px the permanent
+        * column is removed from flow entirely rather than merely narrowed — a
+        * 216px fixed column on a 390px viewport is the same horizontal-overflow
+        * bug the old tab strip had. */}
+      <style>{"@keyframes spin{to{transform:rotate(360deg)}}input[type=range]{accent-color:"+t.goldFill+"}@keyframes slideIn{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}"
+        +".gos-burger{display:none}"
+        +"@media(max-width:900px){.gos-rail{display:none}.gos-burger{display:flex}}"}</style>
 
       {/* Onboarding — first run only */}
       {onboarding&&(
@@ -1196,110 +1220,79 @@ export default function App() {
         </Modal>
       )}
 
-      {/* Header — single bar */}
-      <div style={{background:t.headerBg,borderBottom:"1px solid "+t.border,position:"sticky",top:0,zIndex:100}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:14,padding:"10px 16px",flexWrap:"wrap",width:"100%",maxWidth:1440,margin:"0 auto"}}>
-          {/* Left: logo lockup (home) + tabs. `minWidth:0` matters: without it this
-            * flex child refuses to shrink below its content width, and the tab
-            * strip pushes the document ~30px wider than a 390px viewport, which
-            * scrolls the whole page sideways on a phone. */}
-          <div style={{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap",minWidth:0,maxWidth:"100%"}}>
-            <button onClick={()=>setNav("dashboard")} title="Back to Dashboard" data-tour="logo"
-              style={{display:"flex",alignItems:"center",gap:9,padding:"5px 9px",borderRadius:10,cursor:"pointer",
-                background:"transparent",border:"1px solid transparent",transition:"background .15s, border-color .15s"}}
-              onMouseEnter={e=>{e.currentTarget.style.background=t.goldBg;e.currentTarget.style.borderColor=t.goldBorder;}}
-              onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.borderColor="transparent";}}>
-              <span style={{width:26,height:26,borderRadius:8,background:t.goldFill,color:t.goldText,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:600,fontSize:12,fontFamily:t.serif,letterSpacing:"-0.02em",flexShrink:0}}>GO</span>
-              <span style={{display:"flex",flexDirection:"column",alignItems:"flex-start",lineHeight:1.15}}>
-                <span style={{fontSize:14,fontWeight:700,letterSpacing:"0.06em",color:t.text,fontFamily:t.sans,whiteSpace:"nowrap"}}>GROWTH OS</span>
-                <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,letterSpacing:"0.02em",whiteSpace:"nowrap"}}>{settings.companyName}</span>
-              </span>
-            </button>
-            <div style={{width:1,height:24,background:t.border,flexShrink:0}}/>
-            {/* Scrolls horizontally rather than clipping when the five tabs don't
-              * fit — on a 390px phone "Client Readout" was previously cut off at
-              * the viewport edge and unreachable. */}
-            <div style={{display:"flex",gap:2,background:t.surfaceAlt,padding:3,borderRadius:10,border:"1px solid "+t.border,
-              overflowX:"auto",maxWidth:"100%",scrollbarWidth:"none"}}>
-              {navBtn("dashboard","Dashboard")}
-              {navBtn("initiatives","Initiatives")}
-              {navBtn("library","Library")}
-              {navBtn("creative","Creative")}
-              {navBtn("triage","Triage")}
-              {navBtn("readout","Summary")}
-            </div>
-            {(nav==="detail"||nav==="form")&&(
-              <button onClick={()=>setNav(nav==="detail"?detailOrigin:"initiatives")} style={{...gGh(t),padding:"6px 12px",fontSize:12}}>
-                <span style={{fontSize:12}}>&#8592;</span> Back to {nav==="detail"?(detailOrigin==="triage"?"Triage":detailOrigin==="library"?"Library":"Initiatives"):"Initiatives"}
-              </button>
-            )}
-          </div>
+      {/* Shell — permanent sidebar column above 900px, slide-over drawer below.
+        * A fixed 216px column on a 390px phone would reproduce exactly the
+        * horizontal overflow the old tab strip had, so the breakpoint is not
+        * cosmetic. */}
+      <div style={{display:"flex",alignItems:"flex-start",minHeight:"100vh"}}>
 
-          {/* Right: retailer + contextual actions + utilities */}
-          <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-            {DEMO_MODE&&(
-              <div style={{display:"flex",alignItems:"center",gap:4}}>
-                <span title="This workspace runs on seeded demo data. Nothing here is a real customer's numbers."
-                  style={{display:"flex",alignItems:"center",gap:5,fontSize:10.5,fontWeight:600,letterSpacing:"0.04em",color:t.textMuted,fontFamily:t.mono,background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:20,padding:"4px 10px",whiteSpace:"nowrap"}}>
-                  <span style={{width:6,height:6,borderRadius:"50%",background:t.gold,flexShrink:0}}/>
-                  Demo data
-                </span>
-                <button onClick={()=>setShowResetConfirm(true)} title="Resets everything back to the seed portfolio"
-                  style={{width:26,height:26,borderRadius:8,cursor:"pointer",background:"transparent",border:"1px solid "+t.border,color:t.textMuted,fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                  <span dangerouslySetInnerHTML={{__html:"&#8635;"}}/>
+        {/* Desktop rail */}
+        <aside className="gos-rail" style={{width:216,flexShrink:0,position:"sticky",top:0,height:"100vh"}}>
+          <Sidebar t={t} dk={dk} nav={nav} onNav={setNav} counts={navCounts}
+            brands={brands} activeBrand={activeBrand} setActiveBrand={setActiveBrand}
+            demoMode={DEMO_MODE} onResetDemo={()=>setShowResetConfirm(true)}
+            onTour={()=>{setTourStep(0);setShowTour(true);}}
+            onSignal={()=>setShowCopilot(true)} onGuide={()=>setGuideSection(true)}
+            onSettings={()=>setShowSet(true)} onToggleTheme={toggleDk}/>
+        </aside>
+
+        {/* Mobile drawer */}
+        {navOpen&&(
+          <div className="gos-drawer" onClick={()=>setNavOpen(false)}
+            style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,0.45)"}}>
+            <div onClick={e=>e.stopPropagation()} style={{width:250,height:"100%",boxShadow:t.shadowHi}}>
+              <Sidebar t={t} dk={dk} nav={nav} onNav={setNav} counts={navCounts}
+                brands={brands} activeBrand={activeBrand} setActiveBrand={setActiveBrand}
+                demoMode={DEMO_MODE} onResetDemo={()=>{setNavOpen(false);setShowResetConfirm(true);}}
+                onTour={()=>{setNavOpen(false);setTourStep(0);setShowTour(true);}}
+                onSignal={()=>{setNavOpen(false);setShowCopilot(true);}} onGuide={()=>{setNavOpen(false);setGuideSection(true);}}
+                onSettings={()=>{setNavOpen(false);setShowSet(true);}} onToggleTheme={toggleDk}
+                onClose={()=>setNavOpen(false)}/>
+            </div>
+          </div>
+        )}
+
+        <div style={{flex:1,minWidth:0}}>
+
+        {/* View header. Replaces the old global action row: actions now belong to
+          * the view that owns them rather than being permanently on screen. */}
+        <div style={{background:t.headerBg,borderBottom:"1px solid "+t.border,position:"sticky",top:0,zIndex:100}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,padding:"11px 20px",flexWrap:"wrap",maxWidth:1440,margin:"0 auto"}}>
+            <div style={{display:"flex",alignItems:"center",gap:11,minWidth:0}}>
+              <button className="gos-burger" onClick={()=>setNavOpen(true)} title="Menu"
+                style={{width:32,height:32,borderRadius:9,cursor:"pointer",background:t.surfaceAlt,border:"1px solid "+t.border,color:t.textSub,fontSize:15,alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                <span dangerouslySetInnerHTML={{__html:"&#9776;"}}/>
+              </button>
+              {(nav==="detail"||nav==="form")?(
+                <button onClick={()=>setNav(nav==="detail"?detailOrigin:"initiatives")} style={{...gGh(t),padding:"6px 12px",fontSize:12}}>
+                  <span style={{fontSize:12}}>&#8592;</span> Back to {navName(nav==="detail"?detailOrigin:"initiatives")}
                 </button>
-                <button onClick={()=>{setTourStep(0);setShowTour(true);}} title="Replay the guided tour"
-                  style={{height:26,padding:"0 9px",borderRadius:8,cursor:"pointer",background:"transparent",border:"1px solid "+t.border,color:t.textMuted,fontSize:10.5,fontWeight:600,fontFamily:t.sans,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,whiteSpace:"nowrap"}}>
-                  Tour
+              ):(
+                <div style={{minWidth:0}}>
+                  <div style={{fontFamily:t.serif,fontSize:17,fontWeight:600,color:t.text,lineHeight:1.2}}>{navName(nav)}</div>
+                  <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>{settings.companyName}</div>
+                </div>
+              )}
+            </div>
+
+            <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+              {nav==="initiatives"&&(<>
+                <button onClick={()=>setShowCapture(true)} style={{...gGh(t),padding:"6px 11px",fontSize:11.5}}>
+                  &#9889; Quick capture
                 </button>
-              </div>
-            )}
-            {brands.length>1&&(
-              <select value={activeBrand} onChange={e=>setActiveBrand(e.target.value)} data-tour="brand-select"
-                style={{fontSize:12,padding:"6px 11px",borderRadius:9,border:"1px solid "+(activeBrand==="all"?t.border:t.goldBorder),background:activeBrand==="all"?t.surfaceAlt:t.goldBg,color:activeBrand==="all"?t.textSub:t.gold,fontFamily:t.serif,cursor:"pointer",maxWidth:150}}>
-                <option value="all">All retailers</option>
-                {brands.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
-            )}
-            {nav==="initiatives"&&(<>
-              <button onClick={()=>setShowCapture(true)} style={{...gGh(t),padding:"6px 11px",fontSize:11.5}}>
-                &#9889; Quick capture
-              </button>
-              <button onClick={()=>{setImportRows([]);setImportErrs([]);setImportDone(false);setShowImport(true);}} style={{...gGh(t),padding:"6px 11px",fontSize:11.5}}>
-                &#8645; Import CSV
-              </button>
-              <button onClick={()=>handleExportCSV(filtered,"GrowthOS_export_"+new Date().toISOString().slice(0,10)+".csv")} style={{...gGh(t),padding:"6px 11px",fontSize:11.5}} title="Export current filtered view as CSV">
-                &#8659; Export CSV
-              </button>
-              <button onClick={goNew} style={{...gG(t),padding:"6px 12px",fontSize:12.5}}>
-                + New
-              </button>
-            </>)}
-            <button onClick={()=>setShowCopilot(true)} data-tour="signal-button"
-              style={{fontSize:12.5,padding:"7px 14px",borderRadius:9,cursor:"pointer",
-                background:t.goldFill,border:"1px solid "+t.goldFill,color:t.goldText,fontWeight:600,fontFamily:t.sans,
-                display:"flex",alignItems:"center",gap:5,boxShadow:t.shadow}}>
-              ✦ Signal
-            </button>
-            <button onClick={()=>setGuideSection("signal")} title="What is Signal?"
-              style={{width:20,height:20,marginLeft:-4,borderRadius:"50%",cursor:"pointer",background:"transparent",border:"1px solid "+t.border,color:t.textMuted,fontSize:11,fontWeight:700,fontFamily:t.sans,lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-              ?
-            </button>
-            <button onClick={()=>setGuideSection(true)} title="What can Growth OS do?"
-              style={{width:32,height:32,borderRadius:9,cursor:"pointer",background:t.surfaceAlt,border:"1px solid "+t.border,color:t.textSub,lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,fontWeight:700,fontFamily:t.sans}}>
-              ?
-            </button>
-            <button onClick={()=>setShowSet(true)} title="Settings"
-              style={{width:32,height:32,borderRadius:9,cursor:"pointer",background:t.surfaceAlt,border:"1px solid "+t.border,color:t.textSub,lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>
-              <span dangerouslySetInnerHTML={{__html:"&#9881;"}}/>
-            </button>
-            <button onClick={toggleDk} title={dk?"Light mode":"Dark mode"}
-              style={{width:32,height:32,borderRadius:9,cursor:"pointer",background:t.surfaceAlt,border:"1px solid "+t.border,color:t.textSub,lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>
-              <span dangerouslySetInnerHTML={{__html:dk?"&#9728;":"&#9790;"}}/>
-            </button>
+                <button onClick={()=>{setImportRows([]);setImportErrs([]);setImportDone(false);setShowImport(true);}} style={{...gGh(t),padding:"6px 11px",fontSize:11.5}}>
+                  &#8645; Import CSV
+                </button>
+                <button onClick={()=>handleExportCSV(filtered,"GrowthOS_export_"+new Date().toISOString().slice(0,10)+".csv")} style={{...gGh(t),padding:"6px 11px",fontSize:11.5}} title="Export current filtered view as CSV">
+                  &#8659; Export CSV
+                </button>
+                <button onClick={goNew} style={{...gG(t),padding:"6px 12px",fontSize:12.5}}>
+                  + New
+                </button>
+              </>)}
+            </div>
           </div>
         </div>
-      </div>
 
       {/* Storage failure banner. Deliberately unmissable and not dismissible by
         * clicking away: the state it describes is "your work is not being saved",
@@ -1471,6 +1464,8 @@ export default function App() {
         </Modal>
       )}
       </main>
+        </div>
+      </div>
 
       {showTpl&&(
         <Modal t={t} dk={dk} onClose={()=>setShowTpl(false)} wide title="Start from a template">

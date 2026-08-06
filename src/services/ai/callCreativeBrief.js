@@ -44,9 +44,9 @@ export async function callCreativeBrief(initiative, brand, learningsIndex, setti
   // brief's testable angles have to be expressible there. Naming its vocabulary
   // rule in the prompt is what keeps the generated angles usable as segments
   // rather than sentences that have to be rewritten by hand.
-  const angleSeg = (schema?.segments || []).find(s => s.role === "angle");
-  const angleRule = angleSeg
-    ? `Each angle's \`slug\` must be a legal value for the "${angleSeg.label}" segment of the ad naming convention: CamelCase, no spaces, no "${schema.delimiter}", under 20 characters (e.g. TimeSaver, MorningRoutine, MacroMath).`
+  const angleDim = (schema?.dimensions || []).find(d => d.key === "angle");
+  const angleRule = angleDim
+    ? `Each angle's \`slug\` must be a legal value for the "${angleDim.label}" slot of the ad naming convention: CamelCase, no spaces, no "${schema.delimiter}", under 20 characters (e.g. TimeSaver, MorningRoutine, MacroMath).`
     : "Each angle's `slug` must be CamelCase with no spaces, under 20 characters.";
 
   const sys = [

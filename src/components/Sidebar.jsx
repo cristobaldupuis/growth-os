@@ -1,0 +1,156 @@
+import { NAV_SECTIONS } from "./navSections.js";
+
+// -- Sidebar navigation --------------------------------------------------------
+//
+// Replaces the horizontal tab strip, which had run out of room. At six views
+// plus thirteen header controls the top bar was scrolling sideways on a laptop
+// and clipping on a phone, and every new view made it worse — the strip was a
+// fixed budget being spent by a growing product.
+//
+// A sidebar is the shape that fits what this is becoming: it holds twelve items
+// as comfortably as six, it groups them, it has room for a one-line description
+// of what each view answers, and it can carry a live count without cramping.
+//
+// The section vocabulary and per-view descriptions live in navSections.js.
+
+function NavItem({ t, item, active, count, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-current={active ? "page" : undefined}
+      style={{
+        display:"flex", alignItems:"flex-start", gap:9, width:"100%", textAlign:"left",
+        padding:"8px 9px", borderRadius:9, cursor:"pointer", fontFamily:t.sans,
+        background: active ? t.surface : "transparent",
+        border: "1px solid " + (active ? t.border : "transparent"),
+        boxShadow: active ? t.shadow : "none",
+        transition:"background .15s, border-color .15s",
+      }}
+      onMouseEnter={e => { if (!active) e.currentTarget.style.background = t.surfaceAlt; }}
+      onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
+    >
+      <span style={{
+        width:22, height:22, borderRadius:6, flexShrink:0, marginTop:1,
+        display:"flex", alignItems:"center", justifyContent:"center",
+        fontFamily:t.mono, fontSize:9, fontWeight:700, letterSpacing:"0.02em",
+        background: active ? t.goldFill : t.surfaceAlt,
+        color: active ? t.goldText : t.textMuted,
+        border: "1px solid " + (active ? t.goldFill : t.border),
+      }}>{item.code}</span>
+
+      <span style={{ minWidth:0, flex:1 }}>
+        <span style={{ display:"flex", alignItems:"center", gap:6 }}>
+          <span style={{ fontSize:13, fontWeight: active ? 600 : 500, color: active ? t.text : t.textSub, whiteSpace:"nowrap" }}>
+            {item.name}
+          </span>
+          {count != null && count > 0 && (
+            <span style={{ fontFamily:t.mono, fontSize:10, color:t.textMuted, fontWeight:600 }}>{count}</span>
+          )}
+        </span>
+        <span style={{ display:"block", fontSize:10.5, color:t.textMuted, lineHeight:1.4, marginTop:2, fontFamily:t.serif }}>
+          {item.blurb}
+        </span>
+      </span>
+    </button>
+  );
+}
+
+export function Sidebar({
+  t, dk, nav, onNav, counts, brands, activeBrand, setActiveBrand,
+  demoMode, onResetDemo, onTour, onSignal, onGuide, onSettings, onToggleTheme, onClose,
+}) {
+  return (
+    <div style={{ display:"flex", flexDirection:"column", height:"100%", background:t.surfaceAlt, borderRight:"1px solid "+t.border }}>
+
+      {/* Wordmark — also the home control, and the tour's first anchor */}
+      <div style={{ padding:"16px 14px 14px", borderBottom:"1px solid "+t.borderSoft }}>
+        <button onClick={() => { onNav("dashboard"); if (onClose) onClose(); }} title="Back to Observatory" data-tour="logo"
+          style={{ display:"flex", alignItems:"center", gap:9, padding:0, background:"transparent", border:"none", cursor:"pointer", width:"100%", textAlign:"left" }}>
+          <span style={{ width:26, height:26, borderRadius:8, background:t.goldFill, color:t.goldText, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:600, fontSize:12, fontFamily:t.serif, flexShrink:0 }}>GO</span>
+          <span style={{ display:"flex", flexDirection:"column", alignItems:"flex-start", lineHeight:1.2, minWidth:0 }}>
+            <span style={{ fontSize:13, fontWeight:700, letterSpacing:"0.1em", color:t.text, fontFamily:t.sans, whiteSpace:"nowrap" }}>GROWTH OS</span>
+            <span style={{ fontSize:9.5, color:t.textMuted, fontFamily:t.mono, letterSpacing:"0.09em", textTransform:"uppercase", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", maxWidth:150 }}>
+              Experimentation engine
+            </span>
+          </span>
+        </button>
+      </div>
+
+      {/* Sections */}
+      <nav style={{ padding:"12px 8px", display:"flex", flexDirection:"column", gap:14, overflowY:"auto", flex:1 }}>
+        {NAV_SECTIONS.map(section => (
+          <div key={section.label}>
+            <div style={{ padding:"0 9px 5px", display:"flex", alignItems:"baseline", gap:6 }}>
+              <span style={{ fontFamily:t.mono, fontSize:9, letterSpacing:"0.13em", textTransform:"uppercase", color:t.textMuted, fontWeight:600 }}>
+                {section.label}
+              </span>
+              <span style={{ fontSize:9.5, color:t.textMuted, fontFamily:t.serif, opacity:0.75 }}>{section.hint}</span>
+            </div>
+            <div style={{ display:"flex", flexDirection:"column", gap:1 }}>
+              {section.items.map(item => (
+                <NavItem key={item.key} t={t} item={item} active={nav === item.key}
+                  count={counts ? counts[item.key] : null}
+                  onClick={() => { onNav(item.key); if (onClose) onClose(); }} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </nav>
+
+      {/* Foot — scope, the agent layer, and utilities */}
+      <div style={{ borderTop:"1px solid "+t.borderSoft, padding:"11px 10px", display:"flex", flexDirection:"column", gap:9 }}>
+        {brands.length > 1 && (
+          <select value={activeBrand} onChange={e => setActiveBrand(e.target.value)} data-tour="brand-select"
+            style={{ fontSize:12, padding:"6px 9px", borderRadius:8, width:"100%", boxSizing:"border-box",
+              border:"1px solid "+(activeBrand === "all" ? t.border : t.goldBorder),
+              background: activeBrand === "all" ? t.surface : t.goldBg,
+              color: activeBrand === "all" ? t.textSub : t.gold, fontFamily:t.serif, cursor:"pointer" }}>
+            <option value="all">All retailers</option>
+            {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
+        )}
+
+        <button onClick={onSignal} data-tour="signal-button"
+          style={{ fontSize:12.5, padding:"8px 12px", borderRadius:9, cursor:"pointer", width:"100%",
+            background:t.goldFill, border:"1px solid "+t.goldFill, color:t.goldText, fontWeight:600,
+            fontFamily:t.sans, display:"flex", alignItems:"center", justifyContent:"center", gap:6, boxShadow:t.shadow }}>
+          ✦ Signal
+        </button>
+
+        {demoMode && (
+          <div style={{ display:"flex", alignItems:"center", gap:5 }}>
+            <span title="This workspace runs on seeded demo data. Nothing here is a real customer's numbers."
+              style={{ display:"flex", alignItems:"center", gap:5, fontSize:10, fontWeight:600, letterSpacing:"0.04em",
+                color:t.textMuted, fontFamily:t.mono, background:t.surface, border:"1px solid "+t.border,
+                borderRadius:20, padding:"3px 9px", whiteSpace:"nowrap", flex:1 }}>
+              <span style={{ width:5, height:5, borderRadius:"50%", background:t.gold, flexShrink:0 }}/>
+              Demo data
+            </span>
+            <button onClick={onResetDemo} title="Reset everything to the seed portfolio"
+              style={{ width:24, height:24, borderRadius:7, cursor:"pointer", background:"transparent", border:"1px solid "+t.border, color:t.textMuted, fontSize:11, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+              <span dangerouslySetInnerHTML={{ __html:"&#8635;" }}/>
+            </button>
+            <button onClick={onTour} title="Replay the guided tour"
+              style={{ height:24, padding:"0 8px", borderRadius:7, cursor:"pointer", background:"transparent", border:"1px solid "+t.border, color:t.textMuted, fontSize:10, fontWeight:600, fontFamily:t.sans, flexShrink:0 }}>
+              Tour
+            </button>
+          </div>
+        )}
+
+        <div style={{ display:"flex", gap:6 }}>
+          {[
+            { fn:onGuide,       html:"?",        title:"What can Growth OS do?" },
+            { fn:onSettings,    html:"&#9881;",  title:"Settings" },
+            { fn:onToggleTheme, html: dk ? "&#9728;" : "&#9790;", title: dk ? "Light mode" : "Dark mode" },
+          ].map((b, i) => (
+            <button key={i} onClick={b.fn} title={b.title}
+              style={{ flex:1, height:28, borderRadius:8, cursor:"pointer", background:t.surface, border:"1px solid "+t.border,
+                color:t.textSub, lineHeight:1, display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:700, fontFamily:t.sans }}>
+              <span dangerouslySetInnerHTML={{ __html:b.html }}/>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}

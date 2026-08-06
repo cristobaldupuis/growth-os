@@ -16,10 +16,17 @@ function useTargetRect(selector) {
     const measure = () => {
       if (cancelled) return;
       const el = document.querySelector(selector);
+      // A `display:none` element is still in the DOM and still answers
+      // getBoundingClientRect — with zeroes. Three of these anchors now live in
+      // the sidebar, which is hidden below 900px, so without this check the
+      // spotlight would frame a 12px box in the top-left corner instead of
+      // falling through to the centered card the null branch already provides.
       if (el) {
         const r = el.getBoundingClientRect();
-        setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
-        return;
+        if (r.width > 0 && r.height > 0) {
+          setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
+          return;
+        }
       }
       // The view this selector lives in may still be switching in (a nav
       // change triggered by this same step). Poll briefly before giving up.

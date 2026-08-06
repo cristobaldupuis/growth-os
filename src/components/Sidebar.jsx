@@ -38,17 +38,21 @@ function NavItem({ t, item, active, count, onClick }) {
         border: "1px solid " + (active ? t.goldFill : t.border),
       }}>{item.code}</span>
 
+      {/* Plain label leads; the laboratory name rides in the subtitle, where it
+          carries the flavour and explains the code without ever being the only
+          way to find the view. */}
       <span style={{ minWidth:0, flex:1 }}>
         <span style={{ display:"flex", alignItems:"center", gap:6 }}>
           <span style={{ fontSize:13, fontWeight: active ? 600 : 500, color: active ? t.text : t.textSub, whiteSpace:"nowrap" }}>
-            {item.name}
+            {item.label}
           </span>
           {count != null && count > 0 && (
             <span style={{ fontFamily:t.mono, fontSize:10, color:t.textMuted, fontWeight:600 }}>{count}</span>
           )}
         </span>
         <span style={{ display:"block", fontSize:10.5, color:t.textMuted, lineHeight:1.4, marginTop:2, fontFamily:t.serif }}>
-          {item.blurb}
+          <span style={{ color: active ? t.gold : t.textSub, fontStyle:"italic" }}>{item.lab}</span>
+          {" · " + item.blurb}
         </span>
       </span>
     </button>
@@ -64,7 +68,7 @@ export function Sidebar({
 
       {/* Wordmark — also the home control, and the tour's first anchor */}
       <div style={{ padding:"16px 14px 14px", borderBottom:"1px solid "+t.borderSoft }}>
-        <button onClick={() => { onNav("dashboard"); if (onClose) onClose(); }} title="Back to Observatory" data-tour="logo"
+        <button onClick={() => { onNav("dashboard"); if (onClose) onClose(); }} title="Back to Dashboard" data-tour="logo"
           style={{ display:"flex", alignItems:"center", gap:9, padding:0, background:"transparent", border:"none", cursor:"pointer", width:"100%", textAlign:"left" }}>
           <span style={{ width:26, height:26, borderRadius:8, background:t.goldFill, color:t.goldText, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:600, fontSize:12, fontFamily:t.serif, flexShrink:0 }}>GO</span>
           <span style={{ display:"flex", flexDirection:"column", alignItems:"flex-start", lineHeight:1.2, minWidth:0 }}>

@@ -11,7 +11,7 @@ import {
 import { KEY_ITEMS, KEY_SETTINGS, KEY_DEBATES, KEY_METRICS, KEY_RECS, KEY_CREATIVE, KEY_THEME, KEY_LIB_VIEW, KEY_TOUR_SEEN, store, onWriteError, handleDownloadBackup, handleRestoreBackup } from "./services/store.js";
 import { CreativeStudio } from "./views/CreativeStudio.jsx";
 import { Sidebar } from "./components/Sidebar.jsx";
-import { navName } from "./components/navSections.js";
+import { navName, navLab } from "./components/navSections.js";
 import {
   applyBrandBriefDefaults, DEFAULT_AGENTS, DEFAULT_SETTINGS,
   STATUSES, STATUS_GROUP_ORDER, OUTCOMES, INIT_TYPES, METRIC_SOURCES,
@@ -69,7 +69,7 @@ const GUIDE_SECTIONS = [
     feature: "Next Plays: weekly recommendations",
     what: "Proactive experiment suggestions with the hypothesis pre-written and ICE pre-scored, drawn from your portfolio, learnings library, brand briefs, and latest metrics.",
     why: "Removes the blank-page problem every week. You walk into the standup with three grounded plays already framed and prioritized.",
-    cta: "Go to Observatory",
+    cta: "Go to Dashboard",
     action: "dashboard",
   },
   {
@@ -79,37 +79,37 @@ const GUIDE_SECTIONS = [
     feature: "Contribution-to-revenue view",
     what: "A three-layer revenue picture (realised, probability-weighted in-flight, and probability-weighted pipeline) broken down by category, with one-click copy for client emails.",
     why: "This is the answer to \"what did this engagement actually drive?\" It's the artifact that justifies renewals.",
-    cta: "Go to Observatory",
+    cta: "Go to Dashboard",
     action: "dashboard",
   },
   {
     id: "library",
     views: ["library"],
     label: "Never re-run a dead experiment",
-    feature: "Archive: the learnings library",
+    feature: "Learnings library",
     what: "Every closed initiative becomes a searchable learning, tagged by outcome, category, and type. Filter, synthesize across them with AI, or replicate a winner in one click.",
     why: "Institutional memory that compounds. The longer the engagement runs, the smarter every recommendation gets.",
-    cta: "Open Archive",
+    cta: "Open Library",
     action: "library",
   },
   {
     id: "initiatives",
     views: ["initiatives","detail","form"],
     label: "Track & prioritize the portfolio",
-    feature: "Register: the initiative pipeline, ICE scored",
+    feature: "Initiatives + ICE scoring",
     what: "The full initiative pipeline with ICE scoring, status tracking, blockers, owners, multi-retailer support, CSV import/export, and quick capture for half-formed ideas.",
     why: "One ranked, shared source of truth for what's running, what's queued, and what it's worth.",
-    cta: "Open Register",
+    cta: "Open Initiatives",
     action: "initiatives",
   },
   {
     id: "triage",
     views: ["triage"],
     label: "Run the weekly review",
-    feature: "Quarantine: the weekly decision queue",
+    feature: "Triage",
     what: "Surfaces initiatives that need a decision this week (overdue, awaiting results, or blocked) so nothing stalls silently.",
     why: "Keeps the portfolio moving and gives the standup its agenda.",
-    cta: "Open Quarantine",
+    cta: "Open Triage",
     action: "triage",
   },
   {
@@ -1269,7 +1269,14 @@ export default function App() {
                 </button>
               ):(
                 <div style={{minWidth:0}}>
-                  <div style={{fontFamily:t.serif,fontSize:17,fontWeight:600,color:t.text,lineHeight:1.2}}>{navName(nav)}</div>
+                  <div style={{display:"flex",alignItems:"baseline",gap:8,flexWrap:"wrap"}}>
+                    <span style={{fontFamily:t.serif,fontSize:17,fontWeight:600,color:t.text,lineHeight:1.2}}>{navName(nav)}</span>
+                    {navLab(nav)&&(
+                      <span style={{fontFamily:t.mono,fontSize:9.5,letterSpacing:"0.1em",textTransform:"uppercase",color:t.textMuted}}>
+                        {navLab(nav)}
+                      </span>
+                    )}
+                  </div>
                   <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>{settings.companyName}</div>
                 </div>
               )}

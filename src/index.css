@@ -85,6 +85,215 @@ textarea {
   }
 }
 
+/* -- Interaction layer --------------------------------------------------------
+ *
+ * The palette got quieter because it was spending colour at rest: eight hues on
+ * a dashboard nobody was pointing at. The answer is not less colour, it is
+ * colour that is *earned*. Everything below is inert until you hover or focus
+ * it, and then it says so — the accent rail charges, the bar it belongs to
+ * brightens and a spark runs down it, the card lifts a millimetre.
+ *
+ * That makes the colour informative rather than decorative: at any moment the
+ * only saturated thing on screen is the thing under the cursor. It also gives
+ * every list in the app one behaviour instead of each view inventing its own,
+ * which is what made Triage's permanently-coloured strips look like a different
+ * product from the pages either side of it.
+ *
+ * ## No colour is defined here
+ *
+ * The rule at the top of this file still holds. Every colour arrives through a
+ * custom property set inline from a token in constants.js:
+ *
+ *   --gos-accent   the semantic colour of this row (urgency, outcome, or gold)
+ *   --gos-spark    the specular highlight the charge sweep uses
+ *
+ * A row with no `--gos-accent` set simply has no rail — the fallback is
+ * `transparent`, not a guessed colour.
+ *
+ * ## Reduced motion
+ *
+ * The global `prefers-reduced-motion` block below collapses every duration to
+ * ~0, so each of these degrades to an instant state change rather than
+ * disappearing. Hover still communicates; it just stops moving. That is why the
+ * rail's rest state is `scaleY(0)` rather than `opacity: 0` on a static bar —
+ * snapping to full height reads as intentional, a snapping fade reads as a bug.
+ */
+
+.gos-int {
+  position: relative;
+  overflow: hidden;
+  transition:
+    transform 0.18s cubic-bezier(0.2, 0.7, 0.3, 1),
+    box-shadow 0.18s ease,
+    border-color 0.18s ease,
+    background-color 0.18s ease;
+}
+
+/* The rail. Charges from the top edge downward, like something filling. */
+.gos-int::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--gos-accent, transparent);
+  transform: scaleY(0);
+  transform-origin: top center;
+  transition: transform 0.3s cubic-bezier(0.2, 0.7, 0.3, 1);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.gos-int:hover::before,
+.gos-int:focus-visible::before,
+.gos-int[data-active="true"]::before {
+  transform: scaleY(1);
+}
+
+.gos-int:hover,
+.gos-int:focus-visible {
+  transform: translateY(-1px);
+}
+
+/* Rows inside a card lift nothing — they are already in a lifted surface, so
+ * they tint instead. Same rail, same charge, no double elevation. */
+.gos-int-flat:hover,
+.gos-int-flat:focus-visible {
+  transform: none;
+  background: var(--gos-hover-bg, transparent);
+}
+
+/* -- Magnitude bars ---------------------------------------------------------- */
+
+.gos-track {
+  position: relative;
+  overflow: hidden;
+  border-radius: 999px;
+}
+
+.gos-fill {
+  height: 100%;
+  border-radius: 999px;
+  position: relative;
+  overflow: hidden;
+  transform-origin: left center;
+  animation: gos-fill-in 0.55s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  animation-delay: var(--gos-delay, 0ms);
+  transition:
+    width 0.3s cubic-bezier(0.2, 0.7, 0.3, 1),
+    filter 0.2s ease;
+}
+
+@keyframes gos-fill-in {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* The charge. A specular highlight travels the length of the filled bar while
+ * the row is hovered, and only while it is hovered — a permanently animating
+ * dashboard is the same mistake as a permanently coloured one, one dimension
+ * over. */
+.gos-fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--gos-spark, transparent) 45%,
+    var(--gos-spark, transparent) 55%,
+    transparent 100%
+  );
+  transform: translateX(-101%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.gos-int:hover .gos-fill,
+.gos-int:focus-visible .gos-fill,
+.gos-charge:hover .gos-fill,
+.gos-charge:focus-visible .gos-fill {
+  filter: saturate(1.25) brightness(1.05);
+}
+
+.gos-int:hover .gos-fill::after,
+.gos-int:focus-visible .gos-fill::after,
+.gos-charge:hover .gos-fill::after,
+.gos-charge:focus-visible .gos-fill::after {
+  opacity: 1;
+  animation: gos-charge 1.15s cubic-bezier(0.4, 0, 0.5, 1) infinite;
+}
+
+@keyframes gos-charge {
+  from {
+    transform: translateX(-101%);
+  }
+  to {
+    transform: translateX(101%);
+  }
+}
+
+/* -- Stat tiles -------------------------------------------------------------- */
+/* An underline that draws in from the left, so a tile answers the pointer
+ * without the number under it moving. */
+
+.gos-tile {
+  position: relative;
+  overflow: hidden;
+  transition:
+    transform 0.18s cubic-bezier(0.2, 0.7, 0.3, 1),
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.gos-tile::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--gos-accent, transparent);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 0.28s cubic-bezier(0.2, 0.7, 0.3, 1);
+  pointer-events: none;
+}
+
+.gos-tile:hover::after,
+.gos-tile:focus-visible::after {
+  transform: scaleX(1);
+}
+
+.gos-tile:hover {
+  transform: translateY(-2px);
+}
+
+/* -- Entry ------------------------------------------------------------------- */
+/* Lists arrive rather than appearing. The stagger is capped in JS at ten steps
+ * so a hundred-row import does not take three seconds to finish landing. */
+
+.gos-enter {
+  animation: gos-enter 0.32s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  animation-delay: var(--gos-delay, 0ms);
+}
+
+@keyframes gos-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

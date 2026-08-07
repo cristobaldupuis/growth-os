@@ -316,3 +316,47 @@ actionable one.
 **What this is not:** a retreat toward the slate/indigo console look argued
 against above. The sand-gold editorial identity is unchanged; what changed is
 that it is now spent where it carries information.
+
+**Second amendment — colour is earned on interaction, not spent at rest.** The
+first amendment removed colour and left the app calmer but flatter, which was
+half an answer. The real diagnosis is not that there was too much colour, it is
+that it was *on all the time*: eight hues held at full saturation on a dashboard
+nobody was pointing at, so none of them could mean "look here".
+
+So the colour came back, on a trigger. Every list row, card and stat tile in the
+app is inert at rest and answers the pointer: an accent rail charges down its
+leading edge, the magnitude bar it owns brightens and takes a travelling
+specular highlight, the tile lifts and draws an underline. At any moment the
+only saturated thing on screen is the thing under the cursor, which makes the
+colour informative — it is now telling you where you are, which is a fact, and
+not what category a row belongs to, which the label already said.
+
+The rail's colour is the one thing about a row worth saying in colour, and it
+differs by surface because the surfaces mean different things: urgency in
+Triage, status in the Register, outcome in the Library, plain gold in
+Performance where the only claim is "this is interactive".
+
+**Why this is one primitive and not seven implementations.** Before it, three
+views had three different hover behaviours and four had none — the Register
+recoloured its border inline, Next Plays swapped its background, Triage painted
+a permanent strip and did nothing on hover at all. Pointing at something meant
+something different on every page, which is the same failure as the palette one
+level up: an effect applied inconsistently carries no meaning. It now lives in
+`index.css` plus `components/motion.js`, and a view opts in rather than
+inventing.
+
+**Triage's strips specifically.** They were the visible symptom — permanently
+painted 3px children that no other view had, which made that page read as a
+different product from the ones either side of it. They are now the shared
+primitive, so Triage stopped being the exception without losing the signal:
+urgency is still legible at rest from the tag and the ordering, and the colour
+is what the pointer buys you.
+
+**Constraints this had to respect:** no colour is defined in `index.css` — every
+value arrives through a custom property set inline from a token, so the palette
+stays in one place and a row with no accent gets no rail rather than a guessed
+one. The charge sweep runs only while hovered; an animation that plays on its
+own is the always-on mistake one dimension over. And under
+`prefers-reduced-motion` every duration collapses to zero, so each effect
+degrades to an instant state change rather than vanishing — hover still
+communicates, it just stops moving.

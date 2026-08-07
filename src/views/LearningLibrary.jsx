@@ -7,6 +7,7 @@ import { CitationModal } from "../components/citation.jsx";
 import { renderCitedText, renderProse } from "../components/text.jsx";
 import { callSynthesizeLearnings } from "../services/ai/callSynthesizeLearnings.js";
 import { callAskLibrary } from "../services/ai/callAskLibrary.js";
+import { interactive } from "../components/motion.js";
 
 // Layout toggle glyphs. Drawn inline rather than pulled from an icon font so
 // the control renders on first paint and offline.
@@ -229,7 +230,9 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
         {filtered.map((item,idx)=>{
           const isWin=item.results.outcomeClassification==="Jackpot"||item.results.outcomeClassification==="Success";
           return (
-            <div key={item.id} data-tour={idx===0?"learning-card":undefined} style={{background:t.surface,border:"1px solid "+t.border,borderRadius:8,overflow:"hidden",display:"flex",flexDirection:"column",height:"100%"}}>
+            <div key={item.id} data-tour={idx===0?"learning-card":undefined}
+              {...(()=>{const oc=(dk?OD:OL)[item.results.outcomeClassification]||{};const p=interactive(t,oc.border||t.goldBorder,{index:idx});
+                return {className:p.className, style:{...p.style,background:t.surface,border:"1px solid "+t.border,borderRadius:8,display:"flex",flexDirection:"column",height:"100%"}};})()}>
               <div style={{padding:"10px 14px",flex:"1 1 auto",display:"flex",flexDirection:"column"}}>
                 {/* Badges row */}
                 <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center",marginBottom:6}}>

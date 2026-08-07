@@ -1,4 +1,5 @@
 import { gG, gGh, gSL, gCd } from "../components/styles.js";
+import { interactive, tile } from "../components/motion.js";
 import { renderProse } from "../components/text.jsx";
 
 // -- Triage View --------------------------------------------------------------
@@ -158,7 +159,7 @@ export function TriageView({items, t, brands, activeBrand, onDetail, onLogResult
           {l:"Ending soon", v:endingCount, gold:false},
           {l:"Revenue at risk", v:fmtCur(totalAtRisk), gold:true},
         ].map(m=>(
-          <div key={m.l} style={{background:t.surface,border:"1px solid "+t.border,borderRadius:12,padding:"13px 15px",boxShadow:t.shadow}}>
+          <div key={m.l} {...(()=>{const p=tile(t,m.gold?t.goldFill:t.border,queue.length?0:null);return{className:p.className,style:{...p.style,background:t.surface,border:"1px solid "+t.border,borderRadius:12,padding:"13px 15px",boxShadow:t.shadow}};})()}>
             <div style={{fontSize:9.5,letterSpacing:"0.1em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,fontWeight:600,marginBottom:8}}>{m.l}</div>
             <div style={{fontSize:24,fontWeight:700,color:m.gold?t.gold:t.text,fontFamily:t.mono,letterSpacing:"-0.03em",lineHeight:1}}>{m.v}</div>
           </div>
@@ -180,10 +181,16 @@ export function TriageView({items, t, brands, activeBrand, onDetail, onLogResult
           </div>
         )}
 
-        {queue.map((q)=>(
-          <div key={q.id+"-"+q.kind} style={{...gCd(t),padding:0,overflow:"hidden",display:"flex"}}>
-            <div style={{width:3,background:q.accent,flexShrink:0}}/>
-            <div style={{flex:1,minWidth:0,padding:"13px 16px"}}>
+        {/* The rail used to be a permanently painted 3px child, and Triage was
+            the only view in the app that had one — which made it read as a
+            different product from the pages either side of it. It is now the
+            shared hover primitive: inert until you point at the card, then it
+            charges downward in the colour of that card's urgency. The urgency
+            is still legible at rest from the tag and the ordering; the colour
+            is what the pointer buys you. */}
+        {queue.map((q,i)=>(
+          <div key={q.id+"-"+q.kind} {...(()=>{const p=interactive(t,q.accent,{index:i});return{className:p.className,style:{...gCd(t),...p.style,padding:0,display:"flex"}};})()}>
+            <div style={{flex:1,minWidth:0,padding:"13px 16px 13px 19px"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,marginBottom:6}}>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3,flexWrap:"wrap"}}>

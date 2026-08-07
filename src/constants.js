@@ -2,62 +2,24 @@ import {
   COMPANY_NAME, BUSINESS_MODEL,
   NORTH_STAR_METRIC, NORTH_STAR_CURRENT, NORTH_STAR_TARGET,
   BRANDS as CONFIG_BRANDS,
+  BRAND_BRIEFS,
   CATEGORIES,
   AGENTS as CONFIG_AGENTS,
 } from "./activeConfig.js";
 import { DEFAULT_NAMING_SCHEMA } from "./services/naming.js";
+import { splitCSVLine } from "./services/csvLine.js";
 
 export const DEFAULT_AGENTS = CONFIG_AGENTS;
 
-// Default brand briefs — injected into existing brands that don't yet have brief fields.
-// Keyed by lowercase brand name for fuzzy matching.
-export const DEFAULT_BRAND_BRIEFS = {
-  "northcove home": {
-    whatTheySell:  "Premium home décor and lifestyle products, $80–$300 AOV",
-    categories:    "Home decor, Gifting, Candles, Textiles",
-    icp:           "Women 28–48, considered purchase, gifting occasions and self-treat, high design sensitivity",
-    whyTheyWin:    "Strong visual brand identity, high repeat LTV, emotional purchase driver: aspiration over utility",
-    relationship:  "Own DTC brand: full control over pricing, creative, and customer experience",
-    constraint:    "CAC rising on paid social, creative refresh cadence is the primary ROAS lever",
-  },
-  "retailer 1": {
-    whatTheySell:  "Mid-premium lifestyle and home accessories, $50–$200 AOV",
-    categories:    "Home accessories, Gifting, Candles, Seasonal",
-    icp:           "Women 25–45, deal-aware but brand-loyal, mix of gifting and self-purchase",
-    whyTheyWin:    "Strong loyalty base, broad SKU range, good replenishment behaviour on consumable SKUs",
-    relationship:  "Wholesale / retail partner: shared margin, limited creative control, strong buyer relationship",
-    constraint:    "Margin compression from freight and promo dependency, free shipping threshold sensitivity",
-  },
-  "retailer 2": {
-    whatTheySell:  "Accessible home and lifestyle range, $40–$150 AOV",
-    categories:    "Home decor, Accessories, Seasonal, Gifting",
-    icp:           "Broad female demographic 24–50, price-conscious, discovery-driven, impulse and gifting",
-    whyTheyWin:    "Wide reach, high traffic volume, good basket size when cross-sell is activated",
-    relationship:  "Wholesale / retail partner: high volume, lower margin, category manager relationship",
-    constraint:    "Low CVR vs category benchmark, PDP experience needs improvement, limited personalisation capability",
-  },
-  "grounds control": {
-    whatTheySell:  "Whole-bean and ground specialty coffee, brewing equipment, and a roast subscription program, $20–$120 AOV",
-    categories:    "Whole Bean, Ground Coffee, Brewing Equipment, Subscriptions",
-    icp:           "Home brewing enthusiasts 25–45 graduating from pod machines to manual methods, high LTV once grind and roast preference is captured",
-    whyTheyWin:    "Roast-date transparency and freshness that grocery-shelf competitors can't match; subscription cadence tuned to real reorder behaviour, not a fixed calendar",
-    relationship:  "Own DTC brand; wholesale accounts (cafes, offices) are a secondary channel",
-    constraint:    "Wholesale accounts close easily and inflate topline, but run at roughly half of DTC subscription margin — growth is over-indexed on the channel that doesn't compound",
-  },
-  "peak season": {
-    whatTheySell:  "Technical outdoor apparel and gear — insulated layers, waterproof shells, packs — $70–$380 AOV",
-    categories:    "Outerwear, Base/Mid Layers, Footwear, Packs & Accessories",
-    icp:           "Active outdoor consumers 22–50 buying for a specific trip or season, ranging from weekend hikers to serious backcountry users, high research intensity before purchase",
-    whyTheyWin:    "Category expertise — technical spec depth and honest use-case guidance that big-box retailers can't match at the point of sale",
-    relationship:  "Own DTC brand",
-    constraint:    "Roughly 55% of annual revenue lands in two 8-week pre-season windows (spring hiking, fall/winter); missing the inventory or paid-media timing in either window can't be recovered later in the season",
-  },
-};
+// Brand briefs now live in the config that owns the brands they describe (see
+// BRAND_BRIEFS in config.*.js). They were defined here, which meant this shared
+// module carried descriptions of one specific deployment's brands, and standing
+// up a new client took an edit to app code on top of writing a config.
 
 // Merge brief defaults into a brand object if fields are missing
 export function applyBrandBriefDefaults(brand) {
   const key = (brand.name||"").toLowerCase().trim();
-  const defaults = DEFAULT_BRAND_BRIEFS[key];
+  const defaults = (BRAND_BRIEFS || {})[key];
   if (!defaults) return brand;
   return {
     ...brand,
@@ -315,8 +277,6 @@ export const ICE_STRONG = 34;
 export const ICE_MODERATE = 11;
 export const iceColor = (s, t) =>
   s === null ? t.textMuted : s >= ICE_STRONG ? t.gold : s >= ICE_MODERATE ? t.textSub : t.textMuted;
-export const iceBand = (s) =>
-  s === null ? "unscored" : s >= ICE_STRONG ? "high" : s >= ICE_MODERATE ? "medium" : "low";
 
 export const fmtCur = (n) => {
   if (n === 0) return "—";
@@ -408,19 +368,25 @@ export const mondayOf = (d) => {
   return copy;
 };
 
-// Parse a weekly metrics CSV — header-driven, order-independent
+// Parse a weekly metrics CSV — header-driven, order-independent.
+//
+// Splits with the shared quote-aware splitter rather than a plain `split(",")`.
+// This is the parser a Meta or GA4 export actually lands in, and those files
+// quote any field containing a comma — a campaign name, a notes cell — so a
+// naive split shifted every column after the first quoted one and imported the
+// resulting garbage without complaint. See services/csvLine.js.
 export function parseMetricsCSV(text) {
   const lines = text.trim().split(/\r?\n/).filter(l=>l.trim());
   if (lines.length < 2) return { rows:[], errors:["File appears empty or has no data rows."] };
 
-  const rawHeaders = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g,"").toLowerCase().replace(/\s+/g,"_"));
+  const rawHeaders = splitCSVLine(lines[0]).map(h => h.toLowerCase().replace(/\s+/g,"_"));
   const mapped = rawHeaders.map(h => METRIC_CSV_ALIASES[h] || h);
 
   const errors = [];
   const rows = [];
 
   for (let i = 1; i < lines.length; i++) {
-    const vals = lines[i].split(",").map(v => v.trim().replace(/^"|"$/g,""));
+    const vals = splitCSVLine(lines[i]);
     if (vals.every(v=>!v)) continue;
     const obj = {};
     rawHeaders.forEach((_, j) => { obj[mapped[j]] = vals[j] || ""; });

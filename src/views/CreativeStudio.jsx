@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { gG, gGh, gSL, gCd, gI, gSl } from "../components/styles.js";
 import { renderProse } from "../components/text.jsx";
 import { SBdg, CBdg } from "../components/badges.jsx";
@@ -89,6 +89,32 @@ export function CreativeStudio({
 
   const tier = VIDEO_TIERS[tierKey];
 
+  // Generated assets are keyed by VARIANT INDEX, which is only meaningful
+  // against the variant list that produced them. Switching initiative or
+  // regenerating variants re-points index 0 at something else entirely, so
+  // anything left behind is now attached to the wrong hypothesis — a brief's
+  // key frame showing up under a different initiative's variant in a view whose
+  // whole discipline is that every asset is born attached to one. Clearing is
+  // cheap: none of this is persisted, and the operator downloads what is worth
+  // keeping before they move on.
+  //
+  // Bumping the video run id is what stops an in-flight render from writing its
+  // result into the cleared state a minute later; see genVideo.
+  const videoRunId = useRef(0);
+  const clearGeneratedAssets = () => {
+    videoRunId.current += 1;
+    setImages({});
+    setImgErr({});
+    setVideos({});
+    setVidBusy(null);
+    setPromptPreview(null);
+  };
+
+  // A render outlives the view that started it. Invalidate on unmount so the
+  // poll loop stops rather than running out its five minutes against a torn-down
+  // tree, burning the video proxy's poll budget on a result nobody can see.
+  useEffect(() => () => { videoRunId.current += 1; }, []);
+
   // A render takes 60-170s, so "rendering…" with no moving number reads as a
   // hang. The ticker is separate from the poll loop deliberately: polling every
   // second would burn the proxy's rate-limit budget for no new information,
@@ -133,6 +159,9 @@ export function CreativeStudio({
       const result = await callCreativeBrief(sel, brand, learningsIndex, settings, schema);
       saveRecord({ brief: result, variants: [] });
       setEdits({});
+      // A new brief empties the variant list, so every index-keyed asset now
+      // points at a variant that no longer exists.
+      clearGeneratedAssets();
       showToast("Creative brief generated.", "success");
     } catch (e) { setErr(e.message || "Could not generate the brief."); }
     finally { setBusy(""); }
@@ -145,6 +174,9 @@ export function CreativeStudio({
       const result = await callCreativeVariants(brief, sel, brand, schema, { perAngle, channel });
       saveRecord({ brief, variants: result });
       setEdits({});
+      // Regenerating re-keys every index, so yesterday's frame would otherwise
+      // reappear under a variant that never asked for it.
+      clearGeneratedAssets();
       showToast(result.length + " variants generated.", "success");
     } catch (e) { setErr(e.message || "Could not generate variants."); }
     finally { setBusy(""); }
@@ -188,15 +220,26 @@ export function CreativeStudio({
   const genVideo = async (variant, idx) => {
     const startedAt = Date.now();
     const script = buildVideoScript(variant);
+    // Claim a run id. Every write below is gated on still holding it, so a
+    // render the operator has navigated away from resolves into nothing instead
+    // of into whatever is on screen by then.
+    const runId = ++videoRunId.current;
+    const current = () => videoRunId.current === runId;
+
     setVidBusy({ idx, startedAt });
     setElapsedMs(0);
     setVideos(v => ({ ...v, [idx]: { status: "rendering", tierLabel: tier.label, costUsd: estimateVideoCostUsd(script, tier) } }));
 
     try {
       const { jobId, provider } = await callGenerateVideo({ script, cta: variant.cta, aspectRatio: aspect, tier });
+      if (!current()) return;
 
       for (;;) {
         await new Promise(r => setTimeout(r, VIDEO_POLL_INTERVAL_MS));
+        // Checked before the poll rather than after, so an abandoned render
+        // costs at most the one sleep it was already in — no further calls
+        // against the proxy's poll budget.
+        if (!current()) return;
 
         // A slow render is not a failed one — the job is still alive on the
         // provider's side and will still be billed. So the timeout hands the
@@ -208,6 +251,7 @@ export function CreativeStudio({
         }
 
         const result = await pollVideoJob({ jobId, provider });
+        if (!current()) return;
         if (result.status === "done") {
           setVideos(v => ({ ...v, [idx]: { ...v[idx], status: "done", url: result.url, durationSeconds: result.durationSeconds } }));
           break;
@@ -221,8 +265,9 @@ export function CreativeStudio({
         }
       }
     } catch (e) {
+      if (!current()) return;
       setVideos(v => ({ ...v, [idx]: { ...v[idx], status: "failed", error: e.message || "Could not generate a video." } }));
-    } finally { setVidBusy(null); }
+    } finally { if (current()) setVidBusy(null); }
   };
 
   const downloadImage = (variant, idx) => {
@@ -302,7 +347,7 @@ export function CreativeStudio({
           </div>
         ) : (
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-            <select value={selId} onChange={e => { setSelId(e.target.value); setEdits({}); setErr(""); }}
+            <select value={selId} onChange={e => { setSelId(e.target.value); setEdits({}); setErr(""); clearGeneratedAssets(); }}
               style={{ ...gSl(t), maxWidth: 460, flex: "1 1 300px" }}>
               <option value="">Select an initiative…</option>
               {eligible.map(e => (

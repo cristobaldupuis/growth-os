@@ -34,6 +34,7 @@ import {
   parseName, identifyName, matchNamesToInitiatives, normKey,
   listChannels, listLevels, assignedNameIndex, lookupAssignedName,
 } from "./naming.js";
+import { splitCSVLine } from "./csvLine.js";
 
 /** Rows held in localStorage. Above this the browser store is the wrong home. */
 export const PERF_ROW_LIMIT = 5000;
@@ -125,23 +126,10 @@ export function deriveRatios(m) {
 
 // -- CSV reading ---------------------------------------------------------------
 //
-// Quote-aware, unlike the weekly parser's plain `split(",")`. Every real Meta
-// export quotes at least one field — campaign names contain commas constantly —
-// and a naive split shifts every column after the first one that does, which is
-// the same class of silent mis-attribution the naming convention exists to
-// prevent.
-
-export function splitCSVLine(line) {
-  const out = []; let cur = ""; let inQ = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (ch === '"') { if (inQ && line[i + 1] === '"') { cur += '"'; i++; } else inQ = !inQ; }
-    else if (ch === "," && !inQ) { out.push(cur.trim()); cur = ""; }
-    else cur += ch;
-  }
-  out.push(cur.trim());
-  return out.map(v => v.replace(/^"|"$/g, "").trim());
-}
+// The splitter this module used to define now lives in services/csvLine.js and
+// is shared with every other importer — see that file for why quote-awareness
+// is the whole point. Re-exported here so existing call sites keep their import.
+export { splitCSVLine };
 
 /** Strip currency symbols, thousands separators and percent signs. */
 export const toNumber = (raw) => {

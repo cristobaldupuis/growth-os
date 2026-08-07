@@ -14,6 +14,8 @@
 // to change between clients.
 // =============================================================================
 
+import { buildSeed } from "./services/seedRebase.js";
+
 // -----------------------------------------------------------------------------
 // DEPLOYMENT MODE
 // DEMO_MODE=true skips the onboarding wizard on first visit (a cold visitor
@@ -54,6 +56,42 @@ export const BRANDS = [
   { id: "r2",      name: "Peak Season",     code: "PS",
     northStar: { metric: "Peak Season Revenue",     current: "$581k/mo", target: "$750k/mo" } },
 ];
+
+// Brand briefs — the context the AI features reason from, keyed by LOWERCASE
+// brand name. Backfilled into any brand that has no brief fields of its own; see
+// applyBrandBriefDefaults in constants.js.
+//
+// These used to live in constants.js, which meant this deployment's brands were
+// described in shared app code rather than in the config that owns them — and
+// that standing up a new client took an edit to constants.js on top of writing a
+// config, contradicting activeConfig.js's promise that switching clients is a
+// one-line change.
+export const BRAND_BRIEFS = {
+  "northcove home": {
+    whatTheySell:  "Premium home décor and lifestyle products, $80–$300 AOV",
+    categories:    "Home decor, Gifting, Candles, Textiles",
+    icp:           "Women 28–48, considered purchase, gifting occasions and self-treat, high design sensitivity",
+    whyTheyWin:    "Strong visual brand identity, high repeat LTV, emotional purchase driver: aspiration over utility",
+    relationship:  "Own DTC brand: full control over pricing, creative, and customer experience",
+    constraint:    "CAC rising on paid social, creative refresh cadence is the primary ROAS lever",
+  },
+  "grounds control": {
+    whatTheySell:  "Whole-bean and ground specialty coffee, brewing equipment, and a roast subscription program, $20–$120 AOV",
+    categories:    "Whole Bean, Ground Coffee, Brewing Equipment, Subscriptions",
+    icp:           "Home brewing enthusiasts 25–45 graduating from pod machines to manual methods, high LTV once grind and roast preference is captured",
+    whyTheyWin:    "Roast-date transparency and freshness that grocery-shelf competitors can't match; subscription cadence tuned to real reorder behaviour, not a fixed calendar",
+    relationship:  "Own DTC brand; wholesale accounts (cafes, offices) are a secondary channel",
+    constraint:    "Wholesale accounts close easily and inflate topline, but run at roughly half of DTC subscription margin — growth is over-indexed on the channel that doesn't compound",
+  },
+  "peak season": {
+    whatTheySell:  "Technical outdoor apparel and gear — insulated layers, waterproof shells, packs — $70–$380 AOV",
+    categories:    "Outerwear, Base/Mid Layers, Footwear, Packs & Accessories",
+    icp:           "Active outdoor consumers 22–50 buying for a specific trip or season, ranging from weekend hikers to serious backcountry users, high research intensity before purchase",
+    whyTheyWin:    "Category expertise — technical spec depth and honest use-case guidance that big-box retailers can't match at the point of sale",
+    relationship:  "Own DTC brand",
+    constraint:    "Roughly 55% of annual revenue lands in two 8-week pre-season windows (spring hiking, fall/winter); missing the inventory or paid-media timing in either window can't be recovered later in the season",
+  },
+};
 
 // -----------------------------------------------------------------------------
 // INITIATIVE CATEGORIES
@@ -1051,104 +1089,16 @@ const SEED_WEEKLY_METRICS_AUTHORED = [
 
 // -- Demo timeline rebasing ----------------------------------------------------
 //
-// The two arrays above are an authored narrative: a portfolio mid-flight, with a
-// paid-social test that fatigued and got killed, a replatform in dependency
-// order, and twelve weeks of metrics that move because of those decisions. That
-// story is worth keeping, and rewriting the literal dates by hand every few
-// months is not a maintenance task anyone will actually do.
-//
-// So the dates stay as authored and get shifted at load time. The offset is
-// whatever it takes to land the last authored metrics week on the most recent
-// completed Monday, and every date in both arrays moves by that same offset, so
-// all the relative spacing the narrative depends on — this test ran three weeks,
-// that one starts after its dependency closes — is preserved exactly.
-//
-// The symptom this fixes: the demo opened on "Last logged 68d ago ⚠️" with a
-// staleness warning over a half-empty table, because the fixed dates aged past
-// the freshness thresholds the dashboard checks. A prospect's first screen was
-// the app complaining about its own data.
+// The two arrays above are an authored narrative, kept at their authored dates
+// and shifted onto today's timeline at load time. The machinery that does it —
+// and the derivation of the weekly figures this config never authored — lives
+// in services/seedRebase.js, shared with every other config so a fix to it
+// cannot land in one client and miss the other. See that file for the reasoning.
 
 const AUTHORED_LAST_WEEK = "2026-05-18";  // most recent date in SEED_WEEKLY_METRICS_AUTHORED
 
-/** Most recent completed Monday, local time. */
-function mostRecentMonday(now = new Date()) {
-  const d = new Date(now);
-  d.setHours(12, 0, 0, 0);
-  const day = d.getDay();                     // 0=Sun … 6=Sat
-  d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
-  return d;
-}
-
-const REBASE_OFFSET_DAYS = (() => {
-  const authored = new Date(AUTHORED_LAST_WEEK + "T12:00:00");
-  return Math.round((mostRecentMonday() - authored) / 86400000);
-})();
-
-const shiftDate = (iso) => {
-  if (!iso || typeof iso !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
-  const d = new Date(iso + "T12:00:00");
-  d.setDate(d.getDate() + REBASE_OFFSET_DAYS);
-  return d.toISOString().slice(0, 10);
-};
-
-const DATE_FIELDS = ["startDate", "endDate", "createdAt", "updatedAt", "date"];
-
-function rebaseRecord(rec) {
-  const out = { ...rec };
-  for (const f of DATE_FIELDS) if (out[f]) out[f] = shiftDate(out[f]);
-  if (out.predictionSnapshot?.snapshotDate) {
-    out.predictionSnapshot = { ...out.predictionSnapshot, snapshotDate: shiftDate(out.predictionSnapshot.snapshotDate) };
-  }
-  return out;
-}
-
-// Spend, ROAS and CVR were never authored, so the Weekly Pulse table rendered an
-// em dash in three of its seven columns for every brand — half the headline
-// artifact empty on first run. They are derived rather than invented: spend is
-// implied by the CAC and conversions already recorded, and ROAS and CVR follow
-// from spend and sessions. That keeps the demo internally consistent, so a
-// prospect who checks whether revenue ÷ spend equals the stated ROAS finds that
-// it does.
-// The authored CAC values move the way the narrative needs them to (creeping up
-// during the paid-social scale, dropping after it is killed) but sit at a level
-// that isn't credible: $32-$56 against a $322 AOV implies a 6-11x blended ROAS,
-// which no D2C operator reading the demo would believe. Scaling the whole series
-// by a constant keeps every relative movement — and every note that refers to
-// one — exactly as authored, while landing the level in the 2.4-4.1x band that
-// a home-and-lifestyle brand at this AOV actually runs at.
-const CAC_REALISM_FACTOR = 2.6;
-
-function withDerivedMetrics(entry) {
-  const m0 = entry.metrics || {};
-  const m = m0.cac != null ? { ...m0, cac: Math.round(m0.cac * CAC_REALISM_FACTOR) } : m0;
-  const spend = m.spend ?? (m.cac != null && m.conversions != null
-    ? Math.round(m.cac * m.conversions) : null);
-  const roas = m.roas ?? (spend && m.revenue != null
-    ? Math.round((m.revenue / spend) * 100) / 100 : null);
-  const cvr = m.cvr ?? (m.sessions && m.conversions != null
-    ? Math.round((m.conversions / m.sessions) * 10000) / 100 : null);
-  const derived = { ...m };
-  if (spend != null) derived.spend = spend;
-  if (roas != null) derived.roas = roas;
-  if (cvr != null) derived.cvr = cvr;
-
-  // Registrations and returns feed the Business Health guardrail tiles, which
-  // otherwise sit empty on a fresh demo. Both are anchored to order volume so
-  // they move with the narrative rather than sitting flat: registrations run at
-  // roughly 2.6x orders (account creation is much higher up the funnel than
-  // purchase), and the return rate drifts around a home-and-lifestyle-typical
-  // 8% rather than being pinned to a suspiciously round number.
-  if (derived.registrations == null && m.conversions != null) {
-    derived.registrations = Math.round(m.conversions * 2.6);
-  }
-  if (derived.return_rate == null && m.conversions != null) {
-    const wobble = ((m.conversions % 7) - 3) * 0.25;   // deterministic, ±0.75pp
-    derived.return_rate = Math.round((8.1 + wobble) * 10) / 10;
-  }
-  return { ...entry, metrics: derived };
-}
-
-export const SEED = SEED_AUTHORED.map(rebaseRecord);
-export const SEED_WEEKLY_METRICS = SEED_WEEKLY_METRICS_AUTHORED
-  .map(rebaseRecord)
-  .map(withDerivedMetrics);
+export const { SEED, SEED_WEEKLY_METRICS } = buildSeed({
+  authoredLastWeek: AUTHORED_LAST_WEEK,
+  seed: SEED_AUTHORED,
+  weeklyMetrics: SEED_WEEKLY_METRICS_AUTHORED,
+});

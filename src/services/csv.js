@@ -1,6 +1,7 @@
 import { brandName, generateInitId, INIT_TYPES, STATUSES, withRunningSnapshot } from "../constants.js";
 import { ATTRIBUTION_CONFIG } from "../activeConfig.js";
 import { adNamesOf } from "./naming.js";
+import { splitCSVLine } from "./csvLine.js";
 
 // Separator for the assigned-names column. A pipe, not a comma — the value has
 // to survive a CSV cell — and not the schema delimiter, which is "_" and appears
@@ -96,21 +97,14 @@ export const normaliseDate = (raw) => {
 export const parseCSV = (text) => {
   const lines = text.split(/\r?\n/).filter(l => l.trim());
   if (lines.length < 2) return { headers: [], rows: [] };
-  const splitLine = (line) => {
-    const result = []; let cur = ""; let inQ = false;
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
-      if (ch === '"') { if (inQ && line[i+1] === '"') { cur += '"'; i++; } else inQ = !inQ; }
-      else if (ch === ',' && !inQ) { result.push(cur.trim()); cur = ""; }
-      else cur += ch;
-    }
-    result.push(cur.trim()); return result;
-  };
-  const headers = splitLine(lines[0]).map(h => h.replace(/\s*\*\s*$/, "").trim());
+  // The trailing "*" strip is this parser's own concern: the initiative import
+  // template marks required columns with one, and the asterisk is decoration
+  // rather than part of the column name.
+  const headers = splitCSVLine(lines[0]).map(h => h.replace(/\s*\*\s*$/, "").trim());
   const rows = lines.slice(1).map(l => {
-    const vals = splitLine(l);
+    const vals = splitCSVLine(l);
     const obj = {};
-    headers.forEach((h, i) => { obj[h] = (vals[i] || "").replace(/^"|"$/g, "").trim(); });
+    headers.forEach((h, i) => { obj[h] = vals[i] || ""; });
     return obj;
   }).filter(r => r.title || r.initId);
   return { headers, rows };

@@ -20,6 +20,12 @@ import { availableDimensions, defaultDimension, rollupByInitiative, deriveRatios
 // editor is the next item in this slice — and it says so rather than implying
 // the values are typed here.
 //
+// Typography, same discipline as colour: the reading face (serif) is for copy
+// read as sentences — the empty states, the convention explainer, the "needs a
+// look" prose. Everything bolted to a control, a table row or a stat tile is
+// sans, and figures are mono. Three families each doing one job reads as one
+// system; three families alternating inside a single card reads as three.
+//
 // Colour discipline, deliberately: bars are one ink at one value. Hue carries no
 // information in a magnitude chart — the row is already labelled and the length
 // already encodes the number — so a per-row colour is decoration that reads as
@@ -132,7 +138,7 @@ export function PerformanceView({ t, items, settings, perfRows, onImport, onClea
             </div>
           ))}
           {rows.length >= PERF_ROW_LIMIT && (
-            <div style={{ fontSize: 11.5, color: t.warn, fontFamily: t.serif, flexBasis: "100%", lineHeight: 1.5 }}>
+            <div style={{ fontSize: 11.5, color: t.warn, fontFamily: t.sans, flexBasis: "100%", lineHeight: 1.5 }}>
               At the {PERF_ROW_LIMIT.toLocaleString()}-row browser storage ceiling. The oldest rows are dropped as new
               ones import — narrow the export's date range, or wait for the Postgres fact table.
             </div>
@@ -193,7 +199,7 @@ export function PerformanceView({ t, items, settings, perfRows, onImport, onClea
                   <option value="rows">Row count</option>
                 </select>
               </div>
-              <div style={{ flex: 1, minWidth: 220, fontSize: 12, color: t.textMuted, fontFamily: t.serif, lineHeight: 1.55 }}>
+              <div style={{ flex: 1, minWidth: 220, fontSize: 12, color: t.textMuted, fontFamily: t.sans, lineHeight: 1.55 }}>
                 {dim.hint}
               </div>
             </div>
@@ -203,7 +209,7 @@ export function PerformanceView({ t, items, settings, perfRows, onImport, onClea
                 worse than one that admits it. */}
             {(breakdown.unparsed > 0 || breakdown.notInTemplate > 0) && (
               <div style={{ marginBottom: 12, padding: "9px 12px", borderRadius: 9, background: t.warnBg, border: "1px solid " + t.warnBorder,
-                fontSize: 12, color: t.text, fontFamily: t.serif, lineHeight: 1.55 }}>
+                fontSize: 12, color: t.text, fontFamily: t.sans, lineHeight: 1.55 }}>
                 Not in this pivot:{" "}
                 {breakdown.unparsed > 0 && <><strong>{breakdown.unparsed}</strong> row{breakdown.unparsed !== 1 ? "s" : ""} whose name did not parse</>}
                 {breakdown.unparsed > 0 && breakdown.notInTemplate > 0 && ", "}
@@ -243,7 +249,7 @@ export function PerformanceView({ t, items, settings, perfRows, onImport, onClea
                   </div>
                 );
               })}
-              <div style={{ paddingTop: 10, fontSize: 11.5, color: t.textMuted, fontFamily: t.serif, lineHeight: 1.55 }}>
+              <div style={{ paddingTop: 10, fontSize: 11.5, color: t.textMuted, fontFamily: t.sans, lineHeight: 1.55 }}>
                 ROAS and CPA are recomputed from each group's summed revenue, spend and conversions — never averaged
                 across rows, which would give a $12 ad set the same weight as a $12,000 one.
               </div>
@@ -279,7 +285,7 @@ export function PerformanceView({ t, items, settings, perfRows, onImport, onClea
                     <div style={gSL(t)}>{c.label}</div>
                     <div style={{ fontFamily: t.mono, fontSize: 22, fontWeight: 700, color: t.text, lineHeight: 1.1 }}>{n.toLocaleString()}</div>
                     <div style={{ fontFamily: t.mono, fontSize: 12, color: t.textSub, marginTop: 2 }}>{fmtCur(Math.round(s))} spend</div>
-                    <div style={{ fontSize: 11, color: t.textMuted, fontFamily: t.serif, marginTop: 6, lineHeight: 1.45 }}>{c.note}</div>
+                    <div style={{ fontSize: 11, color: t.textMuted, fontFamily: t.sans, marginTop: 6, lineHeight: 1.45 }}>{c.note}</div>
                   </div>
                 );
               })}
@@ -341,7 +347,7 @@ export function PerformanceView({ t, items, settings, perfRows, onImport, onClea
                           <span style={{ fontFamily: t.mono, fontSize: 10.5, color: t.textMuted, wordBreak: "break-all" }}>{r.name}</span>
                         </div>
                       ))}
-                      {broken.length > 12 && <div style={{ fontSize: 11, color: t.textMuted, fontFamily: t.serif, marginTop: 4 }}>…and {broken.length - 12} more.</div>}
+                      {broken.length > 12 && <div style={{ fontSize: 11, color: t.textMuted, fontFamily: t.sans, marginTop: 4 }}>…and {broken.length - 12} more.</div>}
                     </div>
                   )}
                   {bad.length > 0 && (
@@ -354,10 +360,10 @@ export function PerformanceView({ t, items, settings, perfRows, onImport, onClea
                       {bad.slice(0, 8).map(r => (
                         <div key={r.name} style={{ padding: "4px 0" }}>
                           <div style={{ fontFamily: t.mono, fontSize: 10.5, color: t.textSub, wordBreak: "break-all" }}>{r.name}</div>
-                          <div style={{ fontSize: 11, color: t.textMuted, fontFamily: t.serif, lineHeight: 1.45 }}>{r.parseErrors?.[0]}</div>
+                          <div style={{ fontSize: 11, color: t.textMuted, fontFamily: t.sans, lineHeight: 1.45 }}>{r.parseErrors?.[0]}</div>
                         </div>
                       ))}
-                      {bad.length > 8 && <div style={{ fontSize: 11, color: t.textMuted, fontFamily: t.serif, marginTop: 4 }}>…and {bad.length - 8} more.</div>}
+                      {bad.length > 8 && <div style={{ fontSize: 11, color: t.textMuted, fontFamily: t.sans, marginTop: 4 }}>…and {bad.length - 8} more.</div>}
                     </div>
                   )}
                 </div>
@@ -426,7 +432,7 @@ export function PerformanceView({ t, items, settings, perfRows, onImport, onClea
                             </span>
                           )}
                         </div>
-                        <div style={{ fontSize: 11.5, color: t.textMuted, fontFamily: t.serif, lineHeight: 1.5, marginTop: 2 }}>{d.hint}</div>
+                        <div style={{ fontSize: 11.5, color: t.textMuted, fontFamily: t.sans, lineHeight: 1.5, marginTop: 2 }}>{d.hint}</div>
                         {d.vocab && (
                           <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 5 }}>
                             {d.vocab.map(v => (

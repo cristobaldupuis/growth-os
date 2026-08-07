@@ -1235,7 +1235,7 @@ export default function App() {
           background:toast.type==="error"?t.redBg:toast.type==="success"?t.tealBg:t.surfaceAlt,
           border:"1px solid "+(toast.type==="error"?(t.red):toast.type==="success"?(t.teal):(t.border)),
           color:toast.type==="error"?(t.red):toast.type==="success"?(t.teal):(t.textSub),
-          borderRadius:8,padding:"10px 18px",fontSize:13,fontFamily:t.serif,fontWeight:600,
+          borderRadius:8,padding:"10px 18px",fontSize:13,fontFamily:t.sans,fontWeight:600,
           boxShadow:"0 4px 20px rgba(0,0,0,0.15)",animation:"slideIn 0.2s ease",whiteSpace:"nowrap",
           maxWidth:"90vw",textOverflow:"ellipsis",overflow:"hidden"}}>
           {toast.type==="error"?"⚠ ":toast.type==="success"?"✓ ":"ℹ "}{toast.msg}

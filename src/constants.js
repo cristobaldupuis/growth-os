@@ -211,7 +211,13 @@ export const METRIC_CSV_ALIASES = {
 
 export const FONT_SANS  = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, system-ui, sans-serif";
 export const FONT_MONO  = "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, 'Liberation Mono', monospace";
-// Reading face: headings, titles, and narrative UI copy. Numerals never use it.
+// Reading face: headings, titles, and copy read as sentences. Numerals never
+// use it, and neither does chrome — a label bolted to a control, a table row or
+// a stat tile is sans, however explanatory it sounds. That boundary is the whole
+// discipline: three faces each doing one job reads as one system, and the same
+// three alternating inside a single card reads as three. The nav rail was the
+// worst offender and now carries no serif at all — it is chrome end to end, with
+// no sentence anywhere in it.
 // Weights are capped at 500 (default) / 600 (emphasis). Loaded in index.html.
 export const FONT_SERIF = "'Lora', ui-serif, Georgia, 'Times New Roman', serif";
 

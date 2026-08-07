@@ -13,14 +13,22 @@ import { NAV_SECTIONS } from "./navSections.js";
 //
 // The section vocabulary and per-view descriptions live in navSections.js.
 
+// Two lines, never three. The blurb used to render inline after the laboratory
+// name, and at a 216px rail that is a sentence in roughly 150px of measure — it
+// wrapped to two lines on every item, so seven destinations occupied the height
+// of eleven and the rail read as a wall of prose rather than a list. The blurb
+// still exists and still does its job; it moved to the tooltip, where it costs
+// no height and is there for anyone who wants it. What has to be legible at a
+// glance is the label, and that is now the thing the eye lands on.
 function NavItem({ t, item, active, count, onClick }) {
   return (
     <button
       onClick={onClick}
       aria-current={active ? "page" : undefined}
+      title={item.lab + " · " + item.blurb}
       style={{
-        display:"flex", alignItems:"flex-start", gap:9, width:"100%", textAlign:"left",
-        padding:"8px 9px", borderRadius:9, cursor:"pointer", fontFamily:t.sans,
+        display:"flex", alignItems:"center", gap:9, width:"100%", textAlign:"left",
+        padding:"6px 9px", borderRadius:8, cursor:"pointer", fontFamily:t.sans,
         background: active ? t.surface : "transparent",
         border: "1px solid " + (active ? t.border : "transparent"),
         boxShadow: active ? t.shadow : "none",
@@ -30,9 +38,9 @@ function NavItem({ t, item, active, count, onClick }) {
       onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
     >
       <span style={{
-        width:22, height:22, borderRadius:6, flexShrink:0, marginTop:1,
+        width:20, height:20, borderRadius:6, flexShrink:0,
         display:"flex", alignItems:"center", justifyContent:"center",
-        fontFamily:t.mono, fontSize:9, fontWeight:700, letterSpacing:"0.02em",
+        fontFamily:t.mono, fontSize:8.5, fontWeight:700, letterSpacing:"0.02em",
         background: active ? t.goldFill : t.surfaceAlt,
         color: active ? t.goldText : t.textMuted,
         border: "1px solid " + (active ? t.goldFill : t.border),
@@ -50,9 +58,14 @@ function NavItem({ t, item, active, count, onClick }) {
             <span style={{ fontFamily:t.mono, fontSize:10, color:t.textMuted, fontWeight:600 }}>{count}</span>
           )}
         </span>
-        <span style={{ display:"block", fontSize:10.5, color:t.textMuted, lineHeight:1.4, marginTop:2, fontFamily:t.serif }}>
-          <span style={{ color: active ? t.gold : t.textSub, fontStyle:"italic" }}>{item.lab}</span>
-          {" · " + item.blurb}
+        {/* Clamped rather than merely short: a longer laboratory name in a future
+            config must shorten this line, never add one. */}
+        <span style={{
+          display:"block", fontSize:10, lineHeight:1.35, fontFamily:t.sans, fontStyle:"italic",
+          color: active ? t.gold : t.textMuted,
+          whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis",
+        }}>
+          {item.lab}
         </span>
       </span>
     </button>
@@ -70,7 +83,7 @@ export function Sidebar({
       <div style={{ padding:"16px 14px 14px", borderBottom:"1px solid "+t.borderSoft }}>
         <button onClick={() => { onNav("dashboard"); if (onClose) onClose(); }} title="Back to Dashboard" data-tour="logo"
           style={{ display:"flex", alignItems:"center", gap:9, padding:0, background:"transparent", border:"none", cursor:"pointer", width:"100%", textAlign:"left" }}>
-          <span style={{ width:26, height:26, borderRadius:8, background:t.goldFill, color:t.goldText, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:600, fontSize:12, fontFamily:t.serif, flexShrink:0 }}>GO</span>
+          <span style={{ width:26, height:26, borderRadius:8, background:t.goldFill, color:t.goldText, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, fontSize:12, fontFamily:t.sans, flexShrink:0 }}>GO</span>
           <span style={{ display:"flex", flexDirection:"column", alignItems:"flex-start", lineHeight:1.2, minWidth:0 }}>
             <span style={{ fontSize:13, fontWeight:700, letterSpacing:"0.1em", color:t.text, fontFamily:t.sans, whiteSpace:"nowrap" }}>GROWTH OS</span>
             <span style={{ fontSize:9.5, color:t.textMuted, fontFamily:t.mono, letterSpacing:"0.09em", textTransform:"uppercase", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", maxWidth:150 }}>
@@ -88,7 +101,7 @@ export function Sidebar({
               <span style={{ fontFamily:t.mono, fontSize:9, letterSpacing:"0.13em", textTransform:"uppercase", color:t.textMuted, fontWeight:600 }}>
                 {section.label}
               </span>
-              <span style={{ fontSize:9.5, color:t.textMuted, fontFamily:t.serif, opacity:0.75 }}>{section.hint}</span>
+              <span style={{ fontSize:9.5, color:t.textMuted, fontFamily:t.sans, opacity:0.8 }}>{section.hint}</span>
             </div>
             <div style={{ display:"flex", flexDirection:"column", gap:1 }}>
               {section.items.map(item => (
@@ -108,7 +121,7 @@ export function Sidebar({
             style={{ fontSize:12, padding:"6px 9px", borderRadius:8, width:"100%", boxSizing:"border-box",
               border:"1px solid "+(activeBrand === "all" ? t.border : t.goldBorder),
               background: activeBrand === "all" ? t.surface : t.goldBg,
-              color: activeBrand === "all" ? t.textSub : t.gold, fontFamily:t.serif, cursor:"pointer" }}>
+              color: activeBrand === "all" ? t.textSub : t.gold, fontFamily:t.sans, cursor:"pointer" }}>
             <option value="all">All retailers</option>
             {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>

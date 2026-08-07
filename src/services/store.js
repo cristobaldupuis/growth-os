@@ -5,6 +5,12 @@ export const KEY_DEBATES  = "gos_debates_v1";
 export const KEY_METRICS  = "gos_metrics_v1";
 export const KEY_RECS     = "gos_recs_v1";
 export const KEY_CREATIVE = "gos_creative_v1";
+// Campaign-level performance facts, parsed against the naming schema. Separate
+// from KEY_METRICS because the two shapes are genuinely different: the weekly
+// contract is one row per week per brand per source, this is one row per ad
+// entity per day with its dimensions living inside the name. Capped in
+// services/performance.js — a browser store is a provisional home for these.
+export const KEY_PERF     = "gos_perf_v1";
 export const KEY_LIB_VIEW = "gos_lib_view_v1";
 export const KEY_TOUR_SEEN = "gos_tour_seen_v1";
 
@@ -90,12 +96,12 @@ export const store = (() => {
   };
 })();
 
-// `creative` is optional so a caller that predates the Creative Studio still
+// `creative` and `perfRows` are optional so a caller that predates either still
 // produces a valid backup; version stays 1 because a v1 restore reading a v2
 // payload loses only the new key, and a v2 restore reading a v1 payload finds
 // it absent and skips it. Neither direction corrupts anything, which is the bar
 // a format bump would exist to protect.
-export const handleDownloadBackup = (items, settings, debates, weeklyMetrics, recs, creative) => {
+export const handleDownloadBackup = (items, settings, debates, weeklyMetrics, recs, creative, perfRows) => {
   const payload = {
     _meta: {
       format: "growth-os-backup",
@@ -109,6 +115,7 @@ export const handleDownloadBackup = (items, settings, debates, weeklyMetrics, re
     weeklyMetrics,
     recs,
     creative: creative || [],
+    perfRows: perfRows || [],
   };
   const json = JSON.stringify(payload, null, 2);
   const blob = new Blob([json], { type: "application/json" });
@@ -137,6 +144,7 @@ export const handleRestoreBackup = (file, showToast, setRestorePayload) => {
         metrics: Array.isArray(parsed.weeklyMetrics) ? parsed.weeklyMetrics.length : 0,
         recs: Array.isArray(parsed.recs) ? parsed.recs.length : 0,
         creative: Array.isArray(parsed.creative) ? parsed.creative.length : 0,
+        perfRows: Array.isArray(parsed.perfRows) ? parsed.perfRows.length : 0,
       };
       const stamp = parsed._meta?.exportedAt
         ? new Date(parsed._meta.exportedAt).toLocaleString()

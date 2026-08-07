@@ -17,10 +17,15 @@
 //
 //   `label`  — plain, and the primary thing you read. Unchanged from what
 //              shipped, so nothing anyone already learned stops working.
-//   `lab`    — the laboratory name, rendered underneath as a subtitle. Carries
-//              the flavour, explains the two-letter code, and is never the only
-//              way to find anything.
-//   `blurb`  — what the view answers, in a sentence.
+//   `lab`    — the laboratory name, rendered underneath as a one-line subtitle.
+//              Carries the flavour, explains the two-letter code, and is never
+//              the only way to find anything.
+//   `blurb`  — what the view answers, in a sentence. Rendered as the item's
+//              tooltip rather than inline: at a 216px rail a sentence wraps to
+//              two lines on every item, which made a seven-item list as tall as
+//              eleven and buried the labels in prose. It is still written for
+//              the reader, and it is still the copy the Guide drawer draws on —
+//              it just costs no height in the rail.
 //
 // The heavier science vocabulary belongs to the mechanics rather than the
 // furniture: kill criteria, pre-registration, what would falsify this, the
@@ -36,6 +41,7 @@ export const NAV_SECTIONS = [
       { key:"dashboard",   code:"OB", label:"Dashboard",   lab:"Observatory", blurb:"the whole portfolio at a glance" },
       { key:"initiatives", code:"RG", label:"Initiatives", lab:"Register",    blurb:"every experiment and its status" },
       { key:"library",     code:"AR", label:"Library",     lab:"Archive",     blurb:"what closed experiments taught us" },
+      { key:"performance", code:"MS", label:"Performance", lab:"Microscope",  blurb:"what the ad names reveal about spend" },
     ],
   },
   {

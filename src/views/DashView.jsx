@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { OUTCOMES, INIT_TYPES, METRIC_SOURCES, OL, OD, TYPE_L, TYPE_D, DEFAULT_SETTINGS, catColor, brandName, iceScore, iceColor, fmtCur, fmtDate, mondayOf, parseNorthStarValue, resolveNorthStar } from "../constants.js";
+import { OUTCOMES, INIT_TYPES, METRIC_SOURCES, OL, OD, DEFAULT_SETTINGS, brandName, iceScore, iceColor, fmtCur, fmtDate, mondayOf, parseNorthStarValue, resolveNorthStar } from "../constants.js";
 import { gG, gGh, gSL, gCd } from "../components/styles.js";
 import { Spark } from "../components/Spark.jsx";
 import { WeeklyStandupModal } from "../components/WeeklyStandupModal.jsx";
@@ -81,7 +81,7 @@ function WeeklyPulseSection({t, brands, weeklyMetrics, onLog, onImport}) {
           </button>
           <span style={{fontSize:11,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono}}>Weekly Pulse</span>
           {!isEmpty && (
-            <span style={{fontSize:10,padding:"2px 7px",borderRadius:3,background:stalenessBg,border:"1px solid "+stalenessBorder,color:stalenessColor,fontFamily:t.serif,fontWeight:600}}>
+            <span style={{fontSize:10,padding:"2px 7px",borderRadius:3,background:stalenessBg,border:"1px solid "+stalenessBorder,color:stalenessColor,fontFamily:t.sans,fontWeight:600}}>
               {renderProse(isStale ? `Last logged ${daysSince}d ago ⚠️` : `Updated ${daysSince===0?"today":daysSince+"d ago"}`)}
             </span>
           )}
@@ -109,12 +109,12 @@ function WeeklyPulseSection({t, brands, weeklyMetrics, onLog, onImport}) {
               {/* Revenue sparkline strip */}
               {revenueByWeek.some(v=>v>0) && (
                 <div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:t.surfaceAlt,borderRadius:5}}>
-                  <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,minWidth:60}}>Revenue</span>
+                  <span style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,minWidth:60}}>Revenue</span>
                   <Spark vals={revenueByWeek} color={t.gold} w={100} h={24}/>
                   <span style={{fontSize:11,fontWeight:700,color:t.gold,fontFamily:t.mono,marginLeft:4}}>
                     {fmtCur(revenueByWeek[revenueByWeek.length-1])}
                   </span>
-                  <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginLeft:"auto"}}>last <span style={{fontFamily:t.mono}}>{weeks.length}</span> entries</span>
+                  <span style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginLeft:"auto"}}>last <span style={{fontFamily:t.mono}}>{weeks.length}</span> entries</span>
                 </div>
               )}
 
@@ -167,7 +167,7 @@ function WeeklyPulseSection({t, brands, weeklyMetrics, onLog, onImport}) {
 // Treats categories as funnel stages and shows, per stage: how many initiatives,
 // average ICE quality, and revenue in play (running + draft estimate). Surfaces
 // thin/empty stages as coverage gaps — the diagnostic artifact for onboarding calls.
-function FunnelCoverageMap({t, dk, items, cats, brands, activeBrand}) {
+function FunnelCoverageMap({t, items, cats, brands, activeBrand}) {
   const normB = id => (!id||id==="default") ? ((brands[0]&&brands[0].id)||"default") : id;
   const scoped = items.filter(e=>activeBrand==="all"||normB(e.brandId)===normB(activeBrand));
   const fmtK = (n) => n===0 ? "$0" : "$"+(n>=1000?Math.round(n/100)/10+"k":Math.round(n).toLocaleString());
@@ -200,20 +200,24 @@ function FunnelCoverageMap({t, dk, items, cats, brands, activeBrand}) {
         <span style={{fontSize:12,fontWeight:600,color:t.gold,fontFamily:t.mono}}>{fmtK(totalRevInPlay)} in play</span>
       </div>
 
+      {/* A coverage gap is an opportunity, not a failure, and red is reserved
+        * for blockers and failed outcomes — spending it here is what made the
+        * loudest element on the dashboard the least actionable one. */}
       {gaps.length>0 && (
-        <div style={{display:"flex",alignItems:"flex-start",gap:8,padding:"9px 12px",borderRadius:9,background:t.redBg,border:"1px solid "+t.red,margin:"10px 0 14px"}}>
-          <span style={{color:t.red,fontSize:13,lineHeight:1.4,flexShrink:0}}>&#9888;</span>
-          <span style={{fontSize:12,color:t.red,fontFamily:t.sans,lineHeight:1.45}}>
+        <div style={{display:"flex",alignItems:"flex-start",gap:8,padding:"9px 12px",borderRadius:9,background:t.goldBg,border:"1px solid "+t.goldBorder,margin:"10px 0 14px"}}>
+          <span style={{fontSize:12,color:t.text,fontFamily:t.sans,lineHeight:1.45}}>
             <strong style={{fontWeight:600}}>{gaps.length} stage{gaps.length>1?"s":""} with no active work:</strong> {gaps.map(g=>g.cat).join(", ")}. These are coverage gaps worth a hypothesis.
           </span>
         </div>
       )}
 
+      {/* One ink for every bar. Hue carries nothing in a magnitude chart — the
+        * row is labelled and the length is the number — so a colour per stage
+        * was decoration competing with the figures beside it. */}
       <div style={{display:"flex",flexDirection:"column",gap:2,marginTop:gaps.length>0?0:12}}>
         {stages.map((s,i)=>{
           const isGap = s.active===0;
           const barPct = Math.max(4,(s.count/maxCount)*100);
-          const accent = catColor(s.cat,cats,dk);
           return (
             <div key={s.cat} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:i<stages.length-1?"1px solid "+t.borderSoft:"none"}}>
               {/* Stage label + count bar */}
@@ -221,17 +225,17 @@ function FunnelCoverageMap({t, dk, items, cats, brands, activeBrand}) {
                 <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:5}}>
                   <span style={{fontSize:13,fontWeight:600,color:isGap?t.textMuted:t.text,fontFamily:t.sans}}>{s.cat}</span>
                   {isGap
-                    ? <span style={{fontSize:10,fontWeight:600,color:t.red,fontFamily:t.mono,letterSpacing:"0.04em"}}>UNCOVERED</span>
+                    ? <span style={{fontSize:10,fontWeight:600,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.04em"}}>UNCOVERED</span>
                     : <span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>{s.running} running · {s.draft} draft · {s.done} done</span>}
                 </div>
                 <div style={{height:7,borderRadius:4,background:t.surfaceAlt,overflow:"hidden"}}>
-                  <div style={{width:barPct+"%",height:"100%",background:isGap?t.border:accent,borderRadius:4,transition:"width .3s"}}/>
+                  <div style={{width:barPct+"%",height:"100%",background:isGap?t.border:t.goldFill,borderRadius:4,transition:"width .3s"}}/>
                 </div>
               </div>
               {/* Quality */}
               <div style={{width:62,textAlign:"right",flexShrink:0}}>
                 <div style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>ICE</div>
-                <div style={{fontSize:14,fontWeight:600,color:s.avgIce!=null?(s.avgIce>=60?t.teal:s.avgIce>=35?t.text:t.textSub):t.textMuted,fontFamily:t.mono,lineHeight:1.2}}>{s.avgIce!=null?s.avgIce:"—"}</div>
+                <div style={{fontSize:14,fontWeight:600,color:s.avgIce!=null?t.text:t.textMuted,fontFamily:t.mono,lineHeight:1.2}}>{s.avgIce!=null?s.avgIce:"—"}</div>
               </div>
               {/* Revenue in play */}
               <div style={{width:74,textAlign:"right",flexShrink:0}}>
@@ -341,7 +345,7 @@ function BusinessHealthPanel({ t, settings, weeklyMetrics, activeBrand, brands }
           </button>
           <div>
             <span style={{fontSize:11,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono}}>Business Health</span>
-            <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,marginTop:1}}>
+            <div style={{fontSize:11,color:t.textMuted,fontFamily:t.sans,marginTop:1}}>
               {(!activeBrand||activeBrand==="all")
                 ? "Portfolio-level guardrail metrics: watch these when experiments are running"
                 : brandName(activeBrand,brands)+"'s guardrail metrics: watch these when experiments are running"}
@@ -375,7 +379,7 @@ function BusinessHealthPanel({ t, settings, weeklyMetrics, activeBrand, brands }
                   {fmtd !== null && deltaChip(val, priorVal, metric.higherIsBetter)}
                 </div>
                 {fmtd === null && (
-                  <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginTop:4,lineHeight:1.4}}>Configure in Settings</div>
+                  <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginTop:4,lineHeight:1.4}}>Configure in Settings</div>
                 )}
                 {showTgt && tgtPct !== null && (
                   <div style={{marginTop:8}}>
@@ -456,11 +460,11 @@ function ContributionView({t, contribution, totals, dRange, activeBrand, brands,
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8,flexWrap:"wrap",marginBottom:14}}>
         <div>
           <div style={gSL(t)}>Contribution to revenue</div>
-          <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,lineHeight:1.5}}>
+          <div style={{fontSize:11,color:t.textMuted,fontFamily:t.sans,lineHeight:1.5}}>
             {retailerLabel} &middot; {rangeLabel} &middot; in-flight and pipeline are probability-weighted by category win rate
           </div>
           {totalInView > 0 && (
-            <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginTop:3}}>
+            <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginTop:3}}>
               {totalActualsCount} of {totalInView} initiatives use recorded actuals; remaining figures are team estimates
             </div>
           )}
@@ -473,22 +477,22 @@ function ContributionView({t, contribution, totals, dRange, activeBrand, brands,
         <div style={{padding:"12px 14px",borderRadius:6,background:t.goldBg,border:"1px solid "+t.goldBorder}}>
           <div style={{fontSize:10,color:t.gold,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:4}}>Realised</div>
           <div style={{fontSize:26,fontWeight:700,fontFamily:t.mono,color:colorRealised,letterSpacing:"-0.02em",lineHeight:1}}>{fmtBig(totals.realised)}</div>
-          <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginTop:4}}>measured on completed</div>
+          <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginTop:4}}>measured on completed</div>
         </div>
         <div style={{padding:"12px 14px",borderRadius:6,background:t.surface,border:"1px solid "+t.border}}>
           <div style={{fontSize:10,color:colorInflight,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:4}}>In-flight</div>
           <div style={{fontSize:26,fontWeight:700,fontFamily:t.mono,color:colorInflight,letterSpacing:"-0.02em",lineHeight:1}}>{fmtBig(totals.inflight)}</div>
-          <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginTop:4}}>running, probability-weighted</div>
+          <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginTop:4}}>running, probability-weighted</div>
         </div>
         <div style={{padding:"12px 14px",borderRadius:6,background:t.surface,border:"1px solid "+t.border}}>
           <div style={{fontSize:10,color:colorPipeline,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:4}}>Pipeline</div>
           <div style={{fontSize:26,fontWeight:700,fontFamily:t.mono,color:colorPipeline,letterSpacing:"-0.02em",lineHeight:1}}>{fmtBig(totals.pipeline)}</div>
-          <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginTop:4}}>draft, probability-weighted</div>
+          <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginTop:4}}>draft, probability-weighted</div>
         </div>
       </div>
 
       {totals.realisedBackfilled>0 && (
-        <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,lineHeight:1.5,marginTop:-8,marginBottom:14,fontStyle:"italic"}}>
+        <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,lineHeight:1.5,marginTop:-8,marginBottom:14,fontStyle:"italic"}}>
           + {fmtBig(totals.realisedBackfilled)} from backfilled history (self-reported estimates, not system-measured). Excluded from Realised above.
         </div>
       )}
@@ -502,8 +506,8 @@ function ContributionView({t, contribution, totals, dRange, activeBrand, brands,
             <div key={row.category}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:5,gap:8,flexWrap:"wrap"}}>
                 <div style={{display:"flex",alignItems:"baseline",gap:8,flexWrap:"wrap",minWidth:0}}>
-                  <span style={{fontSize:12,fontWeight:600,color:t.text,fontFamily:t.serif}}>{row.category}</span>
-                  <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif}}>
+                  <span style={{fontSize:12,fontWeight:600,color:t.text,fontFamily:t.sans}}>{row.category}</span>
+                  <span style={{fontSize:10,color:t.textMuted,fontFamily:t.sans}}>
                     win rate {row.winRate}%{row.usesFallback?" (portfolio avg)":""}
                   </span>
                 </div>
@@ -614,7 +618,7 @@ function NextPlaysCard({ t, recs, recsLoad, recsErr, items, onGenerate, onOpenRe
           * from the reader's point of view. Both statements were true; only one
           * of them was useful. */}
         {weekState === "stale" && weekLabel && (
-          <div style={{padding:"6px 10px",background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:4,fontSize:11,color:t.textSub,fontFamily:t.serif}}>
+          <div style={{padding:"6px 10px",background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:4,fontSize:11,color:t.textSub,fontFamily:t.sans}}>
             Showing the slate from {weekLabel}. Regenerate for this week.
           </div>
         )}
@@ -624,11 +628,11 @@ function NextPlaysCard({ t, recs, recsLoad, recsErr, items, onGenerate, onOpenRe
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             <span style={{fontSize:14,color:t.gold}}>◆</span>
             <span style={{fontSize:12,fontWeight:600,fontFamily:t.serif,color:t.text,letterSpacing:"0.02em"}}>Next Plays</span>
-            <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif}}>
+            <span style={{fontSize:10,color:t.textMuted,fontFamily:t.sans}}>
               {renderProse(pending.length > 0 ? pending.length+" ready" : "all resolved")}
             </span>
             {weekLabel && (
-              <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,opacity:0.7}}>
+              <span style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,opacity:0.7}}>
                 · {weekState === "current" ? "Week of "+weekLabel : weekLabel}
               </span>
             )}
@@ -651,7 +655,7 @@ function NextPlaysCard({ t, recs, recsLoad, recsErr, items, onGenerate, onOpenRe
 
         {/* Error inline (rare — usually cleared by next successful gen) */}
         {recsErr && (
-          <div style={{padding:"6px 10px",background:t.redBg,border:"1px solid "+t.red,borderRadius:4,fontSize:11,color:t.red,fontFamily:t.serif}}>
+          <div style={{padding:"6px 10px",background:t.redBg,border:"1px solid "+t.red,borderRadius:4,fontSize:11,color:t.red,fontFamily:t.sans}}>
             {recsErr}
           </div>
         )}
@@ -672,7 +676,7 @@ function NextPlaysCard({ t, recs, recsLoad, recsErr, items, onGenerate, onOpenRe
                   </span>
                   {/* Meta chips — hide on narrow screens via flexShrink */}
                   <span style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,padding:"1px 5px",border:"1px solid "+t.border,borderRadius:3,textTransform:"uppercase",letterSpacing:"0.04em",flexShrink:0}}>{rec.category}</span>
-                  <span style={{fontSize:9,color:t.textMuted,fontFamily:t.serif,flexShrink:0,display:"none"}} className="np-brand">{rec.brandTarget}</span>
+                  <span style={{fontSize:9,color:t.textMuted,fontFamily:t.sans,flexShrink:0,display:"none"}} className="np-brand">{rec.brandTarget}</span>
                   {/* ICE — always visible, the most important signal at a glance */}
                   <span style={{display:"flex",gap:3,alignItems:"baseline",flexShrink:0}}>
                     <span style={{fontSize:9,color:t.textMuted,fontFamily:t.mono}}>ICE</span>
@@ -688,7 +692,7 @@ function NextPlaysCard({ t, recs, recsLoad, recsErr, items, onGenerate, onOpenRe
 
         {/* All-resolved nudge — encourages a regenerate when the slate is exhausted */}
         {pending.length === 0 && (accepted.length > 0 || dismissed.length > 0) && (
-          <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,fontStyle:"italic",padding:"4px 2px"}}>
+          <div style={{fontSize:11,color:t.textMuted,fontFamily:t.sans,fontStyle:"italic",padding:"4px 2px"}}>
             All recommendations from this batch have been resolved. Regenerate when you're ready for the next slate.
           </div>
         )}
@@ -700,8 +704,8 @@ function NextPlaysCard({ t, recs, recsLoad, recsErr, items, onGenerate, onOpenRe
               onClick={() => setDiffExpanded(x => !x)}
               style={{background:"none",border:"none",cursor:"pointer",padding:"2px 0",display:"flex",alignItems:"center",gap:6,width:"100%",textAlign:"left"}}
             >
-              <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif}}>{diffExpanded ? "▾" : "▸"}</span>
-              <span style={{fontSize:10,color:t.textSub,fontFamily:t.serif}}>Changes from last week</span>
+              <span style={{fontSize:10,color:t.textMuted,fontFamily:t.sans}}>{diffExpanded ? "▾" : "▸"}</span>
+              <span style={{fontSize:10,color:t.textSub,fontFamily:t.sans}}>Changes from last week</span>
               <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginLeft:2}}>
                 {[
                   diff.entered.length > 0 && `${diff.entered.length} new`,
@@ -713,19 +717,19 @@ function NextPlaysCard({ t, recs, recsLoad, recsErr, items, onGenerate, onOpenRe
             {diffExpanded && (
               <div style={{marginTop:4,display:"flex",flexDirection:"column",gap:3}}>
                 {diff.entered.map(r => (
-                  <div key={r.id} style={{fontSize:11,color:t.textSub,fontFamily:t.serif,display:"flex",gap:6,paddingLeft:4}}>
+                  <div key={r.id} style={{fontSize:11,color:t.textSub,fontFamily:t.sans,display:"flex",gap:6,paddingLeft:4}}>
                     <span style={{color:t.textMuted}}>+</span>
                     <span>{r.title}</span>
                   </div>
                 ))}
                 {diff.dropped.map(r => (
-                  <div key={r.id} style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,display:"flex",gap:6,paddingLeft:4}}>
+                  <div key={r.id} style={{fontSize:11,color:t.textMuted,fontFamily:t.sans,display:"flex",gap:6,paddingLeft:4}}>
                     <span>−</span>
                     <span style={{textDecoration:"line-through"}}>{r.title}</span>
                   </div>
                 ))}
                 {diff.changed.map(r => (
-                  <div key={r.id} style={{fontSize:11,color:t.textSub,fontFamily:t.serif,display:"flex",gap:6,paddingLeft:4}}>
+                  <div key={r.id} style={{fontSize:11,color:t.textSub,fontFamily:t.sans,display:"flex",gap:6,paddingLeft:4}}>
                     <span style={{color:t.textMuted}}>↕</span>
                     <span>{r.title}</span>
                   </div>
@@ -845,18 +849,18 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
           <div style={{fontSize:15,fontWeight:600,color:t.text,fontFamily:t.serif}}>{ns.metric}</div>
         </div>
         <div style={{display:"flex",gap:20,flexWrap:"wrap"}}>
-          <div><div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginBottom:2}}>Current</div><div style={{fontSize:26,fontWeight:600,color:t.gold,fontFamily:t.serif,letterSpacing:"-0.02em"}}>{ns.current}</div></div>
+          <div><div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginBottom:2}}>Current</div><div style={{fontSize:26,fontWeight:600,color:t.gold,fontFamily:t.sans,letterSpacing:"-0.02em"}}>{ns.current}</div></div>
           <div style={{fontSize:20,color:t.textMuted,alignSelf:"center"}}>&#8594;</div>
-          <div><div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginBottom:2}}>Target</div><div style={{fontSize:26,fontWeight:600,color:t.text,fontFamily:t.serif,letterSpacing:"-0.02em"}}>{ns.target}</div></div>
+          <div><div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginBottom:2}}>Target</div><div style={{fontSize:26,fontWeight:600,color:t.text,fontFamily:t.sans,letterSpacing:"-0.02em"}}>{ns.target}</div></div>
         </div>
         {nsGap !== null && (
-          <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,lineHeight:1.5}}
+          <div style={{fontSize:11,color:t.textMuted,fontFamily:t.sans,lineHeight:1.5}}
             title="Weighted pipeline is the sum of estimated revenue on running and draft initiatives, each multiplied by its category win rate. It is an absolute figure over each initiative's own run length, so it is shown alongside the gap rather than divided into it.">
             <div>Gap to target <strong style={{color:t.text,fontFamily:t.mono}}>{fmtCur(nsGap)}</strong>{nsPeriodLabel}</div>
             <div>Weighted pipeline <strong style={{color:t.gold,fontFamily:t.mono}}>{fmtCur(forwardPipeline)}</strong></div>
           </div>
         )}
-        <div style={{marginLeft:"auto",fontSize:11,color:t.textMuted,fontFamily:t.serif,textAlign:"right"}}>
+        <div style={{marginLeft:"auto",fontSize:11,color:t.textMuted,fontFamily:t.sans,textAlign:"right"}}>
           {activeBrand!=="all"&&<div style={{fontSize:12,fontWeight:600,color:t.gold,marginBottom:2}}>{brandName(activeBrand,brands)}</div>}
           {settings.businessModel}
         </div>
@@ -898,7 +902,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
                     : Math.ceil((today - new Date(item.startDate+"T12:00:00")) / 86400000);
                   return (
                     <div key={i} style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-                      <span style={{fontSize:10,fontWeight:600,fontFamily:t.serif,
+                      <span style={{fontSize:10,fontWeight:600,fontFamily:t.sans,
                         color:type==="expiring"?t.warn:t.red,
                         background:type==="expiring"?t.warnBg:t.redBg,
                         border:"1px solid "+(type==="expiring"?t.warnBorder:t.red),
@@ -906,7 +910,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
                         {type==="expiring" ? `ends in ${days}d` : `running ${days}d`}
                       </span>
                       <span style={{fontSize:12,color:t.textSub,fontFamily:t.serif,flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.title}</span>
-                      {item.owner&&<span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,flexShrink:0}}>{item.owner}</span>}
+                      {item.owner&&<span style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,flexShrink:0}}>{item.owner}</span>}
                     </div>
                   );
                 })}
@@ -1026,14 +1030,14 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
           <div key={m.l} style={{background:m.hero?t.goldBg:t.surface,border:"1px solid "+(m.hero?t.goldBorder:t.border),borderRadius:12,padding:"14px 16px",boxShadow:t.shadow,minHeight:96,display:"flex",flexDirection:"column"}}>
             <div style={{fontSize:9.5,letterSpacing:"0.1em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,fontWeight:600,marginBottom:"auto",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>{m.l}</div>
             <div style={{fontSize:26,fontWeight:700,color:isFinancial?t.gold:t.text,fontFamily:t.mono,lineHeight:1,letterSpacing:"-0.03em",marginTop:9}}>{m.v}</div>
-            {m.s&&m.s!==" "&&<div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginTop:7,whiteSpace:"nowrap",letterSpacing:"0.02em"}}>{m.s}</div>}
+            {m.s&&m.s!==" "&&<div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginTop:7,whiteSpace:"nowrap",letterSpacing:"0.02em"}}>{m.s}</div>}
           </div>
           );
         })}
       </div>
 
       {/* Funnel coverage map — diagnostic: where work & revenue sit across the funnel */}
-      <FunnelCoverageMap t={t} dk={dk} items={items} cats={cats} brands={brands} activeBrand={activeBrand}/>
+      <FunnelCoverageMap t={t} items={items} cats={cats} brands={brands} activeBrand={activeBrand}/>
 
       {/* Contribution to revenue — three-layer breakdown by category */}
       <ContributionView
@@ -1051,7 +1055,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
         <div style={{...gCd(t)}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8,flexWrap:"wrap",marginBottom:10}}>
             <div style={gSL(t)}>Transfer opportunities</div>
-            <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif}}>proven at one brand, not yet running at another</span>
+            <span style={{fontSize:10,color:t.textMuted,fontFamily:t.sans}}>proven at one brand, not yet running at another</span>
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:7}}>
             {transfers.map((tr,i) => {
@@ -1074,37 +1078,37 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
         <div style={gSL(t)}>Revenue estimate calibration</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16,alignItems:"center",marginBottom:dash.totalEstCost>0?12:0}}>
           <div>
-            <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginBottom:2}}>Total estimated</div>
+            <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginBottom:2}}>Total estimated</div>
             <div style={{fontSize:22,fontWeight:700,color:t.text,fontFamily:t.mono,letterSpacing:"-0.02em"}}>{fmtCur(dash.totalEstimated)}</div>
           </div>
           <div>
-            <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginBottom:2}}>Total actual</div>
+            <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginBottom:2}}>Total actual</div>
             <div style={{fontSize:22,fontWeight:700,color:t.gold,fontFamily:t.mono,letterSpacing:"-0.02em"}}>{fmtCur(dash.totalActual)}</div>
           </div>
           <div>
-            <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginBottom:2}}>Accuracy</div>
+            <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginBottom:2}}>Accuracy</div>
             <div style={{fontSize:24,fontWeight:700,fontFamily:t.mono,color:dash.calibration===null?t.textMuted:dash.calibration>=80?t.gold:dash.calibration>=50?t.warn:t.red}}>
               {dash.calibration!==null?dash.calibration+"%":"—"}
             </div>
-            {dash.calibration!==null&&<div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,marginTop:2}}>{dash.calibration>=80?"Well calibrated":dash.calibration>=50?"Moderate accuracy":"Overestimating"}</div>}
+            {dash.calibration!==null&&<div style={{fontSize:11,color:t.textMuted,fontFamily:t.sans,marginTop:2}}>{dash.calibration>=80?"Well calibrated":dash.calibration>=50?"Moderate accuracy":"Overestimating"}</div>}
           </div>
         </div>
         {dash.totalEstCost>0&&(
           <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid "+t.border,display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16}}>
             <div>
-              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginBottom:2}}>Total est. cost</div>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginBottom:2}}>Total est. cost</div>
               <div style={{fontSize:18,fontWeight:700,color:t.text,fontFamily:t.mono}}>{fmtCur(dash.totalEstCost)}</div>
             </div>
             <div>
-              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginBottom:2}}>Total actual cost</div>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginBottom:2}}>Total actual cost</div>
               <div style={{fontSize:18,fontWeight:700,color:t.text,fontFamily:t.mono}}>{dash.totalActualCost>0?fmtCur(dash.totalActualCost):"—"}</div>
             </div>
             <div>
-              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginBottom:2}}>Closed ROI</div>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginBottom:2}}>Closed ROI</div>
               <div style={{fontSize:22,fontWeight:700,fontFamily:t.mono,color:dash.closedROI===null?t.textMuted:dash.closedROI>=2?t.gold:dash.closedROI>=1?t.warn:t.red}}>
                 {dash.closedROI!==null?dash.closedROI+"x":"—"}
               </div>
-              {dash.closedROI!==null&&<div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,marginTop:2}}>{dash.closedROI>=3?"Strong return":dash.closedROI>=1?"Positive":"Negative"}</div>}
+              {dash.closedROI!==null&&<div style={{fontSize:11,color:t.textMuted,fontFamily:t.sans,marginTop:2}}>{dash.closedROI>=3?"Strong return":dash.closedROI>=1?"Positive":"Negative"}</div>}
             </div>
           </div>
         )}
@@ -1117,7 +1121,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
             {[{label:"Started / week",vals:dash.vel.started,color:t.teal},{label:"Closed / week",vals:dash.vel.closed,color:t.gold}].map(row=>(
               <div key={row.label}>
-                <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,marginBottom:4}}>{row.label}</div>
+                <div style={{fontSize:11,color:t.textMuted,fontFamily:t.sans,marginBottom:4}}>{row.label}</div>
                 <div style={{display:"flex",alignItems:"center",gap:10}}>
                   <Spark vals={row.vals} color={row.color} w={120} h={26}/>
                   <span style={{fontSize:20,fontWeight:700,color:t.text,fontFamily:t.mono}}>{row.vals[row.vals.length-1]}</span>
@@ -1134,11 +1138,11 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
               return(
                 <div key={cat}>
                   <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
-                    <span style={{fontSize:12,color:t.textSub,fontFamily:t.serif}}>{cat}</span>
+                    <span style={{fontSize:12,color:t.textSub,fontFamily:t.sans}}>{cat}</span>
                     <span style={{fontSize:12,color:t.textMuted,fontFamily:t.mono}}>{n}</span>
                   </div>
                   <div style={{height:5,background:t.border,borderRadius:3}}>
-                    <div style={{width:pct+"%",height:"100%",borderRadius:3,background:catColor(cat,cats,dk)}}/>
+                    <div style={{width:pct+"%",height:"100%",borderRadius:3,background:t.goldFill}}/>
                   </div>
                 </div>
               );
@@ -1153,15 +1157,14 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           {INIT_TYPES.map(tp=>{
             const n=dash.typeCounts[tp]||0,pct=maxType>0?Math.round((n/maxType)*100):0;
-            const color=(dk?TYPE_D:TYPE_L)[tp]||t.gold;
             return(
               <div key={tp}>
                 <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
-                  <span style={{fontSize:12,color:t.textSub,fontFamily:t.serif}}>{tp}</span>
+                  <span style={{fontSize:12,color:t.textSub,fontFamily:t.sans}}>{tp}</span>
                   <span style={{fontSize:12,color:t.textMuted,fontFamily:t.mono}}>{n}</span>
                 </div>
                 <div style={{height:5,background:t.border,borderRadius:3}}>
-                  <div style={{width:pct+"%",height:"100%",borderRadius:3,background:color}}/>
+                  <div style={{width:pct+"%",height:"100%",borderRadius:3,background:t.goldFill}}/>
                 </div>
               </div>
             );
@@ -1176,7 +1179,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
           {OUTCOMES.map(o=>{const c=(dk?OD:OL)[o]||{};return(
             <div key={o} style={{background:c.bg||t.surfaceAlt,border:"1px solid "+(c.border||t.border),borderRadius:6,padding:"8px 14px",minWidth:80}}>
               <div style={{fontSize:20,fontWeight:700,color:c.text||t.text,fontFamily:t.mono}}>{dash.outCounts[o]||0}</div>
-              <div style={{fontSize:11,color:c.text||t.textMuted,opacity:0.85,fontFamily:t.serif}}>{o}</div>
+              <div style={{fontSize:11,color:c.text||t.textMuted,opacity:0.85,fontFamily:t.sans}}>{o}</div>
             </div>
           );})}
         </div>

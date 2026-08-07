@@ -30,9 +30,17 @@ body {
   margin: 0;
   padding: 0;
   /* Belt and braces against horizontal scroll: no descendant should be able to
-   * push the document wider than the viewport on a phone. */
+   * push the document wider than the viewport on a phone.
+   *
+   * `clip`, not `hidden`, and the difference is not cosmetic. `overflow-x:
+   * hidden` makes the element a scroll container, and once <body> is its own
+   * scroll container the viewport stops being the scrollport for its
+   * descendants — so every `position: sticky` inside the app resolved against a
+   * box that never scrolls and simply scrolled away. That silently broke both
+   * the sidebar rail and the view header. `clip` clips without creating a
+   * scroll container, so the overflow guard stays and sticky works. */
   max-width: 100%;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 #root {

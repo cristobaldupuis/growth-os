@@ -6,7 +6,7 @@ import {
   CATEGORIES,
   AGENTS as CONFIG_AGENTS,
 } from "./activeConfig.js";
-import { DEFAULT_NAMING_SCHEMA } from "./services/naming.js";
+import { DEFAULT_NAMING_SCHEMA, emptyCustomVariables } from "./services/naming.js";
 import { splitCSVLine } from "./services/csvLine.js";
 
 export const DEFAULT_AGENTS = CONFIG_AGENTS;
@@ -38,8 +38,15 @@ export function applyBrandBriefDefaults(brand) {
 // have no `namingSchema` key; `resolveSchema` falls back to the shipped default
 // rather than requiring a migration — the same optional-with-fallback shape the
 // per-brand North Star uses, for the same reason.
+//
+// `namingCustom` is the operator's own layer on top of that schema — variables
+// this deployment needed and the shipped registry does not have. It is a
+// separate key rather than an edit to `namingSchema` so the two can evolve
+// independently: improvements to the shipped vocabulary still reach a workspace
+// that added a `client` dimension a year ago.
 export const DEFAULT_SETTINGS = {
   namingSchema:     DEFAULT_NAMING_SCHEMA,
+  namingCustom:     emptyCustomVariables(),
   companyName:      COMPANY_NAME,
   businessModel:    BUSINESS_MODEL,
   northStarMetric:  NORTH_STAR_METRIC,

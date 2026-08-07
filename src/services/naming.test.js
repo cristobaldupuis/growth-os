@@ -10,6 +10,9 @@ import {
   initiativeDimension, levelCarriesInitiative,
   taxonomy, dimensionUsage, channelDimensions,
   adNamesOf, assignedNameIndex, assignedNameConflicts, lookupAssignedName,
+  emptyCustomVariables, applyCustomVariables, upsertCustomDimension, removeCustomDimension,
+  addVocabValue, removeVocabValue, validateCustomDimension, validateVocabValue,
+  dimensionKeyFrom,
 } from "./naming.js";
 
 const S = DEFAULT_NAMING_SCHEMA;
@@ -427,4 +430,162 @@ test("a specifically claimed ad beats the campaign it sits inside", () => {
 test("a row matching nothing claimed returns null rather than a guess", () => {
   assert.equal(lookupAssignedName([GOLDEN], assignedNameIndex([])), null);
   assert.equal(lookupAssignedName([], assignedNameIndex([{ id:"i1", adNames:[CAMPAIGN] }])), null);
+});
+
+// -- Custom variables ----------------------------------------------------------
+//
+// The registry ships opinionated, and the second company always needs a
+// dimension it does not contain. These cover the overlay that lets an operator
+// add one without a deploy — and, more importantly, the guarantees that make
+// adding one safe to do to a live account.
+
+const REGION = {
+  key: "region", label: "Sales region", hint: "Which region owns the spend.",
+  family: "placement", vocab: ["NorthEast", "West"],
+  placements: [{ channel: "meta", level: "ad" }],
+};
+
+test("a workspace with no custom variables resolves to the shipped schema itself", () => {
+  // Identity, not deep equality: views hang useMemo on this reference.
+  assert.equal(resolveSchema({ namingCustom: emptyCustomVariables() }), DEFAULT_NAMING_SCHEMA);
+  assert.equal(applyCustomVariables(S, null), S);
+  assert.equal(applyCustomVariables(S, { dimensions: [], vocabAdditions: {} }), S);
+});
+
+test("a custom variable becomes a real dimension everywhere the schema is read", () => {
+  const custom = upsertCustomDimension(emptyCustomVariables(), REGION);
+  const sch = resolveSchema({ namingCustom: custom });
+
+  const dim = sch.dimensions.find(d => d.key === "region");
+  assert.ok(dim, "the dimension joins the registry");
+  assert.equal(dim.custom, true);
+  assert.deepEqual(dim.vocab, ["NorthEast", "West"]);
+
+  // It reaches the taxonomy page, the builder's field list, and the templates.
+  assert.ok(taxonomy(sch).find(f => f.key === "placement").dimensions.some(d => d.key === "region"));
+  assert.ok(channelDimensions(sch, "meta").some(d => d.key === "region"));
+  assert.deepEqual(dimensionUsage(sch, "region"), [
+    { channel:"meta", channelLabel:"Meta", level:"ad", levelLabel:"Ad", slot:12, of:12 },
+  ]);
+
+  // And it round-trips: built into a name, parsed back out of one.
+  const values = { ...GOLDEN_VALUES, region:"West" };
+  const { name, errors } = buildName(values, sch, METetc);
+  assert.deepEqual(errors, []);
+  assert.equal(name, GOLDEN + "_West");
+  assert.equal(parseName(name, sch, METetc).values.region, "West");
+});
+
+test("a placed variable is appended, never inserted — old names fail loudly instead of shifting", () => {
+  const sch = resolveSchema({ namingCustom: upsertCustomDimension(emptyCustomVariables(), REGION) });
+  const tpl = templateFor(sch, "meta", "ad").map(d => d.key);
+
+  // Every shipped slot keeps its position; the new one lands at the end.
+  assert.deepEqual(tpl.slice(0, 11), templateFor(S, "meta", "ad").map(d => d.key));
+  assert.equal(tpl[11], "region");
+
+  // The name built before the variable existed now has one slot too few. That
+  // is reported as a parse failure rather than parsed into shifted values —
+  // the whole reason placement appends.
+  const res = parseName(GOLDEN, sch, METetc);
+  assert.equal(res.ok, false);
+  assert.deepEqual(res.values, {});
+  assert.match(res.errors[0], /Expected 12 slots/);
+});
+
+test("a variable placed nowhere is defined but unused, and lengthens no template", () => {
+  const sch = resolveSchema({ namingCustom: upsertCustomDimension(emptyCustomVariables(), { ...REGION, placements: [] }) });
+  assert.ok(sch.dimensions.some(d => d.key === "region"));
+  assert.deepEqual(dimensionUsage(sch, "region"), []);
+  assert.equal(templateFor(sch, "meta", "ad").length, 11);
+  assert.equal(parseName(GOLDEN, sch, METetc).ok, true, "names built before it still parse");
+});
+
+test("added vocabulary lengthens a list without invalidating a single existing name", () => {
+  const custom = addVocabValue(emptyCustomVariables(), "theme", "Sustainability");
+  const sch = resolveSchema({ namingCustom: custom });
+  const theme = sch.dimensions.find(d => d.key === "theme");
+
+  assert.ok(theme.vocab.includes("Sustainability"));
+  assert.deepEqual(theme.vocabAdded, ["Sustainability"], "the UI needs to know which values are the operator's");
+  assert.equal(theme.vocab.length, S.dimensions.find(d => d.key === "theme").vocab.length + 1);
+  assert.equal(validateValue(theme, "Sustainability", sch.delimiter), null);
+  assert.equal(parseName(GOLDEN, sch, METetc).ok, true);
+
+  // Idempotent, case-insensitively — the same guarantee grouping makes.
+  assert.equal(addVocabValue(custom, "theme", "sustainability").vocabAdditions.theme.length, 1);
+
+  const back = removeVocabValue(custom, "theme", "Sustainability");
+  assert.equal(resolveSchema({ namingCustom: back }).dimensions.find(d => d.key === "theme").vocab.length,
+    S.dimensions.find(d => d.key === "theme").vocab.length);
+  assert.equal(back.vocabAdditions.theme, undefined, "an emptied list is dropped rather than left as []");
+});
+
+test("the overlay never redefines a shipped dimension", () => {
+  const sch = resolveSchema({ namingCustom: {
+    dimensions: [{ key:"geo", label:"Hijacked", vocab:["XX"], placements:[{ channel:"meta", level:"ad" }] }],
+    vocabAdditions: {},
+  }});
+  const geo = sch.dimensions.filter(d => d.key === "geo");
+  assert.equal(geo.length, 1);
+  assert.equal(geo[0].label, "Geo");
+  assert.equal(templateFor(sch, "meta", "ad").length, 11, "and the collision places nothing");
+});
+
+test("a malformed stored overlay is dropped, not repaired", () => {
+  // Keys are what templates and imported rows join on, so guessing at one would
+  // silently re-point historical data at a dimension nobody defined.
+  const sch = resolveSchema({ namingCustom: { dimensions: [
+    { key:"Sales Region", label:"Bad key" },
+    { key:"9lives",       label:"Leading digit" },
+    { key:"",             label:"No key" },
+    null,
+  ]}});
+  assert.equal(sch.dimensions.length, S.dimensions.length);
+});
+
+test("editing a custom variable can rename its key without duplicating it", () => {
+  let custom = upsertCustomDimension(emptyCustomVariables(), REGION);
+  custom = upsertCustomDimension(custom, { ...REGION, key:"market", label:"Market" }, "region");
+  assert.deepEqual(custom.dimensions.map(d => d.key), ["market"]);
+
+  custom = removeCustomDimension(custom, "market");
+  assert.deepEqual(custom.dimensions, []);
+  assert.equal(resolveSchema({ namingCustom: custom }), DEFAULT_NAMING_SCHEMA);
+});
+
+test("validation refuses the drafts that would corrupt a name", () => {
+  const ok = validateCustomDimension({ key:"region", label:"Sales region", controlled:true, vocab:["West"] }, S);
+  assert.equal(ok.ok, true);
+
+  assert.ok(validateCustomDimension({ key:"region", label:"", controlled:false }, S).errors.label);
+  assert.ok(validateCustomDimension({ key:"Sales Region", label:"x", controlled:false }, S).errors.key);
+  assert.ok(validateCustomDimension({ key:"geo", label:"x", controlled:false }, S).errors.key,
+    "a key already in the registry is a collision, not an override");
+  assert.ok(validateCustomDimension({ key:"region", label:"x", controlled:true, vocab:[] }, S).errors.vocab);
+  assert.ok(validateCustomDimension({ key:"region", label:"x", controlled:true, vocab:["North East"] }, S).errors.vocab,
+    "a space breaks UTMs and CSV exports");
+  assert.ok(validateCustomDimension({ key:"region", label:"x", controlled:true, vocab:["North_East"] }, S).errors.vocab,
+    "the delimiter would split one value into two slots");
+
+  // Editing itself is not a collision with itself.
+  const sch = resolveSchema({ namingCustom: upsertCustomDimension(emptyCustomVariables(), REGION) });
+  assert.equal(validateCustomDimension({ key:"region", label:"Sales region", controlled:true, vocab:["West"] }, sch,
+    { originalKey:"region" }).ok, true);
+  assert.ok(validateCustomDimension({ key:"region", label:"Other", controlled:false }, sch).errors.key);
+});
+
+test("vocabulary values are validated against the rules a name has to satisfy", () => {
+  assert.equal(validateVocabValue("NorthEast", S, []), null);
+  assert.ok(validateVocabValue("", S, []));
+  assert.ok(validateVocabValue("North East", S, []));
+  assert.ok(validateVocabValue("North_East", S, []));
+  assert.ok(validateVocabValue("west", S, ["West"]), "case-insensitive, like every other comparison here");
+});
+
+test("a key is derived from a label, and is always legal", () => {
+  assert.equal(dimensionKeyFrom("Sales Region"), "sales_region");
+  assert.equal(dimensionKeyFrom("  Retail — Format!  "), "retail_format");
+  assert.equal(dimensionKeyFrom("2024 Wave"), "v_2024_wave");
+  assert.equal(dimensionKeyFrom(""), "");
 });

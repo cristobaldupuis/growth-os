@@ -129,7 +129,7 @@ export const DIMENSION_FAMILIES = [
   { key:"creative",  label:"What it says",   hint:"The creative itself: concept, execution, and the hook under test." },
   { key:"product",   label:"What it sells",  hint:"Product line, variant, and the launch bucket it belongs to." },
   { key:"bridge",    label:"Attribution",    hint:"The slot carrying an initiative's tracking tag. This is what joins spend back to a hypothesis." },
-  { key:"other",     label:"Other",          hint:"Dimensions with no declared family — usually from a hand-edited schema." },
+  { key:"other",     label:"Other",          hint:"Dimensions with no declared group — a custom variable that hasn't been filed under one, or a hand-edited schema." },
 ];
 
 const FAMILY_OF = {
@@ -206,8 +206,18 @@ export const DEFAULT_NAMING_SCHEMA = {
  * existed fall through to the default. Nothing here requires a migration — a
  * workspace saved yesterday keeps working, which is the property that lets the
  * convention evolve without a coordinated release.
+ *
+ * `settings.namingCustom` is merged in last, so an operator's own variables are
+ * part of every schema this app reads. That placement is the point: the builder,
+ * the parser, the breakdown pivots and the AI slot prompts all resolve the
+ * schema through here, so a variable added on the Taxonomy page appears in all
+ * four without any of them knowing custom variables exist.
  */
 export function resolveSchema(settings) {
+  return applyCustomVariables(baseSchema(settings), settings && settings.namingCustom);
+}
+
+function baseSchema(settings) {
   const s = settings && settings.namingSchema;
   if (!s) return DEFAULT_NAMING_SCHEMA;
   if (Array.isArray(s.dimensions) && Array.isArray(s.channels) && s.channels.length > 0) return s;
@@ -227,6 +237,285 @@ export function resolveSchema(settings) {
     };
   }
   return DEFAULT_NAMING_SCHEMA;
+}
+
+// -- Custom variables ----------------------------------------------------------
+//
+// The registry above is the vocabulary this tool ships with, and it is
+// deliberately opinionated: a controlled list is only worth something if
+// somebody decided what belongs on it. But no fixed list survives contact with a
+// second company. An agency running three clients has a `client` dimension; a
+// retailer has `store_format`; a brand launching in a new market next quarter
+// needs a `region` that nobody anticipated when this file was written. The
+// choice is not between a curated registry and an open one — it is between
+// letting operators extend the registry inside the tool, or watching them encode
+// the missing dimension inside the `angle` free-text slot, where it cannot be
+// validated, cannot be pivoted, and cannot be found again.
+//
+// So custom variables are an *overlay*, stored beside the schema rather than
+// baked into it:
+//
+//   { dimensions:[…], vocabAdditions:{ theme:["Sustainability"] } }
+//
+// Kept separate for the same reason `FAMILY_OF` is a side map: the shipped
+// registry keeps improving, and a workspace that saved a full schema copy in
+// March should still pick up a dimension hint rewritten in June. Merging at
+// resolve time means the operator's additions and our corrections both land,
+// and neither needs a migration.
+//
+// ## Two kinds of addition, and why one of them is dangerous
+//
+//   A new value on an existing controlled dimension is free. Vocabularies are
+//   validated as membership tests; a longer list accepts more names and changes
+//   nothing about names already built.
+//
+//   A new dimension placed into a template is not free. It appends a slot, and
+//   every name built before it carries one fewer — so those names stop parsing.
+//   That is why placement is opt-in per (channel, level), why the editor states
+//   the consequence before saving, and above all why a custom dimension is
+//   appended to the END of a template and can never be inserted mid-string.
+//   Appending makes an old name fail the slot-count check, which is loud, gets
+//   counted, and gets reported. Inserting would leave the count right and every
+//   value after the insertion point shifted one dimension to the left — a name
+//   that parses cleanly into wrong answers. The first is an outage; the second
+//   is a quiet corruption of the analysis, which is the failure mode this whole
+//   module is built to refuse.
+
+/** Custom dimension keys are identifiers, not values: they never appear in a name. */
+export const CUSTOM_KEY_PATTERN = /^[a-z][a-z0-9_]*$/;
+
+/** A legal dimension key derived from a human label. */
+export function dimensionKeyFrom(label) {
+  const slug = String(label == null ? "" : label)
+    .trim().toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 32);
+  if (!slug) return "";
+  return CUSTOM_KEY_PATTERN.test(slug) ? slug : "v_" + slug;
+}
+
+/** The empty overlay. Also the shape a settings record starts life with. */
+export const emptyCustomVariables = () => ({ dimensions: [], vocabAdditions: {} });
+
+const uniqueValues = (list) => {
+  const seen = new Set(), out = [];
+  (list || []).forEach(raw => {
+    const v = String(raw == null ? "" : raw).trim();
+    if (!v || seen.has(normKey(v))) return;
+    seen.add(normKey(v));
+    out.push(v);
+  });
+  return out;
+};
+
+const normalisePlacements = (list) => {
+  const seen = new Set(), out = [];
+  (Array.isArray(list) ? list : []).forEach(p => {
+    const channel = String((p && p.channel) || "").trim();
+    const level   = String((p && p.level)   || "").trim();
+    if (!channel || !level) return;
+    const k = channel + "/" + level;
+    if (seen.has(k)) return;
+    seen.add(k);
+    out.push({ channel, level });
+  });
+  return out;
+};
+
+/**
+ * A stored custom dimension, cleaned into registry shape — or null when it is
+ * too malformed to trust.
+ *
+ * Defensive because this data arrives from a browser store and from restored
+ * backup files, neither of which this module controls. A dimension with an
+ * illegal key is dropped rather than repaired: a key is what templates and
+ * parsed rows join on, so guessing at one would silently re-point historical
+ * data at a dimension the operator never defined.
+ */
+function normaliseCustomDimension(raw) {
+  if (!raw) return null;
+  const key = String(raw.key || "").trim().toLowerCase();
+  if (!CUSTOM_KEY_PATTERN.test(key)) return null;
+  const vocab = Array.isArray(raw.vocab) && raw.vocab.length > 0 ? uniqueValues(raw.vocab) : null;
+  return {
+    key,
+    label: String(raw.label || key).trim() || key,
+    vocab: vocab && vocab.length > 0 ? vocab : null,
+    hint: String(raw.hint || ""),
+    family: DIMENSION_FAMILIES.some(f => f.key === raw.family) ? raw.family : "other",
+    custom: true,
+    placements: normalisePlacements(raw.placements),
+  };
+}
+
+/** True when this custom dimension is placed at (channel, level). */
+export const placedAt = (dim, channelId, levelKey) =>
+  (dim && dim.placements || []).some(p => p.channel === channelId && p.level === levelKey);
+
+// One-entry memo. `resolveSchema` is called from render bodies, and several
+// views hang `useMemo` on the schema it returns — a fresh object every render
+// would invalidate a rollup over thousands of performance rows on every
+// keystroke. Both inputs are stable between saves (the settings object only
+// changes identity when it is written), so one entry serves every caller.
+let overlayMemo = { base: null, custom: null, out: null };
+
+/**
+ * Merge a custom-variable overlay into a base schema.
+ *
+ * Returns the base object itself when there is nothing to merge, so callers can
+ * keep comparing schema identity.
+ */
+export function applyCustomVariables(base, custom) {
+  if (!base || !custom) return base;
+  if (overlayMemo.base === base && overlayMemo.custom === custom) return overlayMemo.out;
+
+  const extras    = (Array.isArray(custom.dimensions) ? custom.dimensions : []).map(normaliseCustomDimension).filter(Boolean);
+  const additions = (custom.vocabAdditions && typeof custom.vocabAdditions === "object") ? custom.vocabAdditions : {};
+
+  if (extras.length === 0 && Object.keys(additions).length === 0) {
+    overlayMemo = { base, custom, out: base };
+    return base;
+  }
+
+  // Extra values first. `vocabAdded` is carried through so the taxonomy page can
+  // show which values came from the operator and offer to take them back out —
+  // the shipped list is not theirs to remove.
+  const dimensions = (base.dimensions || []).map(d => {
+    const extra = uniqueValues(additions[d.key]);
+    if (!d.vocab || extra.length === 0) return d;
+    const known = new Set(d.vocab.map(normKey));
+    const added = extra.filter(v => !known.has(normKey(v)));
+    return added.length === 0 ? d : { ...d, vocab: [...d.vocab, ...added], vocabAdded: added };
+  });
+
+  // A custom key colliding with a shipped one is dropped rather than allowed to
+  // shadow it. The editor rejects the collision; this guards a hand-edited or
+  // restored overlay, where losing the addition beats redefining `geo`.
+  const known = new Set(dimensions.map(d => d.key));
+  const fresh = [];
+  extras.forEach(d => {
+    if (known.has(d.key)) return;
+    known.add(d.key);
+    fresh.push(d);
+    dimensions.push(d);
+  });
+
+  const channels = (base.channels || []).map(ch => ({
+    ...ch,
+    levels: (ch.levels || []).map(lv => {
+      const template = lv.template || [];
+      const append = fresh
+        .filter(d => placedAt(d, ch.id, lv.key) && !template.includes(d.key))
+        .map(d => d.key);
+      return append.length === 0 ? lv : { ...lv, template: [...template, ...append] };
+    }),
+  }));
+
+  const out = { ...base, dimensions, channels };
+  overlayMemo = { base, custom, out };
+  return out;
+}
+
+// -- Editing the overlay -------------------------------------------------------
+//
+// Pure functions returning a new overlay, so the caller's only job is to persist
+// what comes back. Nothing here mutates, and nothing here validates — validation
+// is `validateCustomDimension`, which the editor runs while the operator types.
+
+/** Add a custom dimension, or replace one. `originalKey` allows renaming a key. */
+export function upsertCustomDimension(custom, dimension, originalKey) {
+  const next = normaliseCustomDimension(dimension);
+  if (!next) return custom || emptyCustomVariables();
+  const base = { ...emptyCustomVariables(), ...(custom || {}) };
+  const list = Array.isArray(base.dimensions) ? base.dimensions : [];
+  const target = originalKey || next.key;
+  const idx = list.findIndex(d => d && d.key === target);
+  return { ...base, dimensions: idx >= 0 ? list.map((d, i) => i === idx ? next : d) : [...list, next] };
+}
+
+/** Remove a custom dimension. Shipped dimensions are not removable by design. */
+export function removeCustomDimension(custom, key) {
+  const base = { ...emptyCustomVariables(), ...(custom || {}) };
+  return { ...base, dimensions: (base.dimensions || []).filter(d => d && d.key !== key) };
+}
+
+/** Append one value to an existing dimension's controlled vocabulary. */
+export function addVocabValue(custom, dimensionKey, value) {
+  const v = String(value == null ? "" : value).trim();
+  const base = { ...emptyCustomVariables(), ...(custom || {}) };
+  if (!v || !dimensionKey) return base;
+  const additions = { ...(base.vocabAdditions || {}) };
+  const list = Array.isArray(additions[dimensionKey]) ? additions[dimensionKey] : [];
+  if (list.some(x => normKey(x) === normKey(v))) return base;
+  additions[dimensionKey] = [...list, v];
+  return { ...base, vocabAdditions: additions };
+}
+
+/** Take an operator-added value back out. Never touches the shipped list. */
+export function removeVocabValue(custom, dimensionKey, value) {
+  const base = { ...emptyCustomVariables(), ...(custom || {}) };
+  const additions = { ...(base.vocabAdditions || {}) };
+  const list = (additions[dimensionKey] || []).filter(x => normKey(x) !== normKey(value));
+  if (list.length > 0) additions[dimensionKey] = list;
+  else delete additions[dimensionKey];
+  return { ...base, vocabAdditions: additions };
+}
+
+// -- Validating an edit --------------------------------------------------------
+
+/**
+ * Check one vocabulary value against the rules a *name* has to satisfy.
+ *
+ * The same constraints `validateValue` enforces when building, applied one step
+ * earlier: a value carrying a space or the delimiter is not a value that can be
+ * rejected later politely, because by then it is inside a name in an ad account.
+ */
+export function validateVocabValue(value, schema, existing) {
+  const v = String(value == null ? "" : value).trim();
+  if (!v) return "Write the value first.";
+  const delimiter = (schema && schema.delimiter) || "_";
+  if (v.includes(delimiter)) return `A value cannot contain the delimiter "${delimiter}" — it would split into two slots. Use CamelCase.`;
+  if (ILLEGAL.test(v)) return "A value cannot contain a space or a comma — both break UTMs and CSV exports.";
+  if ((existing || []).some(x => normKey(x) === normKey(v))) return `"${v}" is already on the list. Values are matched case-insensitively.`;
+  return null;
+}
+
+/**
+ * Validate a dimension draft against the schema it is about to join.
+ *
+ * Returns `{ ok, errors:{field:message} }` rather than throwing or returning a
+ * flat list, because the editor shows each message under the control that
+ * caused it — a validation summary at the bottom of a form is a message the
+ * reader has to map back onto a field themselves.
+ */
+export function validateCustomDimension(draft, schema, options) {
+  const errors = {};
+  const d = draft || {};
+  const originalKey = (options && options.originalKey) || null;
+
+  if (!String(d.label || "").trim()) errors.label = "Every variable needs a name — this is what the builder labels the field.";
+
+  const key = String(d.key || "").trim().toLowerCase();
+  if (!key) errors.key = "A key is required. It is the identifier templates and imports join on.";
+  else if (!CUSTOM_KEY_PATTERN.test(key)) errors.key = "Lowercase letters, digits and underscores only, starting with a letter (sales_region).";
+  else if (key !== originalKey && (schema.dimensions || []).some(x => x.key === key)) {
+    const clash = (schema.dimensions || []).find(x => x.key === key);
+    errors.key = `"${key}" is already the key for ${clash.label}. Pick another — two dimensions sharing a key cannot be told apart in a pivot.`;
+  }
+
+  if (d.controlled) {
+    const vocab = (d.vocab || []).map(v => String(v).trim()).filter(Boolean);
+    if (vocab.length === 0) errors.vocab = "A controlled variable needs at least one allowed value. Switch it to free text if the answers are genuinely open-ended.";
+    else {
+      for (let i = 0; i < vocab.length; i++) {
+        const err = validateVocabValue(vocab[i], schema, vocab.slice(0, i));
+        if (err) { errors.vocab = err; break; }
+      }
+    }
+  }
+
+  return { ok: Object.keys(errors).length === 0, errors };
 }
 
 export const listChannels = (schema) => (schema.channels || []);

@@ -1,10 +1,15 @@
 import { useState, useMemo } from "react";
-import { gG, gGh, gSL, gCd, gSl } from "../components/styles.js";
+import { gG, gGh, gSL, gCd, gSl, gI } from "../components/styles.js";
 import { fmtCur, fmtDate } from "../constants.js";
-import { resolveSchema, breakdownByDimension, listChannels, listLevels, templateFor, taxonomy, adNamesOf, normKey, NA } from "../services/naming.js";
+import {
+  resolveSchema, breakdownByDimension, listChannels, listLevels, templateFor, taxonomy, adNamesOf, normKey, NA,
+  emptyCustomVariables, upsertCustomDimension, removeCustomDimension,
+  addVocabValue, removeVocabValue, validateVocabValue,
+} from "../services/naming.js";
 import { interactive, tile } from "../components/motion.js";
 import { ChargeBar } from "../components/ChargeBar.jsx";
 import { NameBuilder } from "../components/NameBuilder.jsx";
+import { VariableEditor } from "../components/VariableEditor.jsx";
 import { availableDimensions, defaultDimension, rollupByInitiative, deriveRatios, ADDITIVE_METRICS, PERF_ROW_LIMIT } from "../services/performance.js";
 
 // -- Performance -----------------------------------------------------------------
@@ -69,7 +74,7 @@ function Empty({ t, title, body, action }) {
   );
 }
 
-export function PerformanceView({ t, items, settings, perfRows, onImport, onClear, onAssignNames, showToast, initialTab, initialInitiativeId }) {
+export function PerformanceView({ t, dk, items, settings, perfRows, onImport, onClear, onAssignNames, onSaveSettings, showToast, initialTab, initialInitiativeId }) {
   const schema = resolveSchema(settings);
   const [tab, setTab] = useState(initialTab || "breakdown");
   const [dimKey, setDimKey] = useState("");
@@ -77,6 +82,20 @@ export function PerformanceView({ t, items, settings, perfRows, onImport, onClea
   const [convChannel, setConvChannel] = useState(listChannels(schema)[0]?.id || "meta");
   const [taxMode, setTaxMode] = useState("dimensions");
   const [builderInit, setBuilderInit] = useState(initialInitiativeId || "");
+  // `null` = closed, `{ dimension:null }` = creating, `{ dimension }` = editing.
+  const [editor, setEditor] = useState(null);
+  const [valueFor, setValueFor] = useState(null);
+  const [valueDraft, setValueDraft] = useState("");
+
+  // The operator's own layer on top of the schema. Writing it back through
+  // settings is the whole persistence story — every reader resolves the schema
+  // through `resolveSchema`, so nothing else has to be told the vocabulary grew.
+  const custom = settings?.namingCustom || emptyCustomVariables();
+  const saveCustom = (next, note) => {
+    if (!onSaveSettings) return;
+    onSaveSettings({ ...settings, namingCustom: next });
+    if (note) showToast(note, "success");
+  };
 
   const rows = useMemo(() => perfRows || [], [perfRows]);
   const dims = useMemo(() => availableDimensions(rows, schema), [rows, schema]);
@@ -477,6 +496,9 @@ export function PerformanceView({ t, items, settings, perfRows, onImport, onClea
                     {listChannels(schema).map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
                   </select>
                 )}
+                {onSaveSettings && (
+                  <button onClick={() => setEditor({ dimension: null })} style={gG(t)}>+ Add variable</button>
+                )}
               </div>
             </div>
             <p style={{ fontSize: 12.5, color: t.textSub, fontFamily: t.serif, lineHeight: 1.65, margin: "12px 0 0", maxWidth: 720 }}>
@@ -486,13 +508,15 @@ export function PerformanceView({ t, items, settings, perfRows, onImport, onClea
                   stops <code style={{ fontFamily: t.mono }}>Reels</code> and <code style={{ fontFamily: t.mono }}>reels</code> and{" "}
                   <code style={{ fontFamily: t.mono }}>Reel</code> from becoming three rows in a pivot that should have one.
                   Where each dimension appears is shown beside it, because the same dimension sits at different depths in
-                  different channels and that is a fact about the estate, not an inconsistency.</>
+                  different channels and that is a fact about the estate, not an inconsistency. The shipped list is a
+                  starting point, not the whole vocabulary — add the variables this business actually plans against, and
+                  add values to a controlled list when a campaign brings something the list has never had to describe.</>
               ) : (
                 <>Two rules make positional parsing safe, and both are enforced in code rather than by discipline: a slot is
                   never omitted or reordered — an absent value is written <code style={{ fontFamily: t.mono }}>{schema.placeholder || NA}</code> —
                   and the delimiter never appears inside a value. Names are assembled by the builder, never typed, which is
-                  why an export from three months ago still parses today. The schema itself is read-only here; an editor is
-                  the next item in this slice.</>
+                  why an export from three months ago still parses today. A custom variable is appended to the end of the
+                  templates it is placed in, never inserted into the middle of one — see the Dimensions tab to add one.</>
               )}
             </p>
           </div>
@@ -519,11 +543,75 @@ export function PerformanceView({ t, items, settings, perfRows, onImport, onClea
                         Growth OS bridge
                       </span>
                     )}
+                    {d.custom && (
+                      <span style={{ fontFamily: t.mono, fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase",
+                        color: t.textSub, border: "1px solid " + t.border, borderRadius: 4, padding: "1px 6px" }}>
+                        Custom
+                      </span>
+                    )}
                     <span style={{ fontFamily: t.mono, fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: t.textMuted }}>
                       {d.vocab ? `${d.vocab.length} allowed values` : "free text"}
                     </span>
+
+                    {/* Editing lives on the row it edits. A shipped dimension can
+                        take new values but cannot be removed — an operator
+                        deleting `geo` would orphan every name already carrying
+                        it, and that is not a decision this page should offer. */}
+                    {onSaveSettings && (
+                      <span style={{ marginLeft: "auto", display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        {d.vocab && (
+                          <button onClick={() => { setValueFor(valueFor === d.key ? null : d.key); setValueDraft(""); }}
+                            style={{ ...gGh(t), fontSize: 11, padding: "3px 9px" }}>
+                            {valueFor === d.key ? "Close" : "+ Value"}
+                          </button>
+                        )}
+                        {d.custom && (
+                          <>
+                            <button onClick={() => setEditor({ dimension: d })} style={{ ...gGh(t), fontSize: 11, padding: "3px 9px" }}>Edit</button>
+                            <button
+                              onClick={() => {
+                                const used = d.usage.length;
+                                const warn = used > 0
+                                  ? `Remove ${d.label}? It sits in ${used} template${used !== 1 ? "s" : ""}, and every name already built from ${used !== 1 ? "them" : "it"} will stop parsing.`
+                                  : `Remove ${d.label}? It is in no template, so nothing already built is affected.`;
+                                if (window.confirm(warn)) saveCustom(removeCustomDimension(custom, d.key), `${d.label} removed from the taxonomy.`);
+                              }}
+                              style={{ ...gGh(t), fontSize: 11, padding: "3px 9px", color: t.warn }}>Remove</button>
+                          </>
+                        )}
+                      </span>
+                    )}
                   </div>
                   <div style={{ fontSize: 11.5, color: t.textMuted, fontFamily: t.sans, lineHeight: 1.5, marginTop: 3 }}>{d.hint}</div>
+
+                  {/* Adding a value is the safe half of editing a taxonomy: a
+                      longer list accepts more names and invalidates none of the
+                      names already built against the shorter one. */}
+                  {valueFor === d.key && (() => {
+                    const err = valueDraft.trim() ? validateVocabValue(valueDraft, schema, d.vocab || []) : null;
+                    const commit = () => {
+                      if (!valueDraft.trim() || err) return;
+                      saveCustom(addVocabValue(custom, d.key, valueDraft.trim()), `"${valueDraft.trim()}" added to ${d.label}.`);
+                      setValueDraft("");
+                      setValueFor(null);
+                    };
+                    return (
+                      <div style={{ marginTop: 7, maxWidth: 420 }}>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <input value={valueDraft} onChange={e => setValueDraft(e.target.value)} autoFocus
+                            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); commit(); } }}
+                            placeholder={`New ${d.label.toLowerCase()} value`}
+                            style={{ ...gI(t), fontFamily: t.mono, fontSize: 12, padding: "6px 9px" }} />
+                          <button onClick={commit} disabled={!valueDraft.trim() || !!err}
+                            style={{ ...gG(t), flexShrink: 0, fontSize: 11.5, padding: "5px 12px",
+                              opacity: (!valueDraft.trim() || err) ? 0.45 : 1, cursor: (!valueDraft.trim() || err) ? "not-allowed" : "pointer" }}>Add</button>
+                        </div>
+                        <div style={{ fontSize: 11, lineHeight: 1.45, marginTop: 4, fontFamily: t.sans, color: err ? t.warn : t.textMuted }}>
+                          {err || "Added to this workspace only. The shipped values stay as they are, and every name already built keeps parsing."}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Where it lives. A dimension nothing uses is worth seeing as
                       much as one everything uses — it is usually a leftover. */}
@@ -541,10 +629,24 @@ export function PerformanceView({ t, items, settings, perfRows, onImport, onClea
 
                   {d.vocab && (
                     <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 5 }}>
-                      {d.vocab.map(v => (
-                        <span key={v} style={{ fontFamily: t.mono, fontSize: 10, color: t.textSub, background: t.surfaceAlt,
-                          border: "1px solid " + t.border, borderRadius: 4, padding: "1px 6px" }}>{v}</span>
-                      ))}
+                      {d.vocab.map(v => {
+                        const added = (d.vocabAdded || []).some(x => normKey(x) === normKey(v));
+                        return (
+                          <span key={v} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontFamily: t.mono, fontSize: 10,
+                            color: added ? t.text : t.textSub, background: t.surfaceAlt,
+                            border: "1px solid " + (added ? t.goldBorder : t.border), borderRadius: 4,
+                            padding: added ? "1px 3px 1px 6px" : "1px 6px" }}>
+                            {v}
+                            {added && onSaveSettings && (
+                              <button onClick={() => saveCustom(removeVocabValue(custom, d.key, v), `"${v}" removed from ${d.label}.`)}
+                                title={`Remove ${v} — names already built with it will stop validating`}
+                                style={{ background: "transparent", border: "none", color: t.textMuted, cursor: "pointer", fontSize: 11, lineHeight: 1, padding: "0 2px" }}>
+                                <span>&#10005;</span>
+                              </button>
+                            )}
+                          </span>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -602,6 +704,20 @@ export function PerformanceView({ t, items, settings, perfRows, onImport, onClea
             );
           })}
         </>
+      )}
+
+      {editor && (
+        <VariableEditor t={t} dk={dk} schema={schema} dimension={editor.dimension}
+          onClose={() => setEditor(null)}
+          onSave={(draft, originalKey) => {
+            saveCustom(
+              upsertCustomDimension(custom, draft, originalKey),
+              originalKey
+                ? `${draft.label} updated. The builder, the parser and every breakdown use it from here.`
+                : `${draft.label} added. It is now a dimension everywhere the schema is read.`
+            );
+            setEditor(null);
+          }} />
       )}
     </div>
   );

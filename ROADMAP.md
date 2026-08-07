@@ -119,11 +119,31 @@ and does not wait on Supabase.
   controlled vocabularies. The schema was editable data with no surface at all —
   the only way to see it was to produce variants in the Creative Studio and read
   the slot editors, so "where is the naming convention" had no answer.
+- [x] **The taxonomy takes a company's own variables.** `Performance → Taxonomy`
+  now writes as well as reads. An operator can add a dimension the shipped
+  registry does not have — controlled or free text, placed into whichever
+  (channel, level) templates they choose, or placed nowhere yet — and can add a
+  value to a shipped controlled list when a campaign brings something the list
+  has never had to describe. Additions live in `settings.namingCustom` as an
+  overlay merged at `resolveSchema` time rather than as an edit to the schema
+  blob, so the shipped registry keeps improving underneath a workspace that
+  extended it. Every reader resolves the schema through that one function, so a
+  variable added here appears in the builder, the parser, the breakdown pivots
+  and the creative slot prompts without any of them knowing custom variables
+  exist. A placed variable is appended to the end of its template and never
+  inserted into the middle of one — appending makes an older name fail the
+  slot-count check, which is loud and counted, where inserting would shift every
+  value after the insertion point one dimension left and parse cleanly into
+  wrong answers.
 
 ### Next in this slice
 
-- [ ] **Naming schema editor.** The Convention tab reads the schema; nothing
-  writes it. Changing a vocabulary still means editing the settings blob.
+- [ ] **The rest of the schema editor.** Custom variables are editable in the
+  app; the delimiter, the placeholder, the slot *order* inside a template and
+  the shipped dimensions' own labels and hints are not. Reordering is the one
+  that is not simply the next checkbox — it needs an answer for the names
+  already live in the ad account, which cannot be renamed without resetting
+  their learning phase.
 - [ ] **Feed measured figures into Test Validity.** The rollup now knows each
   initiative's real spend, conversions and revenue from its ad names. The Test
   Validity panel still takes hand-entered control/variant counts.

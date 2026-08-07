@@ -1,10 +1,16 @@
 import { brandName, generateInitId, INIT_TYPES, STATUSES, withRunningSnapshot } from "../constants.js";
 import { ATTRIBUTION_CONFIG } from "../activeConfig.js";
+import { adNamesOf } from "./naming.js";
+
+// Separator for the assigned-names column. A pipe, not a comma — the value has
+// to survive a CSV cell — and not the schema delimiter, which is "_" and appears
+// inside every one of these names by construction.
+const AD_NAME_SEP = " | ";
 
 export const CSV_COLS = [
   "initId","title","initType","category","status","brandId","owner",
   "hypothesis","primaryMetric","killCriteria","startDate","endDate",
-  "measurementMetric","measurementScope","trackingTag",
+  "measurementMetric","measurementScope","trackingTag","adNames",
   "sampleSize","duration","ice_impact","ice_certainty","ice_ease",
   "revenueImpact","spendCost","resourceCost","notes",
   "results_actualOutcome","results_keyLearning","results_outcomeClassification",
@@ -32,6 +38,10 @@ export const itemToCSVRow = (item, brands) => ({
   measurementMetric: item.measurementMetric || "",
   measurementScope:  item.measurementScope || "",
   trackingTag:       item.trackingTag || "",
+  // Names only. Channel and level are display metadata that the matcher never
+  // reads — attribution is on the string — so a round-trip that drops them
+  // loses nothing that changes what the data means.
+  adNames:           adNamesOf(item).map(e => e.name).join(AD_NAME_SEP),
   sampleSize:       item.sampleSize || "",
   duration:         item.duration || "",
   ice_impact:       item.ice?.impact ?? "",
@@ -120,7 +130,8 @@ export const parseCSV = (text) => {
 //   Identity:    initId, title, initType, category, status, brandId (brand NAME), owner
 //   Spec:        hypothesis, primaryMetric, killCriteria, startDate, endDate,
 //                sampleSize, duration, notes
-//   Attribution: measurementMetric, measurementScope, trackingTag
+//   Attribution: measurementMetric, measurementScope, trackingTag,
+//                adNames (pipe-separated campaign/ad set/ad names)
 //   ICE:         ice_impact, ice_certainty, ice_ease   (1-10)
 //   Economics:   revenueImpact, spendCost, resourceCost
 //   Results:     results_keyLearning (presence = closed with results),
@@ -186,6 +197,14 @@ export function normalizeInitiativeRecord(rec, ctx, attributionConfig = ATTRIBUT
     measurementMetric: r.measurementMetric || existingById?.measurementMetric || "",
     measurementScope:  r.measurementScope  || existingById?.measurementScope  || "",
     trackingTag:       r.trackingTag       || existingById?.trackingTag       || "",
+    // A blank column carries the existing assignments through rather than
+    // clearing them: most re-imports are a spreadsheet edit of three columns,
+    // and silently unlinking every campaign on an initiative because a column
+    // was left empty is exactly the kind of quiet data loss that only surfaces
+    // a month later as missing spend.
+    adNames: r.adNames
+      ? r.adNames.split("|").map(s => ({ name: s.trim(), level: "", channel: "", addedAt: "" })).filter(e => e.name)
+      : (existingById?.adNames || []),
     startDate: sd || existingById?.startDate || "",
     endDate:   ed || existingById?.endDate   || "",
     sampleSize: r.sampleSize || existingById?.sampleSize || "",

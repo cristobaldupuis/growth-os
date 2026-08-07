@@ -8,6 +8,8 @@ import {
   trackingTagFromName, matchNamesToInitiatives, suggestTrackingTag,
   breakdownByDimension, resolveSchema, templateFor, listChannels, listLevels,
   initiativeDimension, levelCarriesInitiative,
+  taxonomy, dimensionUsage, channelDimensions,
+  adNamesOf, assignedNameIndex, assignedNameConflicts, lookupAssignedName,
 } from "./naming.js";
 
 const S = DEFAULT_NAMING_SCHEMA;
@@ -327,4 +329,102 @@ test("resolveSchema falls back for settings that predate the feature", () => {
 test("NA is the exported placeholder the schema uses", () => {
   assert.equal(NA, "NA");
   assert.equal(S.placeholder, NA);
+});
+
+// -- Taxonomy ------------------------------------------------------------------
+
+test("every dimension lands in exactly one family, and no family renders empty", () => {
+  const fams = taxonomy(S);
+  const keys = fams.flatMap(f => f.dimensions.map(d => d.key));
+  assert.equal(keys.length, S.dimensions.length, "no dimension is dropped");
+  assert.equal(new Set(keys).size, keys.length, "and none appears twice");
+  assert.ok(fams.every(f => f.dimensions.length > 0));
+});
+
+test("the initiative slot is filed as the bridge, not among the descriptive dimensions", () => {
+  const bridge = taxonomy(S).find(f => f.key === "bridge");
+  assert.deepEqual(bridge.dimensions.map(d => d.key), ["initiative"]);
+  assert.equal(bridge.dimensions[0].isBridge, true);
+});
+
+test("a schema whose dimensions predate families still groups rather than vanishing", () => {
+  // The pre-rewrite flat shape, lifted by resolveSchema. Nothing in it declares
+  // a family, and the lookup has never seen these keys.
+  const legacy = resolveSchema({ namingSchema:{ segments:[
+    { key:"weird", label:"Weird", vocab:null, hint:"" },
+    { key:"tag",   label:"Tag",   vocab:null, hint:"", role:"initiative" },
+  ]}});
+  const fams = taxonomy(legacy);
+  assert.equal(fams.flatMap(f => f.dimensions).length, 2);
+  assert.deepEqual(fams.find(f => f.key === "bridge").dimensions.map(d => d.key), ["tag"],
+    "the declared initiative dimension is the bridge whatever it is called");
+  assert.deepEqual(fams.find(f => f.key === "other").dimensions.map(d => d.key), ["weird"]);
+});
+
+test("dimensionUsage reports every place a dimension sits, with its slot", () => {
+  const geo = dimensionUsage(S, "geo");
+  const meta = geo.filter(u => u.channel === "meta");
+  assert.deepEqual(meta.map(u => [u.level, u.slot, u.of]), [["campaign", 4, 5], ["adset", 1, 5]],
+    "the same dimension sits at different depths per level — that is the point");
+  assert.ok(geo.some(u => u.channel === "google"));
+});
+
+test("a dimension no template uses reports no usage rather than throwing", () => {
+  assert.deepEqual(dimensionUsage(S, "not-a-dimension"), []);
+});
+
+test("channelDimensions is the union across levels, asked once, in first-appearance order", () => {
+  const dims = channelDimensions(S, "meta");
+  const keys = dims.map(d => d.key);
+  assert.equal(new Set(keys).size, keys.length, "geo is in two Meta templates and is still asked once");
+  assert.equal(keys[0], "channel");
+  const geo = dims.find(d => d.key === "geo");
+  assert.deepEqual(geo.levels.map(l => l.key), ["campaign", "adset"],
+    "and it still says which levels will consume the answer");
+  // Everything any Meta level needs is present, or a level would build with holes.
+  listLevels(S, "meta").forEach(lv => lv.template.forEach(k => assert.ok(keys.includes(k), k + " missing")));
+});
+
+// -- Assigned names ------------------------------------------------------------
+
+const CAMPAIGN = "Meta_Prospect_Pastry_US_Purchase";
+
+test("assigned names accept a bare string and deduplicate case-insensitively", () => {
+  const item = { id:"i1", adNames:[CAMPAIGN, { name:CAMPAIGN.toLowerCase() }, { name:"  " }, null] };
+  const names = adNamesOf(item);
+  assert.equal(names.length, 1);
+  assert.equal(names[0].name, CAMPAIGN, "the first spelling written is the one kept");
+});
+
+test("an initiative with no assignments returns an empty list, not undefined", () => {
+  assert.deepEqual(adNamesOf({ id:"i1" }), []);
+  assert.deepEqual(adNamesOf(null), []);
+});
+
+test("two initiatives claiming one name resolve stably, and the clash is reportable", () => {
+  const items = [
+    { id:"i1", initId:"NH-001", adNames:[{ name:CAMPAIGN }] },
+    { id:"i2", initId:"NH-002", adNames:[{ name:CAMPAIGN.toUpperCase() }] },
+  ];
+  assert.equal(assignedNameIndex(items).get(normKey(CAMPAIGN)).initiative.id, "i1");
+  const clashes = assignedNameConflicts(items);
+  assert.equal(clashes.length, 1);
+  assert.deepEqual(clashes[0].initiatives.map(i => i.id), ["i1", "i2"]);
+});
+
+test("a specifically claimed ad beats the campaign it sits inside", () => {
+  const items = [
+    { id:"campaignOwner", adNames:[{ name:CAMPAIGN }] },
+    { id:"adOwner",       adNames:[{ name:GOLDEN }] },
+  ];
+  const index = assignedNameIndex(items);
+  // Finest grain first is the caller's contract; this is the ad row's candidates.
+  const hit = lookupAssignedName([GOLDEN, "someAdSet", CAMPAIGN], index);
+  assert.equal(hit.initiative.id, "adOwner");
+  assert.equal(hit.matchedName, GOLDEN);
+});
+
+test("a row matching nothing claimed returns null rather than a guess", () => {
+  assert.equal(lookupAssignedName([GOLDEN], assignedNameIndex([])), null);
+  assert.equal(lookupAssignedName([], assignedNameIndex([{ id:"i1", adNames:[CAMPAIGN] }])), null);
 });

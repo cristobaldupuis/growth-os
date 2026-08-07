@@ -3,10 +3,20 @@ import { STATUSES, INIT_TYPES, BLOCKERS, SL, SD, fmtCur } from "../constants.js"
 import { gG, gGh, gI, gTA, gSl, gSc, gSL } from "../components/styles.js";
 import { FR } from "../components/FR.jsx";
 import { ICESliders } from "../components/ICESliders.jsx";
+import { adNamesOf, adNameEntry, normKey } from "../services/naming.js";
 
 // -- Form ----------------------------------------------------------------------
-export function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hypReview,iceReview,dataCtx,setDataCtx,onAi,onIceAssist,onAcceptHyp,onRejectHyp,onAcceptIce,onRejectIce,onSave,onCancel}) {
+export function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hypReview,iceReview,dataCtx,setDataCtx,onAi,onIceAssist,onAcceptHyp,onRejectHyp,onAcceptIce,onRejectIce,onSave,onCancel,onOpenBuilder}) {
   const f=(k,v)=>setForm(p=>({...p,[k]:v}));
+  const claimed = adNamesOf(form);
+  const [pasteName,setPasteName] = useState("");
+  const addName = () => {
+    const entry = adNameEntry({ name: pasteName, addedAt: new Date().toISOString().slice(0,10) });
+    if (!entry) return;
+    if (claimed.some(e => normKey(e.name) === normKey(entry.name))) { setPasteName(""); return; }
+    f("adNames", [...claimed, entry]);
+    setPasteName("");
+  };
   const canAi  = form.hypothesis&&form.hypothesis.length>=60;
   const canIce = !!(form.hypothesis&&form.title);
   return (
@@ -94,6 +104,58 @@ export function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hyp
             Use this only when the test has a clean identifier (mostly paid campaigns). Most initiatives match on metric + window + scope alone.
           </div>
         </div>
+
+        {/* Claimed ad names — the other bridge.
+            The tracking tag above works when the name was built from the naming
+            convention. This works when it wasn't, which is most spend that
+            already exists: a campaign live in Ads Manager for six weeks cannot be
+            renamed without resetting its learning phase, so the join has to take
+            the name as it is. Pasting one here is enough — an imported row
+            matches at any level, so claiming a campaign claims every ad under it.
+            Composing a NEW name belongs in the builder, not in this form, which
+            is why that is a link rather than a second editor. */}
+        <div style={{marginTop:14,paddingTop:12,borderTop:"1px solid "+t.borderSoft}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8,flexWrap:"wrap",marginBottom:6}}>
+            <div style={{...gSL(t),marginBottom:0}}>Campaign &amp; ad names</div>
+            {onOpenBuilder && (
+              <button type="button" onClick={onOpenBuilder} style={{...gGh(t),fontSize:11,padding:"4px 10px"}}
+                title="Save this initiative and open the name builder with it selected">
+                Build a new name &#8594;
+              </button>
+            )}
+          </div>
+          <p style={{fontSize:11.5,color:t.textSub,fontFamily:t.sans,lineHeight:1.5,margin:"0 0 9px"}}>
+            Paste a campaign, ad set or ad name exactly as it appears in Google or Meta and this initiative claims it.
+            Imported performance rows carrying that name roll up here automatically — a claimed campaign brings every ad
+            underneath it. To compose a convention-correct name from scratch, use the builder.
+          </p>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            <input style={{...gI(t),fontFamily:t.mono,flex:"1 1 260px",width:"auto"}} value={pasteName}
+              onChange={e=>setPasteName(e.target.value)}
+              onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();addName();}}}
+              placeholder="e.g. Meta_Prospect_Pastry_US_Purchase"/>
+            <button type="button" onClick={addName} disabled={!pasteName.trim()}
+              style={{...gG(t),opacity:pasteName.trim()?1:0.45,cursor:pasteName.trim()?"pointer":"not-allowed"}}>Claim</button>
+          </div>
+          {claimed.length>0 && (
+            <div style={{marginTop:9}}>
+              {claimed.map(e=>(
+                <div key={e.name} style={{display:"flex",justifyContent:"space-between",gap:10,alignItems:"baseline",padding:"6px 0",borderBottom:"1px solid "+t.borderSoft,flexWrap:"wrap"}}>
+                  <div style={{minWidth:0,flex:"1 1 240px"}}>
+                    <div style={{fontFamily:t.mono,fontSize:11.5,color:t.text,wordBreak:"break-all"}}>{e.name}</div>
+                    {[e.channel,e.level,e.addedAt].filter(Boolean).length>0 && (
+                      <div style={{fontFamily:t.mono,fontSize:10,color:t.textMuted,marginTop:2}}>
+                        {[e.channel,e.level,e.addedAt].filter(Boolean).join(" · ")}
+                      </div>
+                    )}
+                  </div>
+                  <button type="button" onClick={()=>f("adNames",claimed.filter(x=>normKey(x.name)!==normKey(e.name)))}
+                    style={{...gGh(t),fontSize:11,padding:"3px 9px"}}>Remove</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <FR label="⚠️ Blocker" t={t}>
@@ -178,7 +240,7 @@ export function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hyp
 
       <div style={{display:"flex",gap:8,justifyContent:"flex-end",paddingTop:4}}>
         <button style={gGh(t)} onClick={onCancel}>Cancel</button>
-        <button style={gG(t)} onClick={onSave} disabled={!form.title}>Save</button>
+        <button style={gG(t)} onClick={()=>onSave()} disabled={!form.title}>Save</button>
       </div>
     </div>
   );

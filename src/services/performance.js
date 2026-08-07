@@ -32,7 +32,7 @@
 
 import {
   parseName, identifyName, matchNamesToInitiatives, normKey,
-  listChannels, listLevels,
+  listChannels, listLevels, assignedNameIndex, lookupAssignedName,
 } from "./naming.js";
 
 /** Rows held in localStorage. Above this the browser store is the wrong home. */
@@ -340,16 +340,42 @@ export function mergePerformanceRows(existing, incoming, limit = PERF_ROW_LIMIT)
 // -- The initiative bridge -----------------------------------------------------
 
 /**
- * Resolve performance rows onto initiatives through the naming convention.
+ * Every name a row could be attributed by, finest grain first.
  *
- * Delegates the actual tag→initiative decision to `matchNamesToInitiatives`, on
- * the unique name set rather than per row: a month of daily data repeats the
- * same thirty names thousands of times, and the join is a property of the name,
- * not of the day. The three-way split it returns is preserved exactly —
- * `untagged` is business-as-usual spend and `unmatched` is a broken link — and
- * carried through to the rollup so both stay countable.
+ * A Meta ad-level export repeats the campaign and ad set name on every ad row,
+ * which is what makes "assign a campaign to an initiative" work at all: the
+ * campaign name is present on rows whose own identity is an ad. Finest first so
+ * a specifically-assigned ad beats the campaign it sits inside.
+ */
+const candidateNames = (r) => [r.name, r.adsetName, r.campaignName].filter(Boolean);
+
+/**
+ * Resolve performance rows onto initiatives.
+ *
+ * Two joins run here, in a deliberate order.
+ *
+ * The first is direct assignment: a campaign, ad set or ad name recorded on an
+ * initiative by hand. It runs BEFORE parsing is even consulted, and that is the
+ * whole point of it — spend named in Ads Manager last quarter does not follow
+ * this convention and never will, because renaming a live campaign resets its
+ * learning phase. Those rows are `unparsed` for every dimensional purpose and
+ * still attribute correctly, which is the difference between measuring an
+ * account as it is and asking an account to be rebuilt before it can be measured.
+ *
+ * The second is the tag slot, unchanged: delegated to `matchNamesToInitiatives`
+ * on the unique name set rather than per row, because a month of daily data
+ * repeats the same thirty names thousands of times and the join is a property of
+ * the name, not of the day. Its three-way split is preserved exactly — `untagged`
+ * is business-as-usual spend, `unmatched` is a broken link — so both stay
+ * countable.
+ *
+ * `attributionVia` records which join won, because "we measured this" and "you
+ * told us this" are different claims and the rollup should be able to say which
+ * one it is standing on.
  */
 export function attachInitiatives(rows, items, schema) {
+  const assigned = assignedNameIndex(items);
+
   const byChannelLevel = new Map();
   (rows || []).forEach(r => {
     if (!r.parsed) return;
@@ -368,8 +394,24 @@ export function attachInitiatives(rows, items, schema) {
   });
 
   const attached = (rows || []).map(r => {
+    const direct = assigned.size > 0 ? lookupAssignedName(candidateNames(r), assigned) : null;
+    if (direct) return {
+      ...r,
+      attribution: "matched",
+      attributionVia: "name",
+      assignedName: direct.matchedName,
+      trackingTag: direct.initiative?.trackingTag || null,
+      initiativeId: direct.initiative?.id || null,
+    };
     const hit = r.parsed ? index.get(r.name) : null;
-    return { ...r, attribution: hit ? hit.status : "unparsed", trackingTag: hit?.trackingTag || null, initiativeId: hit?.initiative?.id || null };
+    return {
+      ...r,
+      attribution: hit ? hit.status : "unparsed",
+      attributionVia: hit?.status === "matched" ? "tag" : null,
+      assignedName: null,
+      trackingTag: hit?.trackingTag || null,
+      initiativeId: hit?.initiative?.id || null,
+    };
   });
 
   const counts = attached.reduce((a, r) => { a[r.attribution] = (a[r.attribution] || 0) + 1; return a; }, {});
@@ -393,11 +435,12 @@ export function rollupByInitiative(rows, items, schema) {
     const g = groups.get(r.initiativeId) || {
       initiativeId: r.initiativeId,
       initiative: (items || []).find(i => i.id === r.initiativeId) || null,
-      trackingTag: r.trackingTag, rows: 0, names: new Set(), metrics: {},
+      trackingTag: r.trackingTag, rows: 0, names: new Set(), via: new Set(), metrics: {},
       firstDate: null, lastDate: null,
     };
     g.rows += 1;
     g.names.add(r.name);
+    if (r.attributionVia) g.via.add(r.attributionVia);
     ADDITIVE_METRICS.forEach(k => { const v = r.metrics?.[k]; if (typeof v === "number") g.metrics[k] = (g.metrics[k] || 0) + v; });
     if (r.date) {
       if (!g.firstDate || r.date < g.firstDate) g.firstDate = r.date;
@@ -407,7 +450,7 @@ export function rollupByInitiative(rows, items, schema) {
   });
 
   const list = Array.from(groups.values())
-    .map(g => ({ ...g, names: [...g.names], ratios: deriveRatios(g.metrics) }))
+    .map(g => ({ ...g, names: [...g.names], via: [...g.via], ratios: deriveRatios(g.metrics) }))
     .sort((a, b) => (b.metrics.spend || 0) - (a.metrics.spend || 0));
 
   return { groups: list, counts, spend, rows: attached };

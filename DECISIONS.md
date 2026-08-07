@@ -360,3 +360,97 @@ own is the always-on mistake one dimension over. And under
 `prefers-reduced-motion` every duration collapses to zero, so each effect
 degrades to an instant state change rather than vanishing — hover still
 communicates, it just stops moving.
+
+---
+
+## Two bridges into the portfolio: the tag slot, and names claimed by hand
+
+**Decision:** An imported performance row reaches an initiative one of two ways,
+and either alone is sufficient. It can carry the initiative's `trackingTag` in
+the naming convention's initiative slot, which is what `naming.js` has always
+done. Or the initiative can *claim* a campaign, ad set or ad name outright —
+stored on the record as `adNames: [{name, level, channel, addedAt}]`, matched on
+the exact string. `attachInitiatives` tries the claim first and falls back to the
+tag, recording which one won as `attributionVia`.
+
+**Why a second mechanism rather than a better first one:** the tag slot only
+works on names this tool built. Most spend an operator wants to measure was named
+before this tool was in the room, and cannot be renamed — editing a live Meta
+campaign's name resets its learning phase, so "rename your account and we will
+measure it" is a way of saying no. Claiming costs one paste and joins the same
+rows. It is the difference between measuring an account as it is and asking for
+an account to be rebuilt before it can be measured.
+
+**Why the claim runs before parsing rather than after:** a legacy name parses
+against nothing, so gating attribution on a successful parse would exclude
+exactly the rows this exists to rescue. Those rows stay `parsed:false` — they
+still contribute to no dimensional breakdown, which is honest, because their
+names genuinely carry no dimensions — and they attribute anyway. Coverage and
+correctness are separate claims and the code keeps them separate.
+
+**Why a claim outranks the tag when they disagree:** one of them is a person
+pointing at a specific string and saying "this one is mine", and the other is a
+convention that could have been followed by accident. When a human decision and
+an inferred one conflict, the human decision is the answer. For the same reason
+claims match finest-grain-first: an ad claimed by A inside a campaign claimed by
+B belongs to A.
+
+**Why a claim matches at any level:** platform exports repeat the campaign and ad
+set name on every child row, so claiming a campaign claims every ad underneath it
+without anyone enumerating them. That is what "this campaign belongs to this
+test" already means to the person saying it.
+
+**The failure mode this introduces, and what answers it:** a claim that never
+appears in an export is silent — the rollup simply shows less spend than it
+should and nothing says why. Usually it is a paste that picked up a trailing
+space, or a campaign renamed after being claimed. So the Attribution tab reports
+claimed-but-absent names by name, on the same principle as `unparsed`: a total
+that quietly excludes spend is worse than one that admits it. The CSV round-trip
+follows from the same worry — a blank `adNames` column carries existing claims
+through rather than clearing them, because a spreadsheet that drops a column it
+does not understand should not silently unlink every campaign an initiative
+measures.
+
+**Forcing condition:** claims are exact-string today. Platform-side renames break
+them, and the durable fix is the platform's own entity ID, which only an API
+integration can supply. When that lands, `adNames` gains an optional `entityId`
+and the string becomes the fallback rather than the key.
+
+---
+
+## The convention gets a taxonomy view and a builder, because a grammar is not a sentence
+
+**Decision:** The Performance view's Convention tab is now Taxonomy, leading with
+the dimension registry grouped into families (`DIMENSION_FAMILIES` in
+`naming.js`) with each dimension showing every template position it occupies;
+the per-channel templates remain as a second mode. A new Name builder tab
+composes one dimension record into every level of a channel at once and can
+assign the result to an initiative.
+
+**Why the taxonomy leads:** the tab used to answer "what does a Meta ad name look
+like", which is a question about syntax. The question people actually arrive with
+is "what is a Theme, and where is it allowed to appear" — and that was
+reverse-engineerable only by reading five template strings side by side. Twenty-
+four dimensions in registry order is a list; six labelled groups of three or four
+is something a person can work through and agree to. Families are presentation
+only: slot order comes from templates alone, so regrouping can never change what
+a name means.
+
+**Why families are a side lookup, not a field on each dimension:** `resolveSchema`
+returns a stored custom schema verbatim, and a schema saved before this existed
+carries no family fields. A lookup keyed on dimension key groups those correctly
+too, and anything unrecognised lands in "Other" rather than vanishing.
+
+**Why the builder is its own surface:** it existed twice before and neither time
+as somewhere you could go. The Creative Studio assembles names, but only as a
+consequence of generating variants — so getting one name for one campaign meant
+producing a creative brief nobody asked for. The Convention tab described the
+templates without letting you fill one in. The gap between "here is the grammar"
+and "here is a sentence" was left for the operator to cross in their head, which
+is the crossing the convention exists to remove.
+
+**Why the initiative editor links rather than embeds:** composing a new name is a
+different job from claiming an existing one. The editor does the second, because
+pasting a name you already have belongs next to the other attribution fields; the
+first is a link that saves the initiative first, so the builder opens with a
+record that exists and can actually be claimed against.

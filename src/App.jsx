@@ -451,6 +451,12 @@ export default function App() {
   const [dk,        setDk]        = useState(false);
   const [nav,       setNav]       = useState("dashboard");
   const [detailOrigin, setDetailOrigin] = useState("initiatives");
+  // Which Performance tab to land on, and which initiative the name builder
+  // opens with. Held here rather than inside the view because the entry point is
+  // outside it: the initiative editor sends you to the builder with the
+  // initiative you were just editing already selected.
+  const [perfTab,   setPerfTab]   = useState("breakdown");
+  const [builderInit, setBuilderInit] = useState("");
   const [selId,     setSelId]     = useState(null);
   // Multi-select status filter. Defaults to Running + Draft rather than "All" —
   // Completed/Killed stay fully reachable via the chips, just not pre-selected.
@@ -1025,7 +1031,12 @@ export default function App() {
     setShowTpl(false);setNav("form");
   };
 
-  const handleSave = ()=>{
+  // `then` lets a caller redirect after the save instead of landing on the
+  // detail view. The name builder needs this: an initiative has to exist and be
+  // saved before a campaign name can be claimed for it, and asking someone to
+  // save, navigate, and re-find their own initiative is three steps where one
+  // will do. Nothing is committed twice — the save is the same save.
+  const handleSave = (then)=>{
     if(!form||!form.title) return;
     const {_new,...data}=form;
     if(_new && !data.initId) data.initId = generateInitId(data.brandId||"default", brands, items);
@@ -1042,7 +1053,8 @@ export default function App() {
       }));
       setPendingRecAccept(null);
     }
-    setNav(_new?"initiatives":"detail");
+    if(then==="builder"){ setPerfTab("builder"); setBuilderInit(data.id); setNav("performance"); }
+    else setNav(_new?"initiatives":"detail");
     setForm(null);setHypReview(null);setIceReview(null);setDataCtx("");
   };
 
@@ -1411,6 +1423,8 @@ export default function App() {
       {nav==="creative"&&<CreativeStudio t={t} dk={dk} items={items} brands={brands} activeBrand={activeBrand} settings={settings}
         creative={creative} onSaveCreative={saveCreative} onSaveItems={saveItems} showToast={showToast}/>}
       {nav==="performance"&&<PerformanceView t={t} items={items} settings={settings} perfRows={perfRows}
+        initialTab={perfTab} initialInitiativeId={builderInit} showToast={showToast}
+        onAssignNames={(id,adNames)=>saveItems(items.map(e=>e.id===id?{...e,adNames}:e))}
         onImport={()=>setShowMetricsImport(true)}
         onClear={()=>{savePerf([]); showToast("Imported performance data cleared.","success");}}/>}
       {nav==="readout"&&<ClientReadoutView t={t} dk={dk} dash={dash} items={items} brands={brands} activeBrand={activeBrand} cats={cats} weeklyMetrics={weeklyMetrics} settings={settings}/>}
@@ -1543,6 +1557,7 @@ export default function App() {
           onAcceptIce={()=>{if(iceReview){setForm(p=>({...p,ice:{...p.ice,impact:iceReview.impact,certainty:iceReview.certainty}}));setIceReview(null);}}}
           onRejectIce={()=>setIceReview(null)}
           onSave={handleSave}
+          onOpenBuilder={()=>handleSave("builder")}
           onCancel={()=>{setForm(null);setHypReview(null);setIceReview(null);setDataCtx("");setPendingRecAccept(null);setNav("initiatives");}}/>
       )}
 

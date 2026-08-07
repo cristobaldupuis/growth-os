@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { gG, gGh, gSL, gCd, gI, gSl } from "../components/styles.js";
 import { renderProse } from "../components/text.jsx";
 import { SBdg, CBdg } from "../components/badges.jsx";
@@ -7,6 +7,16 @@ import { resolveSchema, buildNameSet, templateFor, listChannels, listLevels, sug
 import { callCreativeBrief } from "../services/ai/callCreativeBrief.js";
 import { callCreativeVariants } from "../services/ai/callCreativeVariants.js";
 import { callGenerateImage, buildImagePrompt, IMAGE_ASPECTS, IMAGE_MODELS } from "../services/ai/callGenerateImage.js";
+import {
+  callGenerateVideo, pollVideoJob, buildVideoScript, VIDEO_TIERS, VIDEO_TIER_LIST,
+  estimateSpokenSeconds, estimateVideoCostUsd, VIDEO_POLL_INTERVAL_MS, VIDEO_POLL_TIMEOUT_MS,
+} from "../services/ai/callGenerateVideo.js";
+
+const usd = n => "$" + n.toFixed(2);
+const mmss = ms => {
+  const s = Math.floor(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+};
 
 // -- Creative Studio -----------------------------------------------------------
 //
@@ -64,6 +74,30 @@ export function CreativeStudio({
   const [imgErr, setImgErr]     = useState({});     // {variantIdx: message}
   const [aspect, setAspect]     = useState("4:5");
   const [promptPreview, setPromptPreview] = useState(null); // {idx, text}
+
+  // Video is held the same way and for a stronger version of the same reason.
+  // What is kept here is a URL, not bytes — the record below never holds the
+  // clip itself, and nothing re-fetches it into the app. A rendered video is
+  // 5-50MB, so persisting one is not a quota risk the way an image is, it is a
+  // certainty; and re-hosting the provider's signed URL would make this app a
+  // video CDN with its own egress bill and retention policy. The operator
+  // downloads the clip before the provider's link expires. See api/video.js.
+  const [tierKey, setTierKey]   = useState("STANDARD");
+  const [videos, setVideos]     = useState({});     // {variantIdx: {status, url?, durationSeconds?, error?, tierLabel, costUsd}}
+  const [vidBusy, setVidBusy]   = useState(null);   // {idx, startedAt} while one render is in flight
+  const [elapsedMs, setElapsedMs] = useState(0);
+
+  const tier = VIDEO_TIERS[tierKey];
+
+  // A render takes 60-170s, so "rendering…" with no moving number reads as a
+  // hang. The ticker is separate from the poll loop deliberately: polling every
+  // second would burn the proxy's rate-limit budget for no new information,
+  // but the elapsed clock has to move faster than the polls to look alive.
+  useEffect(() => {
+    if (!vidBusy) return;
+    const id = setInterval(() => setElapsedMs(Date.now() - vidBusy.startedAt), 1000);
+    return () => clearInterval(id);
+  }, [vidBusy]);
 
   // Creative is produced at the ad level (message, for a channel with no ad
   // level), so that is the template the editors render.
@@ -145,6 +179,50 @@ export function CreativeStudio({
     } catch (e) {
       setImgErr({ ...imgErr, [idx]: e.message || "Could not generate an image." });
     } finally { setImgBusy(null); }
+  };
+
+  // Submit, then poll until the provider resolves. The loop lives here rather
+  // than inside pollVideoJob because the UI has to keep reporting "still
+  // rendering, 1:24 elapsed" between polls — a promise that resolves in three
+  // minutes with nothing in between is indistinguishable from a broken button.
+  const genVideo = async (variant, idx) => {
+    const startedAt = Date.now();
+    const script = buildVideoScript(variant);
+    setVidBusy({ idx, startedAt });
+    setElapsedMs(0);
+    setVideos(v => ({ ...v, [idx]: { status: "rendering", tierLabel: tier.label, costUsd: estimateVideoCostUsd(script, tier) } }));
+
+    try {
+      const { jobId, provider } = await callGenerateVideo({ script, cta: variant.cta, aspectRatio: aspect, tier });
+
+      for (;;) {
+        await new Promise(r => setTimeout(r, VIDEO_POLL_INTERVAL_MS));
+
+        // A slow render is not a failed one — the job is still alive on the
+        // provider's side and will still be billed. So the timeout hands the
+        // operator the job id and stops polling, rather than reporting an error
+        // that implies nothing was spent.
+        if (Date.now() - startedAt > VIDEO_POLL_TIMEOUT_MS) {
+          setVideos(v => ({ ...v, [idx]: { ...v[idx], status: "stalled", jobId } }));
+          break;
+        }
+
+        const result = await pollVideoJob({ jobId, provider });
+        if (result.status === "done") {
+          setVideos(v => ({ ...v, [idx]: { ...v[idx], status: "done", url: result.url, durationSeconds: result.durationSeconds } }));
+          break;
+        }
+        if (result.status === "failed") {
+          // The provider's own message, verbatim. A moderation refusal and a
+          // bad avatar URL need different fixes, and paraphrasing them into
+          // "render failed" throws away the only thing that distinguishes them.
+          setVideos(v => ({ ...v, [idx]: { ...v[idx], status: "failed", error: result.error || "The provider reported a failed render." } }));
+          break;
+        }
+      }
+    } catch (e) {
+      setVideos(v => ({ ...v, [idx]: { ...v[idx], status: "failed", error: e.message || "Could not generate a video." } }));
+    } finally { setVidBusy(null); }
   };
 
   const downloadImage = (variant, idx) => {
@@ -351,6 +429,11 @@ export function CreativeStudio({
               <select value={aspect} onChange={e => setAspect(e.target.value)} style={{ ...gSl(t), width: 132, padding: "6px 8px" }}>
                 {IMAGE_ASPECTS.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}
               </select>
+              <label style={{ fontSize: 12, color: t.textSub }}>Video</label>
+              <select value={tierKey} onChange={e => setTierKey(e.target.value)} style={{ ...gSl(t), width: 178, padding: "6px 8px" }}
+                title={VIDEO_TIERS[tierKey].blurb}>
+                {VIDEO_TIER_LIST.map(v => <option key={v.key} value={v.key}>{v.label}</option>)}
+              </select>
               <label style={{ fontSize: 12, color: t.textSub }}>Channel</label>
               <select value={channel} onChange={e => { setChannel(e.target.value); setEdits({}); }} style={{ ...gSl(t), width: 118, padding: "6px 8px" }}>
                 {channels.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
@@ -450,6 +533,87 @@ export function CreativeStudio({
                       </div>
                     )}
                   </div>
+
+                  {/* Talking-head render. Unlike the key frame, the price is not
+                      fixed — it is set by how long this variant's script takes
+                      to say — so both tiers are priced here before the button is
+                      pressed. That comparison is the whole reason the tier
+                      picker is a choice rather than a setting. */}
+                  {(() => {
+                    const vidScript = buildVideoScript(v);
+                    const seconds   = estimateSpokenSeconds(vidScript);
+                    const job       = videos[i];
+                    const rendering = vidBusy?.idx === i;
+                    if (!vidScript) return null;
+                    return (
+                      <div style={{ margin:"12px 0", padding:"11px 12px", background:t.surface, border:"1px solid "+t.borderSoft, borderRadius:10 }}>
+                        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:9, flexWrap:"wrap" }}>
+                          <div style={{ ...gSL(t), marginBottom:0 }}>Talking head</div>
+                          <button onClick={() => genVideo(v, i)} disabled={vidBusy !== null}
+                            style={{ ...(job?.status === "done" ? gGh(t) : gG(t)), padding:"5px 11px", fontSize:11.5, opacity: vidBusy !== null ? 0.55 : 1 }}>
+                            {rendering ? "Rendering…" : job?.status === "done" ? "Regenerate" : "Generate video"}
+                          </button>
+                        </div>
+
+                        {/* Priced before spend, both tiers, so the difference is
+                            legible rather than something you learn afterwards. */}
+                        <div style={{ marginTop:8, fontSize:11, fontFamily:t.mono, color:t.textMuted, display:"flex", gap:10, flexWrap:"wrap" }}>
+                          <span>~{Math.round(seconds)}s spoken</span>
+                          {VIDEO_TIER_LIST.map(x => (
+                            <span key={x.key} style={{ color: x.key === tierKey ? t.gold : t.textMuted, fontWeight: x.key === tierKey ? 700 : 400 }}>
+                              {x.key === tierKey ? "▸ " : ""}{x.key.toLowerCase()} {usd(estimateVideoCostUsd(vidScript, x))}
+                            </span>
+                          ))}
+                        </div>
+
+                        {rendering && (
+                          <div style={{ marginTop:9, fontSize:11.5, color:t.textSub, lineHeight:1.5 }}>
+                            Rendering on {job?.tierLabel} · {mmss(elapsedMs)} elapsed. Typically 1-3 minutes.
+                            Leaving this view cancels the wait, not the render.
+                          </div>
+                        )}
+
+                        {job?.status === "stalled" && (
+                          <div style={{ marginTop:9, fontSize:11.5, color:t.warn, lineHeight:1.5 }}>
+                            Still rendering after {Math.round(VIDEO_POLL_TIMEOUT_MS / 60000)} minutes, so this stopped watching — the job is
+                            alive on the provider and will still be billed. Job <code style={{ fontFamily:t.mono }}>{job.jobId}</code>; collect it
+                            from the provider's dashboard.
+                          </div>
+                        )}
+
+                        {job?.status === "failed" && (
+                          <div style={{ marginTop:9, fontSize:11.5, color:t.red, lineHeight:1.5 }}>{job.error}</div>
+                        )}
+
+                        {job?.status === "done" && (
+                          <div style={{ marginTop:10 }}>
+                            <video src={job.url} controls playsInline
+                              style={{ maxWidth:"100%", width:260, borderRadius:9, border:"1px solid "+t.border, display:"block", background:"#000" }} />
+                            <div style={{ marginTop:8, padding:"8px 10px", borderRadius:8, background:t.warnBg, border:"1px solid "+t.warnBorder }}>
+                              <div style={{ fontSize:11.5, color:t.text, lineHeight:1.5 }}>
+                                <strong>Download this now.</strong> The link is a signed provider URL that expires in 24-72 hours, and nothing
+                                here keeps a copy. Once it lapses the clip is gone and re-rendering costs {usd(job.costUsd)} again.
+                              </div>
+                              <a href={job.url} target="_blank" rel="noreferrer" download
+                                style={{ ...gGh(t), padding:"5px 9px", fontSize:11, display:"inline-block", marginTop:7, textDecoration:"none" }}>
+                                Download video
+                              </a>
+                            </div>
+                            <div style={{ fontSize:10.5, color:t.textMuted, fontFamily:t.mono, marginTop:6 }}>
+                              {job.tierLabel} · {job.durationSeconds ? Math.round(job.durationSeconds) + "s" : "~" + Math.round(seconds) + "s est."} · ~{usd(job.costUsd)}
+                            </div>
+                          </div>
+                        )}
+
+                        {!job && !rendering && (
+                          <div style={{ marginTop:8, fontSize:11.5, color:t.textMuted, fontFamily:t.serif, lineHeight:1.5 }}>
+                            Reads this variant's own approved script, unchanged — the hook and beats above, nothing rewritten. Held for this
+                            session only; the provider's link expires, so download what is worth keeping.
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* Slot editors. Controlled dimensions render as selects so an
                       off-vocabulary value cannot be introduced by hand; the

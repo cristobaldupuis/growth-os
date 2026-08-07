@@ -173,6 +173,28 @@ The client also sends `{model, prompt, aspectRatio}` rather than a provider-shap
 
 ---
 
+## Video generation is sold as two priced tiers, not three providers
+
+**Decision:** `VIDEO_TIERS` exposes exactly two choices — `STANDARD` (HeyGen, ~$0.017/sec) and `PREMIUM` (VEED Fabric 1.0 at 720p, $0.15/sec) — and both are priced against the actual script before the generate button is pressed. The provider id survives underneath as the wire value and the adapter-map key; it is simply not the thing the operator picks.
+
+**Why not the provider list it started as:** the first draft exposed HeyGen / D-ID / Fabric directly, on the theory that an operator would want to A/B providers on a real script. That is the wrong unit of choice. What is actually being decided at the moment of spend is "is this clip worth nine times the money" — nobody has a view on D-ID's lip-sync model, and asking them to form one is how a picker becomes noise. Naming the tiers after the decision keeps the question answerable, and swapping the provider behind a tier stays a one-line change.
+
+**Why D-ID is implemented but not a tier:** at August 2026 pricing it lands around $0.035/sec — above HeyGen without being visibly better. A third option nobody has a reason to pick is worse than two. The adapter stays so re-promoting it is one line if that inverts.
+
+**Why cost is computed before submit rather than reported after:** a video's price is set by how long the script takes to say, so unlike an image it is neither fixed nor knowable from the button label. A tier picker showing two names and no numbers asks the operator to choose blind. The estimator (~150wpm, plus the beat pauses `buildVideoScript` inserts, floored at 3s) lives in `callGenerateVideo.js` and is *imported* by `api/video.js` rather than reimplemented there — one formula, so the figure shown before the click cannot drift from the figure logged against the job. It is a planning number, not a quote.
+
+**Why VEED Fabric is reached through fal.ai:** there is no `api.veed.io` REST endpoint for Fabric — it is distributed through fal.ai's inference queue, auth is `Authorization: Key ...`, and the headline `veed/fabric-1.0` model takes image + *audio*, not a script. The script-native path is a separate sub-endpoint, `veed/fabric-1.0/text`. This app only ever has a script, so premium renders are that endpoint or nothing. `VEED_API_KEY` therefore holds a fal.ai key; it is named for the model because the model is what is being chosen.
+
+**Why the browser drives the poll loop:** renders take 60-170 seconds. Holding a serverless function open that long exceeds Vercel's execution limit, so `api/video.js` has `submit` and `poll` actions and `CreativeStudio` owns the cadence (8s interval, 5min timeout). A timeout surfaces "still rendering, here is the job id" rather than an error — a slow render is not a failed one, and it has still been billed.
+
+**Why video is not persisted, more strongly than images:** the same localStorage reasoning as generated images, except a rendered clip is 5-50MB rather than ~1MB, so it is not a quota risk but a certainty. Only the provider's signed URL is held, in session state, and nothing re-fetches the file into the app — re-hosting it would make this a video CDN with its own egress bill and retention policy. Provider links expire in 24-72h, so the UI says so at the point of completion rather than letting the operator discover it later.
+
+**Forcing condition:** the same one as images, arriving sooner and harder. The first operator who needs a rendered clip to survive a reload needs blob storage; unlike images, they will hit it on their first genuinely good take rather than after a few.
+
+**Unverified:** the D-ID and Fabric adapters are written from current provider documentation, not exercised against live credentials. Fabric's queue-lookup URLs drop the `/text` sub-path and address the base app id, which is fal's documented behaviour for models with variants and the likeliest thing here to break.
+
+---
+
 ## Write access to ad platforms goes through a proposal gate, never a direct tool call
 
 **Decision:** No AI path writes to Meta or Google Ads directly. Every mutation — create campaign, change budget, pause ad set — is produced as a *proposed change*, rendered as a diff against current live state, approved by a human, and then executed by a separate applier that writes an audit record. The proposer and the applier are different code paths with different credentials.

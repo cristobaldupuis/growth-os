@@ -272,6 +272,28 @@ ANTHROPIC_API_KEY=your_key
 # returns a clear "not configured" error rather than failing obscurely.
 GEMINI_API_KEY=your_key
 
+# Optional. Enables talking-head video generation in the Creative Studio. Each
+# tier needs only its own key — the standard tier works without the premium
+# one, and vice versa. Without either, video generation returns a clear "not
+# configured" error rather than failing obscurely.
+#
+# Standard tier. A HeyGen API key, from Settings -> API in the HeyGen dashboard.
+HEYGEN_API_KEY=your_key
+
+# Premium tier. VEED Fabric 1.0 is served through fal.ai's inference queue
+# rather than a VEED-hosted endpoint, so this holds a fal.ai key (fal.ai/dashboard/keys),
+# sent as `Authorization: Key ...`. Named for the model rather than the host
+# because the model is what you are choosing.
+VEED_API_KEY=your_key
+
+# Optional, and not offered as a tier in the UI — D-ID currently prices above
+# HeyGen without being better. The adapter is kept so re-promoting it is a
+# one-line change. NOTE: this must be the ALREADY base64-encoded `email:key`
+# pair, not the raw key copied from D-ID Studio — the header is sent as
+# `Basic $DID_API_KEY` verbatim. Encoding it twice is the usual cause of a 401.
+#   printf '%s' 'you@example.com:your_key' | base64
+DID_API_KEY=your_base64_encoded_pair
+
 # Optional. Comma-separated origins the proxy will accept. Defaults to the
 # canonical deployment, so a missing value fails closed rather than opening up.
 ALLOWED_ORIGINS=https://your-deployment.vercel.app

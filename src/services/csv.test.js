@@ -2,7 +2,7 @@
 // normalizeInitiativeRecord.  No test framework required.
 // Run with: node src/services/csv.test.js
 import assert from "node:assert/strict";
-import { normalizeInitiativeRecord } from "./csv.js";
+import { normalizeInitiativeRecord, itemToCSVRow } from "./csv.js";
 import { ATTRIBUTION_CONFIG } from "../config.js";
 
 // Minimal shared context — mirrors real call sites in the app.
@@ -116,6 +116,35 @@ test("no-match fallback: initId auto-generated, trackingTag empty", () => {
   assert.ok(result.initId.startsWith("NH-"), "auto-generated initId uses NH prefix for default brand");
   assert.strictEqual(result.trackingTag, "");
   assert.strictEqual(result.title, "Organic Post");
+});
+
+// 6. Claimed campaign/ad names — the direct attribution bridge. These join
+//    imported performance rows to an initiative by exact name, so a round-trip
+//    that drops them silently unlinks every campaign an initiative measures.
+test("claimed campaign names survive a CSV round-trip", () => {
+  const item = {
+    id: "i1", initId: "NH-001", title: "Spring refresh",
+    adNames: [
+      { name: "Spring Sale - Prospecting", level: "campaign", channel: "meta", addedAt: "2026-08-01" },
+      { name: "Static B" },
+    ],
+  };
+  const row = itemToCSVRow(item, BRANDS);
+  assert.strictEqual(row.adNames, "Spring Sale - Prospecting | Static B");
+  const back = normalizeInitiativeRecord({ ...row, brandId: "Northcove Home" }, ctx);
+  assert.deepStrictEqual(back.adNames.map(e => e.name), ["Spring Sale - Prospecting", "Static B"]);
+});
+
+// 7. The quiet-data-loss guard: someone exports, edits three columns in a
+//    spreadsheet that drops the one it does not understand, re-imports, and every
+//    claim disappears. That surfaces a month later as missing spend.
+test("a blank adNames column carries existing claims through rather than clearing them", () => {
+  const existing = { id: "i1", initId: "NH-001", title: "Spring refresh", adNames: [{ name: "Spring Sale - Prospecting" }] };
+  const result = normalizeInitiativeRecord(
+    { initId: "NH-001", title: "Spring refresh", adNames: "" },
+    { ...ctx, items: [existing] }
+  );
+  assert.deepStrictEqual(result.adNames.map(e => e.name), ["Spring Sale - Prospecting"]);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

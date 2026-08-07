@@ -1,9 +1,10 @@
 import { useState, useMemo } from "react";
 import { gG, gGh, gSL, gCd, gSl } from "../components/styles.js";
 import { fmtCur, fmtDate } from "../constants.js";
-import { resolveSchema, breakdownByDimension, listChannels, listLevels, templateFor, NA } from "../services/naming.js";
+import { resolveSchema, breakdownByDimension, listChannels, listLevels, templateFor, taxonomy, adNamesOf, normKey, NA } from "../services/naming.js";
 import { interactive, tile } from "../components/motion.js";
 import { ChargeBar } from "../components/ChargeBar.jsx";
+import { NameBuilder } from "../components/NameBuilder.jsx";
 import { availableDimensions, defaultDimension, rollupByInitiative, deriveRatios, ADDITIVE_METRICS, PERF_ROW_LIMIT } from "../services/performance.js";
 
 // -- Performance -----------------------------------------------------------------
@@ -37,7 +38,22 @@ import { availableDimensions, defaultDimension, rollupByInitiative, deriveRatios
 const TABS = [
   { key: "breakdown",  label: "Breakdown",   blurb: "pivot spend and conversions by any dimension in the name" },
   { key: "attribution", label: "Attribution", blurb: "which spend reached an initiative, and which links are broken" },
-  { key: "convention", label: "Convention",  blurb: "the naming schema every name is built and parsed against" },
+  { key: "builder",    label: "Name builder", blurb: "compose a campaign, ad set and ad name, and claim it for an initiative" },
+  { key: "taxonomy",   label: "Taxonomy",    blurb: "the controlled vocabulary every name is built and parsed against" },
+];
+
+// The Convention tab was renamed rather than replaced: same schema, read from
+// the other end. It used to answer "what does a Meta ad name look like", which
+// is a question about syntax, and left "what is a Theme, and where is it allowed
+// to appear" — the question people actually arrive with — for the reader to
+// reverse-engineer out of five template strings. So dimensions lead now, grouped
+// by the kind of question they settle, each carrying every place it appears; the
+// templates follow as the projection of that vocabulary rather than as the
+// primary object. `taxonomy` and `dimensionUsage` both derive from the same
+// registry the parser uses, so there is no second copy to drift.
+const TAXONOMY_MODES = [
+  { key: "dimensions", label: "Dimensions" },
+  { key: "templates",  label: "Templates" },
 ];
 
 const fmtNum = (n) => n == null ? "—" : Math.round(n).toLocaleString();
@@ -53,12 +69,14 @@ function Empty({ t, title, body, action }) {
   );
 }
 
-export function PerformanceView({ t, items, settings, perfRows, onImport, onClear }) {
+export function PerformanceView({ t, items, settings, perfRows, onImport, onClear, onAssignNames, showToast, initialTab, initialInitiativeId }) {
   const schema = resolveSchema(settings);
-  const [tab, setTab] = useState("breakdown");
+  const [tab, setTab] = useState(initialTab || "breakdown");
   const [dimKey, setDimKey] = useState("");
   const [sortBy, setSortBy] = useState("spend");
   const [convChannel, setConvChannel] = useState(listChannels(schema)[0]?.id || "meta");
+  const [taxMode, setTaxMode] = useState("dimensions");
+  const [builderInit, setBuilderInit] = useState(initialInitiativeId || "");
 
   const rows = useMemo(() => perfRows || [], [perfRows]);
   const dims = useMemo(() => availableDimensions(rows, schema), [rows, schema]);
@@ -290,8 +308,13 @@ export function PerformanceView({ t, items, settings, perfRows, onImport, onClea
               <div style={gSL(t)}>Measured performance by initiative</div>
               {roll.groups.length === 0 ? (
                 <div style={{ fontSize: 13, color: t.textSub, fontFamily: t.serif, lineHeight: 1.6 }}>
-                  Nothing joined. An ad name attributes to an initiative when its final slot holds that initiative's
-                  tracking tag — set one in the Creative Studio, and every name it builds carries it from then on.
+                  Nothing joined. There are two ways a row reaches an initiative, and either is enough: the name carries
+                  that initiative's tracking tag in its final slot, or the initiative has claimed the name outright.
+                  Build names with the tag already in them from the Name builder; claim names that already exist in the
+                  ad account from the same place.
+                  {" "}
+                  <button onClick={() => setTab("builder")} style={{ background: "none", border: "none", padding: 0, cursor: "pointer",
+                    fontFamily: t.serif, fontSize: 13, color: t.gold, textDecoration: "underline" }}>Open the name builder</button>.
                 </div>
               ) : (
                 <>
@@ -308,7 +331,11 @@ export function PerformanceView({ t, items, settings, perfRows, onImport, onClea
                           {g.initiative?.initId ? g.initiative.initId + " · " : ""}{g.initiative?.title || "Unknown"}
                         </div>
                         <div style={{ fontSize: 11, color: t.textMuted, fontFamily: t.mono, marginTop: 2 }}>
-                          {g.trackingTag} · {g.names.length} ad{g.names.length !== 1 ? "s" : ""} · {g.rows} row{g.rows !== 1 ? "s" : ""}
+                          {/* Which bridge carried this. "Claimed" is a person's
+                              decision and "tag" is the convention working; a
+                              rollup should be able to say which it is standing on. */}
+                          {(g.via || []).map(v => v === "name" ? "claimed name" : "tracking tag").join(" + ") || "—"}
+                          {g.trackingTag ? " " + g.trackingTag : ""} · {g.names.length} name{g.names.length !== 1 ? "s" : ""} · {g.rows} row{g.rows !== 1 ? "s" : ""}
                           {g.firstDate ? ` · ${fmtDate(g.firstDate)} → ${fmtDate(g.lastDate)}` : ""}
                         </div>
                       </div>
@@ -321,6 +348,50 @@ export function PerformanceView({ t, items, settings, perfRows, onImport, onClea
                 </>
               )}
             </div>
+
+            {/* Claimed names, and whether the data actually contains them.
+                A claim that never appears in an export is silent — the rollup
+                simply shows less spend than it should, and nothing anywhere says
+                why. Usually it is a paste that picked up a trailing space or a
+                campaign that was renamed after being claimed. Both are one-line
+                fixes once you can see them, and invisible until then. */}
+            {(() => {
+              const claimed = (items || []).flatMap(i => adNamesOf(i).map(e => ({ ...e, item: i })));
+              if (claimed.length === 0) return null;
+              const seen = new Set();
+              roll.rows.forEach(r => [r.name, r.adsetName, r.campaignName].forEach(n => { if (n) seen.add(normKey(n)); }));
+              const missing = claimed.filter(c => !seen.has(normKey(c.name)));
+              return (
+                <div style={{ ...gCd(t), marginBottom: 14, ...(missing.length ? { borderColor: t.warnBorder } : {}) }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+                    <div style={{ ...gSL(t), marginBottom: 0 }}>Claimed names</div>
+                    <div style={{ fontFamily: t.mono, fontSize: 11, color: missing.length ? t.warn : t.textMuted }}>
+                      {claimed.length - missing.length}/{claimed.length} found in this data
+                    </div>
+                  </div>
+                  {missing.length === 0 ? (
+                    <div style={{ fontSize: 12.5, color: t.textSub, fontFamily: t.serif, lineHeight: 1.6, marginTop: 8 }}>
+                      Every name an initiative claims appears in the imported rows. Nothing is being claimed into thin air.
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: 12.5, color: t.text, fontFamily: t.serif, lineHeight: 1.6, margin: "8px 0 7px" }}>
+                        <strong>{missing.length} claimed name{missing.length !== 1 ? "s do" : " does"} not appear anywhere in this import.</strong>{" "}
+                        The claim is doing nothing until the string matches exactly — check for a stray space, or for a
+                        campaign renamed in the platform after it was claimed here.
+                      </div>
+                      {missing.slice(0, 10).map(c => (
+                        <div key={c.item.id + c.name} style={{ display: "flex", gap: 8, alignItems: "baseline", padding: "4px 0", flexWrap: "wrap" }}>
+                          <code style={{ fontFamily: t.mono, fontSize: 10.5, color: t.textSub, wordBreak: "break-all" }}>{c.name}</code>
+                          <span style={{ fontFamily: t.mono, fontSize: 10, color: t.warn }}>{c.item.initId || c.item.title}</span>
+                        </div>
+                      ))}
+                      {missing.length > 10 && <div style={{ fontSize: 11, color: t.textMuted, fontFamily: t.sans, marginTop: 4 }}>…and {missing.length - 10} more.</div>}
+                    </>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Broken links, named. A count is not actionable; the string is. */}
             {(() => {
@@ -368,8 +439,15 @@ export function PerformanceView({ t, items, settings, perfRows, onImport, onClea
         )
       )}
 
-      {/* --------------------------------------------------------------- Convention */}
-      {tab === "convention" && (
+      {/* ------------------------------------------------------------------ Builder */}
+      {tab === "builder" && (
+        <NameBuilder t={t} schema={schema} items={items}
+          initiativeId={builderInit} onInitiative={setBuilderInit}
+          onAssign={onAssignNames} showToast={showToast} />
+      )}
+
+      {/* ----------------------------------------------------------------- Taxonomy */}
+      {tab === "taxonomy" && (
         <>
           <div style={{ ...gCd(t), marginBottom: 14 }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
@@ -381,21 +459,101 @@ export function PerformanceView({ t, items, settings, perfRows, onImport, onClea
                   {schema.initiativeDimension ? ` · initiative slot "${schema.initiativeDimension}"` : ""}
                 </div>
               </div>
-              <select value={convChannel} onChange={e => setConvChannel(e.target.value)} style={{ ...gSl(t), width: 170 }}>
-                {listChannels(schema).map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
-              </select>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+                <div style={{ display: "flex", gap: 3 }}>
+                  {TAXONOMY_MODES.map(m => (
+                    <button key={m.key} onClick={() => setTaxMode(m.key)}
+                      style={{
+                        fontSize: 12, padding: "7px 12px", borderRadius: 9, cursor: "pointer", fontFamily: t.sans,
+                        fontWeight: taxMode === m.key ? 600 : 500,
+                        background: taxMode === m.key ? t.surfaceAlt : "transparent",
+                        border: "1px solid " + (taxMode === m.key ? t.border : "transparent"),
+                        color: taxMode === m.key ? t.text : t.textMuted,
+                      }}>{m.label}</button>
+                  ))}
+                </div>
+                {taxMode === "templates" && (
+                  <select value={convChannel} onChange={e => setConvChannel(e.target.value)} style={{ ...gSl(t), width: 170 }}>
+                    {listChannels(schema).map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                  </select>
+                )}
+              </div>
             </div>
             <p style={{ fontSize: 12.5, color: t.textSub, fontFamily: t.serif, lineHeight: 1.65, margin: "12px 0 0", maxWidth: 720 }}>
-              Two rules make positional parsing safe, and both are enforced in code rather than by discipline: a slot is
-              never omitted or reordered — an absent value is written <code style={{ fontFamily: t.mono }}>{schema.placeholder || NA}</code> —
-              and the delimiter never appears inside a value. Names are assembled by the builder, never typed, which is
-              why an export from three months ago still parses today. This view is read-only; a schema editor is the
-              next item in this slice.
+              {taxMode === "dimensions" ? (
+                <>The vocabulary comes first because it is the part that has to be agreed. A dimension is a question the
+                  name answers, and a controlled one is a question with a fixed set of allowed answers — which is what
+                  stops <code style={{ fontFamily: t.mono }}>Reels</code> and <code style={{ fontFamily: t.mono }}>reels</code> and{" "}
+                  <code style={{ fontFamily: t.mono }}>Reel</code> from becoming three rows in a pivot that should have one.
+                  Where each dimension appears is shown beside it, because the same dimension sits at different depths in
+                  different channels and that is a fact about the estate, not an inconsistency.</>
+              ) : (
+                <>Two rules make positional parsing safe, and both are enforced in code rather than by discipline: a slot is
+                  never omitted or reordered — an absent value is written <code style={{ fontFamily: t.mono }}>{schema.placeholder || NA}</code> —
+                  and the delimiter never appears inside a value. Names are assembled by the builder, never typed, which is
+                  why an export from three months ago still parses today. The schema itself is read-only here; an editor is
+                  the next item in this slice.</>
+              )}
             </p>
           </div>
 
+          {/* Dimensions, grouped by the kind of question they settle */}
+          {taxMode === "dimensions" && taxonomy(schema).map((fam, fi) => (
+            <div key={fam.key} style={{ ...gCd(t), marginBottom: 12 }}>
+              <div style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap", marginBottom: 10 }}>
+                <div style={{ ...gSL(t), marginBottom: 0 }}>{fam.label}</div>
+                <div style={{ fontFamily: t.mono, fontSize: 10.5, color: t.textMuted }}>
+                  {fam.dimensions.length} dimension{fam.dimensions.length !== 1 ? "s" : ""}
+                </div>
+                <div style={{ fontSize: 12, color: t.textMuted, fontFamily: t.sans, lineHeight: 1.5, flex: "1 1 260px" }}>{fam.hint}</div>
+              </div>
+              {fam.dimensions.map((d, di) => (
+                <div key={d.key} {...(() => { const p = interactive(t, d.isBridge ? t.gold : t.goldFill, { flat: true, index: fi + di, hoverBg: t.surfaceAlt });
+                  return { className: p.className, style: { ...p.style, padding: "9px 8px 9px 12px", borderRadius: 8, borderBottom: di < fam.dimensions.length - 1 ? "1px solid " + t.borderSoft : "none" } }; })()}>
+                  <div style={{ display: "flex", gap: 7, alignItems: "baseline", flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: t.text, fontFamily: t.sans }}>{d.label}</span>
+                    <span style={{ fontFamily: t.mono, fontSize: 10, color: t.textMuted }}>{d.key}</span>
+                    {d.isBridge && (
+                      <span style={{ fontFamily: t.mono, fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase",
+                        color: t.gold, border: "1px solid " + t.goldBorder, borderRadius: 4, padding: "1px 6px" }}>
+                        Growth OS bridge
+                      </span>
+                    )}
+                    <span style={{ fontFamily: t.mono, fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: t.textMuted }}>
+                      {d.vocab ? `${d.vocab.length} allowed values` : "free text"}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 11.5, color: t.textMuted, fontFamily: t.sans, lineHeight: 1.5, marginTop: 3 }}>{d.hint}</div>
+
+                  {/* Where it lives. A dimension nothing uses is worth seeing as
+                      much as one everything uses — it is usually a leftover. */}
+                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
+                    {d.usage.length === 0 ? (
+                      <span style={{ fontSize: 11, color: t.textMuted, fontFamily: t.sans }}>In no template — defined but unused.</span>
+                    ) : d.usage.map(u => (
+                      <span key={u.channel + u.level} title={`Slot ${u.slot} of ${u.of}`}
+                        style={{ fontFamily: t.mono, fontSize: 9.5, color: t.textSub, background: t.surfaceAlt,
+                          border: "1px solid " + t.border, borderRadius: 4, padding: "1px 6px" }}>
+                        {u.channelLabel} {u.levelLabel.toLowerCase()} · {u.slot}/{u.of}
+                      </span>
+                    ))}
+                  </div>
+
+                  {d.vocab && (
+                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 5 }}>
+                      {d.vocab.map(v => (
+                        <span key={v} style={{ fontFamily: t.mono, fontSize: 10, color: t.textSub, background: t.surfaceAlt,
+                          border: "1px solid " + t.border, borderRadius: 4, padding: "1px 6px" }}>{v}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ))}
+
           {/* Levels — one record projects into all of them at once */}
-          {listLevels(schema, convChannel).map(level => {
+          {taxMode === "templates" && listLevels(schema, convChannel).map(level => {
             const tpl = templateFor(schema, convChannel, level.key);
             return (
               <div key={level.key} style={{ ...gCd(t), marginBottom: 12 }}>

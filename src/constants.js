@@ -491,6 +491,14 @@ export const mkDefault = (cats, activeBrand) => ({
   // trackingTag: optional hard identifier (UTM campaign, discount code, GA4 event) for precise auto-match.
   // The measurement window is startDate→endDate, already above.
   measurementMetric:"", measurementScope:"", trackingTag:"",
+  // adNames: campaign / ad set / ad names claimed by this initiative, as
+  // {name, level, channel, addedAt}. The trackingTag above works when the name
+  // was built from the convention; this works when it wasn't — a campaign that
+  // has been live in Ads Manager for six weeks cannot be renamed without
+  // resetting its learning phase, so the join has to accept the name as it
+  // already is. Matched at any level an export carries, so claiming a campaign
+  // claims every ad row underneath it. See services/naming.js.
+  adNames:[],
 });
 
 // -- Prediction ledger ---------------------------------------------------------

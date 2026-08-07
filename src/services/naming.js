@@ -97,6 +97,62 @@ const DIMENSIONS = [
   { key:"initiative", label:"Initiative",  vocab:null, hint:"The Growth OS bridge. Set to the initiative's trackingTag when this belongs to a tracked experiment. NA otherwise — never invent one." },
 ];
 
+// -- Families ------------------------------------------------------------------
+//
+// A flat registry of twenty-four dimensions is a list, not a taxonomy. It reads
+// fine in code, because a reader arrives with a question ("what does `lane`
+// mean") and scans to it. It reads badly on a page, because a reader arrives
+// without one, and twenty-four rows of equal weight give them nowhere to start.
+//
+// The families answer "what kind of question does this dimension settle", which
+// is the axis an operator already thinks along: where it runs, what it is for,
+// who it targets, what it says, what it sells — and then the one dimension that
+// is not a description of the ad at all, but a pointer back into the portfolio.
+// That last family has exactly one member on purpose. The bridge is structurally
+// unlike everything around it, and filing it among the descriptive dimensions
+// would hide the single most important fact about the convention.
+//
+// Kept as a side map rather than a `family` field on each dimension, for a
+// reason that matters: `resolveSchema` returns a stored custom schema verbatim,
+// and a schema saved before this existed carries no family fields at all. A
+// lookup keyed on dimension key groups those correctly too, and anything it does
+// not recognise lands in "Other" rather than vanishing.
+//
+// Families are presentation and nothing else. Slot order and position come from
+// the templates alone, so regrouping the taxonomy can never change what a name
+// means.
+
+export const DIMENSION_FAMILIES = [
+  { key:"placement", label:"Where it runs",  hint:"Platform, surface and market — the coordinates of the buy." },
+  { key:"intent",    label:"What it is for", hint:"Funnel stage, optimisation event, commercial offer. Why the money is being spent." },
+  { key:"audience",  label:"Who it targets", hint:"Targeting dimensions. Present on the platforms that let you set them, NA on the ones that don't." },
+  { key:"creative",  label:"What it says",   hint:"The creative itself: concept, execution, and the hook under test." },
+  { key:"product",   label:"What it sells",  hint:"Product line, variant, and the launch bucket it belongs to." },
+  { key:"bridge",    label:"Attribution",    hint:"The slot carrying an initiative's tracking tag. This is what joins spend back to a hypothesis." },
+  { key:"other",     label:"Other",          hint:"Dimensions with no declared family — usually from a hand-edited schema." },
+];
+
+const FAMILY_OF = {
+  channel:"placement", handle:"placement", geo:"placement", placement:"placement",
+  funnel:"intent", objective:"intent", bidding:"intent", offer:"intent", cta:"intent",
+  audience:"audience", age:"audience", gender:"audience",
+  asset:"creative", theme:"creative", angle:"creative", concept:"creative",
+  cut:"creative", talent:"creative", format:"creative", lane:"creative",
+  campaign:"product", category:"product", flavor:"product",
+  initiative:"bridge",
+};
+
+/**
+ * The family a dimension belongs to. The schema's own `family` field wins when
+ * one is present, so a custom schema can declare its own grouping; otherwise the
+ * key is looked up, and an unrecognised dimension is "other" rather than dropped.
+ */
+export const familyOf = (dim, schema) =>
+  (dim && dim.family) ||
+  (schema && schema.initiativeDimension && dim && dim.key === schema.initiativeDimension ? "bridge" : null) ||
+  FAMILY_OF[dim && dim.key] ||
+  "other";
+
 // -- Channels and their levels -------------------------------------------------
 //
 // The Meta ad-level template is byte-identical to the convention already in
@@ -201,6 +257,87 @@ export function initiativeDimension(schema) {
 /** True when this level's template includes the initiative dimension. */
 export const levelCarriesInitiative = (schema, channelId, levelKey) =>
   templateFor(schema, channelId, levelKey).some(d => d.key === schema.initiativeDimension);
+
+// -- Taxonomy ------------------------------------------------------------------
+//
+// Everything above describes how a name is assembled. These describe what the
+// vocabulary *is*, which is a different question and the one a new operator (or
+// a client being handed the convention) asks first. Both are derived from the
+// same registry and templates, so the taxonomy can never drift from the thing it
+// documents — there is no second copy to keep in sync.
+
+/**
+ * Every place a dimension appears, as `{channel, channelLabel, level, levelLabel,
+ * slot, of}`. `slot` is 1-based because it is read by humans counting segments in
+ * a name, not by code indexing an array.
+ *
+ * This is the fact that makes the registry legible: `geo` reading "Meta campaign
+ * slot 4, Meta ad set slot 1, Google campaign slot 4" tells an operator both that
+ * the dimension is load-bearing and that it sits at different depths per level —
+ * which is precisely the thing a single flat template could not express.
+ */
+export function dimensionUsage(schema, dimensionKey) {
+  const out = [];
+  listChannels(schema).forEach(ch => {
+    (ch.levels || []).forEach(lv => {
+      const i = (lv.template || []).indexOf(dimensionKey);
+      if (i >= 0) out.push({
+        channel: ch.id, channelLabel: ch.label,
+        level: lv.key, levelLabel: lv.label,
+        slot: i + 1, of: lv.template.length,
+      });
+    });
+  });
+  return out;
+}
+
+/**
+ * The registry grouped into families, each dimension carrying its usage.
+ *
+ * Families with no members are dropped rather than rendered empty: a schema that
+ * declares no audience dimensions should not show an "Who it targets" heading
+ * over blank space, which reads as a bug rather than as an absence.
+ */
+export function taxonomy(schema) {
+  const dims = (schema.dimensions || []).map(d => ({
+    ...d,
+    family: familyOf(d, schema),
+    usage: dimensionUsage(schema, d.key),
+    isBridge: d.key === schema.initiativeDimension,
+  }));
+  return DIMENSION_FAMILIES
+    .map(f => ({ ...f, dimensions: dims.filter(d => d.family === f.key) }))
+    .filter(f => f.dimensions.length > 0);
+}
+
+/**
+ * Every dimension one channel touches, in first-appearance order across its
+ * levels, each annotated with the levels that use it.
+ *
+ * This is the builder's field list. Editing per level would make an operator
+ * type `geo` twice for Meta — once for the campaign, once for the ad set — and
+ * the second one is not a second decision, it is the same decision restated with
+ * a chance to contradict itself. One record, projected into every level, is the
+ * property the whole module is built on; the builder just has to honour it.
+ */
+export function channelDimensions(schema, channelId) {
+  const dims = dimensionMap(schema);
+  const order = [];
+  const seen = new Map();
+  listLevels(schema, channelId).forEach(lv => {
+    (lv.template || []).forEach(k => {
+      if (!seen.has(k)) {
+        const entry = { ...(dims.get(k) || { key:k, label:k, vocab:null, hint:"" }), levels: [] };
+        entry.family = familyOf(entry, schema);
+        entry.isBridge = k === schema.initiativeDimension;
+        seen.set(k, entry);
+        order.push(entry);
+      }
+      seen.get(k).levels.push({ key: lv.key, label: lv.label });
+    });
+  });
+  return order;
+}
 
 // -- Validation ----------------------------------------------------------------
 
@@ -326,6 +463,113 @@ export function identifyName(name, schema) {
 }
 
 // -- The Growth OS bridge ------------------------------------------------------
+//
+// There are two bridges, and they exist for different situations.
+//
+//   The tag slot  — a name built here carries the initiative's trackingTag in a
+//                   slot, so attribution is a property of the string itself.
+//                   Scales: name a hundred ads, all hundred attribute, and the
+//                   join keeps working in exports nobody has seen yet.
+//
+//   Assigned names — a specific campaign, ad set or ad name, recorded on the
+//                   initiative by hand. Attribution is a property of the
+//                   *portfolio*, not the string.
+//
+// The second exists because most spend an operator wants to measure was named
+// before this tool was in the room. A campaign that has been running in Ads
+// Manager for six weeks cannot be renamed without resetting its learning phase,
+// and telling someone "rename your account and we will measure it" is telling
+// them no. Registering the name they already have costs one paste and joins the
+// same rows.
+//
+// Assigned names win over the tag slot where both apply, because one of them is
+// a person pointing at a specific string and saying "this one is mine", and the
+// other is a convention that could have been followed by mistake. When a human
+// decision and an inferred one disagree, the human decision is the answer.
+//
+// Assignment matches at ANY level the export carries: register a campaign name
+// and every ad row underneath it attributes, because platform exports repeat the
+// campaign name on every child row. That is the behaviour the operator expects
+// from "this campaign belongs to this test", and it is why the row shape keeps
+// `campaignName` and `adsetName` alongside its own identity.
+
+/** One assigned-name record, normalised. Accepts a bare string for robustness. */
+export const adNameEntry = (raw) => {
+  if (!raw) return null;
+  if (typeof raw === "string") {
+    const name = raw.trim();
+    return name ? { name, level: "", channel: "", addedAt: "" } : null;
+  }
+  const name = String(raw.name || "").trim();
+  if (!name) return null;
+  return {
+    name,
+    level: raw.level || "",
+    channel: raw.channel || "",
+    addedAt: raw.addedAt || "",
+  };
+};
+
+/** An initiative's assigned names, deduplicated case-insensitively. */
+export function adNamesOf(item) {
+  const out = [], seen = new Set();
+  ((item && item.adNames) || []).forEach(raw => {
+    const e = adNameEntry(raw);
+    if (!e || seen.has(normKey(e.name))) return;
+    seen.add(normKey(e.name));
+    out.push(e);
+  });
+  return out;
+}
+
+/**
+ * `normKey(name)` → `{initiative, entry}` across the whole portfolio.
+ *
+ * First registration wins a collision. Two initiatives claiming one ad name is a
+ * genuine conflict — the same spend cannot belong to two experiments — and the
+ * resolution is stable rather than clever, so the same import always attributes
+ * the same way. `assignedNameConflicts` surfaces the collisions for the UI to
+ * report; this function's job is to be deterministic, not to arbitrate.
+ */
+export function assignedNameIndex(items) {
+  const index = new Map();
+  (items || []).forEach(it => {
+    adNamesOf(it).forEach(entry => {
+      const k = normKey(entry.name);
+      if (!index.has(k)) index.set(k, { initiative: it, entry });
+    });
+  });
+  return index;
+}
+
+/** Names claimed by more than one initiative: `{name, initiatives:[…]}`. */
+export function assignedNameConflicts(items) {
+  const byName = new Map();
+  (items || []).forEach(it => {
+    adNamesOf(it).forEach(entry => {
+      const k = normKey(entry.name);
+      if (!byName.has(k)) byName.set(k, { name: entry.name, initiatives: [] });
+      byName.get(k).initiatives.push(it);
+    });
+  });
+  return [...byName.values()].filter(c => c.initiatives.length > 1);
+}
+
+/**
+ * The first of a row's candidate names that is assigned to an initiative.
+ *
+ * Order is finest grain first: an ad registered to initiative A inside a campaign
+ * registered to initiative B belongs to A. The specific claim beats the general
+ * one, which is the same rule a stylesheet uses and the one an operator means.
+ */
+export function lookupAssignedName(candidateNames, index) {
+  for (const name of candidateNames || []) {
+    if (!name) continue;
+    const hit = index.get(normKey(name));
+    if (hit) return { ...hit, matchedName: name };
+  }
+  return null;
+}
 
 /**
  * The trackingTag a name claims, or null when it carries the placeholder, has no

@@ -1,5 +1,5 @@
 import { Analytics } from "@vercel/analytics/react";
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from "react";
 import {
   BRANDS as CONFIG_BRANDS,
   TEMPLATES,
@@ -9,8 +9,6 @@ import {
 } from "./activeConfig.js";
 
 import { KEY_ITEMS, KEY_SETTINGS, KEY_DEBATES, KEY_METRICS, KEY_RECS, KEY_CREATIVE, KEY_PERF, KEY_THEME, KEY_LIB_VIEW, KEY_RAIL, KEY_TOUR_SEEN, store, onWriteError, handleDownloadBackup, handleRestoreBackup } from "./services/store.js";
-import { CreativeStudio } from "./views/CreativeStudio.jsx";
-import { PerformanceView } from "./views/PerformanceView.jsx";
 import { resolveSchema } from "./services/naming.js";
 import { attachInitiatives } from "./services/performance.js";
 import { Sidebar } from "./components/Sidebar.jsx";
@@ -28,6 +26,22 @@ import {
 import { downloadCSV, itemToCSVRow, normaliseDate, parseCSV, normalizeInitiativeRecord } from "./services/csv.js";
 import { buildLearningsIndex, buildPortfolioContext } from "./services/portfolio.js";
 import { stampUpdatedAt } from "./services/items.js";
+
+// -- Deferred views ------------------------------------------------------------
+//
+// Four views the app does not need to boot. Each is reached by a deliberate
+// click — a nav item or the Signal button — never on first paint, and none is
+// anchored by a guided-tour step, which is the constraint that decides what can
+// move here. The tour polls ~40 frames for its target before falling back to a
+// centred card, so putting a tour-anchored view behind a network fetch would
+// quietly degrade the demo on a slow connection rather than fail loudly.
+// DashView stays eager for the same reason in reverse: it IS first paint.
+//
+// Named exports, so each needs the default-shape adapter React.lazy expects.
+const CreativeStudio    = lazy(() => import("./views/CreativeStudio.jsx").then(m => ({ default: m.CreativeStudio })));
+const PerformanceView   = lazy(() => import("./views/PerformanceView.jsx").then(m => ({ default: m.PerformanceView })));
+const CopilotPanel      = lazy(() => import("./views/CopilotPanel.jsx").then(m => ({ default: m.CopilotPanel })));
+const ClientReadoutView = lazy(() => import("./views/ClientReadoutView.jsx").then(m => ({ default: m.ClientReadoutView })));
 import { callExpandHypothesis } from "./services/ai/callExpandHypothesis.js";
 import { callSuggestICE } from "./services/ai/callSuggestICE.js";
 import { callQuickCapture } from "./services/ai/callQuickCapture.js";
@@ -46,13 +60,23 @@ import { MetricsLogModal } from "./components/MetricsLogModal.jsx";
 import { MetricsImportModal } from "./components/MetricsImportModal.jsx";
 import { NextPlaysModal } from "./components/NextPlaysModal.jsx";
 import { SettingsModal } from "./components/SettingsModal.jsx";
-import { CopilotPanel } from "./views/CopilotPanel.jsx";
 import { DashView } from "./views/DashView.jsx";
 import { DetailView } from "./views/DetailView.jsx";
 import { FormView } from "./views/FormView.jsx";
 import { TriageView } from "./views/TriageView.jsx";
 import { LearningLibrary } from "./views/LearningLibrary.jsx";
-import { ClientReadoutView } from "./views/ClientReadoutView.jsx";
+
+// Shown only while a deferred view's chunk is in flight — typically a frame or
+// two on a warm connection. Deliberately not a spinner: a chunk fetch that
+// resolves in 80ms with a spinner reads as a stutter, whereas a quiet held
+// space reads as nothing happening at all, which is the truth.
+function ViewLoading({ t }) {
+  return (
+    <div style={{padding:"48px 20px",textAlign:"center",color:t.textMuted,fontFamily:t.mono,fontSize:11,letterSpacing:"0.08em",textTransform:"uppercase"}}>
+      Loading…
+    </div>
+  );
+}
 
 // ── Guide drawer ─────────────────────────────────────────────────────────────
 // Feature discovery, organized by job-to-be-done rather than by feature name.
@@ -1431,6 +1455,7 @@ export default function App() {
         * ultrawide. 1440 keeps line lengths readable and still gives the Weekly
         * Pulse table room for all seven columns without scrolling. */}
       <main style={{width:"100%",maxWidth:1440,margin:"0 auto",flex:1}}>
+      <Suspense fallback={<ViewLoading t={t}/>}>
       {nav==="dashboard"&&<DashView t={t} dk={dk} dash={dash} cats={cats} settings={settings} brands={brands} activeBrand={activeBrand} weeklyMetrics={weeklyMetrics} onLog={()=>setShowPulse(true)} onImport={()=>setShowMetricsImport(true)} dRange={dRange} setDRange={setDRange} cFrom={cFrom} cTo={cTo} setCFrom={setCFrom} setCTo={setCTo} onGo={()=>setNav("initiatives")} recs={recs} recsLoad={recsLoad} recsErr={recsErr} items={items} onGenerateRecs={generateRecommendations} onOpenRec={(batchId,recId)=>setShowRecModal({batchId,recId})} showToast={showToast} onSaveItems={saveItems}/>}
       {nav==="triage"&&<TriageView items={items} t={t} dk={dk} cats={cats} brands={brands} activeBrand={activeBrand} onDetail={(id)=>goDetail(id,"triage")}
         onLogResults={(id)=>{const it=items.find(e=>e.id===id); if(it){setSelId(id); setRForm(it.results?{...it.results,actualRevenueImpact:it.results.actualRevenueImpact!=null?it.results.actualRevenueImpact:"",actualSpendCost:it.results.actualSpendCost!=null?it.results.actualSpendCost:"",actualResourceCost:it.results.actualResourceCost!=null?it.results.actualResourceCost:""}:{actualOutcome:"",keyLearning:"",outcomeClassification:"Success",decisionMade:"",outcomeCertainty:75,actualRevenueImpact:"",actualSpendCost:"",actualResourceCost:""}); setShowR(true);}}}
@@ -1611,6 +1636,7 @@ export default function App() {
           </div>
         </Modal>
       )}
+      </Suspense>
       </main>
         </div>
       </div>
@@ -1799,6 +1825,7 @@ export default function App() {
       )}
 
       {showCopilot&&(
+        <Suspense fallback={<ViewLoading t={t}/>}>
         <CopilotPanel
           t={t} dk={dk}
           settings={settings}
@@ -1828,6 +1855,7 @@ export default function App() {
           }}
           onClose={() => setShowCopilot(false)}
         />
+        </Suspense>
       )}
       {showRecModal && (
         <NextPlaysModal

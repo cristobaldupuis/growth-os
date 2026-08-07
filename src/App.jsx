@@ -1438,9 +1438,10 @@ export default function App() {
       {nav==="library"&&<LearningLibrary items={items} t={t} dk={dk} cats={cats} brands={brands} activeBrand={activeBrand} settings={settings} view={libView} onView={saveLibView} onViewInitiative={(id)=>goDetail(id,"library")} onReplicate={(item)=>{const base=mkDefault(cats,activeBrand);setForm({...base,title:"[Replicate] "+item.title,hypothesis:"Based on learning from: "+item.title+". Original: "+item.hypothesis,category:item.category,initType:item.initType,ice:{...item.ice},revenueImpact:item.revenueImpact,notes:"Replicated from initiative "+item.id+". Original learning: "+item.results.keyLearning});setNav("form");}}/>}
       {nav==="creative"&&<CreativeStudio t={t} dk={dk} items={items} brands={brands} activeBrand={activeBrand} settings={settings}
         creative={creative} onSaveCreative={saveCreative} onSaveItems={saveItems} showToast={showToast}/>}
-      {nav==="performance"&&<PerformanceView t={t} items={items} settings={settings} perfRows={perfRows}
+      {nav==="performance"&&<PerformanceView t={t} dk={dk} items={items} settings={settings} perfRows={perfRows}
         initialTab={perfTab} initialInitiativeId={builderInit} showToast={showToast}
         onAssignNames={(id,adNames)=>saveItems(items.map(e=>e.id===id?{...e,adNames}:e))}
+        onSaveSettings={saveSettings}
         onImport={()=>setShowMetricsImport(true)}
         onClear={()=>{savePerf([]); showToast("Imported performance data cleared.","success");}}/>}
       {nav==="readout"&&<ClientReadoutView t={t} dk={dk} dash={dash} items={items} brands={brands} activeBrand={activeBrand} cats={cats} weeklyMetrics={weeklyMetrics} settings={settings}/>}

@@ -38,6 +38,58 @@ Architecture decisions worth remembering. The bar for this file is a real tradeo
 
 ---
 
+## Custom naming variables are an overlay, and a placed one is appended rather than inserted
+
+**Decision:** A company's own naming dimensions live in `settings.namingCustom`
+— `{dimensions:[…], vocabAdditions:{…}}` — and are merged into the schema by
+`resolveSchema` at read time. They are not written into `settings.namingSchema`.
+A custom dimension placed into a template is appended to the end of it; the
+editor offers no way to insert one mid-string or to reorder existing slots.
+
+**Why an overlay and not an edit to the schema:** the shipped registry is still
+being improved — a hint rewritten, a vocabulary corrected against what is
+actually in use. A workspace that saved a full schema copy and then edited it
+would be frozen at the version it copied, and would need a migration to receive
+anything after it. Keeping the operator's additions in a separate key means both
+layers move independently and neither needs one. It is the same reasoning that
+made `FAMILY_OF` a side map rather than a `family` field on every dimension, and
+the same optional-with-fallback shape as the per-brand North Star.
+
+**Why appended and never inserted:** both change the slot count of names already
+live in the ad account, so neither is free — but they fail in different classes.
+An appended slot leaves an older name one segment short, and `parseName` refuses
+a slot-count mismatch outright: the row is counted, reported as unparsed, and
+excluded from breakdowns until it is rebuilt. An inserted slot leaves the count
+plausible and shifts every value after the insertion point one dimension to the
+left, producing a name that parses cleanly into wrong answers and enters the
+analysis silently. The first is an outage the operator can see; the second is a
+quiet corruption of the number they are about to make a decision on. Where those
+are the two options, the loud one wins — the same rule that governs positional
+parsing refusing to guess at an alignment.
+
+**Why the vocabulary and the dimension are separate additions:** adding a value
+to a controlled list is genuinely free — vocabularies are membership tests, and
+a longer list accepts more names while invalidating none of the ones already
+built. It is also the more common need, since "a new campaign brought a theme
+the list has never had to describe" happens far more often than "this business
+plans along an axis the registry does not model". Putting the safe operation one
+click away on the row it applies to, and the consequential one behind a form
+that states the slot-count change before it saves, matches the cost of each.
+
+**What is deliberately not editable:** shipped dimensions cannot be removed or
+renamed, and slot order cannot be changed. Removing `geo` would orphan every
+name already carrying it, and reordering would rewrite the meaning of every name
+in the account — neither has a safe answer that does not involve renaming live
+entities, which resets their learning phase. The absence is the decision, not an
+omission.
+
+**Forcing condition:** when a deployment needs a *second* convention rather than
+an extended one — an agency whose client uses a different delimiter or a
+genuinely different slot order — the overlay stops being the right shape and the
+schema needs to be selectable per brand rather than per workspace.
+
+---
+
 ## One importer, two shapes, routed by the file's own headers
 
 **Decision:** The metrics importer accepts both the weekly-brand contract and a

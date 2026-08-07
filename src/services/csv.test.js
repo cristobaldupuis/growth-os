@@ -3,7 +3,10 @@
 // Run with: node src/services/csv.test.js
 import assert from "node:assert/strict";
 import { normalizeInitiativeRecord, itemToCSVRow } from "./csv.js";
-import { ATTRIBUTION_CONFIG } from "../config.js";
+// Deliberately the ACTIVE config, not a config.*.js file directly — csv.js reads
+// ATTRIBUTION_CONFIG through activeConfig.js, so importing anything else here
+// would assert against rules the running app does not use.
+import { ATTRIBUTION_CONFIG } from "../activeConfig.js";
 
 // Minimal shared context — mirrors real call sites in the app.
 const BRANDS = [

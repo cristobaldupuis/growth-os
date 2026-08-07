@@ -138,7 +138,7 @@ export function Sidebar({
             style={{ ...railBtn(t), width:26 }}
             onMouseEnter={e=>{e.currentTarget.style.borderColor=t.goldBorder;e.currentTarget.style.color=t.gold;}}
             onMouseLeave={e=>{e.currentTarget.style.borderColor=t.border;e.currentTarget.style.color=t.textSub;}}>
-            <span dangerouslySetInnerHTML={{ __html:"&#8676;" }}/>
+            <span>{"⇤"}</span>
           </button>
         )}
       </div>
@@ -149,7 +149,7 @@ export function Sidebar({
             style={{ ...railBtn(t), width:"100%" }}
             onMouseEnter={e=>{e.currentTarget.style.borderColor=t.goldBorder;e.currentTarget.style.color=t.gold;}}
             onMouseLeave={e=>{e.currentTarget.style.borderColor=t.border;e.currentTarget.style.color=t.textSub;}}>
-            <span dangerouslySetInnerHTML={{ __html:"&#8677;" }}/>
+            <span>{"⇥"}</span>
           </button>
         </div>
       )}
@@ -214,7 +214,7 @@ export function Sidebar({
             </span>
             <button onClick={onResetDemo} title="Reset everything to the seed portfolio"
               style={{ width:24, height:24, borderRadius:7, cursor:"pointer", background:"transparent", border:"1px solid "+t.border, color:t.textMuted, fontSize:11, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-              <span dangerouslySetInnerHTML={{ __html:"&#8635;" }}/>
+              <span>{"↻"}</span>
             </button>
             <button onClick={onTour} title="Replay the guided tour"
               style={{ height:24, padding:"0 8px", borderRadius:7, cursor:"pointer", background:"transparent", border:"1px solid "+t.border, color:t.textMuted, fontSize:10, fontWeight:600, fontFamily:t.sans, flexShrink:0 }}>
@@ -225,15 +225,15 @@ export function Sidebar({
 
         <div style={{ display:"flex", gap:6, flexDirection: collapsed ? "column" : "row" }}>
           {[
-            { fn:onGuide,       html:"?",        title:"What can Growth OS do?" },
-            { fn:onSettings,    html:"&#9881;",  title:"Settings" },
-            { fn:onToggleTheme, html: dk ? "&#9728;" : "&#9790;", title: dk ? "Light mode" : "Dark mode" },
-          ].map((b, i) => (
-            <button key={i} onClick={b.fn} title={b.title}
+            { fn:onGuide,       icon:"?",        title:"What can Growth OS do?" },
+            { fn:onSettings,    icon:"⚙",   title:"Settings" },
+            { fn:onToggleTheme, icon: dk ? "☀" : "☾", title: dk ? "Light mode" : "Dark mode" },
+          ].map((b) => (
+            <button key={b.title} onClick={b.fn} title={b.title}
               style={{ ...railBtn(t), flex: collapsed ? "none" : 1, width: collapsed ? "100%" : undefined, height:28, borderRadius:8, fontSize:13 }}
               onMouseEnter={e=>{e.currentTarget.style.borderColor=t.goldBorder;e.currentTarget.style.color=t.gold;}}
               onMouseLeave={e=>{e.currentTarget.style.borderColor=t.border;e.currentTarget.style.color=t.textSub;}}>
-              <span dangerouslySetInnerHTML={{ __html:b.html }}/>
+              <span>{b.icon}</span>
             </button>
           ))}
         </div>

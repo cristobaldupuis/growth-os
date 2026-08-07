@@ -1,5 +1,5 @@
 import { Analytics } from "@vercel/analytics/react";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   BRANDS as CONFIG_BRANDS,
   TEMPLATES,
@@ -512,7 +512,19 @@ export default function App() {
   // Set when a durable write fails. Sticky — it stays until a backup is taken,
   // because the consequence (silent loss of everything since) doesn't go away.
   const [storageError, setStorageError] = useState(null);
-  const showToast = (msg, type="info") => { setToast({msg,type}); setTimeout(()=>setToast(null), 3500); };
+  // One timer, not one per call. Each toast used to set its own bare 3.5s
+  // timeout, so an earlier toast's timer would fire while a later one was on
+  // screen and clear it — two toasts three seconds apart meant the second was
+  // visible for half a second. Cancelling the pending timer before arming the
+  // next one gives every toast its full dwell, and clearing on unmount stops a
+  // late fire from setting state on a torn-down tree.
+  const toastTimer = useRef(null);
+  const showToast = (msg, type="info") => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({msg,type});
+    toastTimer.current = setTimeout(()=>{ toastTimer.current = null; setToast(null); }, 3500);
+  };
+  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
 
   // Restore confirm modal state
   const [restorePayload, setRestorePayload] = useState(null);
@@ -1345,7 +1357,7 @@ export default function App() {
             <div style={{display:"flex",alignItems:"center",gap:11,minWidth:0}}>
               <button className="gos-burger" onClick={()=>setNavOpen(true)} title="Menu"
                 style={{width:32,height:32,borderRadius:9,cursor:"pointer",background:t.surfaceAlt,border:"1px solid "+t.border,color:t.textSub,fontSize:15,alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                <span dangerouslySetInnerHTML={{__html:"&#9776;"}}/>
+                <span>{"☰"}</span>
               </button>
               {(nav==="detail"||nav==="form")?(
                 <button onClick={()=>setNav(nav==="detail"?detailOrigin:"initiatives")} style={{...gGh(t),padding:"6px 12px",fontSize:12}}>

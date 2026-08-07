@@ -315,8 +315,6 @@ export const ICE_STRONG = 34;
 export const ICE_MODERATE = 11;
 export const iceColor = (s, t) =>
   s === null ? t.textMuted : s >= ICE_STRONG ? t.gold : s >= ICE_MODERATE ? t.textSub : t.textMuted;
-export const iceBand = (s) =>
-  s === null ? "unscored" : s >= ICE_STRONG ? "high" : s >= ICE_MODERATE ? "medium" : "low";
 
 export const fmtCur = (n) => {
   if (n === 0) return "—";

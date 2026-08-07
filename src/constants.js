@@ -6,6 +6,7 @@ import {
   AGENTS as CONFIG_AGENTS,
 } from "./activeConfig.js";
 import { DEFAULT_NAMING_SCHEMA } from "./services/naming.js";
+import { splitCSVLine } from "./services/csvLine.js";
 
 export const DEFAULT_AGENTS = CONFIG_AGENTS;
 
@@ -406,19 +407,25 @@ export const mondayOf = (d) => {
   return copy;
 };
 
-// Parse a weekly metrics CSV — header-driven, order-independent
+// Parse a weekly metrics CSV — header-driven, order-independent.
+//
+// Splits with the shared quote-aware splitter rather than a plain `split(",")`.
+// This is the parser a Meta or GA4 export actually lands in, and those files
+// quote any field containing a comma — a campaign name, a notes cell — so a
+// naive split shifted every column after the first quoted one and imported the
+// resulting garbage without complaint. See services/csvLine.js.
 export function parseMetricsCSV(text) {
   const lines = text.trim().split(/\r?\n/).filter(l=>l.trim());
   if (lines.length < 2) return { rows:[], errors:["File appears empty or has no data rows."] };
 
-  const rawHeaders = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g,"").toLowerCase().replace(/\s+/g,"_"));
+  const rawHeaders = splitCSVLine(lines[0]).map(h => h.toLowerCase().replace(/\s+/g,"_"));
   const mapped = rawHeaders.map(h => METRIC_CSV_ALIASES[h] || h);
 
   const errors = [];
   const rows = [];
 
   for (let i = 1; i < lines.length; i++) {
-    const vals = lines[i].split(",").map(v => v.trim().replace(/^"|"$/g,""));
+    const vals = splitCSVLine(lines[i]);
     if (vals.every(v=>!v)) continue;
     const obj = {};
     rawHeaders.forEach((_, j) => { obj[mapped[j]] = vals[j] || ""; });

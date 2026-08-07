@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "node --test src/services/csv.test.js src/services/naming.test.js src/services/performance.test.js src/services/cadence.test.js src/services/ai/models.test.js src/services/ai/image.test.js src/services/ai/video.test.js src/services/ai/requests.test.js",
+    "test": "node --test src/services/csv.test.js src/services/csvLine.test.js src/services/items.test.js src/services/naming.test.js src/services/performance.test.js src/services/cadence.test.js src/services/ai/models.test.js src/services/ai/image.test.js src/services/ai/video.test.js src/services/ai/requests.test.js",
     "check:contrast": "node scripts/check-contrast.mjs",
     "verify": "npm run lint && npm run test && npm run check:contrast && npm run build"
   },

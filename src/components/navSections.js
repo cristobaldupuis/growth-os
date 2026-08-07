@@ -36,6 +36,7 @@ export const NAV_SECTIONS = [
       { key:"dashboard",   code:"OB", label:"Dashboard",   lab:"Observatory", blurb:"the whole portfolio at a glance" },
       { key:"initiatives", code:"RG", label:"Initiatives", lab:"Register",    blurb:"every experiment and its status" },
       { key:"library",     code:"AR", label:"Library",     lab:"Archive",     blurb:"what closed experiments taught us" },
+      { key:"performance", code:"MS", label:"Performance", lab:"Microscope",  blurb:"what the ad names reveal about spend" },
     ],
   },
   {

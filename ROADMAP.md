@@ -96,17 +96,41 @@ and does not wait on Supabase.
   Session-only by design — see DECISIONS.md for why persisting them needs blob
   storage rather than a bigger JSON blob.
 
+- [x] **Performance import keyed on ad name.** The metrics importer now accepts a
+  campaign-level export as well as the weekly-brand shape, routed by
+  `detectCsvShape` from the file's own headers rather than by asking first. Each
+  row's entity name is parsed through `naming.js` against the channel and the
+  level the header implies, and rows are joined to initiatives with
+  `matchNamesToInitiatives`. Platform export headers ("Amount spent (USD)",
+  "Purchases conversion value", "Impr.") are recognised as they come, and the
+  reader is quote-aware — a campaign name containing a comma used to be able to
+  shift every metric column left.
+- [x] **Breakdown view.** `Performance → Breakdown` pivots spend, conversions,
+  revenue, ROAS and CPA by any dimension the imported names carry, with unparsed
+  and not-in-template counts stated above the pivot rather than hidden. Ratios
+  are recomputed from each group's summed numerator and denominator, never
+  averaged across rows.
+- [x] **Attribution surface.** `Performance → Attribution` keeps the three-way
+  split the bridge was designed around — attributed, untagged (normal BAU
+  spend), and a tag that resolves to nothing (a broken link) — and names the
+  broken ones, since a count is not actionable and the string is.
+- [x] **The convention has a page.** `Performance → Convention` renders the
+  active schema: every channel, every level, every slot in order, with hints and
+  controlled vocabularies. The schema was editable data with no surface at all —
+  the only way to see it was to produce variants in the Creative Studio and read
+  the slot editors, so "where is the naming convention" had no answer.
+
 ### Next in this slice
 
-- [ ] **Performance import keyed on ad name.** Extend the metrics importer to
-  accept a campaign-level export, parse each `name` through `naming.js`, and
-  attach rows to initiatives via the tag. This is what turns the Test Validity
-  panel's hand-entered control/variant counts into real ones.
-- [ ] **Breakdown view.** `breakdownBySegment` already returns the shape; it
-  needs a view that pivots spend and conversions by any segment, with the
-  unparsed count shown rather than hidden.
-- [ ] **Naming schema editor.** The schema is editable data with no editor yet —
-  changing a vocabulary currently means editing the settings blob.
+- [ ] **Naming schema editor.** The Convention tab reads the schema; nothing
+  writes it. Changing a vocabulary still means editing the settings blob.
+- [ ] **Feed measured figures into Test Validity.** The rollup now knows each
+  initiative's real spend, conversions and revenue from its ad names. The Test
+  Validity panel still takes hand-entered control/variant counts.
+- [ ] **Performance rows do not survive the browser.** Capped at 5,000 rows in
+  `localStorage`, oldest dropped on merge with the count reported. This is the
+  read path proven against real exports, deliberately ahead of its storage —
+  Phase 5.3 is where it gets a home that fits.
 
 ---
 

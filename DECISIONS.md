@@ -38,6 +38,51 @@ Architecture decisions worth remembering. The bar for this file is a real tradeo
 
 ---
 
+## One importer, two shapes, routed by the file's own headers
+
+**Decision:** The metrics importer accepts both the weekly-brand contract and a
+campaign-level ad platform export. Which one a file is gets decided by
+`detectCsvShape` reading its headers, not by asking the operator to choose an
+importer first. Campaign rows land in their own store (`KEY_PERF`) rather than
+being coerced into `{date, brand, source, metrics:{}}`.
+
+**Why not one widened contract:** the weekly shape is one row per week per brand
+per source, and its dimensions are columns. A campaign export is one row per
+entity per day, and its dimensions are not columns at all — they are positions
+inside a string. Widening the weekly contract to hold it would either drop the
+name (and with it every dimension the import exists to recover) or redefine
+`brand` as a name field it isn't. Two shapes behind one entry point costs a
+detector; one shape holding both costs the meaning of every field.
+
+**Why detection rather than a picker:** the operator does not experience these as
+two importers. They experience it as the CSV they just downloaded. Detection is
+also cheap to make safe — the preview names the shape it detected, the channel
+it parsed against, and how many rows parsed, all before anything is written. An
+import that resolves 3 of 400 names is almost always the wrong channel, and that
+is a thirty-second fix at the preview and a wrong dashboard afterwards.
+
+**Why the level comes from the header and the channel from the operator:** a Meta
+ad-level export carries campaign, ad set and ad name columns, so the header
+already says which template each name was built from — the finest-grained column
+present is the row's identity. The channel it can't know, so it is asked for, and
+`parseName` runs against a known (channel, level) rather than `identifyName`
+guessing between templates that share a slot count. Detection is still offered
+and still refuses to resolve an ambiguous name, per the parsing decision above.
+
+**What this deliberately does not fix:** the storage. Rows are capped at 5,000 in
+`localStorage`, oldest dropped on merge with the count reported rather than
+truncated quietly. A month of ad-level Meta data does not fit in a browser and no
+amount of care makes it fit — the durable answer is the Phase 5.3 fact table.
+Shipping the read path first is the point: parsing, attribution and the pivot are
+proven against real exports now, so the migration later moves where rows live
+without re-deriving any of the logic that reads them.
+
+**Forcing condition:** the first operator who needs more than a few weeks of
+ad-level history at once. That is Supabase, and it is the same piece of work as
+the campaign fact model — not a bigger cap.
+
+---
+
 ## Creative direction is briefed against an initiative, never standalone
 
 **Decision:** The Creative Studio requires an initiative before it will brief anything, and only offers Draft or Running ones. Generated briefs carry `wouldFalsify` and `claimsToVerify` as required fields.
@@ -249,3 +294,25 @@ Going indigo/slate would solve the same problem by removing the thing that disti
 **The genuine defect:** in light mode `gold` measured 2.42:1 against white — below AA, and applied to the largest, most important figures on the dashboard. Dark mode measured 10.12:1 for the same token. The palette had clearly been tuned in dark mode only. `gold` is now an ink value that passes AA on every surface it lands on, and `goldFill` is a separate bright value used only as a background behind dark text.
 
 **Enforcement:** `npm run check:contrast` validates all 66 themed pairings against WCAG AA and fails CI on regression. The point is that this class of bug is invisible to a build that only checks the app compiles.
+
+**Amendment — hue is not a label.** The palette was defensible and its
+*application* was not: the funnel coverage map, the category chart and the type
+chart each painted every bar a different hue from `CAT_L`/`TYPE_L`, so the
+dashboard carried eight to thirteen simultaneous accent colours competing with
+the figures beside them. Those are magnitude charts. The row is already labelled
+and the bar length already encodes the number, so hue there is decoration that
+costs the palette its meaning everywhere else — once thirteen colours mean
+nothing, the two that do mean something stop being read. All three now draw in
+one ink at one value. The category and type token tables stay, because they still
+do real work on the identity badges, where a colour marks the same category
+across a list rather than distinguishing one bar from its neighbour.
+
+The funnel coverage gap notice also came out of red. A stage with no active work
+is an opportunity worth a hypothesis, and this decision already reserves red for
+blockers and failed outcomes — spending it on the one panel that is prompting
+rather than warning made the loudest element on the dashboard the least
+actionable one.
+
+**What this is not:** a retreat toward the slate/indigo console look argued
+against above. The sand-gold editorial identity is unchanged; what changed is
+that it is now spent where it carries information.

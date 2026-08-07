@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { OUTCOMES, INIT_TYPES, METRIC_SOURCES, OL, OD, TYPE_L, TYPE_D, DEFAULT_SETTINGS, catColor, brandName, iceScore, iceColor, fmtCur, fmtDate, mondayOf, parseNorthStarValue, resolveNorthStar } from "../constants.js";
+import { OUTCOMES, INIT_TYPES, METRIC_SOURCES, OL, OD, DEFAULT_SETTINGS, brandName, iceScore, iceColor, fmtCur, fmtDate, mondayOf, parseNorthStarValue, resolveNorthStar } from "../constants.js";
 import { gG, gGh, gSL, gCd } from "../components/styles.js";
 import { Spark } from "../components/Spark.jsx";
 import { WeeklyStandupModal } from "../components/WeeklyStandupModal.jsx";
@@ -167,7 +167,7 @@ function WeeklyPulseSection({t, brands, weeklyMetrics, onLog, onImport}) {
 // Treats categories as funnel stages and shows, per stage: how many initiatives,
 // average ICE quality, and revenue in play (running + draft estimate). Surfaces
 // thin/empty stages as coverage gaps — the diagnostic artifact for onboarding calls.
-function FunnelCoverageMap({t, dk, items, cats, brands, activeBrand}) {
+function FunnelCoverageMap({t, items, cats, brands, activeBrand}) {
   const normB = id => (!id||id==="default") ? ((brands[0]&&brands[0].id)||"default") : id;
   const scoped = items.filter(e=>activeBrand==="all"||normB(e.brandId)===normB(activeBrand));
   const fmtK = (n) => n===0 ? "$0" : "$"+(n>=1000?Math.round(n/100)/10+"k":Math.round(n).toLocaleString());
@@ -200,20 +200,24 @@ function FunnelCoverageMap({t, dk, items, cats, brands, activeBrand}) {
         <span style={{fontSize:12,fontWeight:600,color:t.gold,fontFamily:t.mono}}>{fmtK(totalRevInPlay)} in play</span>
       </div>
 
+      {/* A coverage gap is an opportunity, not a failure, and red is reserved
+        * for blockers and failed outcomes — spending it here is what made the
+        * loudest element on the dashboard the least actionable one. */}
       {gaps.length>0 && (
-        <div style={{display:"flex",alignItems:"flex-start",gap:8,padding:"9px 12px",borderRadius:9,background:t.redBg,border:"1px solid "+t.red,margin:"10px 0 14px"}}>
-          <span style={{color:t.red,fontSize:13,lineHeight:1.4,flexShrink:0}}>&#9888;</span>
-          <span style={{fontSize:12,color:t.red,fontFamily:t.sans,lineHeight:1.45}}>
+        <div style={{display:"flex",alignItems:"flex-start",gap:8,padding:"9px 12px",borderRadius:9,background:t.goldBg,border:"1px solid "+t.goldBorder,margin:"10px 0 14px"}}>
+          <span style={{fontSize:12,color:t.text,fontFamily:t.sans,lineHeight:1.45}}>
             <strong style={{fontWeight:600}}>{gaps.length} stage{gaps.length>1?"s":""} with no active work:</strong> {gaps.map(g=>g.cat).join(", ")}. These are coverage gaps worth a hypothesis.
           </span>
         </div>
       )}
 
+      {/* One ink for every bar. Hue carries nothing in a magnitude chart — the
+        * row is labelled and the length is the number — so a colour per stage
+        * was decoration competing with the figures beside it. */}
       <div style={{display:"flex",flexDirection:"column",gap:2,marginTop:gaps.length>0?0:12}}>
         {stages.map((s,i)=>{
           const isGap = s.active===0;
           const barPct = Math.max(4,(s.count/maxCount)*100);
-          const accent = catColor(s.cat,cats,dk);
           return (
             <div key={s.cat} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:i<stages.length-1?"1px solid "+t.borderSoft:"none"}}>
               {/* Stage label + count bar */}
@@ -221,17 +225,17 @@ function FunnelCoverageMap({t, dk, items, cats, brands, activeBrand}) {
                 <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:5}}>
                   <span style={{fontSize:13,fontWeight:600,color:isGap?t.textMuted:t.text,fontFamily:t.sans}}>{s.cat}</span>
                   {isGap
-                    ? <span style={{fontSize:10,fontWeight:600,color:t.red,fontFamily:t.mono,letterSpacing:"0.04em"}}>UNCOVERED</span>
+                    ? <span style={{fontSize:10,fontWeight:600,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.04em"}}>UNCOVERED</span>
                     : <span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>{s.running} running · {s.draft} draft · {s.done} done</span>}
                 </div>
                 <div style={{height:7,borderRadius:4,background:t.surfaceAlt,overflow:"hidden"}}>
-                  <div style={{width:barPct+"%",height:"100%",background:isGap?t.border:accent,borderRadius:4,transition:"width .3s"}}/>
+                  <div style={{width:barPct+"%",height:"100%",background:isGap?t.border:t.goldFill,borderRadius:4,transition:"width .3s"}}/>
                 </div>
               </div>
               {/* Quality */}
               <div style={{width:62,textAlign:"right",flexShrink:0}}>
                 <div style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>ICE</div>
-                <div style={{fontSize:14,fontWeight:600,color:s.avgIce!=null?(s.avgIce>=60?t.teal:s.avgIce>=35?t.text:t.textSub):t.textMuted,fontFamily:t.mono,lineHeight:1.2}}>{s.avgIce!=null?s.avgIce:"—"}</div>
+                <div style={{fontSize:14,fontWeight:600,color:s.avgIce!=null?t.text:t.textMuted,fontFamily:t.mono,lineHeight:1.2}}>{s.avgIce!=null?s.avgIce:"—"}</div>
               </div>
               {/* Revenue in play */}
               <div style={{width:74,textAlign:"right",flexShrink:0}}>
@@ -1033,7 +1037,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
       </div>
 
       {/* Funnel coverage map — diagnostic: where work & revenue sit across the funnel */}
-      <FunnelCoverageMap t={t} dk={dk} items={items} cats={cats} brands={brands} activeBrand={activeBrand}/>
+      <FunnelCoverageMap t={t} items={items} cats={cats} brands={brands} activeBrand={activeBrand}/>
 
       {/* Contribution to revenue — three-layer breakdown by category */}
       <ContributionView
@@ -1138,7 +1142,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
                     <span style={{fontSize:12,color:t.textMuted,fontFamily:t.mono}}>{n}</span>
                   </div>
                   <div style={{height:5,background:t.border,borderRadius:3}}>
-                    <div style={{width:pct+"%",height:"100%",borderRadius:3,background:catColor(cat,cats,dk)}}/>
+                    <div style={{width:pct+"%",height:"100%",borderRadius:3,background:t.goldFill}}/>
                   </div>
                 </div>
               );
@@ -1153,7 +1157,6 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           {INIT_TYPES.map(tp=>{
             const n=dash.typeCounts[tp]||0,pct=maxType>0?Math.round((n/maxType)*100):0;
-            const color=(dk?TYPE_D:TYPE_L)[tp]||t.gold;
             return(
               <div key={tp}>
                 <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
@@ -1161,7 +1164,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
                   <span style={{fontSize:12,color:t.textMuted,fontFamily:t.mono}}>{n}</span>
                 </div>
                 <div style={{height:5,background:t.border,borderRadius:3}}>
-                  <div style={{width:pct+"%",height:"100%",borderRadius:3,background:color}}/>
+                  <div style={{width:pct+"%",height:"100%",borderRadius:3,background:t.goldFill}}/>
                 </div>
               </div>
             );

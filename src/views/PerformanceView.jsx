@@ -1,0 +1,449 @@
+import { useState, useMemo } from "react";
+import { gG, gGh, gSL, gCd, gSl } from "../components/styles.js";
+import { fmtCur, fmtDate } from "../constants.js";
+import { resolveSchema, breakdownByDimension, listChannels, listLevels, templateFor, NA } from "../services/naming.js";
+import { availableDimensions, defaultDimension, rollupByInitiative, deriveRatios, ADDITIVE_METRICS, PERF_ROW_LIMIT } from "../services/performance.js";
+
+// -- Performance -----------------------------------------------------------------
+//
+// The read half of the nomenclature engine. Everything before this wrote names;
+// this reads them back and turns them into three answers:
+//
+//   Breakdown    — spend and conversions pivoted by any dimension the names carry.
+//   Attribution  — which spend reached an initiative, and which links are broken.
+//   Convention   — the naming schema itself, in one place you can point a client at.
+//
+// The Convention tab exists because the schema had no surface at all: it was
+// data with an editor's worth of meaning and no page, reachable only by
+// producing variants inside the Creative Studio and reading the slot editors.
+// "Where is the naming convention" had no answer. It is read-only for now — the
+// editor is the next item in this slice — and it says so rather than implying
+// the values are typed here.
+//
+// Colour discipline, deliberately: bars are one ink at one value. Hue carries no
+// information in a magnitude chart — the row is already labelled and the length
+// already encodes the number — so a per-row colour is decoration that reads as
+// noise. Colour is spent only where it means something: a broken attribution
+// link, and an unparsed share of spend.
+
+const TABS = [
+  { key: "breakdown",  label: "Breakdown",   blurb: "pivot spend and conversions by any dimension in the name" },
+  { key: "attribution", label: "Attribution", blurb: "which spend reached an initiative, and which links are broken" },
+  { key: "convention", label: "Convention",  blurb: "the naming schema every name is built and parsed against" },
+];
+
+const fmtNum = (n) => n == null ? "—" : Math.round(n).toLocaleString();
+const fmtRatio = (n, suffix = "") => n == null ? "—" : (Math.round(n * 100) / 100).toFixed(2) + suffix;
+
+/** One bar in a magnitude list. Single ink, single width — see the note above. */
+function Bar({ t, pct, muted }) {
+  return (
+    <div style={{ height: 6, borderRadius: 3, background: t.surfaceAlt, overflow: "hidden" }}>
+      <div style={{ width: Math.max(2, pct) + "%", height: "100%", borderRadius: 3, background: muted ? t.border : t.goldFill, transition: "width .3s" }} />
+    </div>
+  );
+}
+
+function Empty({ t, title, body, action }) {
+  return (
+    <div style={{ ...gCd(t), textAlign: "center", padding: "34px 22px" }}>
+      <div style={{ fontFamily: t.serif, fontSize: 16, fontWeight: 600, color: t.text, marginBottom: 7 }}>{title}</div>
+      <div style={{ fontSize: 13, color: t.textSub, fontFamily: t.serif, lineHeight: 1.65, maxWidth: 520, margin: "0 auto 16px" }}>{body}</div>
+      {action}
+    </div>
+  );
+}
+
+export function PerformanceView({ t, items, settings, perfRows, onImport, onClear }) {
+  const schema = resolveSchema(settings);
+  const [tab, setTab] = useState("breakdown");
+  const [dimKey, setDimKey] = useState("");
+  const [sortBy, setSortBy] = useState("spend");
+  const [convChannel, setConvChannel] = useState(listChannels(schema)[0]?.id || "meta");
+
+  const rows = useMemo(() => perfRows || [], [perfRows]);
+  const dims = useMemo(() => availableDimensions(rows, schema), [rows, schema]);
+  // Falls back to the dimension that splits the data rather than to registry
+  // order, so the view opens on a pivot with something to compare.
+  const fallback = useMemo(() => defaultDimension(rows, schema), [rows, schema]);
+  const dim  = dims.find(d => d.key === dimKey) || fallback;
+
+  const roll = useMemo(() => rollupByInitiative(rows, items, schema), [rows, items, schema]);
+
+  const breakdown = useMemo(
+    () => dim ? breakdownByDimension(rows, dim.key, schema) : { groups: [], unparsed: 0, notInTemplate: 0 },
+    [rows, dim, schema]
+  );
+
+  const totals = useMemo(() => {
+    const m = {};
+    rows.forEach(r => ADDITIVE_METRICS.forEach(k => { const v = r.metrics?.[k]; if (typeof v === "number") m[k] = (m[k] || 0) + v; }));
+    return { metrics: m, ratios: deriveRatios(m) };
+  }, [rows]);
+
+  const dateRange = useMemo(() => {
+    const dates = rows.map(r => r.date).filter(Boolean).sort();
+    return dates.length ? { from: dates[0], to: dates[dates.length - 1] } : null;
+  }, [rows]);
+
+  const sorted = useMemo(() => {
+    const g = [...breakdown.groups];
+    if (sortBy === "rows") return g.sort((a, b) => b.rows - a.rows);
+    return g.sort((a, b) => (b.metrics[sortBy] || 0) - (a.metrics[sortBy] || 0));
+  }, [breakdown, sortBy]);
+
+  const maxVal = sorted.reduce((m, g) => Math.max(m, sortBy === "rows" ? g.rows : (g.metrics[sortBy] || 0)), 0);
+
+  const importBtn = <button onClick={onImport} style={{ ...gG(t), display: "inline-flex" }}>&#8645; Import performance CSV</button>;
+
+  return (
+    <div style={{ maxWidth: 1180, margin: "0 auto", padding: "0 20px 60px" }}>
+
+      {/* Header */}
+      <div style={{ margin: "22px 0 18px", display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 14, flexWrap: "wrap" }}>
+        <div>
+          <h2 style={{ fontFamily: t.serif, fontSize: 24, fontWeight: 600, margin: 0, color: t.text }}>Performance</h2>
+          <p style={{ fontSize: 13, color: t.textSub, margin: "6px 0 0", maxWidth: 700, lineHeight: 1.6 }}>
+            Import a campaign-level export and every ad name is parsed back through your naming convention. That turns
+            a flat spend report into a dimensional one, and joins the rows that carry a tracking tag to the initiative
+            they belong to — no API integration involved.
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {rows.length > 0 && <button onClick={onClear} style={gGh(t)}>Clear imported data</button>}
+          <button onClick={onImport} style={gG(t)}>&#8645; Import CSV</button>
+        </div>
+      </div>
+
+      {/* Corpus summary — what is loaded, before any tab makes a claim about it */}
+      {rows.length > 0 && (
+        <div style={{ ...gCd(t), marginBottom: 16, display: "flex", gap: 22, flexWrap: "wrap", alignItems: "baseline" }}>
+          {[
+            ["Rows", rows.length.toLocaleString()],
+            ["Spend", fmtCur(Math.round(totals.metrics.spend || 0))],
+            ["Conversions", fmtNum(totals.metrics.conversions)],
+            ["Revenue", fmtCur(Math.round(totals.metrics.revenue || 0))],
+            ["ROAS", fmtRatio(totals.ratios.roas, "x")],
+            ["Window", dateRange ? `${fmtDate(dateRange.from)} → ${fmtDate(dateRange.to)}` : "no dates in file"],
+          ].map(([label, value]) => (
+            <div key={label}>
+              <div style={gSL(t)}>{label}</div>
+              <div style={{ fontFamily: t.mono, fontSize: 15, fontWeight: 700, color: t.text, lineHeight: 1.1 }}>{value}</div>
+            </div>
+          ))}
+          {rows.length >= PERF_ROW_LIMIT && (
+            <div style={{ fontSize: 11.5, color: t.warn, fontFamily: t.serif, flexBasis: "100%", lineHeight: 1.5 }}>
+              At the {PERF_ROW_LIMIT.toLocaleString()}-row browser storage ceiling. The oldest rows are dropped as new
+              ones import — narrow the export's date range, or wait for the Postgres fact table.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tabs */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 16, flexWrap: "wrap" }}>
+        {TABS.map(tb => (
+          <button key={tb.key} onClick={() => setTab(tb.key)} title={tb.blurb}
+            style={{
+              fontSize: 12.5, padding: "7px 14px", borderRadius: 9, cursor: "pointer", fontFamily: t.sans,
+              fontWeight: tab === tb.key ? 600 : 500,
+              background: tab === tb.key ? t.surface : "transparent",
+              border: "1px solid " + (tab === tb.key ? t.border : "transparent"),
+              color: tab === tb.key ? t.text : t.textMuted,
+              boxShadow: tab === tb.key ? t.shadow : "none",
+            }}>
+            {tb.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ---------------------------------------------------------------- Breakdown */}
+      {tab === "breakdown" && (
+        rows.length === 0 ? (
+          <Empty t={t}
+            title="No performance data imported yet"
+            body="Export a campaign, ad set or ad-level report from Meta or Google Ads and drop it in. Column order does not
+                  matter and the usual export headers — Amount spent, Purchases conversion value, Impr. — are recognised
+                  as they come."
+            action={importBtn} />
+        ) : !dim ? (
+          <Empty t={t}
+            title="Nothing parsed against the convention"
+            body="Every name in the file failed to match a template, so there are no dimensions to pivot by. The Attribution
+                  tab lists what was rejected and why — the usual cause is picking the wrong channel at import, or names
+                  written before the convention existed."
+            action={<button onClick={() => setTab("attribution")} style={{ ...gG(t), display: "inline-flex" }}>See what failed</button>} />
+        ) : (
+          <>
+            <div style={{ ...gCd(t), marginBottom: 14, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+              <div>
+                <div style={gSL(t)}>Break down by</div>
+                <select value={dim.key} onChange={e => setDimKey(e.target.value)} style={{ ...gSl(t), width: 210 }}>
+                  {dims.map(d => <option key={d.key} value={d.key}>{d.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <div style={gSL(t)}>Rank by</div>
+                <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={{ ...gSl(t), width: 150 }}>
+                  <option value="spend">Spend</option>
+                  <option value="conversions">Conversions</option>
+                  <option value="revenue">Revenue</option>
+                  <option value="clicks">Clicks</option>
+                  <option value="impressions">Impressions</option>
+                  <option value="rows">Row count</option>
+                </select>
+              </div>
+              <div style={{ flex: 1, minWidth: 220, fontSize: 12, color: t.textMuted, fontFamily: t.serif, lineHeight: 1.55 }}>
+                {dim.hint}
+              </div>
+            </div>
+
+            {/* Coverage. Reported above the pivot rather than in a footnote,
+                because a breakdown that quietly excludes a third of spend is
+                worse than one that admits it. */}
+            {(breakdown.unparsed > 0 || breakdown.notInTemplate > 0) && (
+              <div style={{ marginBottom: 12, padding: "9px 12px", borderRadius: 9, background: t.warnBg, border: "1px solid " + t.warnBorder,
+                fontSize: 12, color: t.text, fontFamily: t.serif, lineHeight: 1.55 }}>
+                Not in this pivot:{" "}
+                {breakdown.unparsed > 0 && <><strong>{breakdown.unparsed}</strong> row{breakdown.unparsed !== 1 ? "s" : ""} whose name did not parse</>}
+                {breakdown.unparsed > 0 && breakdown.notInTemplate > 0 && ", "}
+                {breakdown.notInTemplate > 0 && <><strong>{breakdown.notInTemplate}</strong> row{breakdown.notInTemplate !== 1 ? "s" : ""} whose template has no {dim.label} slot</>}
+                . They are excluded from the figures below, not from the import.
+              </div>
+            )}
+
+            <div style={gCd(t)}>
+              <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.6fr) repeat(5, minmax(64px,0.7fr))", gap: 10, paddingBottom: 8, borderBottom: "1px solid " + t.border }}>
+                {[dim.label, "Spend", "Conv.", "Revenue", "ROAS", "CPA"].map((h, i) => (
+                  <div key={h} style={{ ...gSL(t), marginBottom: 0, textAlign: i === 0 ? "left" : "right" }}>{h}</div>
+                ))}
+              </div>
+              {sorted.map(g => {
+                const r = deriveRatios(g.metrics);
+                const val = sortBy === "rows" ? g.rows : (g.metrics[sortBy] || 0);
+                const isPlaceholder = String(g.value).toUpperCase() === NA;
+                return (
+                  <div key={g.value} style={{ padding: "11px 0", borderBottom: "1px solid " + t.borderSoft }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.6fr) repeat(5, minmax(64px,0.7fr))", gap: 10, alignItems: "baseline" }}>
+                      <div style={{ minWidth: 0 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: isPlaceholder ? t.textMuted : t.text, fontFamily: t.sans, wordBreak: "break-word" }}>
+                          {g.value}
+                        </span>
+                        <span style={{ fontSize: 11, color: t.textMuted, fontFamily: t.mono, marginLeft: 7 }}>{g.rows} row{g.rows !== 1 ? "s" : ""}</span>
+                      </div>
+                      <div style={{ textAlign: "right", fontFamily: t.mono, fontSize: 13, color: t.text }}>{fmtCur(Math.round(g.metrics.spend || 0))}</div>
+                      <div style={{ textAlign: "right", fontFamily: t.mono, fontSize: 13, color: t.textSub }}>{fmtNum(g.metrics.conversions)}</div>
+                      <div style={{ textAlign: "right", fontFamily: t.mono, fontSize: 13, color: t.textSub }}>{fmtCur(Math.round(g.metrics.revenue || 0))}</div>
+                      <div style={{ textAlign: "right", fontFamily: t.mono, fontSize: 13, fontWeight: 600, color: t.text }}>{fmtRatio(r.roas, "x")}</div>
+                      <div style={{ textAlign: "right", fontFamily: t.mono, fontSize: 13, color: t.textSub }}>{r.cpa == null ? "—" : fmtCur(Math.round(r.cpa))}</div>
+                    </div>
+                    <div style={{ marginTop: 7 }}>
+                      <Bar t={t} pct={maxVal > 0 ? (val / maxVal) * 100 : 0} muted={isPlaceholder} />
+                    </div>
+                  </div>
+                );
+              })}
+              <div style={{ paddingTop: 10, fontSize: 11.5, color: t.textMuted, fontFamily: t.serif, lineHeight: 1.55 }}>
+                ROAS and CPA are recomputed from each group's summed revenue, spend and conversions — never averaged
+                across rows, which would give a $12 ad set the same weight as a $12,000 one.
+              </div>
+            </div>
+          </>
+        )
+      )}
+
+      {/* -------------------------------------------------------------- Attribution */}
+      {tab === "attribution" && (
+        rows.length === 0 ? (
+          <Empty t={t}
+            title="No performance data imported yet"
+            body="Attribution needs rows to attribute. Import a campaign-level export and any ad whose name ends in an
+                  initiative's tracking tag will be joined to it automatically."
+            action={importBtn} />
+        ) : (
+          <>
+            {/* The three-way split, kept three-way on purpose: untagged spend is
+                normal business as usual, an unresolvable tag is a broken link. */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 12, marginBottom: 16 }}>
+              {[
+                { key: "matched",  label: "Attributed",  note: "joined to an initiative" },
+                { key: "untagged", label: "Untagged",    note: "no tag in the name — normal for BAU spend" },
+                { key: "unmatched",label: "Broken links",note: "carries a tag that resolves to nothing", alarm: true },
+                { key: "unparsed", label: "Unparsed",    note: "name does not fit any template", alarm: true },
+              ].map(c => {
+                const n = roll.counts[c.key] || 0;
+                const s = roll.spend[c.key] || 0;
+                const live = c.alarm && n > 0;
+                return (
+                  <div key={c.key} style={{ ...gCd(t), borderColor: live ? t.warnBorder : t.border, background: live ? t.warnBg : t.surface }}>
+                    <div style={gSL(t)}>{c.label}</div>
+                    <div style={{ fontFamily: t.mono, fontSize: 22, fontWeight: 700, color: t.text, lineHeight: 1.1 }}>{n.toLocaleString()}</div>
+                    <div style={{ fontFamily: t.mono, fontSize: 12, color: t.textSub, marginTop: 2 }}>{fmtCur(Math.round(s))} spend</div>
+                    <div style={{ fontSize: 11, color: t.textMuted, fontFamily: t.serif, marginTop: 6, lineHeight: 1.45 }}>{c.note}</div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Measured performance per initiative */}
+            <div style={{ ...gCd(t), marginBottom: 14 }}>
+              <div style={gSL(t)}>Measured performance by initiative</div>
+              {roll.groups.length === 0 ? (
+                <div style={{ fontSize: 13, color: t.textSub, fontFamily: t.serif, lineHeight: 1.6 }}>
+                  Nothing joined. An ad name attributes to an initiative when its final slot holds that initiative's
+                  tracking tag — set one in the Creative Studio, and every name it builds carries it from then on.
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: "grid", gridTemplateColumns: "minmax(0,2fr) repeat(4, minmax(60px,0.7fr))", gap: 10, paddingBottom: 8, borderBottom: "1px solid " + t.border }}>
+                    {["Initiative", "Spend", "Conv.", "Revenue", "ROAS"].map((h, i) => (
+                      <div key={h} style={{ ...gSL(t), marginBottom: 0, textAlign: i === 0 ? "left" : "right" }}>{h}</div>
+                    ))}
+                  </div>
+                  {roll.groups.map(g => (
+                    <div key={g.initiativeId} style={{ display: "grid", gridTemplateColumns: "minmax(0,2fr) repeat(4, minmax(60px,0.7fr))", gap: 10, padding: "11px 0", borderBottom: "1px solid " + t.borderSoft, alignItems: "baseline" }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: t.text, fontFamily: t.sans }}>
+                          {g.initiative?.initId ? g.initiative.initId + " · " : ""}{g.initiative?.title || "Unknown"}
+                        </div>
+                        <div style={{ fontSize: 11, color: t.textMuted, fontFamily: t.mono, marginTop: 2 }}>
+                          {g.trackingTag} · {g.names.length} ad{g.names.length !== 1 ? "s" : ""} · {g.rows} row{g.rows !== 1 ? "s" : ""}
+                          {g.firstDate ? ` · ${fmtDate(g.firstDate)} → ${fmtDate(g.lastDate)}` : ""}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right", fontFamily: t.mono, fontSize: 13, color: t.text }}>{fmtCur(Math.round(g.metrics.spend || 0))}</div>
+                      <div style={{ textAlign: "right", fontFamily: t.mono, fontSize: 13, color: t.textSub }}>{fmtNum(g.metrics.conversions)}</div>
+                      <div style={{ textAlign: "right", fontFamily: t.mono, fontSize: 13, color: t.textSub }}>{fmtCur(Math.round(g.metrics.revenue || 0))}</div>
+                      <div style={{ textAlign: "right", fontFamily: t.mono, fontSize: 13, fontWeight: 600, color: t.text }}>{fmtRatio(g.ratios.roas, "x")}</div>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+
+            {/* Broken links, named. A count is not actionable; the string is. */}
+            {(() => {
+              const broken = [...new Map(roll.rows.filter(r => r.attribution === "unmatched").map(r => [r.name, r])).values()];
+              const bad    = [...new Map(roll.rows.filter(r => r.attribution === "unparsed").map(r => [r.name, r])).values()];
+              if (broken.length === 0 && bad.length === 0) return null;
+              return (
+                <div style={gCd(t)}>
+                  <div style={gSL(t)}>Needs a look</div>
+                  {broken.length > 0 && (
+                    <div style={{ marginBottom: bad.length ? 14 : 0 }}>
+                      <div style={{ fontSize: 12.5, color: t.text, fontFamily: t.serif, marginBottom: 7, lineHeight: 1.55 }}>
+                        <strong>{broken.length} name{broken.length !== 1 ? "s" : ""} carry a tracking tag that matches no initiative.</strong>{" "}
+                        Either the initiative was deleted, or the tag was typed rather than stamped.
+                      </div>
+                      {broken.slice(0, 12).map(r => (
+                        <div key={r.name} style={{ display: "flex", gap: 8, alignItems: "baseline", padding: "4px 0", flexWrap: "wrap" }}>
+                          <code style={{ fontFamily: t.mono, fontSize: 11, color: t.warn, fontWeight: 700 }}>{r.trackingTag}</code>
+                          <span style={{ fontFamily: t.mono, fontSize: 10.5, color: t.textMuted, wordBreak: "break-all" }}>{r.name}</span>
+                        </div>
+                      ))}
+                      {broken.length > 12 && <div style={{ fontSize: 11, color: t.textMuted, fontFamily: t.serif, marginTop: 4 }}>…and {broken.length - 12} more.</div>}
+                    </div>
+                  )}
+                  {bad.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: 12.5, color: t.text, fontFamily: t.serif, marginBottom: 7, lineHeight: 1.55 }}>
+                        <strong>{bad.length} name{bad.length !== 1 ? "s" : ""} did not parse.</strong>{" "}
+                        These are counted in every total but contribute to no dimension — parsing refuses to guess at an
+                        alignment rather than mis-attributing the row.
+                      </div>
+                      {bad.slice(0, 8).map(r => (
+                        <div key={r.name} style={{ padding: "4px 0" }}>
+                          <div style={{ fontFamily: t.mono, fontSize: 10.5, color: t.textSub, wordBreak: "break-all" }}>{r.name}</div>
+                          <div style={{ fontSize: 11, color: t.textMuted, fontFamily: t.serif, lineHeight: 1.45 }}>{r.parseErrors?.[0]}</div>
+                        </div>
+                      ))}
+                      {bad.length > 8 && <div style={{ fontSize: 11, color: t.textMuted, fontFamily: t.serif, marginTop: 4 }}>…and {bad.length - 8} more.</div>}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </>
+        )
+      )}
+
+      {/* --------------------------------------------------------------- Convention */}
+      {tab === "convention" && (
+        <>
+          <div style={{ ...gCd(t), marginBottom: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
+              <div style={{ minWidth: 0, flex: "1 1 340px" }}>
+                <div style={gSL(t)}>Active schema</div>
+                <div style={{ fontFamily: t.serif, fontSize: 16, fontWeight: 600, color: t.text }}>{schema.label}</div>
+                <div style={{ fontFamily: t.mono, fontSize: 11, color: t.textMuted, marginTop: 3 }}>
+                  {schema.id} · delimiter <strong>{schema.delimiter}</strong> · placeholder <strong>{schema.placeholder || NA}</strong>
+                  {schema.initiativeDimension ? ` · initiative slot "${schema.initiativeDimension}"` : ""}
+                </div>
+              </div>
+              <select value={convChannel} onChange={e => setConvChannel(e.target.value)} style={{ ...gSl(t), width: 170 }}>
+                {listChannels(schema).map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+              </select>
+            </div>
+            <p style={{ fontSize: 12.5, color: t.textSub, fontFamily: t.serif, lineHeight: 1.65, margin: "12px 0 0", maxWidth: 720 }}>
+              Two rules make positional parsing safe, and both are enforced in code rather than by discipline: a slot is
+              never omitted or reordered — an absent value is written <code style={{ fontFamily: t.mono }}>{schema.placeholder || NA}</code> —
+              and the delimiter never appears inside a value. Names are assembled by the builder, never typed, which is
+              why an export from three months ago still parses today. This view is read-only; a schema editor is the
+              next item in this slice.
+            </p>
+          </div>
+
+          {/* Levels — one record projects into all of them at once */}
+          {listLevels(schema, convChannel).map(level => {
+            const tpl = templateFor(schema, convChannel, level.key);
+            return (
+              <div key={level.key} style={{ ...gCd(t), marginBottom: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, flexWrap: "wrap", marginBottom: 9 }}>
+                  <div style={{ ...gSL(t), marginBottom: 0 }}>{level.label} name</div>
+                  <div style={{ fontFamily: t.mono, fontSize: 10.5, color: t.textMuted }}>{tpl.length} slots</div>
+                </div>
+                <div style={{ fontFamily: t.mono, fontSize: 11.5, color: t.text, background: t.surfaceAlt, border: "1px solid " + t.border,
+                  borderRadius: 9, padding: "9px 11px", wordBreak: "break-all", lineHeight: 1.7 }}>
+                  {tpl.map(d => d.label).join(schema.delimiter)}
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 1, marginTop: 10 }}>
+                  {tpl.map((d, i) => (
+                    <div key={d.key} style={{ display: "flex", gap: 10, padding: "7px 0", borderBottom: i < tpl.length - 1 ? "1px solid " + t.borderSoft : "none" }}>
+                      <span style={{ fontFamily: t.mono, fontSize: 10, color: t.textMuted, width: 20, flexShrink: 0, paddingTop: 2 }}>{i + 1}</span>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ display: "flex", gap: 7, alignItems: "baseline", flexWrap: "wrap" }}>
+                          <span style={{ fontSize: 12.5, fontWeight: 600, color: t.text, fontFamily: t.sans }}>{d.label}</span>
+                          <span style={{ fontFamily: t.mono, fontSize: 10, color: t.textMuted }}>{d.key}</span>
+                          {d.key === schema.initiativeDimension && (
+                            <span style={{ fontFamily: t.mono, fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase",
+                              color: t.gold, border: "1px solid " + t.goldBorder, borderRadius: 4, padding: "1px 6px" }}>
+                              Growth OS bridge
+                            </span>
+                          )}
+                          {!d.vocab && (
+                            <span style={{ fontFamily: t.mono, fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: t.textMuted }}>
+                              free text
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: 11.5, color: t.textMuted, fontFamily: t.serif, lineHeight: 1.5, marginTop: 2 }}>{d.hint}</div>
+                        {d.vocab && (
+                          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 5 }}>
+                            {d.vocab.map(v => (
+                              <span key={v} style={{ fontFamily: t.mono, fontSize: 10, color: t.textSub, background: t.surfaceAlt,
+                                border: "1px solid " + t.border, borderRadius: 4, padding: "1px 6px" }}>{v}</span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </>
+      )}
+    </div>
+  );
+}

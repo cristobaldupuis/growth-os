@@ -37,7 +37,7 @@ Built to demonstrate how a Director of Growth thinks about velocity, incremental
 ## Core features
 
 ### Multi-brand portfolio management
-Cross-tenant architecture — filter the dashboard, pipeline, and learning library across multiple retailers in a single workspace. Auto-generated initiative IDs scoped per brand (e.g. `NH-001`, `R2-003`).
+Cross-tenant architecture — filter the dashboard, pipeline, and learning library across multiple retailers in a single workspace. Auto-generated initiative IDs scoped per brand (e.g. `NH-001`, `PS-003`).
 
 ### Performance dashboard
 Tracks revenue impacted by completed tests, active revenue at risk, and a running calibration score comparing estimated vs. actual revenue outcomes. One-click executive summary generator for stakeholder updates.
@@ -170,7 +170,7 @@ Each retailer carries a structured brief injected into every AI call:
 - **Relationship** — own brand, wholesale, marketplace
 - **Current constraint** — what's holding this retailer back
 
-This is what makes recommendations specific — instead of "test SMS cart recovery at Retailer 2," the agent reasons about their specific buyer's consideration window and adjusts the mechanic accordingly.
+This is what makes recommendations specific — instead of "test SMS cart recovery at Peak Season," the agent reasons about their specific buyer's consideration window and adjusts the mechanic accordingly.
 
 ---
 
@@ -195,21 +195,28 @@ This is what makes recommendations specific — instead of "test SMS cart recove
 src/
   App.jsx              # Orchestration layer
   activeConfig.js      # Re-export barrel — the one line that switches which config.*.js is live
-  config.js            # Generic deployment context — brands, agents, categories, seed data
+  config.js            # Generic deployment context — brands, briefs, agents, categories, seed data
   config.[client].js   # Per-client copy of config.js (e.g. config.csc.js)
   constants.js         # Theme tokens, status/outcome palettes, ICE scoring, formatters
   views/               # DashView, TriageView, LearningLibrary, DetailView, ClientReadoutView, CreativeStudio, CopilotPanel
   components/          # Shared UI atoms
   services/
     store.js           # Backend-agnostic persistence with explicit write-failure reporting
+    items.js           # Save-time bookkeeping — stamps updatedAt only on what changed
     portfolio.js       # Portfolio context + tool definitions passed to the agents
     naming.js          # Campaign nomenclature — build/parse/validate, and the initiative bridge
+    performance.js     # Campaign-level export ingestion, parsed back through the naming schema
     csv.js             # Import/export and record normalisation
+    csvLine.js         # The one quote-aware CSV line splitter, shared by every importer
+    seedRebase.js      # Shifts each config's authored demo timeline onto today, derives weekly figures
+    cadence.js         # Rolling activity windows for the initiative rails
     ai/
       models.js        # Model tier selection, effort, prompt-cache policy
       call*.js         # One file per AI feature
 api/
   proxy.js             # Serverless Anthropic proxy — origin allowlist, request-shape bounds, durable rate limiting
+  image.js             # Gemini image generation, bounded on count rather than tokens
+  video.js             # Talking-head avatar render — submit/poll, bounded on script length
 scripts/
   check-contrast.mjs   # Fails the build if any themed pairing drops below WCAG AA
 ```

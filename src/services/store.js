@@ -12,6 +12,10 @@ export const KEY_CREATIVE = "gos_creative_v1";
 // services/performance.js — a browser store is a provisional home for these.
 export const KEY_PERF     = "gos_perf_v1";
 export const KEY_LIB_VIEW = "gos_lib_view_v1";
+// Sidebar collapsed state. A layout preference, so it persists like the theme
+// does — being asked to re-collapse the rail on every load is the kind of small
+// friction that makes a tool feel like it is not listening.
+export const KEY_RAIL     = "gos_rail_v1";
 export const KEY_TOUR_SEEN = "gos_tour_seen_v1";
 
 // Storage helper — works in Claude artifacts (window.storage), StackBlitz

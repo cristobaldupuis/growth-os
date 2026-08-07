@@ -8,7 +8,7 @@ import {
   DEMO_MODE,
 } from "./activeConfig.js";
 
-import { KEY_ITEMS, KEY_SETTINGS, KEY_DEBATES, KEY_METRICS, KEY_RECS, KEY_CREATIVE, KEY_PERF, KEY_THEME, KEY_LIB_VIEW, KEY_TOUR_SEEN, store, onWriteError, handleDownloadBackup, handleRestoreBackup } from "./services/store.js";
+import { KEY_ITEMS, KEY_SETTINGS, KEY_DEBATES, KEY_METRICS, KEY_RECS, KEY_CREATIVE, KEY_PERF, KEY_THEME, KEY_LIB_VIEW, KEY_RAIL, KEY_TOUR_SEEN, store, onWriteError, handleDownloadBackup, handleRestoreBackup } from "./services/store.js";
 import { CreativeStudio } from "./views/CreativeStudio.jsx";
 import { PerformanceView } from "./views/PerformanceView.jsx";
 import { resolveSchema, listChannels } from "./services/naming.js";
@@ -39,6 +39,7 @@ import { Modal } from "./components/Modal.jsx";
 import { GuidedTour } from "./components/GuidedTour.jsx";
 import { TOUR_STEPS } from "./components/tourSteps.js";
 import { CBar } from "./components/CBar.jsx";
+import { interactive } from "./components/motion.js";
 import { EAlert } from "./components/EAlert.jsx";
 import { FR } from "./components/FR.jsx";
 import { CitationModal } from "./components/citation.jsx";
@@ -521,6 +522,9 @@ export default function App() {
   // 216px column would do the same, so on narrow screens it slides over rather
   // than taking width from the content.
   const [navOpen, setNavOpen] = useState(false);
+  // Desktop rail collapsed to icons. Persisted — see store.js.
+  const [railCollapsed, setRailCollapsed] = useState(false);
+  const toggleRail = () => setRailCollapsed(c => { const next = !c; store.set(KEY_RAIL, next ? "1" : "0"); return next; });
 
   const t    = dk ? TD : TL;
   const cats   = settings.categories || DEFAULT_SETTINGS.categories;
@@ -534,11 +538,12 @@ export default function App() {
 
     const load = async ()=>{
       try {
-        const [ir,sr,dr,mr,rr,tr,lv,ts,cr,pr] = await Promise.all([store.get(KEY_ITEMS),store.get(KEY_SETTINGS),store.get(KEY_DEBATES),store.get(KEY_METRICS),store.get(KEY_RECS),store.get(KEY_THEME),store.get(KEY_LIB_VIEW),store.get(KEY_TOUR_SEEN),store.get(KEY_CREATIVE),store.get(KEY_PERF)]);
+        const [ir,sr,dr,mr,rr,tr,lv,ts,cr,pr,rc] = await Promise.all([store.get(KEY_ITEMS),store.get(KEY_SETTINGS),store.get(KEY_DEBATES),store.get(KEY_METRICS),store.get(KEY_RECS),store.get(KEY_THEME),store.get(KEY_LIB_VIEW),store.get(KEY_TOUR_SEEN),store.get(KEY_CREATIVE),store.get(KEY_PERF),store.get(KEY_RAIL)]);
         // Read theme from the resolved store before first render (gated on `loaded`),
         // so the persisted choice applies without an async flash.
         if(tr&&tr.value) setDk(tr.value==="dark");
         if(lv&&lv.value==="grid") setLibView("grid");
+        if(rc&&rc.value==="1") setRailCollapsed(true);
         setItems(ir&&ir.value?JSON.parse(ir.value):SEED);
         if(!ir||!ir.value) store.set(KEY_ITEMS,JSON.stringify(SEED));
         const isFirstVisit = !sr || !sr.value;
@@ -961,10 +966,17 @@ export default function App() {
   const cadWindow = useMemo(()=>cadenceWindow(14),[]);
   const cadLabel  = useMemo(()=>windowLabel(cadWindow),[cadWindow]);
 
-  const renderInitiativeCard = (item)=>(
-    <div key={item.id} onClick={()=>goDetail(item.id,"initiatives")} style={{...gCd(t),cursor:"pointer",padding:"14px 16px",transition:"border-color .15s, box-shadow .15s, transform .15s"}}
-      onMouseEnter={e=>{setHoverId(item.id);e.currentTarget.style.borderColor=t.goldBorder;e.currentTarget.style.boxShadow=t.shadowHi;e.currentTarget.style.transform="translateY(-1px)";}}
-      onMouseLeave={e=>{setHoverId(null);e.currentTarget.style.borderColor=t.border;e.currentTarget.style.boxShadow=t.shadow;e.currentTarget.style.transform="none";}}>
+  // The lift and the border recolour used to be hand-rolled here, and were the
+  // only hover state in the app that did this. Both now come from the shared
+  // primitive, so a card in the Register, the Library and Triage answer the
+  // pointer identically. The rail colour is the item's status, which is the one
+  // thing about a row worth saying in colour.
+  const renderInitiativeCard = (item,idx)=>(
+    <div key={item.id} onClick={()=>goDetail(item.id,"initiatives")}
+      {...(()=>{const p=interactive(t,(dk?SD:SL)[item.status]?.border||t.goldBorder,{index:idx});
+        return {className:p.className, style:{...gCd(t),...p.style,cursor:"pointer",padding:"14px 16px 14px 18px"}};})()}
+      onMouseEnter={e=>{setHoverId(item.id);e.currentTarget.style.borderColor=t.goldBorder;e.currentTarget.style.boxShadow=t.shadowHi;}}
+      onMouseLeave={e=>{setHoverId(null);e.currentTarget.style.borderColor=t.border;e.currentTarget.style.boxShadow=t.shadow;}}>
       {/* Row 1: title (lead) + ICE/revenue anchors */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
         <div style={{flex:"1 1 auto",minWidth:0}}>
@@ -1285,8 +1297,10 @@ export default function App() {
       <div style={{display:"flex",alignItems:"flex-start",minHeight:"100vh"}}>
 
         {/* Desktop rail */}
-        <aside className="gos-rail" style={{width:216,flexShrink:0,position:"sticky",top:0,height:"100vh"}}>
+        <aside className="gos-rail" style={{width:railCollapsed?58:216,flexShrink:0,position:"sticky",top:0,height:"100vh",
+          transition:"width .22s cubic-bezier(.2,.7,.3,1)"}}>
           <Sidebar t={t} dk={dk} nav={nav} onNav={setNav} counts={navCounts}
+            collapsed={railCollapsed} onToggleCollapse={toggleRail}
             brands={brands} activeBrand={activeBrand} setActiveBrand={setActiveBrand}
             demoMode={DEMO_MODE} onResetDemo={()=>setShowResetConfirm(true)}
             onTour={()=>{setTourStep(0);setShowTour(true);}}

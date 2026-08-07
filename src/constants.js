@@ -247,6 +247,11 @@ export const TL = {
   teal:"#0F7A5A", tealBg:"#E2F2EC", red:"#B23A20", redBg:"#FBEAE5",
   warn:"#8A5A0B", warnBg:"#FDF4E3", warnBorder:"#E0C176",
   headerBg:"#FFFFFF", inputBg:"#FFFFFF", inputBorder:"#D8D4CA",
+  // Specular highlight for the hover charge sweep. Not a palette colour — it is
+  // a lighting effect over whatever accent the bar is already painted in, which
+  // is why it is an alpha white rather than a hue and why check-contrast has
+  // nothing to say about it.
+  spark:"rgba(255,255,255,0.62)",
   shadow:"0 1px 2px rgba(40,38,30,0.04), 0 4px 14px rgba(40,38,30,0.06)",
   shadowHi:"0 2px 6px rgba(40,38,30,0.06), 0 12px 30px rgba(40,38,30,0.10)",
   mono:FONT_MONO, sans:FONT_SANS, serif:FONT_SERIF,
@@ -260,6 +265,7 @@ export const TD = {
   teal:"#43C79A", tealBg:"#10241E", red:"#E8836B", redBg:"#2A1512",
   warn:"#E0B155", warnBg:"#241D10", warnBorder:"#5A4820",
   headerBg:"#0E0F12", inputBg:"#16181D", inputBorder:"#2C303A",
+  spark:"rgba(255,255,255,0.34)",
   shadow:"0 1px 2px rgba(0,0,0,0.4), 0 4px 16px rgba(0,0,0,0.35)",
   shadowHi:"0 2px 8px rgba(0,0,0,0.5), 0 14px 36px rgba(0,0,0,0.5)",
   mono:FONT_MONO, sans:FONT_SANS, serif:FONT_SERIF,

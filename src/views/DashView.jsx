@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { OUTCOMES, INIT_TYPES, METRIC_SOURCES, OL, OD, DEFAULT_SETTINGS, brandName, iceScore, iceColor, fmtCur, fmtDate, mondayOf, parseNorthStarValue, resolveNorthStar } from "../constants.js";
+import { interactive, tile } from "../components/motion.js";
+import { ChargeBar } from "../components/ChargeBar.jsx";
 import { gG, gGh, gSL, gCd } from "../components/styles.js";
 import { Spark } from "../components/Spark.jsx";
 import { WeeklyStandupModal } from "../components/WeeklyStandupModal.jsx";
@@ -219,7 +221,8 @@ function FunnelCoverageMap({t, items, cats, brands, activeBrand}) {
           const isGap = s.active===0;
           const barPct = Math.max(4,(s.count/maxCount)*100);
           return (
-            <div key={s.cat} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:i<stages.length-1?"1px solid "+t.borderSoft:"none"}}>
+            <div key={s.cat} {...(()=>{const p=interactive(t,isGap?t.border:t.goldFill,{flat:true,index:i,hoverBg:t.surfaceAlt});
+              return {className:p.className, style:{...p.style,display:"flex",alignItems:"center",gap:12,padding:"10px 10px 10px 12px",borderBottom:i<stages.length-1?"1px solid "+t.borderSoft:"none",borderRadius:8}};})()}>
               {/* Stage label + count bar */}
               <div style={{flex:"1 1 auto",minWidth:0}}>
                 <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:5}}>
@@ -228,9 +231,7 @@ function FunnelCoverageMap({t, items, cats, brands, activeBrand}) {
                     ? <span style={{fontSize:10,fontWeight:600,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.04em"}}>UNCOVERED</span>
                     : <span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>{s.running} running · {s.draft} draft · {s.done} done</span>}
                 </div>
-                <div style={{height:7,borderRadius:4,background:t.surfaceAlt,overflow:"hidden"}}>
-                  <div style={{width:barPct+"%",height:"100%",background:isGap?t.border:t.goldFill,borderRadius:4,transition:"width .3s"}}/>
-                </div>
+                <ChargeBar t={t} pct={barPct} height={7} muted={isGap} index={i}/>
               </div>
               {/* Quality */}
               <div style={{width:62,textAlign:"right",flexShrink:0}}>
@@ -1021,13 +1022,13 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
           {l:"Avg to close",     v:dash.avgDays||"—",         s:"days, completed"},
           {l:"Avg ICE",          v:dash.avgIce||"—",          s:"all initiatives"},
           {l:"Closed ROI",        v:dash.closedROI!==null?dash.closedROI+"x":"—", s:"actual rev / cost"},
-        ].map(m=>{
+        ].map((m,mi)=>{
           const isMoney = typeof m.v === "string" && m.v.startsWith("$");
           const isPct   = typeof m.v === "string" && m.v.endsWith("%");
           const isMulti = typeof m.v === "string" && m.v.endsWith("x");
           const isFinancial = isMoney || isPct || isMulti;
           return (
-          <div key={m.l} style={{background:m.hero?t.goldBg:t.surface,border:"1px solid "+(m.hero?t.goldBorder:t.border),borderRadius:12,padding:"14px 16px",boxShadow:t.shadow,minHeight:96,display:"flex",flexDirection:"column"}}>
+          <div key={m.l} {...(()=>{const p=tile(t,t.goldFill,mi);return{className:p.className,style:{...p.style,background:m.hero?t.goldBg:t.surface,border:"1px solid "+(m.hero?t.goldBorder:t.border),borderRadius:12,padding:"14px 16px",boxShadow:t.shadow,minHeight:96,display:"flex",flexDirection:"column"}};})()}>
             <div style={{fontSize:9.5,letterSpacing:"0.1em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,fontWeight:600,marginBottom:"auto",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>{m.l}</div>
             <div style={{fontSize:26,fontWeight:700,color:isFinancial?t.gold:t.text,fontFamily:t.mono,lineHeight:1,letterSpacing:"-0.03em",marginTop:9}}>{m.v}</div>
             {m.s&&m.s!==" "&&<div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginTop:7,whiteSpace:"nowrap",letterSpacing:"0.02em"}}>{m.s}</div>}
@@ -1133,17 +1134,15 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
         <div style={gCd(t)}>
           <div style={gSL(t)}>By category</div>
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            {cats.map(cat=>{
+            {cats.map((cat,ci)=>{
               const n=dash.catCounts[cat]||0,pct=maxCat>0?Math.round((n/maxCat)*100):0;
               return(
-                <div key={cat}>
+                <div key={cat} className="gos-charge" style={{padding:"1px 0"}}>
                   <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
                     <span style={{fontSize:12,color:t.textSub,fontFamily:t.sans}}>{cat}</span>
                     <span style={{fontSize:12,color:t.textMuted,fontFamily:t.mono}}>{n}</span>
                   </div>
-                  <div style={{height:5,background:t.border,borderRadius:3}}>
-                    <div style={{width:pct+"%",height:"100%",borderRadius:3,background:t.goldFill}}/>
-                  </div>
+                  <ChargeBar t={t} pct={pct} height={5} muted={n===0} index={ci}/>
                 </div>
               );
             })}
@@ -1155,17 +1154,15 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
       <div style={gCd(t)}>
         <div style={gSL(t)}>By initiative type</div>
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {INIT_TYPES.map(tp=>{
+          {INIT_TYPES.map((tp,ti)=>{
             const n=dash.typeCounts[tp]||0,pct=maxType>0?Math.round((n/maxType)*100):0;
             return(
-              <div key={tp}>
+              <div key={tp} className="gos-charge" style={{padding:"1px 0"}}>
                 <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
                   <span style={{fontSize:12,color:t.textSub,fontFamily:t.sans}}>{tp}</span>
                   <span style={{fontSize:12,color:t.textMuted,fontFamily:t.mono}}>{n}</span>
                 </div>
-                <div style={{height:5,background:t.border,borderRadius:3}}>
-                  <div style={{width:pct+"%",height:"100%",borderRadius:3,background:t.goldFill}}/>
-                </div>
+                <ChargeBar t={t} pct={pct} height={5} muted={n===0} index={ti}/>
               </div>
             );
           })}

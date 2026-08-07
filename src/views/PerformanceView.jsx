@@ -2,6 +2,8 @@ import { useState, useMemo } from "react";
 import { gG, gGh, gSL, gCd, gSl } from "../components/styles.js";
 import { fmtCur, fmtDate } from "../constants.js";
 import { resolveSchema, breakdownByDimension, listChannels, listLevels, templateFor, NA } from "../services/naming.js";
+import { interactive, tile } from "../components/motion.js";
+import { ChargeBar } from "../components/ChargeBar.jsx";
 import { availableDimensions, defaultDimension, rollupByInitiative, deriveRatios, ADDITIVE_METRICS, PERF_ROW_LIMIT } from "../services/performance.js";
 
 // -- Performance -----------------------------------------------------------------
@@ -40,15 +42,6 @@ const TABS = [
 
 const fmtNum = (n) => n == null ? "—" : Math.round(n).toLocaleString();
 const fmtRatio = (n, suffix = "") => n == null ? "—" : (Math.round(n * 100) / 100).toFixed(2) + suffix;
-
-/** One bar in a magnitude list. Single ink, single width — see the note above. */
-function Bar({ t, pct, muted }) {
-  return (
-    <div style={{ height: 6, borderRadius: 3, background: t.surfaceAlt, overflow: "hidden" }}>
-      <div style={{ width: Math.max(2, pct) + "%", height: "100%", borderRadius: 3, background: muted ? t.border : t.goldFill, transition: "width .3s" }} />
-    </div>
-  );
-}
 
 function Empty({ t, title, body, action }) {
   return (
@@ -224,12 +217,13 @@ export function PerformanceView({ t, items, settings, perfRows, onImport, onClea
                   <div key={h} style={{ ...gSL(t), marginBottom: 0, textAlign: i === 0 ? "left" : "right" }}>{h}</div>
                 ))}
               </div>
-              {sorted.map(g => {
+              {sorted.map((g, gi) => {
                 const r = deriveRatios(g.metrics);
                 const val = sortBy === "rows" ? g.rows : (g.metrics[sortBy] || 0);
                 const isPlaceholder = String(g.value).toUpperCase() === NA;
                 return (
-                  <div key={g.value} style={{ padding: "11px 0", borderBottom: "1px solid " + t.borderSoft }}>
+                  <div key={g.value} {...(()=>{const p=interactive(t,isPlaceholder?t.border:t.goldFill,{flat:true,index:gi,hoverBg:t.surfaceAlt});
+                    return {className:p.className, style:{...p.style, padding:"11px 8px 11px 12px", borderBottom:"1px solid "+t.borderSoft, borderRadius:8}};})()}>
                     <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.6fr) repeat(5, minmax(64px,0.7fr))", gap: 10, alignItems: "baseline" }}>
                       <div style={{ minWidth: 0 }}>
                         <span style={{ fontSize: 13, fontWeight: 600, color: isPlaceholder ? t.textMuted : t.text, fontFamily: t.sans, wordBreak: "break-word" }}>
@@ -244,7 +238,7 @@ export function PerformanceView({ t, items, settings, perfRows, onImport, onClea
                       <div style={{ textAlign: "right", fontFamily: t.mono, fontSize: 13, color: t.textSub }}>{r.cpa == null ? "—" : fmtCur(Math.round(r.cpa))}</div>
                     </div>
                     <div style={{ marginTop: 7 }}>
-                      <Bar t={t} pct={maxVal > 0 ? (val / maxVal) * 100 : 0} muted={isPlaceholder} />
+                      <ChargeBar t={t} pct={maxVal > 0 ? (val / maxVal) * 100 : 0} muted={isPlaceholder} index={gi} />
                     </div>
                   </div>
                 );
@@ -276,12 +270,12 @@ export function PerformanceView({ t, items, settings, perfRows, onImport, onClea
                 { key: "untagged", label: "Untagged",    note: "no tag in the name — normal for BAU spend" },
                 { key: "unmatched",label: "Broken links",note: "carries a tag that resolves to nothing", alarm: true },
                 { key: "unparsed", label: "Unparsed",    note: "name does not fit any template", alarm: true },
-              ].map(c => {
+              ].map((c, ci) => {
                 const n = roll.counts[c.key] || 0;
                 const s = roll.spend[c.key] || 0;
                 const live = c.alarm && n > 0;
                 return (
-                  <div key={c.key} style={{ ...gCd(t), borderColor: live ? t.warnBorder : t.border, background: live ? t.warnBg : t.surface }}>
+                  <div key={c.key} {...(()=>{const p=tile(t,live?t.warn:t.goldFill,ci);return{className:p.className,style:{...gCd(t),...p.style,borderColor:live?t.warnBorder:t.border,background:live?t.warnBg:t.surface}};})()}>
                     <div style={gSL(t)}>{c.label}</div>
                     <div style={{ fontFamily: t.mono, fontSize: 22, fontWeight: 700, color: t.text, lineHeight: 1.1 }}>{n.toLocaleString()}</div>
                     <div style={{ fontFamily: t.mono, fontSize: 12, color: t.textSub, marginTop: 2 }}>{fmtCur(Math.round(s))} spend</div>
@@ -306,8 +300,9 @@ export function PerformanceView({ t, items, settings, perfRows, onImport, onClea
                       <div key={h} style={{ ...gSL(t), marginBottom: 0, textAlign: i === 0 ? "left" : "right" }}>{h}</div>
                     ))}
                   </div>
-                  {roll.groups.map(g => (
-                    <div key={g.initiativeId} style={{ display: "grid", gridTemplateColumns: "minmax(0,2fr) repeat(4, minmax(60px,0.7fr))", gap: 10, padding: "11px 0", borderBottom: "1px solid " + t.borderSoft, alignItems: "baseline" }}>
+                  {roll.groups.map((g, ri) => (
+                    <div key={g.initiativeId} {...(()=>{const p=interactive(t,t.goldFill,{flat:true,index:ri,hoverBg:t.surfaceAlt});
+                      return {className:p.className, style:{...p.style, display:"grid", gridTemplateColumns:"minmax(0,2fr) repeat(4, minmax(60px,0.7fr))", gap:10, padding:"11px 8px 11px 12px", borderBottom:"1px solid "+t.borderSoft, alignItems:"baseline", borderRadius:8}};})()}>
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, color: t.text, fontFamily: t.sans }}>
                           {g.initiative?.initId ? g.initiative.initId + " · " : ""}{g.initiative?.title || "Unknown"}

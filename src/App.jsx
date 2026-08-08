@@ -1,5 +1,5 @@
 import { Analytics } from "@vercel/analytics/react";
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from "react";
 import {
   BRANDS as CONFIG_BRANDS,
   TEMPLATES,
@@ -9,33 +9,46 @@ import {
 } from "./activeConfig.js";
 
 import { KEY_ITEMS, KEY_SETTINGS, KEY_DEBATES, KEY_METRICS, KEY_RECS, KEY_CREATIVE, KEY_PERF, KEY_THEME, KEY_LIB_VIEW, KEY_RAIL, KEY_TOUR_SEEN, store, onWriteError, handleDownloadBackup, handleRestoreBackup } from "./services/store.js";
-import { CreativeStudio } from "./views/CreativeStudio.jsx";
-import { PerformanceView } from "./views/PerformanceView.jsx";
-import { resolveSchema, listChannels } from "./services/naming.js";
-import { detectCsvShape, parsePerformanceCSV, mergePerformanceRows, attachInitiatives, splitCSVLine } from "./services/performance.js";
+import { resolveSchema } from "./services/naming.js";
+import { attachInitiatives } from "./services/performance.js";
 import { Sidebar } from "./components/Sidebar.jsx";
 import { CadenceRail, CadenceLegend } from "./components/CadenceRail.jsx";
 import { cadenceWindow, cadenceFor, windowLabel, groupRollup } from "./services/cadence.js";
 import { navName, navLab } from "./components/navSections.js";
 import {
   applyBrandBriefDefaults, DEFAULT_AGENTS, DEFAULT_SETTINGS,
-  STATUSES, STATUS_GROUP_ORDER, OUTCOMES, INIT_TYPES, METRIC_SOURCES,
+  STATUSES, STATUS_GROUP_ORDER, OUTCOMES, INIT_TYPES,
   TL, TD, SL, SD, OL, OD,
-  catColor, brandColor, brandName, iceScore, iceColor,
+  catColor, brandColor, brandName, iceScore,
   fmtCur, fmtDate, parseD, somM, eomM, mondayOf,
-  parseMetricsCSV, generateInitId, mkDefault, withRunningSnapshot, computePredictionError,
+  generateInitId, mkDefault, withRunningSnapshot, computePredictionError,
 } from "./constants.js";
 import { downloadCSV, itemToCSVRow, normaliseDate, parseCSV, normalizeInitiativeRecord } from "./services/csv.js";
 import { buildLearningsIndex, buildPortfolioContext } from "./services/portfolio.js";
 import { stampUpdatedAt } from "./services/items.js";
+
+// -- Deferred views ------------------------------------------------------------
+//
+// Four views the app does not need to boot. Each is reached by a deliberate
+// click — a nav item or the Signal button — never on first paint, and none is
+// anchored by a guided-tour step, which is the constraint that decides what can
+// move here. The tour polls ~40 frames for its target before falling back to a
+// centred card, so putting a tour-anchored view behind a network fetch would
+// quietly degrade the demo on a slow connection rather than fail loudly.
+// DashView stays eager for the same reason in reverse: it IS first paint.
+//
+// Named exports, so each needs the default-shape adapter React.lazy expects.
+const CreativeStudio    = lazy(() => import("./views/CreativeStudio.jsx").then(m => ({ default: m.CreativeStudio })));
+const PerformanceView   = lazy(() => import("./views/PerformanceView.jsx").then(m => ({ default: m.PerformanceView })));
+const CopilotPanel      = lazy(() => import("./views/CopilotPanel.jsx").then(m => ({ default: m.CopilotPanel })));
+const ClientReadoutView = lazy(() => import("./views/ClientReadoutView.jsx").then(m => ({ default: m.ClientReadoutView })));
 import { callExpandHypothesis } from "./services/ai/callExpandHypothesis.js";
 import { callSuggestICE } from "./services/ai/callSuggestICE.js";
 import { callQuickCapture } from "./services/ai/callQuickCapture.js";
 import { callGenerateCandidates } from "./services/ai/callGenerateCandidates.js";
 import { callExpandRecommendation } from "./services/ai/callExpandRecommendation.js";
-import { gG, gGh, gI, gTA, gSl, gSc, gSL, gCd } from "./components/styles.js";
+import { gG, gGh, gI, gTA, gSl, gCd } from "./components/styles.js";
 import { Bdg, SBdg, OBdg, CBdg, TBdg, BlockerBadge, ICEChip } from "./components/badges.jsx";
-import { renderProse } from "./components/text.jsx";
 import { Modal } from "./components/Modal.jsx";
 import { GuidedTour } from "./components/GuidedTour.jsx";
 import { TOUR_STEPS } from "./components/tourSteps.js";
@@ -43,14 +56,27 @@ import { CBar } from "./components/CBar.jsx";
 import { interactive } from "./components/motion.js";
 import { EAlert } from "./components/EAlert.jsx";
 import { FR } from "./components/FR.jsx";
-import { CitationModal } from "./components/citation.jsx";
-import { CopilotPanel } from "./views/CopilotPanel.jsx";
+import { MetricsLogModal } from "./components/MetricsLogModal.jsx";
+import { MetricsImportModal } from "./components/MetricsImportModal.jsx";
+import { NextPlaysModal } from "./components/NextPlaysModal.jsx";
+import { SettingsModal } from "./components/SettingsModal.jsx";
 import { DashView } from "./views/DashView.jsx";
 import { DetailView } from "./views/DetailView.jsx";
 import { FormView } from "./views/FormView.jsx";
 import { TriageView } from "./views/TriageView.jsx";
 import { LearningLibrary } from "./views/LearningLibrary.jsx";
-import { ClientReadoutView } from "./views/ClientReadoutView.jsx";
+
+// Shown only while a deferred view's chunk is in flight — typically a frame or
+// two on a warm connection. Deliberately not a spinner: a chunk fetch that
+// resolves in 80ms with a spinner reads as a stutter, whereas a quiet held
+// space reads as nothing happening at all, which is the truth.
+function ViewLoading({ t }) {
+  return (
+    <div style={{padding:"48px 20px",textAlign:"center",color:t.textMuted,fontFamily:t.mono,fontSize:11,letterSpacing:"0.08em",textTransform:"uppercase"}}>
+      Loading…
+    </div>
+  );
+}
 
 // ── Guide drawer ─────────────────────────────────────────────────────────────
 // Feature discovery, organized by job-to-be-done rather than by feature name.
@@ -1429,6 +1455,7 @@ export default function App() {
         * ultrawide. 1440 keeps line lengths readable and still gives the Weekly
         * Pulse table room for all seven columns without scrolling. */}
       <main style={{width:"100%",maxWidth:1440,margin:"0 auto",flex:1}}>
+      <Suspense fallback={<ViewLoading t={t}/>}>
       {nav==="dashboard"&&<DashView t={t} dk={dk} dash={dash} cats={cats} settings={settings} brands={brands} activeBrand={activeBrand} weeklyMetrics={weeklyMetrics} onLog={()=>setShowPulse(true)} onImport={()=>setShowMetricsImport(true)} dRange={dRange} setDRange={setDRange} cFrom={cFrom} cTo={cTo} setCFrom={setCFrom} setCTo={setCTo} onGo={()=>setNav("initiatives")} recs={recs} recsLoad={recsLoad} recsErr={recsErr} items={items} onGenerateRecs={generateRecommendations} onOpenRec={(batchId,recId)=>setShowRecModal({batchId,recId})} showToast={showToast} onSaveItems={saveItems}/>}
       {nav==="triage"&&<TriageView items={items} t={t} dk={dk} cats={cats} brands={brands} activeBrand={activeBrand} onDetail={(id)=>goDetail(id,"triage")}
         onLogResults={(id)=>{const it=items.find(e=>e.id===id); if(it){setSelId(id); setRForm(it.results?{...it.results,actualRevenueImpact:it.results.actualRevenueImpact!=null?it.results.actualRevenueImpact:"",actualSpendCost:it.results.actualSpendCost!=null?it.results.actualSpendCost:"",actualResourceCost:it.results.actualResourceCost!=null?it.results.actualResourceCost:""}:{actualOutcome:"",keyLearning:"",outcomeClassification:"Success",decisionMade:"",outcomeCertainty:75,actualRevenueImpact:"",actualSpendCost:"",actualResourceCost:""}); setShowR(true);}}}
@@ -1610,6 +1637,7 @@ export default function App() {
           </div>
         </Modal>
       )}
+      </Suspense>
       </main>
         </div>
       </div>
@@ -1798,6 +1826,7 @@ export default function App() {
       )}
 
       {showCopilot&&(
+        <Suspense fallback={<ViewLoading t={t}/>}>
         <CopilotPanel
           t={t} dk={dk}
           settings={settings}
@@ -1827,6 +1856,7 @@ export default function App() {
           }}
           onClose={() => setShowCopilot(false)}
         />
+        </Suspense>
       )}
       {showRecModal && (
         <NextPlaysModal
@@ -1869,801 +1899,3 @@ export default function App() {
     </div>
   );
 }
-
-
-// Weekly metrics log modal — manual entry per brand, source-filtered fields
-function MetricsLogModal({t, dk, brands, weeklyMetrics, onSave, onClose}) {
-  const today = new Date().toISOString().slice(0,10);
-  const [date, setDate] = useState(today);
-  const [rows, setRows] = useState(
-    brands.map(b => ({ brandId: b.id, source: "manual", metrics: {} }))
-  );
-
-  const updateRow = (idx, field, val) => {
-    setRows(r => r.map((row,i) => i===idx ? {...row, [field]: val} : row));
-  };
-  const updateMetric = (idx, key, val) => {
-    setRows(r => r.map((row,i) => i===idx ? {...row, metrics:{...row.metrics,[key]:val}} : row));
-  };
-
-  const handleSave = () => {
-    const newEntries = rows
-      .filter(row => Object.values(row.metrics).some(v => v !== "" && v !== undefined))
-      .map(row => {
-        const src = METRIC_SOURCES.find(s=>s.id===row.source);
-        const cleanMetrics = {};
-        if (src) {
-          src.fields.forEach(f => {
-            const v = row.metrics[f.key];
-            if (v !== "" && v !== undefined) {
-              cleanMetrics[f.key] = f.type === "number" ? parseFloat(v)||0 : v;
-            }
-          });
-        }
-        return { date, brand: row.brandId, source: row.source, metrics: cleanMetrics };
-      });
-
-    if (!newEntries.length) { onClose(); return; }
-
-    // Deduplicate: replace existing entries for same date+brand+source
-    const filtered = weeklyMetrics.filter(m =>
-      !newEntries.some(e => e.date===m.date && e.brand===m.brand && e.source===m.source)
-    );
-    onSave([...newEntries, ...filtered].sort((a,b)=>b.date.localeCompare(a.date)));
-    onClose();
-  };
-
-  return (
-    <Modal t={t} dk={dk} onClose={onClose} wide title="Log this week's metrics">
-      <div style={{display:"flex",flexDirection:"column",gap:14}}>
-        <FR label="Week ending / reporting date" t={t}>
-          <input type="date" style={gI(t)} value={date} onChange={e=>setDate(e.target.value)}/>
-        </FR>
-
-        {rows.map((row, idx) => {
-          const brand = brands[idx];
-          const srcDef = METRIC_SOURCES.find(s=>s.id===row.source);
-          return (
-            <div key={idx} style={{border:"1px solid "+t.border,borderRadius:6,padding:"12px 14px",background:t.surfaceAlt}}>
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginBottom:10,flexWrap:"wrap"}}>
-                <div style={{fontSize:13,fontWeight:600,color:t.text,fontFamily:t.serif}}>{brand.name}</div>
-                <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-                  {METRIC_SOURCES.map(s=>(
-                    <button key={s.id} onClick={()=>updateRow(idx,"source",s.id)}
-                      style={{fontSize:10,padding:"3px 8px",borderRadius:4,cursor:"pointer",fontFamily:t.serif,
-                        background:row.source===s.id?t.gold:"transparent",
-                        border:"1px solid "+(row.source===s.id?t.gold:t.border),
-                        color:row.source===s.id?t.goldText:t.textMuted,fontWeight:row.source===s.id?700:400}}>
-                      {s.icon} {s.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:8}}>
-                {srcDef && srcDef.fields.map(f=>(
-                  <div key={f.key} style={{display:"flex",flexDirection:"column",gap:3}}>
-                    <label style={{fontSize:10,color:t.textMuted,fontFamily:t.serif}}>{f.label}</label>
-                    {f.type==="text"
-                      ? <input style={{...gI(t),fontSize:12}} value={row.metrics[f.key]||""} placeholder={f.hint} onChange={e=>updateMetric(idx,f.key,e.target.value)}/>
-                      : <input style={{...gI(t),fontSize:12}} type="number" step="any" value={row.metrics[f.key]||""} placeholder={f.hint} onChange={e=>updateMetric(idx,f.key,e.target.value)}/>
-                    }
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })}
-
-        <div style={{display:"flex",gap:8,justifyContent:"flex-end",paddingTop:4}}>
-          <button style={gGh(t)} onClick={onClose}>Cancel</button>
-          <button style={gG(t)} onClick={handleSave}>Save metrics</button>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
-// Weekly metrics CSV import modal
-// -- Metrics import ------------------------------------------------------------
-//
-// One entry point, two accepted shapes. Which one a file is gets decided by
-// `detectCsvShape` from its headers rather than by asking the operator to pick
-// first, because the operator does not think of "my Meta export" and "my weekly
-// numbers" as two different importers — they think of it as the CSV they just
-// downloaded. Getting the routing wrong is also cheap to notice and impossible
-// to act on silently: the preview names the shape it detected before anything
-// is written.
-//
-//   weekly       {date, brand, source, metrics:{}} — one row per week per brand.
-//   performance  one row per ad entity per day, with dimensions inside the name.
-//
-// The performance path additionally needs the channel, because parsing a name
-// positionally means knowing which template produced it. "Detect" is offered and
-// is honest about ambiguity, but naming the channel is the reliable answer and
-// the preview says so when detection fails.
-function MetricsImportModal({t, dk, weeklyMetrics, perfRows, items, settings, onSave, onSavePerf, showToast, onClose}) {
-  const [step, setStep] = useState("upload"); // upload | preview | done
-  const [shape, setShape] = useState("weekly"); // weekly | performance
-  const [parsed, setParsed] = useState({rows:[], errors:[]});
-  const [perf, setPerf] = useState({rows:[], errors:[], stats:null});
-  const [rawText, setRawText] = useState("");
-  const [channel, setChannel] = useState("");
-  const [conflictMode, setConflictMode] = useState("overwrite"); // overwrite | skip
-
-  const schema = resolveSchema(settings);
-  const channels = listChannels(schema);
-  // Default to the channel whose ad-level template the file's names actually
-  // match, when there is exactly one — the common case, and it saves the
-  // operator answering a question the data already answers.
-  const effChannel = channel || channels[0]?.id || "meta";
-
-  const readPerf = (text, ch) => {
-    const res = parsePerformanceCSV(text, schema, { channel: ch });
-    setPerf(res);
-    return res;
-  };
-
-  const ingest = (text) => {
-    setRawText(text);
-    const headers = splitCSVLine((text.split(/\r?\n/)[0] || ""));
-    const detected = detectCsvShape(headers);
-    setShape(detected.shape);
-    if (detected.shape === "performance") {
-      // Try each channel and prefer one that parses everything; fall back to
-      // the first rather than to "auto", since a named channel is deterministic.
-      const scored = channels.map(c => ({ id: c.id, res: parsePerformanceCSV(text, schema, { channel: c.id }) }))
-        .map(x => ({ ...x, ok: x.res.rows.filter(r => r.parsed).length }));
-      const best = scored.sort((a,b) => b.ok - a.ok)[0];
-      const pick = best && best.ok > 0 ? best.id : (channels[0]?.id || "meta");
-      setChannel(pick);
-      setPerf(best && best.ok > 0 ? best.res : parsePerformanceCSV(text, schema, { channel: pick }));
-    } else {
-      setParsed(parseMetricsCSV(text));
-    }
-    setStep("preview");
-  };
-
-  const handleFile = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => ingest(ev.target.result);
-    reader.readAsText(file);
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    const file = e.dataTransfer.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => ingest(ev.target.result);
-    reader.readAsText(file);
-  };
-
-  const handleConfirmPerf = () => {
-    const { rows, dropped } = mergePerformanceRows(perfRows || [], perf.rows);
-    onSavePerf(rows);
-    const { counts } = attachInitiatives(perf.rows, items, schema);
-    const bits = [`${perf.rows.length} row${perf.rows.length!==1?"s":""} imported`];
-    if (counts.matched)   bits.push(`${counts.matched} attributed to initiatives`);
-    if (counts.unmatched) bits.push(`${counts.unmatched} with a tag that resolves to nothing`);
-    if (dropped)          bits.push(`${dropped} oldest row${dropped!==1?"s":""} dropped at the storage ceiling`);
-    if (showToast) showToast(bits.join(" · "), counts.unmatched ? "info" : "success");
-    setStep("done");
-    setTimeout(onClose, 1200);
-  };
-
-  const handleConfirm = () => {
-    const existing = [...weeklyMetrics];
-    let merged;
-    if (conflictMode === "overwrite") {
-      const filtered = existing.filter(m =>
-        !parsed.rows.some(r => r.date===m.date && r.brand===m.brand && r.source===m.source)
-      );
-      merged = [...parsed.rows, ...filtered].sort((a,b)=>b.date.localeCompare(a.date));
-    } else {
-      // skip: only add rows that don't already exist
-      const newOnly = parsed.rows.filter(r =>
-        !existing.some(m => m.date===r.date && m.brand===r.brand && m.source===r.source)
-      );
-      merged = [...newOnly, ...existing].sort((a,b)=>b.date.localeCompare(a.date));
-    }
-    onSave(merged);
-    setStep("done");
-    setTimeout(onClose, 1200);
-  };
-
-  const conflicts = parsed.rows.filter(r =>
-    weeklyMetrics.some(m => m.date===r.date && m.brand===r.brand && m.source===r.source)
-  );
-
-  return (
-    <Modal t={t} dk={dk} onClose={onClose} wide title="Import CSV">
-      <div style={{display:"flex",flexDirection:"column",gap:12}}>
-        {step==="done" && (
-          <div style={{padding:"24px",textAlign:"center",color:t.teal,fontFamily:t.serif,fontSize:13}}>
-            ✓ Imported successfully
-          </div>
-        )}
-
-        {step==="upload" && (
-          <>
-            <div onDrop={handleDrop} onDragOver={e=>e.preventDefault()}
-              style={{border:"2px dashed "+t.border,borderRadius:8,padding:"28px",textAlign:"center",cursor:"pointer",background:t.surfaceAlt}}
-              onClick={()=>document.getElementById("metrics-csv-input").click()}>
-              <div style={{fontSize:28,marginBottom:8}}>📂</div>
-              <div style={{fontSize:13,color:t.text,marginBottom:4}}>Drop your CSV here or click to upload</div>
-              <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>Header-driven, so column order doesn't matter. The shape is detected from the headers.</div>
-              <input id="metrics-csv-input" type="file" accept=".csv" style={{display:"none"}} onChange={handleFile}/>
-            </div>
-            <div style={{background:t.surfaceAlt,borderRadius:6,padding:"10px 12px",fontSize:11,fontFamily:t.serif,color:t.textMuted,lineHeight:1.7}}>
-              <strong style={{color:t.textSub}}>Weekly numbers</strong> — needs <span style={{fontFamily:t.mono}}>date, brand, source</span>; then any of revenue, spend, roas, cvr, cac, aov, traffic, conversions, impressions, clicks, cpm, ctr, notes.<br/>
-              <strong style={{color:t.textSub}}>Campaign export</strong> — needs an <span style={{fontFamily:t.mono}}>Ad name</span>, <span style={{fontFamily:t.mono}}>Ad set name</span>, <span style={{fontFamily:t.mono}}>Ad group name</span> or <span style={{fontFamily:t.mono}}>Campaign name</span> column. Each name is parsed through your naming convention and joined to an initiative by its tracking tag.<br/>
-              Column names are case-insensitive, and platform export headers ("Amount spent (USD)", "Purchases conversion value", "Impr.") are recognised as they come.
-            </div>
-          </>
-        )}
-
-        {/* ------------------------------------------------ campaign-level preview */}
-        {step==="preview" && shape==="performance" && (
-          <>
-            <div style={{display:"flex",gap:10,alignItems:"flex-end",flexWrap:"wrap",padding:"10px 12px",borderRadius:9,background:t.goldBg,border:"1px solid "+t.goldBorder}}>
-              <div style={{flex:"1 1 260px",minWidth:0}}>
-                <div style={{fontSize:12.5,color:t.text,fontFamily:t.serif,lineHeight:1.55}}>
-                  <strong>Campaign-level export detected</strong> — {perf.identityLevel || "ad"}-level rows.
-                  Names are parsed against your naming convention rather than treated as free text.
-                </div>
-              </div>
-              <div>
-                <div style={{...gSL(t),marginBottom:4}}>Channel</div>
-                <select value={effChannel} onChange={e=>{setChannel(e.target.value); readPerf(rawText, e.target.value);}}
-                  style={{...gSl(t),width:150,padding:"6px 9px",fontSize:12}}>
-                  {channels.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}
-                </select>
-              </div>
-            </div>
-
-            {perf.errors.length>0 && (
-              <div style={{display:"flex",flexDirection:"column",gap:3,maxHeight:96,overflowY:"auto"}}>
-                {perf.errors.slice(0,8).map((e,i)=>(
-                  <div key={i} style={{fontSize:11,fontFamily:t.serif,padding:"4px 8px",background:t.warnBg,border:"1px solid "+t.warnBorder,borderRadius:4,color:t.text}}>{e}</div>
-                ))}
-              </div>
-            )}
-
-            {/* Coverage before confirmation. An import that parses 3 of 400 names
-                is almost always the wrong channel, and this is where that is
-                cheap to notice — after the write it is a wrong dashboard. */}
-            <div style={{display:"flex",gap:18,flexWrap:"wrap",padding:"10px 12px",borderRadius:9,background:t.surfaceAlt,border:"1px solid "+t.border}}>
-              {[
-                ["Rows", (perf.stats?.total||0).toLocaleString()],
-                ["Parsed", (perf.stats?.parsed||0).toLocaleString()],
-                ["Unparsed", (perf.stats?.unparsed||0).toLocaleString()],
-                ["Spend", fmtCur(Math.round(perf.stats?.spend||0))],
-                ["Attributed", String(attachInitiatives(perf.rows, items, schema).counts.matched||0)],
-              ].map(([l,v])=>(
-                <div key={l}>
-                  <div style={gSL(t)}>{l}</div>
-                  <div style={{fontFamily:t.mono,fontSize:15,fontWeight:700,color:t.text,lineHeight:1.1}}>{v}</div>
-                </div>
-              ))}
-            </div>
-
-            {perf.stats && perf.stats.total>0 && perf.stats.parsed===0 && (
-              <div style={{padding:"9px 12px",borderRadius:9,background:t.warnBg,border:"1px solid "+t.warnBorder,fontSize:12,color:t.text,fontFamily:t.serif,lineHeight:1.55}}>
-                Nothing parsed against <strong>{channels.find(c=>c.id===effChannel)?.label}</strong>. Try another channel above —
-                a slot-count mismatch means the names were built from a different template, and parsing refuses to guess
-                at an alignment rather than mis-attributing every row.
-              </div>
-            )}
-
-            <div style={{maxHeight:220,overflowY:"auto",display:"flex",flexDirection:"column",gap:3}}>
-              {perf.rows.slice(0,120).map((row,i)=>(
-                <div key={i} style={{display:"flex",gap:8,alignItems:"center",padding:"6px 10px",borderRadius:4,
-                  background:row.parsed?t.surfaceAlt:t.warnBg,border:"1px solid "+(row.parsed?t.border:t.warnBorder)}}>
-                  <span style={{fontSize:10,fontFamily:t.mono,color:t.textMuted,minWidth:74,flexShrink:0}}>{row.date||"lifetime"}</span>
-                  <span style={{fontSize:10.5,fontFamily:t.mono,color:t.text,flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{row.name}</span>
-                  <span style={{fontSize:10,fontFamily:t.mono,color:t.textMuted,flexShrink:0}}>{fmtCur(Math.round(row.metrics?.spend||0))}</span>
-                  {!row.parsed && <span style={{fontSize:9,color:t.warn,fontFamily:t.mono,flexShrink:0}}>unparsed</span>}
-                </div>
-              ))}
-              {perf.rows.length>120 && (
-                <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,padding:"4px 10px"}}>…and {perf.rows.length-120} more rows.</div>
-              )}
-            </div>
-
-            <div style={{display:"flex",gap:8,justifyContent:"space-between",paddingTop:4}}>
-              <button style={gGh(t)} onClick={()=>setStep("upload")}>← Re-upload</button>
-              <div style={{display:"flex",gap:8}}>
-                <button style={gGh(t)} onClick={onClose}>Cancel</button>
-                <button style={gG(t)} onClick={handleConfirmPerf} disabled={!perf.rows.length}>
-                  Import {perf.rows.length} row{perf.rows.length!==1?"s":""}
-                </button>
-              </div>
-            </div>
-          </>
-        )}
-
-        {step==="preview" && shape==="weekly" && (
-          <>
-            {parsed.errors.length > 0 && (
-              <div style={{display:"flex",flexDirection:"column",gap:3,maxHeight:100,overflowY:"auto"}}>
-                {parsed.errors.map((e,i)=>(
-                  <div key={i} style={{fontSize:11,fontFamily:t.serif,padding:"4px 8px",background:t.redBg,border:"1px solid "+(t.red),borderRadius:4,color:t.red}}>{e}</div>
-                ))}
-              </div>
-            )}
-
-            <div style={{fontSize:12,fontFamily:t.serif,color:t.textSub}}>
-              <span style={{fontFamily:t.mono}}>{parsed.rows.length}</span> row{parsed.rows.length!==1?"s":""} ready to import
-              {conflicts.length > 0 && <span style={{color:t.warn}}> · {conflicts.length} conflict{conflicts.length!==1?"s":""} with existing data</span>}
-            </div>
-
-            {conflicts.length > 0 && (
-              <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-                <span style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>On conflict:</span>
-                {[["overwrite","Overwrite existing"],["skip","Keep existing"]].map(([v,l])=>(
-                  <button key={v} onClick={()=>setConflictMode(v)}
-                    style={{fontSize:11,padding:"3px 9px",borderRadius:4,cursor:"pointer",fontFamily:t.serif,
-                      background:conflictMode===v?t.gold:"transparent",border:"1px solid "+(conflictMode===v?t.gold:t.border),
-                      color:conflictMode===v?t.goldText:t.textMuted}}>{l}</button>
-                ))}
-              </div>
-            )}
-
-            <div style={{maxHeight:220,overflowY:"auto",display:"flex",flexDirection:"column",gap:3}}>
-              {parsed.rows.map((row,i)=>{
-                const isConflict = weeklyMetrics.some(m=>m.date===row.date&&m.brand===row.brand&&m.source===row.source);
-                const srcDef = METRIC_SOURCES.find(s=>s.id===row.source);
-                return (
-                  <div key={i} style={{display:"flex",gap:8,alignItems:"center",padding:"6px 10px",
-                    background:isConflict?(t.warnBg):t.surfaceAlt,
-                    border:"1px solid "+(isConflict?(t.warnBorder):t.border),borderRadius:4}}>
-                    <span style={{fontSize:10,fontFamily:t.mono,color:t.textMuted,minWidth:80,flexShrink:0}}>{row.date}</span>
-                    <span style={{fontSize:11,fontFamily:t.serif,color:t.text,fontWeight:600,minWidth:80,flexShrink:0}}>{row.brand}</span>
-                    <span style={{fontSize:10,fontFamily:t.serif,color:t.textMuted,minWidth:60,flexShrink:0}}>{srcDef?.label||row.source}</span>
-                    <span style={{fontSize:10,fontFamily:t.mono,color:t.textMuted,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                      {Object.entries(row.metrics).filter(([k])=>k!=="notes").map(([k,v])=>`${k}: ${v}`).join(" · ")}
-                    </span>
-                    {isConflict&&<span style={{fontSize:9,color:t.warn,fontFamily:t.serif,flexShrink:0}}>conflict</span>}
-                  </div>
-                );
-              })}
-            </div>
-
-            <div style={{display:"flex",gap:8,justifyContent:"space-between",paddingTop:4}}>
-              <button style={gGh(t)} onClick={()=>setStep("upload")}>← Re-upload</button>
-              <div style={{display:"flex",gap:8}}>
-                <button style={gGh(t)} onClick={onClose}>Cancel</button>
-                <button style={gG(t)} onClick={handleConfirm} disabled={!parsed.rows.length}>
-                  Import {parsed.rows.length} row{parsed.rows.length!==1?"s":""}
-                </button>
-              </div>
-            </div>
-          </>
-        )}
-      </div>
-    </Modal>
-  );
-}
-// Modal — full recommendation detail with hypothesis, ICE rationale, reasoning
-// trace, and cited learnings. Actions: Add to backlog | Dismiss.
-function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, cats, onAccept, onDismiss, onClose }) {
-  // Every hook must run before the first early return. `useState` used to sit
-  // below `if (!rec) return null`, so the hook count changed between renders the
-  // moment a recommendation stopped resolving (dismissed from another surface, a
-  // batch rotating out of the last-10 window, a restored backup) and React threw
-  // "rendered fewer hooks than expected", taking the whole dashboard down.
-  const [citeItem, setCiteItem] = useState(null);
-
-  const batch = recs.find(b => b.id === batchId);
-  const rec = batch ? batch.recommendations.find(r => r.id === recId) : null;
-  if (!rec) return null;
-
-  const iceTotal = iceScore(rec.ice.impact, rec.ice.certainty, rec.ice.ease);
-  const citedLearnings = (rec.sourceLearningIds || [])
-    .map(id => items.find(e => e.id === id))
-    .filter(Boolean);
-
-  // Footnote map: each cited learning gets a stable superscript number, appended
-  // to the reasoning trace as end-of-trace references. The prose stays clean; the
-  // numbers tell you what fed the reasoning, and each is clickable.
-  const footnotes = citedLearnings.map((it, i) => ({ n: i+1, item: it }));
-
-  const isResolved = rec.status !== "pending";
-
-  return (
-    <Modal t={t} dk={dk} onClose={onClose} title="Next Play" wide>
-      <div style={{display:"flex",flexDirection:"column",gap:16}}>
-        {/* Title + meta */}
-        <div>
-          <div style={{fontSize:20,fontWeight:600,color:t.text,fontFamily:t.serif,lineHeight:1.3,marginBottom:8}}>{rec.title}</div>
-          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-            <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,padding:"2px 8px",border:"1px solid "+t.border,borderRadius:3,textTransform:"uppercase",letterSpacing:"0.04em"}}>{rec.category}</span>
-            <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,padding:"2px 8px",border:"1px solid "+t.border,borderRadius:3}}>{rec.brandTarget}</span>
-            <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,padding:"2px 8px",border:"1px solid "+t.border,borderRadius:3}}>{rec.initType}</span>
-            {isResolved && (
-              <span style={{fontSize:10,fontFamily:t.serif,padding:"2px 8px",borderRadius:3,fontWeight:600,
-                background: rec.status==="accepted"?(t.tealBg):(t.surfaceAlt),
-                color: rec.status==="accepted"?(t.teal):t.textMuted,
-                border:"1px solid "+(rec.status==="accepted"?(t.teal):t.border)}}>
-                {rec.status==="accepted" ? "✓ Added to backlog" : "✕ Dismissed"}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Why now — the specific portfolio signal that drove this recommendation
-            (Pass 1 rationale). Muted single line, distinct from the hypothesis
-            block. Older recs predate this field — render nothing rather than a
-            placeholder. */}
-        {rec.whyNow && (
-          <div style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,lineHeight:1.5,marginTop:-6}}>
-            <span style={{fontWeight:700,letterSpacing:"0.04em",textTransform:"uppercase",marginRight:6}}>Why now</span>
-            {rec.whyNow}
-          </div>
-        )}
-
-        {/* Reasoning trace — the trust-builder. Footnote superscripts map to the
-            cited learnings below; prose stays clean, references are clickable. */}
-        {rec.reasoningTrace && (
-          <div style={gSc(t)}>
-            <div style={gSL(t)}>Why this, why now</div>
-            <p style={{margin:0,color:t.textSub,lineHeight:1.6,fontSize:14,fontFamily:t.serif}}>
-              {rec.reasoningTrace}
-              {footnotes.map(f => (
-                <button key={f.n} onClick={()=>setCiteItem(f.item)} title={f.item.title}
-                  style={{verticalAlign:"super",fontSize:"0.7em",fontWeight:700,fontFamily:t.mono,color:t.gold,
-                    background:"none",border:"none",cursor:"pointer",padding:"0 1px",lineHeight:1}}>
-                  {f.n}
-                </button>
-              ))}
-            </p>
-            {footnotes.length>0 && (
-              <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid "+t.border,display:"flex",flexDirection:"column",gap:4}}>
-                {footnotes.map(f => (
-                  <button key={f.n} onClick={()=>setCiteItem(f.item)}
-                    style={{display:"flex",gap:6,alignItems:"baseline",background:"none",border:"none",cursor:"pointer",textAlign:"left",padding:0,fontFamily:t.serif}}>
-                    <span style={{fontSize:10,fontWeight:700,color:t.gold}}>{f.n}</span>
-                    <span style={{fontSize:11,color:t.textMuted}}>
-                      {f.item.initId ? f.item.initId+" · " : ""}{f.item.title}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Hypothesis structure */}
-        <div style={gSc(t)}>
-          <div style={gSL(t)}>Hypothesis framework</div>
-          <div style={{display:"flex",flexDirection:"column",gap:12}}>
-            {rec.observation && (
-              <div>
-                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>📊 Observation</div>
-                <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:13}}>{rec.observation}</p>
-              </div>
-            )}
-            {rec.hypothesis && (
-              <div style={{borderLeft:"3px solid "+t.gold,paddingLeft:12}}>
-                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>💡 Hypothesis</div>
-                <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:14,fontWeight:600}}>{rec.hypothesis}</p>
-              </div>
-            )}
-            {rec.successMetric && (
-              <div>
-                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>🎯 Success metric</div>
-                <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:13}}>{rec.successMetric}</p>
-              </div>
-            )}
-            {rec.killCriteria && (
-              <div>
-                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>⏹ Kill criteria</div>
-                <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:13}}>{rec.killCriteria}</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* ICE with rationale */}
-        <div style={gSc(t)}>
-          <div style={gSL(t)}>ICE scoring · AI suggested</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:14,alignItems:"center"}}>
-            <div>
-              <div style={{display:"flex",alignItems:"baseline",gap:6,marginBottom:4}}>
-                <span style={{fontSize:22,fontWeight:700,color:t.gold,fontFamily:t.mono}}>{rec.ice.impact}</span>
-                <span style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>/10 Impact</span>
-              </div>
-              {rec.impactRationale && <div style={{fontSize:12,color:t.textSub,lineHeight:1.5,fontFamily:t.serif}}>{rec.impactRationale}</div>}
-            </div>
-            <div>
-              <div style={{display:"flex",alignItems:"baseline",gap:6,marginBottom:4}}>
-                <span style={{fontSize:22,fontWeight:700,color:t.gold,fontFamily:t.mono}}>{rec.ice.certainty}</span>
-                <span style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>/10 Certainty</span>
-              </div>
-              {rec.certaintyRationale && <div style={{fontSize:12,color:t.textSub,lineHeight:1.5,fontFamily:t.serif}}>{rec.certaintyRationale}</div>}
-            </div>
-            <div style={{textAlign:"center",borderLeft:"1px solid "+t.border,paddingLeft:16}}>
-              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:3,textTransform:"uppercase",letterSpacing:"0.06em"}}>Total</div>
-              <div style={{fontSize:24,fontWeight:700,fontFamily:t.mono,color:iceTotal!==null?iceColor(iceTotal,t):t.textMuted}}>{iceTotal!==null?iceTotal:"—"}</div>
-              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono}}>/100</div>
-            </div>
-          </div>
-          <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginTop:8,fontStyle:"italic"}}>
-            Ease is left at 5. Adjust when you add to backlog based on your team's capacity.
-          </div>
-        </div>
-
-        {/* Cited source learnings — the grounding */}
-        {citedLearnings.length > 0 && (
-          <div style={gSc(t)}>
-            <div style={gSL(t)}>Source learnings · what this is grounded in</div>
-            <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              {citedLearnings.map(item => (
-                <div key={item.id} onClick={()=>setCiteItem(item)} style={{padding:"10px 12px",background:t.surfaceAlt,borderLeft:"3px solid "+t.gold,borderRadius:"0 4px 4px 0",cursor:"pointer"}}>
-                  <div style={{fontSize:12,fontWeight:600,color:t.text,fontFamily:t.serif,marginBottom:4}}>{item.title}</div>
-                  <div style={{display:"flex",gap:6,marginBottom:6,flexWrap:"wrap"}}>
-                    <span style={{fontSize:9,color:t.textMuted,fontFamily:t.serif,padding:"1px 6px",border:"1px solid "+t.border,borderRadius:3}}>
-                      {item.results?.outcomeClassification || "Inconclusive"}
-                    </span>
-                    <span style={{fontSize:9,color:t.textMuted,fontFamily:t.serif,padding:"1px 6px",border:"1px solid "+t.border,borderRadius:3}}>
-                      {brandName(item.brandId, brands)}
-                    </span>
-                  </div>
-                  {item.results?.keyLearning && (
-                    <div style={{fontSize:12,color:t.textSub,fontFamily:t.serif,lineHeight:1.5}}>"{renderProse(item.results.keyLearning)}"</div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Actions — only if pending */}
-        {!isResolved && (
-          <div style={{display:"flex",gap:8,justifyContent:"flex-end",borderTop:"1px solid "+t.border,paddingTop:14}}>
-            <button onClick={()=>onDismiss(batchId, recId)} style={{...gGh(t),fontSize:12,padding:"7px 14px"}}>
-              ✕ Dismiss
-            </button>
-            <button onClick={()=>onAccept(batchId, recId)} style={{...gG(t),fontSize:12,padding:"7px 14px"}}>
-              ✓ Add to backlog
-            </button>
-          </div>
-        )}
-      </div>
-      {citeItem && <CitationModal item={citeItem} t={t} dk={dk} cats={cats} brands={brands} onClose={()=>setCiteItem(null)}/>}
-    </Modal>
-  );
-}
-
-
-
-
-// -- Settings ------------------------------------------------------------------
-function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onRestoreBackup,onResetDemo}) {
-  const [local,setLocal]=useState({...settings});
-  const [newCat,setNewCat]=useState("");
-  const f=(k,v)=>setLocal(p=>({...p,[k]:v}));
-  const addCat=()=>{const c=newCat.trim();if(!c||local.categories.includes(c))return;f("categories",[...local.categories,c]);setNewCat("");};
-  return (
-    <Modal t={t} dk={dk} onClose={onClose} wide title="Settings">
-      <div style={{display:"flex",flexDirection:"column",gap:14}}>
-        <FR label="Company / workspace name" t={t}><input style={gI(t)} value={local.companyName} onChange={e=>f("companyName",e.target.value)}/></FR>
-        <FR label="Business model (one line)" t={t}><input style={gI(t)} value={local.businessModel} onChange={e=>f("businessModel",e.target.value)}/></FR>
-        <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
-          <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:10,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>North star metric</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
-            <FR label="Metric name" t={t}><input style={gI(t)} value={local.northStarMetric} onChange={e=>f("northStarMetric",e.target.value)}/></FR>
-            <FR label="Current value" t={t}><input style={gI(t)} value={local.northStarCurrent} onChange={e=>f("northStarCurrent",e.target.value)}/></FR>
-            <FR label="Target" t={t}><input style={gI(t)} value={local.northStarTarget} onChange={e=>f("northStarTarget",e.target.value)}/></FR>
-          </div>
-        </div>
-        <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
-          <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:10,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Categories</div>
-          <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}}>
-            {local.categories.map(c=>(
-              <span key={c} style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:12,fontWeight:600,color:catColor(c,local.categories,dk),background:t.surfaceAlt,border:"1px solid "+(t.border),borderRadius:4,padding:"3px 8px"}}>
-                {c}<button onClick={()=>f("categories",local.categories.filter(x=>x!==c))} style={{background:"none",border:"none",color:"inherit",cursor:"pointer",padding:0,fontSize:12,lineHeight:1,opacity:0.6}}>&#215;</button>
-              </span>
-            ))}
-          </div>
-          <div style={{display:"flex",gap:6}}>
-            <input style={{...gI(t),flex:1}} value={newCat} onChange={e=>setNewCat(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")addCat();}} placeholder="New category…"/>
-            <button style={gG(t)} onClick={addCat}>Add</button>
-          </div>
-        </div>
-        <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
-          <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:10,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Retailers / Partners</div>
-          <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:10}}>
-            {(local.brands||[]).map((b,i)=>{
-              const upd = (k,v) => { const bs=[...(local.brands||[])]; bs[i]={...bs[i],[k]:v}; setLocal(p=>({...p,brands:bs})); };
-              return (
-              <div key={b.id} style={{padding:"12px 14px",background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:6,display:"flex",flexDirection:"column",gap:8}}>
-                {/* Name row */}
-                <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  <div style={{width:8,height:8,borderRadius:"50%",background:brandColor(b.id,local.brands||[],dk),flexShrink:0}}/>
-                  <input style={{...gI(t),flex:1,padding:"4px 8px",fontWeight:700}} value={b.name}
-                    onChange={e=>upd("name",e.target.value)} placeholder="Retailer / brand name"/>
-                  {(local.brands||[]).length>1&&<button onClick={()=>setLocal(p=>({...p,brands:(p.brands||[]).filter((_,j)=>j!==i)}))}
-                    style={{background:"none",border:"none",color:t.textMuted,cursor:"pointer",fontSize:14,padding:"0 4px"}}>&#10005;</button>}
-                </div>
-                {/* Brief fields */}
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
-                  <div>
-                    <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>WHAT THEY SELL</label>
-                    <input style={{...gI(t),fontSize:11}} value={b.whatTheySell||""} onChange={e=>upd("whatTheySell",e.target.value)}
-                      placeholder="e.g. Premium home décor, $80–$300 AOV"/>
-                  </div>
-                  <div>
-                    <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>CATEGORIES (comma-separated)</label>
-                    <input style={{...gI(t),fontSize:11}} value={b.categories||""} onChange={e=>upd("categories",e.target.value)}
-                      placeholder="e.g. Home decor, Gifting, Candles"/>
-                  </div>
-                  <div>
-                    <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>ICP (comma-separated)</label>
-                    <input style={{...gI(t),fontSize:11}} value={b.icp||""} onChange={e=>upd("icp",e.target.value)}
-                      placeholder="e.g. Women 28–45, gifting buyers, high-intent decorators"/>
-                  </div>
-                  <div>
-                    <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>WHY THEY WIN</label>
-                    <input style={{...gI(t),fontSize:11}} value={b.whyTheyWin||""} onChange={e=>upd("whyTheyWin",e.target.value)}
-                      placeholder="e.g. Visual brand, strong repeat buyer LTV"/>
-                  </div>
-                  <div>
-                    <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>RELATIONSHIP</label>
-                    <input style={{...gI(t),fontSize:11}} value={b.relationship||""} onChange={e=>upd("relationship",e.target.value)}
-                      placeholder="e.g. Own DTC brand, wholesale account, marketplace"/>
-                  </div>
-                  <div>
-                    <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>CURRENT CONSTRAINT</label>
-                    <input style={{...gI(t),fontSize:11}} value={b.constraint||""} onChange={e=>upd("constraint",e.target.value)}
-                      placeholder="e.g. CAC rising, thin margin on hero SKU"/>
-                  </div>
-                </div>
-              </div>
-            );})}
-          </div>
-          <button onClick={()=>{const newId="brand-"+Date.now();setLocal(p=>({...p,brands:[...(p.brands||[]),{id:newId,name:"New retailer"}]}));}}
-            style={{...gGh(t),fontSize:11}}>+ Add retailer</button>
-        </div>
-        <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
-          <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:4,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>C-Suite Debate Agents</div>
-          <p style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,lineHeight:1.5,margin:"0 0 10px"}}>
-            Customise the agents that participate in the strategy debate. Edit lenses to match your industry (e.g. "Category Manager" for CPG, "Buyer Relations" for retail).
-          </p>
-          <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:8}}>
-            {(local.agents||DEFAULT_AGENTS).map((agent,i)=>(
-              <div key={agent.id} style={{padding:"10px 12px",background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:6,display:"flex",flexDirection:"column",gap:8}}>
-                <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                  <input style={{...gI(t),width:44,textAlign:"center",padding:"4px",fontSize:18,flexShrink:0}}
-                    value={agent.icon}
-                    onChange={e=>{const a=[...(local.agents||DEFAULT_AGENTS)];a[i]={...a[i],icon:e.target.value};setLocal(p=>({...p,agents:a}));}}/>
-                  <input style={{...gI(t),flex:"0 0 80px",fontWeight:700}}
-                    value={agent.label}
-                    onChange={e=>{const a=[...(local.agents||DEFAULT_AGENTS)];a[i]={...a[i],label:e.target.value};setLocal(p=>({...p,agents:a}));}}
-                    placeholder="Label"/>
-                  <div style={{width:20,height:20,borderRadius:"50%",background:agent.color,flexShrink:0,border:"2px solid "+t.border}}/>
-                  {(local.agents||DEFAULT_AGENTS).length>2&&(
-                    <button onClick={()=>setLocal(p=>({...p,agents:(p.agents||DEFAULT_AGENTS).filter((_,j)=>j!==i)}))}
-                      style={{background:"none",border:"none",color:t.textMuted,cursor:"pointer",fontSize:14,padding:"0 4px",marginLeft:"auto"}}>✕</button>
-                  )}
-                </div>
-                <input style={gI(t)} value={agent.lens}
-                  onChange={e=>{const a=[...(local.agents||DEFAULT_AGENTS)];a[i]={...a[i],lens:e.target.value};setLocal(p=>({...p,agents:a}));}}
-                  placeholder="Strategic lens (what this exec focuses on)"/>
-                <input style={{...gI(t),fontSize:11}} value={agent.blindspot}
-                  onChange={e=>{const a=[...(local.agents||DEFAULT_AGENTS)];a[i]={...a[i],blindspot:e.target.value};setLocal(p=>({...p,agents:a}));}}
-                  placeholder="Known blindspot (keeps the debate honest)"/>
-              </div>
-            ))}
-          </div>
-          <div style={{display:"flex",gap:6}}>
-            <button onClick={()=>{const newA={id:"agent-"+Date.now(),label:"New",icon:"💼",color:"#888888",lens:"",blindspot:""};setLocal(p=>({...p,agents:[...(p.agents||DEFAULT_AGENTS),newA]}));}}
-              style={{...gGh(t),fontSize:11}}>+ Add agent</button>
-            <button onClick={()=>setLocal(p=>({...p,agents:DEFAULT_AGENTS}))}
-              style={{...gGh(t),fontSize:11}}>Reset to defaults</button>
-          </div>
-        </div>
-        <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
-          <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:4,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Health Metrics</div>
-          <p style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,lineHeight:1.5,margin:"0 0 10px"}}>
-            Portfolio-level guardrail metrics surfaced on the dashboard. Calculated metrics pull from weekly pulse data automatically.
-          </p>
-          <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:8}}>
-            {(local.healthMetrics||DEFAULT_SETTINGS.healthMetrics).map((metric,idx)=>{
-              const updhm=(k,v)=>{const hm=(local.healthMetrics||DEFAULT_SETTINGS.healthMetrics).map((m,i)=>i===idx?{...m,[k]:v}:m);setLocal(p=>({...p,healthMetrics:hm}));};
-              return (
-                <div key={metric.key} style={{padding:"10px 12px",background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:6,display:"flex",flexDirection:"column",gap:8,opacity:metric.enabled?1:0.55}}>
-                  <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                    <button onClick={()=>updhm("enabled",!metric.enabled)}
-                      style={{flexShrink:0,width:34,height:20,borderRadius:10,cursor:"pointer",border:"none",
-                        background:metric.enabled?t.teal:t.border,position:"relative",transition:"background 0.15s"}}>
-                      <span style={{position:"absolute",top:3,left:metric.enabled?16:3,width:14,height:14,borderRadius:"50%",background:"#fff",transition:"left 0.15s"}}/>
-                    </button>
-                    <input style={{...gI(t),flex:1,fontWeight:600,fontSize:12}} value={metric.label}
-                      onChange={e=>updhm("label",e.target.value)} placeholder="Metric label"/>
-                    <button onClick={()=>setLocal(p=>({...p,healthMetrics:(local.healthMetrics||DEFAULT_SETTINGS.healthMetrics).filter((_,i)=>i!==idx)}))}
-                      style={{background:"none",border:"none",color:t.textMuted,cursor:"pointer",fontSize:14,padding:"0 4px"}}>&#10005;</button>
-                  </div>
-                  {metric.isCalculated&&(
-                    <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,lineHeight:1.5,padding:"5px 8px",background:t.surface,border:"1px solid "+t.borderSoft,borderRadius:4}}>
-                      {metric.calculationNote}
-                    </div>
-                  )}
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                    <div>
-                      <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>
-                        {metric.isCalculated?"MANUAL FALLBACK":"CURRENT VALUE"}
-                      </label>
-                      <input style={{...gI(t),fontSize:12}} type="number" step="any"
-                        value={metric.manualValue??""} placeholder={metric.isCalculated?"Used if auto-calc unavailable":"Enter current value"}
-                        onChange={e=>updhm("manualValue",e.target.value===""?null:parseFloat(e.target.value))}/>
-                    </div>
-                    <div>
-                      <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>TARGET (OPTIONAL)</label>
-                      <input style={{...gI(t),fontSize:12}} type="number" step="any"
-                        value={metric.target??""} placeholder="Target value"
-                        onChange={e=>updhm("target",e.target.value===""?null:parseFloat(e.target.value))}/>
-                    </div>
-                  </div>
-                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                    <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif}}>Direction:</span>
-                    {[{v:true,l:"Higher is better"},{v:false,l:"Lower is better"}].map(opt=>(
-                      <button key={String(opt.v)} onClick={()=>updhm("higherIsBetter",opt.v)}
-                        style={{fontSize:10,padding:"3px 8px",borderRadius:3,cursor:"pointer",fontFamily:t.serif,
-                          background:metric.higherIsBetter===opt.v?t.gold:"transparent",
-                          border:"1px solid "+(metric.higherIsBetter===opt.v?t.gold:t.border),
-                          color:metric.higherIsBetter===opt.v?t.goldText:t.textMuted}}>
-                        {opt.l}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          {(local.healthMetrics||DEFAULT_SETTINGS.healthMetrics).length<8&&(
-            <button style={{...gGh(t),fontSize:11}} onClick={()=>{
-              const hm=local.healthMetrics||DEFAULT_SETTINGS.healthMetrics;
-              if(hm.length>=8)return;
-              setLocal(p=>({...p,healthMetrics:[...hm,{key:"metric_"+Date.now(),label:"Custom Metric",enabled:true,isCalculated:false,calculationNote:"",manualValue:null,target:null,higherIsBetter:true}]}));
-            }}>+ Add metric</button>
-          )}
-        </div>
-        <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
-          <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:10,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Backup &amp; restore</div>
-          <p style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,lineHeight:1.6,margin:"0 0 10px"}}>Download a full snapshot of your data (initiatives, settings, debates, weekly metrics) as a JSON file. Keep a copy somewhere safe. This is the only off-device record until cloud sync ships.</p>
-          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-            <button onClick={onDownloadBackup} style={{...gG(t),fontSize:12}}>&#8659; Download backup</button>
-            <label style={{...gGh(t),fontSize:12,cursor:"pointer"}}>
-              &#8645; Restore from backup
-              <input type="file" accept="application/json,.json" style={{display:"none"}}
-                onChange={e=>{ const f=e.target.files?.[0]; if(f){onRestoreBackup(f); e.target.value="";} }}/>
-            </label>
-          </div>
-        </div>
-        <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
-          <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:8,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Demo data</div>
-          <p style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,lineHeight:1.6,margin:"0 0 10px"}}>Reload the built-in demo initiatives and weekly metrics. Replaces all current initiatives and weekly pulse data.</p>
-          <button onClick={onResetDemo} style={{...gGh(t),fontSize:12}}>&#8635; Reset to demo data</button>
-        </div>
-        <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-            <div style={{fontSize:12,fontWeight:700,color:t.textSub,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Data sources</div>
-            <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,background:t.border,padding:"2px 6px",borderRadius:3}}>Placeholder · coming soon</span>
-          </div>
-          <p style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,lineHeight:1.6,margin:"0 0 8px"}}>Planned: Google Sheets (pulling from GA4, Looker, Meta Ads), BigQuery, direct GA4 and Meta Ads APIs. Paste data manually in the initiative form for now.</p>
-          <div style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,padding:"10px 12px",background:t.surfaceAlt,borderRadius:4,border:"1px dashed "+t.border}}>No data sources connected yet.</div>
-        </div>
-        <div style={{display:"flex",gap:8,justifyContent:"flex-end",paddingTop:4}}>
-          <button style={gGh(t)} onClick={onClose}>Cancel</button>
-          <button style={gG(t)} onClick={()=>{ onSave(local); }}>Save settings</button>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
-
-

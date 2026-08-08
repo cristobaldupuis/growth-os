@@ -43,9 +43,7 @@
 // expires — same pattern as the image path's session-only base64.
 
 import { VIDEO_TIERS, estimateVideoCostUsd } from "../src/services/ai/callGenerateVideo.js";
-
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "https://growth-os-iota-seven.vercel.app")
-  .split(",").map((s) => s.trim()).filter(Boolean);
+import { guardEntry, guardRateLimit, clientIp } from "./_guard.js";
 
 export const ALLOWED_PROVIDERS = new Set(["heygen", "did", "fabric"]);
 
@@ -75,51 +73,13 @@ export const ALLOWED_ASPECTS = new Set(["9:16", "4:5", "1:1", "16:9"]);
 // materially worse than the "$15-20" this comment used to claim, because that
 // figure predated the premium tier existing. It is bounded and it is survivable
 // for a single-operator deployment, but it is not a number to carry into Phase 4
-// unrevisited, and it is the reason the fail-closed branch below is not
+// unrevisited, and it is the reason the fail-closed branch in _guard.js is not
 // negotiable.
 const SUBMIT_RATE_LIMIT_MAX = 12;
-const SUBMIT_RATE_LIMIT_WINDOW = 60 * 60 * 1000;
 // Polling costs the provider nothing extra and the proxy very little; bounded
 // generously so a normal 60-170s render (6-20 polls at the client's suggested
 // 8s interval) never gets throttled mid-job.
 const POLL_RATE_LIMIT_MAX = 120;
-
-const memoryLog = new Map();
-function memoryRateLimit(id, action, max, window) {
-  const key = `${action}:${id}`;
-  const now = Date.now();
-  const entry = memoryLog.get(key) || { count: 0, windowStart: now };
-  if (now - entry.windowStart > window) { entry.count = 0; entry.windowStart = now; }
-  entry.count += 1;
-  memoryLog.set(key, entry);
-  return entry.count > max;
-}
-
-async function redisRateLimit(id, action, max, window) {
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) return null;
-  const key = `gos:vid:${action}:${id}:${Math.floor(Date.now() / window)}`;
-  const ttl = Math.ceil(window / 1000);
-  const res = await fetch(`${url}/pipeline`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify([["INCR", key], ["EXPIRE", key, ttl]]),
-  });
-  if (!res.ok) throw new Error(`rate-limit backend returned ${res.status}`);
-  const out = await res.json();
-  const count = Number(out?.[0]?.result);
-  if (!Number.isFinite(count)) throw new Error("rate-limit backend returned an unreadable count");
-  return count > max;
-}
-
-function originAllowed(req) {
-  const origin = req.headers.origin;
-  if (origin) return ALLOWED_ORIGINS.includes(origin);
-  const referer = req.headers.referer;
-  if (referer) return ALLOWED_ORIGINS.some((o) => referer.startsWith(o));
-  return false;
-}
 
 /** Returns an error string, or null. Exported so the request-shape test asserts
  *  against the real rule, same convention as validateImageBody. */
@@ -349,45 +309,20 @@ const adapters = {
 };
 
 export default async function handler(req, res) {
-  const origin = req.headers.origin;
-  if (origin && ALLOWED_ORIGINS.includes(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-    res.setHeader("Vary", "Origin");
-  }
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  if (guardEntry(req, res, { maxBodyBytes: MAX_BODY_BYTES })) return;
 
-  if (req.method === "OPTIONS") return res.status(200).end();
-  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
-  if (!originAllowed(req)) return res.status(403).json({ error: "Forbidden" });
-
-  const contentLength = Number(req.headers["content-length"] || 0);
-  if (contentLength > MAX_BODY_BYTES) return res.status(413).json({ error: "Request body too large." });
-
-  const ip = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || "unknown";
+  // Which bucket and which ceiling applies is decided by the action, so this
+  // has to resolve between the entry checks and the rate limit — a submit costs
+  // a dollar-plus and a poll costs nothing, and they must not share a budget.
   const action = req.body?.action;
   if (action !== "submit" && action !== "poll") return res.status(400).json({ error: "action must be \"submit\" or \"poll\"." });
 
-  const limits = action === "submit"
-    ? { max: SUBMIT_RATE_LIMIT_MAX, window: SUBMIT_RATE_LIMIT_WINDOW }
-    : { max: POLL_RATE_LIMIT_MAX, window: SUBMIT_RATE_LIMIT_WINDOW };
-
-  try {
-    const limited = await redisRateLimit(ip, action, limits.max, limits.window);
-    if (limited === null) {
-      console.warn("Video rate limiting is in-memory only; set UPSTASH_REDIS_REST_URL/TOKEN for a durable limit.");
-      if (memoryRateLimit(ip, action, limits.max, limits.window)) {
-        return res.status(429).json({ error: "Video generation limit reached. Try again later." });
-      }
-    } else if (limited) {
-      return res.status(429).json({ error: "Video generation limit reached. Try again later." });
-    }
-  } catch (err) {
-    // Fail closed — more important here than on the image path, since a
-    // successful submit is a dollar-plus of provider spend, not a few cents.
-    console.error("Video rate limit check failed:", err);
-    return res.status(503).json({ error: "Service temporarily unavailable." });
-  }
+  if (await guardRateLimit(req, res, {
+    key: `gos:vid:${action}:${clientIp(req)}`,
+    max: action === "submit" ? SUBMIT_RATE_LIMIT_MAX : POLL_RATE_LIMIT_MAX,
+    limitMessage: "Video generation limit reached. Try again later.",
+    label: "Video",
+  })) return;
 
   const adapter = adapters[req.body?.provider];
 

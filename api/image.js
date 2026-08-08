@@ -24,10 +24,9 @@
 // around 5MB, and this app has already shipped one silent data-loss bug caused
 // by a full quota. Images are the fastest possible way to reproduce it.
 
-const GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/models";
+import { guardEntry, guardRateLimit, clientIp } from "./_guard.js";
 
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "https://growth-os-iota-seven.vercel.app")
-  .split(",").map((s) => s.trim()).filter(Boolean);
+const GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/models";
 
 // Image models this app actually calls. "Nano Banana" is the community name for
 // Gemini 2.5 Flash Image; the Pro tier is the Gemini 3 image preview.
@@ -43,46 +42,6 @@ const MAX_BODY_BYTES = 64 * 1024;
 // Deliberately far below the text proxy's 60/hour. At roughly four cents an
 // image this is a bounded worst case of about a dollar an hour per IP.
 const RATE_LIMIT_MAX = 25;
-const RATE_LIMIT_WINDOW = 60 * 60 * 1000;
-
-const memoryLog = new Map();
-function memoryRateLimit(id) {
-  const now = Date.now();
-  const entry = memoryLog.get(id) || { count: 0, windowStart: now };
-  if (now - entry.windowStart > RATE_LIMIT_WINDOW) { entry.count = 0; entry.windowStart = now; }
-  entry.count += 1;
-  memoryLog.set(id, entry);
-  return entry.count > RATE_LIMIT_MAX;
-}
-
-async function redisRateLimit(id) {
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) return null;
-
-  // Separate key namespace from the text proxy: image spend has its own, much
-  // lower ceiling and must not be able to exhaust or be exhausted by text calls.
-  const key = `gos:img:${id}:${Math.floor(Date.now() / RATE_LIMIT_WINDOW)}`;
-  const ttl = Math.ceil(RATE_LIMIT_WINDOW / 1000);
-  const res = await fetch(`${url}/pipeline`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify([["INCR", key], ["EXPIRE", key, ttl]]),
-  });
-  if (!res.ok) throw new Error(`rate-limit backend returned ${res.status}`);
-  const out = await res.json();
-  const count = Number(out?.[0]?.result);
-  if (!Number.isFinite(count)) throw new Error("rate-limit backend returned an unreadable count");
-  return count > RATE_LIMIT_MAX;
-}
-
-function originAllowed(req) {
-  const origin = req.headers.origin;
-  if (origin) return ALLOWED_ORIGINS.includes(origin);
-  const referer = req.headers.referer;
-  if (referer) return ALLOWED_ORIGINS.some((o) => referer.startsWith(o));
-  return false;
-}
 
 /**
  * Returns an error string, or null when acceptable.
@@ -132,36 +91,15 @@ export function extractImage(data) {
 }
 
 export default async function handler(req, res) {
-  const origin = req.headers.origin;
-  if (origin && ALLOWED_ORIGINS.includes(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-    res.setHeader("Vary", "Origin");
-  }
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-
-  if (req.method === "OPTIONS") return res.status(200).end();
-  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
-  if (!originAllowed(req)) return res.status(403).json({ error: "Forbidden" });
-
-  const contentLength = Number(req.headers["content-length"] || 0);
-  if (contentLength > MAX_BODY_BYTES) return res.status(413).json({ error: "Request body too large." });
-
-  const ip = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || "unknown";
-  try {
-    const limited = await redisRateLimit(ip);
-    if (limited === null) {
-      console.warn("Image rate limiting is in-memory only; set UPSTASH_REDIS_REST_URL/TOKEN for a durable limit.");
-      if (memoryRateLimit(ip)) return res.status(429).json({ error: "Image generation limit reached. Try again later." });
-    } else if (limited) {
-      return res.status(429).json({ error: "Image generation limit reached. Try again later." });
-    }
-  } catch (err) {
-    // Fail closed, same reasoning as the text proxy — more so here, because each
-    // unbounded call costs a fixed few cents rather than a fraction of one.
-    console.error("Image rate limit check failed:", err);
-    return res.status(503).json({ error: "Service temporarily unavailable." });
-  }
+  if (guardEntry(req, res, { maxBodyBytes: MAX_BODY_BYTES })) return;
+  // Separate key namespace from the text proxy: image spend has its own, much
+  // lower ceiling and must not be able to exhaust or be exhausted by text calls.
+  if (await guardRateLimit(req, res, {
+    key: `gos:img:${clientIp(req)}`,
+    max: RATE_LIMIT_MAX,
+    limitMessage: "Image generation limit reached. Try again later.",
+    label: "Image",
+  })) return;
 
   const invalid = validateImageBody(req.body);
   if (invalid) return res.status(400).json({ error: invalid });

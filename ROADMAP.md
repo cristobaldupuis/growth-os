@@ -159,7 +159,7 @@ and does not wait on Supabase.
 - [ ] **Performance rows do not survive the browser.** Capped at 5,000 rows in
   `localStorage`, oldest dropped on merge with the count reported. This is the
   read path proven against real exports, deliberately ahead of its storage —
-  Phase 5.3 is where it gets a home that fits.
+  Phase 5.4 is where it gets a home that fits.
 
 ### Phase 1.7 — Interface audit remediation (August 2026)
 
@@ -256,8 +256,8 @@ Auth for the session token the proxy needs. Schema draft is in
 
 Be honest about the cost: `store.js` stores one JSON blob per key, and that model does not survive contact with a relational schema. The read paths are real work, not an adapter swap.
 
-**Sequencing consequence:** the campaign fact model (Phase 5.3) and the read
-connectors (5.4) both list Supabase as a hard prerequisite. With 2.0 pulled
+**Sequencing consequence:** the campaign fact model (Phase 5.4) and the read
+connectors (5.5) both list Supabase as a hard prerequisite. With 2.0 pulled
 forward, those stop being late-phase items gated on infrastructure that keeps
 receding and become the next real work after it.
 
@@ -375,9 +375,9 @@ The expansion from a decision engine into an experimentation platform that also
 executes. Sequenced by dependency, not by appeal: everything below Phase 5.1
 needs a backend, and pretending otherwise is how this stalls.
 
-**5.1 and 5.2 are the next app-layer work after 2.0** — both are pure additions to
+**5.1, 5.2 and 5.3 are the next app-layer work after 2.0** — all three are pure additions to
 the existing data model with no backend dependency, and together they are what
-turns a backlog into a research programme. They are also the two items a buyer can
+turns a backlog into a research programme. They are also the three items a buyer can
 see in a demo without a single connector being wired.
 
 Positioning is **practice-first, product-shaped** — built for the operator's own
@@ -414,7 +414,59 @@ criteria are set, and a Running initiative shows live distance to its kill line.
 Also from that prototype and worth adopting: a **Franchise / Loonshot** risk
 taxonomy, so a portfolio can be read for whether it is taking any real swings.
 
-### 5.3 — Campaign fact model *(requires Supabase)*
+### 5.3 — Diagnostic escalation: the system names the dimension it is missing
+
+The naming convention captures around two dozen dimensions. The ad platforms can
+break down on a dozen more — realised placement as against targeted, device,
+time of day, geo below the `geo` slot, and the demographic split that Phase 1.6's
+export decision deliberately leaves out (DECISIONS.md). When a result is
+unexplained, the missing dimension is usually one of those.
+
+This closes that gap without ingesting any of it in bulk. When a closed
+initiative's actual outcome diverges from the prediction frozen at launch, the
+system ranks which un-captured dimension most plausibly accounts for the gap and
+asks for exactly that one: *pull Meta → Ads → Breakdown by Age for campaign X,
+3–17 Nov, paste it here.* Scoped to one initiative, one window, one axis —
+tens of rows, not the 21× row multiplier a standing demographic feed would carry.
+
+**Why this is not a feature a competitor can copy.** It needs a frozen
+expectation to detect the anomaly against. `predictionSnapshot` holds revenue
+impact and ICE as of launch, and `portfolio.js` already separates `tracked` from
+`backfilled` so the deltas that matter are distinguishable from the ones that are
+artefacts of backfill. A tracker whose results are typed in by a human has no
+frozen prediction and no ad-account rows, so it cannot generate the sentence.
+
+**Four constraints that decide whether it works, not decorations on it:**
+
+1. **Fire rarely.** Gate on prediction error past a threshold *and* a nameable
+   candidate explanation. Three times a quarter and right beats weekly and
+   ignored — an escalation that becomes routine is a notification, and
+   notifications get muted.
+2. **The paste-back is a third CSV shape.** A breakdown export replaces the name
+   axis with the breakdown axis, so rows key on (entity, breakdown value) and may
+   carry no ad name at all. `detectCsvShape` needs a third branch; the weekly and
+   campaign shapes do not stretch to cover it.
+3. **It does not enter the fact table.** This is evidence attached to one
+   initiative's post-mortem — scoped to a question, a window and an axis. Modelled
+   as `initiative_evidence`, which also keeps demographic data under a stricter
+   retention and consent posture than the main store, containing the DPA surface
+   rather than spreading it.
+4. **It must return a verdict, not a table.** "The 45-54 band took 60% of spend
+   and converted at half the rate — that is the gap" or "mix was stable, look
+   elsewhere." If pasting yields a pivot table, the product has charged an
+   operator manual work and handed back homework.
+
+**The compounding property, which is the actual argument for building it.** Every
+time it fires and the answer is yes, that is evidence the client should be
+*naming* that dimension from now on. Three tests confounded by placement produces
+"add `placement` to your ad template." The diagnostic feeds back into taxonomy
+design, and the taxonomy improving under supervision is the thing a retainer is
+actually paying for.
+
+App-layer work on the existing data model. No backend dependency, no connector —
+which makes it unusually cheap for how hard it is to copy.
+
+### 5.4 — Campaign fact model *(requires Supabase)*
 
 The weekly-metrics contract is one row per week per brand per source. Campaign
 analysis needs facts at campaign/adset/ad × day, with nomenclature segments
@@ -436,7 +488,22 @@ same table, two entry points.
 survive a relational fact table; this is the read-path work DECISIONS.md warns
 is real rather than an adapter swap.
 
-### 5.4 — Read connectors: Meta and Google Ads *(requires Supabase)*
+**Store the raw name, and treat parsed dimensions as derived.** Every fact row
+keeps `raw_name` and the schema version in force at import alongside its typed
+dimensions, and a reparse job rewrites the derived columns when the schema
+changes. This is what makes `performance.js`'s refusal to guess pay off: a row
+that fails to parse today parses tomorrow once the taxonomy is corrected. Persist
+only the parsed dimensions and the first schema correction silently orphans every
+historical row with no path back — and it is also the precondition for retiring
+the `gender`/`talent` collision recorded in DECISIONS.md, which cannot be fixed
+in place because a vocabulary change turns previously-valid names unparseable.
+
+**Import batches are first-class:** filename, imported_at, schema version, and
+the attributed / untagged / broken-link split as of import. That table is the
+audit trail for the product's core claim, and a client watching their own tagging
+discipline improve month over month is a renewal argument rather than plumbing.
+
+### 5.5 — Read connectors: Meta and Google Ads *(requires Supabase)*
 
 Ships behind the existing normalisation contract, one at a time, per the
 ingestion decision. Note this reorders the original sequencing: Meta and Google
@@ -449,7 +516,7 @@ uniquely own.
 forcing condition for Supabase, arriving whether or not a client ever asks where
 their data is stored.
 
-### 5.5 — Campaign execution behind a proposal gate *(requires 5.4)*
+### 5.6 — Campaign execution behind a proposal gate *(requires 5.5)*
 
 Create, budget, pause. Every mutation is a proposed change, diffed against live
 state, human-approved, then applied by a separate path that writes an audit
@@ -457,12 +524,12 @@ record. No auto-approval at any spend level. Full reasoning in DECISIONS.md — 
 is the one part of the scope where getting it wrong costs money rather than
 credibility.
 
-### 5.6 — Creative production, including video from evidence
+### 5.7 — Creative production, including video from evidence
 
 Extends the Creative Studio from direction to assets: brief → variant set →
 generated or templated creative → tagged with the initiative → matched back
 through the naming convention when performance lands. Closes the loop that
-5.1–5.5 opens.
+5.1–5.6 opens.
 
 **Product video generated from the learning library is the intended end state,**
 and it is deliberately last. The interesting version is not "generate a video" —
@@ -470,7 +537,7 @@ it is a video whose angle, hook and proof are chosen because the library says
 those are the claims this brand's own tests have supported, generated against a
 hypothesis, named with the initiative's tracking tag, and joined back to its own
 performance when the rows land. Every one of those clauses depends on 5.1 through
-5.4 working on real data. Built earlier, it is an asset generator, which is a
+5.5 working on real data. Built earlier, it is an asset generator, which is a
 commodity, and it is the fastest way to be mistaken for one.
 
 **What ships today is not this.** `api/video.js` renders talking-head avatars

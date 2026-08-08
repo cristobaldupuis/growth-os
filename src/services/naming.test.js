@@ -8,7 +8,7 @@ import {
   trackingTagFromName, matchNamesToInitiatives, suggestTrackingTag,
   breakdownByDimension, resolveSchema, templateFor, listChannels, listLevels,
   initiativeDimension, levelCarriesInitiative,
-  taxonomy, dimensionUsage, channelDimensions,
+  taxonomy, dimensionUsage, dimensionCoverage, channelDimensions,
   adNamesOf, assignedNameIndex, assignedNameConflicts, lookupAssignedName,
   emptyCustomVariables, applyCustomVariables, upsertCustomDimension, removeCustomDimension,
   addVocabValue, removeVocabValue, validateCustomDimension, validateVocabValue,
@@ -374,6 +374,41 @@ test("dimensionUsage reports every place a dimension sits, with its slot", () =>
 
 test("a dimension no template uses reports no usage rather than throwing", () => {
   assert.deepEqual(dimensionUsage(S, "not-a-dimension"), []);
+});
+
+test("dimensionCoverage separates a partial rollup from an empty one", () => {
+  // The dangerous case: most channels carry it, two do not, and the chart
+  // looks complete either way.
+  const gender = dimensionCoverage(S, "gender");
+  assert.deepEqual(gender.covered.map(c => c.id).sort(), ["meta", "tiktok"]);
+  assert.deepEqual(gender.missing.map(c => c.id).sort(), ["google", "klaviyo", "youtube"]);
+  assert.equal(gender.partial, true, "a Meta+TikTok rollup must not be captioned as portfolio-wide");
+
+  // Carried everywhere: nothing to warn about.
+  const channel = dimensionCoverage(S, "channel");
+  assert.equal(channel.missing.length, 0);
+  assert.equal(channel.partial, false);
+
+  // Carried nowhere: obviously empty, so not the case worth flagging.
+  const nothing = dimensionCoverage(S, "not-a-dimension");
+  assert.equal(nothing.covered.length, 0);
+  assert.equal(nothing.partial, false);
+});
+
+test("breakdownByDimension reports the coverage behind its own numbers", () => {
+  const rows = [{ channel:"meta", level:"adset", name:"US_25-34_F_StressInterest_Auto", metrics:{ spend:10 } }];
+  const { groups, coverage } = breakdownByDimension(rows, "age", S);
+  assert.equal(groups.length, 1);
+  assert.equal(coverage.partial, true, "age is Meta+TikTok only — the caller needs to be able to say so");
+});
+
+test("age is a controlled list, because the platforms' buckets are fixed", () => {
+  const age = S.dimensions.find(d => d.key === "age");
+  assert.ok(Array.isArray(age.vocab), "free text here splits one band across three spellings");
+  // Broad/Advantage+ delivery sets no band at all, and that is now the common case.
+  assert.equal(validateValue(age, "Broad", "_"), null);
+  assert.equal(validateValue(age, "25-34", "_"), null);
+  assert.ok(validateValue(age, "25-34yo", "_"), "a typo'd band is rejected rather than silently pivoted apart");
 });
 
 test("channelDimensions is the union across levels, asked once, in first-appearance order", () => {

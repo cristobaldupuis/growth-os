@@ -711,3 +711,101 @@ A contrast gate with an exemption for the token that does most of the work is a
 gate that reports what it was told rather than what is true. The waiver now
 names a token that is actually decorative, and is checked against the surfaces
 that token is allowed on.
+## Performance exports are ad-level with no breakdowns, and demographics are fetched on demand
+
+**Decision:** The supported export is campaign + ad set + ad names at ad-level
+grain, with no platform breakdowns. Demographic splits are not ingested in bulk;
+they are requested per-question by the diagnostic escalation in ROADMAP 5.3.
+
+**Why ad-level and not campaign-level:** the `initiative` slot exists in exactly
+two templates — `ad` on all four ad channels, and `message` on Klaviyo. Campaign
+names are `channel_funnel_category_geo_objective`, with no bridge segment. A
+campaign-level export therefore parses cleanly and attributes to nothing, which
+the importer would correctly report as 100% untagged — a true statement that
+looks exactly like a broken product. Including the campaign and ad set name
+columns in the same ad-level export costs no extra rows, because
+`LEVEL_PRECEDENCE` takes the ad name as the row's identity and the coarser names
+ride along.
+
+**Why no demographic breakdowns, strongest reason first:**
+
+1. **The schema already has `age` and `gender`, and they mean the opposite
+   thing.** The named slots record what was *targeted* — an input, a decision
+   somebody made. A platform breakdown reports who was *reached* — an output.
+   Ingesting both produces two columns named gender with contradictory semantics
+   and rollups that silently blend them. This is a correctness problem, not a
+   volume one, and it would surface months later as numbers nobody can explain.
+2. **It is the one thing that breaks the volume argument.** Age × gender is
+   roughly a 21× row multiplier: ~6k rows/month/client becomes ~126k, ~1.5M/year.
+   That is where "Postgres will not notice" stops being true and retention policy
+   stops being deferrable.
+3. **It is where the DPA obligation lives.** Campaign-level spend and revenue is
+   business data. Demographic breakdowns are what make a processor agreement
+   genuinely necessary rather than boilerplate.
+
+**What this deliberately gives up, and why the loss is smaller than it looks:**
+the named slots cannot tell you who actually responded. That limit is getting
+worse, not better — under Advantage+ and broad targeting, which is now the
+default, nobody sets age or gender at all, so `age` reads `Broad` and carries no
+information. The answer is not to ingest the breakdown by default; it is that
+this gap is precisely what ROADMAP 5.3 exists to close, one question at a time.
+If a demographic split matters to a hypothesis in advance, the disciplined path
+is a separate ad set with `age`/`gender` in its name, which flows through the
+ledger as structure rather than arriving as an unattributable report.
+
+**Forcing condition:** a client whose analysis genuinely requires standing
+demographic data — at which point it lands in `initiative_evidence` with its own
+retention and consent posture, not in the main fact table.
+
+---
+
+## The `gender`/`talent` collision is not fixable in place — it needs a schema version
+
+**Decision:** Meta's ad-level `gender` slot stays where it is, despite being
+semantically wrong. The fix is deferred to the schema-versioning work that the
+campaign fact model (ROADMAP 5.4) makes possible.
+
+**The defect, which is real:** `gender` means two unrelated things depending on
+level. In Meta's ad set template it is targeting; in Meta's *ad* template it is
+who appears on screen. The dimension's own hint admits this — "Targeted or
+presented gender" — and one field with two meanings blends under any rollup that
+crosses levels. Worse, the same fact is filed under different names across
+channels: Meta's ad template calls the on-screen presenter `gender`, YouTube's
+calls it `talent` with a richer vocabulary (`Woman/Man/Family/Expert/None`). So
+"how do ads featuring a woman perform" is unanswerable cross-channel — the data
+is there, under two names.
+
+**Why the obvious fix is worse than the defect.** Swapping slot 5 of Meta's ad
+template from `gender` to `talent` changes that slot's vocabulary from `[F, M,
+NA]` to `[Woman, Man, Family, Expert, None, NA]`. `validateValue` then rejects
+`F`, `parseName` sets `ok: false`, and `identifyName` returns no candidate — so
+every Meta ad name ever built under the current convention stops being
+identifiable and drops out of attribution entirely. That is silent
+mis-attribution of an account's whole history, which is the exact failure
+`naming.js` was written to prevent, and it breaks the invariant stated at the top
+of the templates: every name built before the rewrite still parses.
+
+Users who have saved a custom schema are insulated, because `baseSchema` returns
+a stored schema verbatim. Everyone on the default — the demo, and every new
+client — is not.
+
+**Why not a superset vocabulary as a bridge:** letting `talent` accept `F`
+alongside `Woman` keeps old names parsing, but `normKey("F") !== normKey("Woman")`,
+so the pivot splits into two rows for one fact. That trades a loud failure for a
+quiet one, which is the wrong direction.
+
+**What was done instead, now:** `age` gained a controlled vocabulary — it was
+free text against fixed platform buckets, so `25-34`, `25_34` and `25-34yo` each
+split the same band. That change is a tightening and carries the same class of
+risk in principle, but the blast radius was checked and is nil: one ad-set-shaped
+name exists in the codebase and its value is in the vocabulary. `dimensionCoverage`
+was added so a caller can tell a partial rollup from an empty one — `age` and
+`gender` sit in Meta's and TikTok's templates and in neither Google's nor
+YouTube's, so a demographic breakdown across a mixed portfolio is a Meta + TikTok
+number wearing a portfolio label. The figure was never wrong; the caption was, and
+now the caption is derivable.
+
+**Forcing condition:** the fact model landing with `raw_name` and a schema version
+stamped on every row. Reparse-on-version-change is what makes a vocabulary
+correction safe, because the old names are re-read under the schema that built
+them. Until that exists, this defect is cheaper than its fix.

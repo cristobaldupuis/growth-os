@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { brandName, iceScore, fmtCur, fmtDate, parseD, somM, eomM, resolveNorthStar } from "../constants.js";
+import { brandName, iceScore, fmtCur, fmtDate, fmtDateLong, parseD, somM, eomM, resolveNorthStar } from "../constants.js";
 import { gG, gGh, gCd, gSL } from "../components/styles.js";
 import { OBdg, CBdg, ICEChip } from "../components/badges.jsx";
 import { renderProse } from "../components/text.jsx";
@@ -391,7 +391,7 @@ export function ClientReadoutView({ t, dk, dash, items, brands, activeBrand, cat
   }, [dRange, cFrom, cTo]);
 
   const rangeLabel = useMemo(() => {
-    const fmt = (d) => d.toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" });
+    const fmt = (d) => d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
     return fmt(bounds.from) + " – " + fmt(bounds.to);
   }, [bounds]);
 
@@ -457,9 +457,14 @@ export function ClientReadoutView({ t, dk, dash, items, brands, activeBrand, cat
   const runningText   = buildRunningText(running);
   const nextText      = buildNextText(next);
 
+  // This block is pasted into a client email, which made "GROWTH OS SUMMARY"
+  // the single highest-stakes instance of a name DECISIONS.md had retired. The
+  // heading is now the workspace's own — a client reading their own summary
+  // should see their name at the top, not their agency's tooling — with the
+  // tool credited once at the foot, matching the dashboard's executive summary.
   const fullText = [
-    "GROWTH OS SUMMARY",
-    "Generated: " + new Date().toLocaleDateString("en-CA", { month: "long", day: "numeric", year: "numeric" }),
+    ((settings.companyName || "Portfolio").toUpperCase()) + " — GROWTH SUMMARY",
+    "Generated: " + fmtDateLong(),
     "Portfolio: " + (activeBrand === "all" ? "All brands" : brandName(activeBrand, brands)),
     "",
     scorecardText,
@@ -469,6 +474,8 @@ export function ClientReadoutView({ t, dk, dash, items, brands, activeBrand, cat
     runningText,
     "",
     nextText,
+    "",
+    "Tracked in Marketers Lab · " + fmtDateLong(),
   ].join("\n");
 
   return (

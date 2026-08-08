@@ -1,16 +1,23 @@
 import { gG, gGh, gSL, gCd } from "../components/styles.js";
 import { interactive, tile } from "../components/motion.js";
 import { renderProse } from "../components/text.jsx";
+import { fmtCur, fmtDateShort, parseD, iceScore } from "../constants.js";
+import { IconCheck } from "../components/icons.jsx";
 
 // -- Triage View --------------------------------------------------------------
+//
+// This file used to carry local copies of `fmtCur`, `fmtDate`, `parseD` and the
+// ICE calculation. They had drifted: the local `fmtCur` had no millions branch,
+// so a $2.4M initiative read "$2400k" here and "$2.4M" on the dashboard, and the
+// local `fmtDate` dropped the year, so the same end date read "Aug 12" here and
+// "Aug 12, 2026" everywhere else. The shared ones are also the only place the
+// workspace currency and locale are applied.
 export function TriageView({items, t, brands, activeBrand, onDetail, onLogResults, onExtend, onActivate}) {
   const today = new Date();
-  const parseD = d => d ? new Date(d+"T12:00:00") : null;
-  const fmtDate = d => d ? new Date(d+"T12:00:00").toLocaleDateString("en-CA",{month:"short",day:"numeric"}) : "—";
-  const fmtCur = n => { if(!n||n===0)return"—"; const abs=Math.abs(n); return(abs>=1000?"$"+Math.round(abs/1000)+"k":"$"+abs); };
+  const fmtDate = fmtDateShort;
   const brandFilter = e => activeBrand==="all" || (e.brandId||"default")===activeBrand;
   const brandLabel = e => (brands.find(b=>b.id===(e.brandId||"default"))||brands[0]||{}).name||"";
-  const iceOf = e => e.ice ? Math.round(((e.ice.impact||0)*(e.ice.certainty||0)*(e.ice.ease||0)/1000)*100) : 0;
+  const iceOf = e => e.ice ? (iceScore(e.ice.impact, e.ice.certainty, e.ice.ease) || 0) : 0;
   const daysFrom = d => { const p=parseD(d); return p?Math.ceil((p-today)/86400000):null; };
 
   const running = items.filter(e=>e.status==="Running"&&brandFilter(e));
@@ -124,7 +131,7 @@ export function TriageView({items, t, brands, activeBrand, onDetail, onLogResult
         border:"1px solid "+(topItem?t.border:t.teal)}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8,flexWrap:"wrap",marginBottom:topItem?12:4}}>
           <div style={{fontSize:10,letterSpacing:"0.11em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,fontWeight:600}}>
-            {today.toLocaleDateString("en-CA",{weekday:"long",month:"long",day:"numeric"})}
+            {today.toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"})}
           </div>
           <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>
             {renderProse(totalAtRisk>0?fmtCur(totalAtRisk)+" at risk across "+running.length+" running":running.length+" running · "+draft.length+" in draft")}
@@ -146,7 +153,7 @@ export function TriageView({items, t, brands, activeBrand, onDetail, onLogResult
           </div>
         ) : (
           <div style={{fontSize:13.5,color:t.teal,fontFamily:t.sans,fontWeight:500}}>
-            ✓ Queue clear. Nothing needs a decision today. Good week to activate a draft or run the Signal debate.
+            Queue clear. Nothing needs a decision today. Good week to activate a draft or run the Signal debate.
           </div>
         )}
       </div>
@@ -175,7 +182,7 @@ export function TriageView({items, t, brands, activeBrand, onDetail, onLogResult
 
         {queue.length===0 && (
           <div style={{...gCd(t),padding:"40px 24px",textAlign:"center"}}>
-            <div style={{fontSize:24,marginBottom:8,opacity:.5}}>✓</div>
+            <div style={{display:"flex",justifyContent:"center",marginBottom:8,color:t.teal}}><IconCheck size={24}/></div>
             <div style={{fontSize:14,fontWeight:600,color:t.text,fontFamily:t.sans,marginBottom:5}}>Nothing in the queue</div>
             <div style={{fontSize:12.5,color:t.textSub,fontFamily:t.sans,maxWidth:360,margin:"0 auto"}}>No running initiatives need a decision and no strong drafts are waiting. Log new metrics or generate a Signal slate to fill the pipeline.</div>
           </div>
@@ -197,7 +204,7 @@ export function TriageView({items, t, brands, activeBrand, onDetail, onLogResult
                     <span style={{fontSize:10,fontWeight:600,color:q.accent,fontFamily:t.serif,letterSpacing:"0.05em"}}>{q.tag}</span>
                     {q.brand&&brands.length>1&&<span style={{fontSize:10.5,color:t.textMuted,fontFamily:t.serif}}>{q.brand}</span>}
                   </div>
-                  <div onClick={()=>onDetail(q.id)} style={{fontSize:14.5,fontWeight:600,color:t.text,fontFamily:t.sans,lineHeight:1.3,cursor:"pointer"}}>{q.title}</div>
+                  <button type="button" onClick={()=>onDetail(q.id)} style={{background:"none",border:"none",padding:0,textAlign:"left",font:"inherit",fontSize:14.5,fontWeight:600,color:t.text,fontFamily:t.sans,lineHeight:1.3,cursor:"pointer"}}>{q.title}</button>
                 </div>
                 {q.money>0 && <span style={{fontSize:16,fontWeight:700,color:t.gold,fontFamily:t.mono,letterSpacing:"-0.02em",flexShrink:0}}>{fmtCur(q.money)}</span>}
               </div>

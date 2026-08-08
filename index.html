@@ -3,17 +3,73 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Marketers Lab</title>
+    <meta
+      name="description"
+      content="An experiment ledger for ecommerce growth teams. Records what you believed, what you predicted, what the ad account actually did, and what the organisation now knows — and joins them automatically, because the campaign names carry the link."
+    />
+
+    <!-- A link to this app gets pasted into Slack and LinkedIn far more often
+         than it gets typed. Without these it unfurls as a bare URL. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Marketers Lab" />
+    <meta
+      property="og:site_name"
+      content="Marketers Lab"
+    />
+    <meta
+      property="og:description"
+      content="An experiment ledger for ecommerce growth teams. Every experiment should make the next one smarter."
+    />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Marketers Lab" />
+    <meta
+      name="twitter:description"
+      content="An experiment ledger for ecommerce growth teams. Every experiment should make the next one smarter."
+    />
+
+    <!-- Theme, resolved before first paint.
+         index.css sets `color-scheme: light dark` on :root, so the browser
+         paints its canvas from the *operating system* preference — while the
+         app's own theme is read asynchronously from the store after React
+         mounts. A user with a light OS and the app set to dark therefore got a
+         full white frame on every single load. This reads the same key the
+         store writes, sets it as an attribute, and pins the canvas colour, so
+         the first painted pixel is already the right one.
+
+         Deliberately inline and deliberately before the stylesheet: a deferred
+         script would run after the flash it exists to prevent. -->
+    <script>
+      (function () {
+        try {
+          var dark = localStorage.getItem("gos_theme_v1") === "dark";
+          var root = document.documentElement;
+          root.setAttribute("data-theme", dark ? "dark" : "light");
+          root.style.colorScheme = dark ? "dark" : "light";
+          root.style.background = dark ? "#0E0F12" : "#EDEAE3";
+        } catch (e) {
+          /* Storage blocked. The default light canvas is the right guess. */
+        }
+      })();
+    </script>
+    <meta name="theme-color" content="#EDEAE3" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0E0F12" media="(prefers-color-scheme: dark)" />
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,500;0,600;1,500;1,600&display=swap"
     />
-    <title>Marketers Lab</title>
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      Marketers Lab needs JavaScript enabled to run.
+    </noscript>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

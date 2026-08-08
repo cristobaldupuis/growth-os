@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { OUTCOMES, INIT_TYPES, METRIC_SOURCES, OL, OD, DEFAULT_SETTINGS, brandName, iceScore, iceColor, fmtCur, fmtDate, mondayOf, parseNorthStarValue, resolveNorthStar } from "../constants.js";
+import { OUTCOMES, INIT_TYPES, METRIC_SOURCES, OL, OD, DEFAULT_SETTINGS, brandName, iceScore, iceColor, fmtCur, fmtCurFine, fmtDate, fmtDateLong, fmtDateShort, mondayOf, parseNorthStarValue, resolveNorthStar } from "../constants.js";
 import { interactive, tile } from "../components/motion.js";
 import { ChargeBar } from "../components/ChargeBar.jsx";
 import { gG, gGh, gSL, gCd } from "../components/styles.js";
@@ -7,6 +7,7 @@ import { Spark } from "../components/Spark.jsx";
 import { WeeklyStandupModal } from "../components/WeeklyStandupModal.jsx";
 import { buildCrossBrandTransfers } from "../services/portfolio.js";
 import { renderProse } from "../components/text.jsx";
+import { IconImport, IconPlus, IconChart, IconBolt, IconAlert, IconChevronDown, IconChevronRight, IconCopy, IconSparkle, IconSpinner, IconDiamond, IconTrendUp, IconTrendDown, IconCheck, IconClose } from "../components/icons.jsx";
 
 // -- Weekly Pulse --------------------------------------------------------------
 function WeeklyPulseSection({t, brands, weeklyMetrics, onLog, onImport}) {
@@ -66,7 +67,11 @@ function WeeklyPulseSection({t, brands, weeklyMetrics, onLog, onImport}) {
   const deltaEl = (d) => {
     if (typeof d !== "number" || !isFinite(d)) return null;
     const pos = d >= 0;
-    return <span style={{fontSize:10,fontWeight:600,fontFamily:t.mono,color:pos?t.teal:t.red,marginLeft:3}}>{pos?"▲":"▼"}{Math.abs(d).toFixed(1)}%</span>;
+    return (
+      <span style={{display:"inline-flex",alignItems:"center",gap:2,fontSize:10,fontWeight:600,fontFamily:t.mono,color:pos?t.teal:t.red,marginLeft:4,verticalAlign:"-1px"}}>
+        {pos?<IconTrendUp size={10}/>:<IconTrendDown size={10}/>}{Math.abs(d).toFixed(1)}%
+      </span>
+    );
   };
 
   const stalenessColor  = isStale ? t.warn : t.teal;
@@ -78,19 +83,21 @@ function WeeklyPulseSection({t, brands, weeklyMetrics, onLog, onImport}) {
       {/* Header row */}
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <button onClick={()=>setExpanded(e=>!e)} style={{background:"none",border:"none",cursor:"pointer",color:t.textMuted,fontSize:13,padding:0,lineHeight:1}}>
-            {expanded?"▾":"▸"}
+          <button onClick={()=>setExpanded(e=>!e)} aria-expanded={expanded} aria-label={(expanded?"Collapse":"Expand")+" Weekly Pulse"}
+            style={{background:"none",border:"none",cursor:"pointer",color:t.textMuted,padding:0,lineHeight:1,display:"inline-flex"}}>
+            {expanded?<IconChevronDown size={14}/>:<IconChevronRight size={14}/>}
           </button>
           <span style={{fontSize:11,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono}}>Weekly Pulse</span>
           {!isEmpty && (
             <span style={{fontSize:10,padding:"2px 7px",borderRadius:3,background:stalenessBg,border:"1px solid "+stalenessBorder,color:stalenessColor,fontFamily:t.sans,fontWeight:600}}>
-              {renderProse(isStale ? `Last logged ${daysSince}d ago ⚠️` : `Updated ${daysSince===0?"today":daysSince+"d ago"}`)}
+              {isStale && <IconAlert size={11} style={{display:"inline-block",verticalAlign:"-1px",marginRight:4}}/>}
+              {renderProse(isStale ? `Last logged ${daysSince}d ago` : `Updated ${daysSince===0?"today":daysSince+"d ago"}`)}
             </span>
           )}
         </div>
         <div style={{display:"flex",gap:5}}>
-          <button onClick={onImport} style={{...gGh(t),fontSize:11,padding:"3px 9px"}}>⬆ Import CSV</button>
-          <button onClick={onLog}    style={{...gG(t),fontSize:11,padding:"3px 9px"}}>+ Log this week</button>
+          <button onClick={onImport} style={gGh(t,"sm")}><IconImport size={12}/> Import CSV</button>
+          <button onClick={onLog}    style={gG(t,"sm")}><IconPlus size={12}/> Log this week</button>
         </div>
       </div>
 
@@ -98,12 +105,12 @@ function WeeklyPulseSection({t, brands, weeklyMetrics, onLog, onImport}) {
         <div style={{marginTop:12}}>
           {isEmpty ? (
             <div style={{padding:"26px 20px",textAlign:"center",border:"1px dashed "+t.border,borderRadius:10}}>
-              <div style={{fontSize:24,marginBottom:8,opacity:.5}}>&#128202;</div>
+              <div style={{display:"flex",justifyContent:"center",marginBottom:8,color:t.textFaint}}><IconChart size={24}/></div>
               <div style={{fontSize:13.5,fontWeight:600,color:t.text,fontFamily:t.sans,marginBottom:4}}>No metrics logged yet</div>
               <div style={{fontSize:12.5,color:t.textSub,fontFamily:t.sans,lineHeight:1.5,maxWidth:340,margin:"0 auto 14px"}}>Track revenue, spend, ROAS and CVR week over week to power the pulse and contribution views.</div>
               <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
-                <button onClick={onLog} style={{...gG(t),fontSize:12.5,padding:"7px 15px"}}>+ Log this week</button>
-                <button onClick={onImport} style={{...gGh(t),fontSize:12.5,padding:"7px 13px"}}>&#8645; Import CSV</button>
+                <button onClick={onLog} style={gG(t)}><IconPlus size={13}/> Log this week</button>
+                <button onClick={onImport} style={gGh(t)}><IconImport size={13}/> Import CSV</button>
               </div>
             </div>
           ) : (
@@ -172,7 +179,10 @@ function WeeklyPulseSection({t, brands, weeklyMetrics, onLog, onImport}) {
 function FunnelCoverageMap({t, items, cats, brands, activeBrand}) {
   const normB = id => (!id||id==="default") ? ((brands[0]&&brands[0].id)||"default") : id;
   const scoped = items.filter(e=>activeBrand==="all"||normB(e.brandId)===normB(activeBrand));
-  const fmtK = (n) => n===0 ? "$0" : "$"+(n>=1000?Math.round(n/100)/10+"k":Math.round(n).toLocaleString());
+  // Was a third local currency formatter, disagreeing with both the shared one
+  // and Triage's copy. `fmtCurFine` is the shared one with the decimal place
+  // this dense breakdown wants.
+  const fmtK = fmtCurFine;
 
   const stages = cats.map(cat=>{
     const inCat   = scoped.filter(e=>e.category===cat);
@@ -341,8 +351,9 @@ function BusinessHealthPanel({ t, settings, weeklyMetrics, activeBrand, brands }
     <div style={{...gCd(t),border:"1px solid "+t.border}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <button onClick={()=>setExpanded(e=>!e)} style={{background:"none",border:"none",cursor:"pointer",color:t.textMuted,fontSize:13,padding:0,lineHeight:1}}>
-            {expanded?"▾":"▸"}
+          <button onClick={()=>setExpanded(e=>!e)} aria-expanded={expanded} aria-label={(expanded?"Collapse":"Expand")+" Weekly Pulse"}
+            style={{background:"none",border:"none",cursor:"pointer",color:t.textMuted,padding:0,lineHeight:1,display:"inline-flex"}}>
+            {expanded?<IconChevronDown size={14}/>:<IconChevronRight size={14}/>}
           </button>
           <div>
             <span style={{fontSize:11,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono}}>Business Health</span>
@@ -429,7 +440,7 @@ function ContributionView({t, contribution, totals, dRange, activeBrand, brands,
   const colorPipeline = t.textMuted;
 
   const copyText = () => {
-    const date = new Date().toLocaleDateString("en-CA",{month:"long",day:"numeric",year:"numeric"});
+    const date = fmtDateLong();
     const lines = [
       "Contribution to Revenue · "+date,
       "Retailer: "+retailerLabel+" | Range: "+rangeLabel,
@@ -603,7 +614,7 @@ function NextPlaysCard({ t, recs, recsLoad, recsErr, items, onGenerate, onOpenRe
     ? (latest.weekOf || mondayOf(new Date(latest.generatedAt)).toISOString().slice(0, 10))
     : null;
   const weekLabel = batchWeekOf
-    ? new Date(batchWeekOf + "T12:00:00").toLocaleDateString("en-CA", { month: "short", day: "numeric" })
+    ? fmtDateShort(batchWeekOf)
     : null;
 
   // -- COMPACT MODE — recs exist and not currently loading -------------------
@@ -627,7 +638,7 @@ function NextPlaysCard({ t, recs, recsLoad, recsErr, items, onGenerate, onOpenRe
         {/* Header strip */}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <span style={{fontSize:14,color:t.gold}}>◆</span>
+            <span style={{color:t.gold,display:"inline-flex"}}><IconDiamond size={13}/></span>
             <span style={{fontSize:12,fontWeight:600,fontFamily:t.serif,color:t.text,letterSpacing:"0.02em"}}>Next Plays</span>
             <span style={{fontSize:10,color:t.textMuted,fontFamily:t.sans}}>
               {renderProse(pending.length > 0 ? pending.length+" ready" : "all resolved")}
@@ -641,15 +652,15 @@ function NextPlaysCard({ t, recs, recsLoad, recsErr, items, onGenerate, onOpenRe
           <div style={{display:"flex",gap:6,alignItems:"center"}}>
             {(accepted.length > 0 || dismissed.length > 0) && (
               <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginRight:4}}>
-                {accepted.length > 0 && <span>✓ {accepted.length}</span>}
+                {accepted.length > 0 && <span style={{display:"inline-flex",alignItems:"center",gap:3}}><IconCheck size={11}/>{accepted.length}</span>}
                 {accepted.length > 0 && dismissed.length > 0 && <span> · </span>}
-                {dismissed.length > 0 && <span>✕ {dismissed.length}</span>}
+                {dismissed.length > 0 && <span style={{display:"inline-flex",alignItems:"center",gap:3}}><IconClose size={11}/>{dismissed.length}</span>}
               </span>
             )}
             <button onClick={onGenerate}
               style={{...(weekState==="stale"?gG(t):gGh(t)),fontSize:10,padding:"3px 8px"}}
               title="Regenerate from current portfolio state">
-              ↻ Regenerate
+              — Regenerate
             </button>
           </div>
         </div>
@@ -705,7 +716,7 @@ function NextPlaysCard({ t, recs, recsLoad, recsErr, items, onGenerate, onOpenRe
               onClick={() => setDiffExpanded(x => !x)}
               style={{background:"none",border:"none",cursor:"pointer",padding:"2px 0",display:"flex",alignItems:"center",gap:6,width:"100%",textAlign:"left"}}
             >
-              <span style={{fontSize:10,color:t.textMuted,fontFamily:t.sans}}>{diffExpanded ? "▾" : "▸"}</span>
+              <span style={{color:t.textMuted,display:"inline-flex"}}>{diffExpanded ? <IconChevronDown size={11}/> : <IconChevronRight size={11}/>}</span>
               <span style={{fontSize:10,color:t.textSub,fontFamily:t.sans}}>Changes from last week</span>
               <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginLeft:2}}>
                 {[
@@ -731,7 +742,7 @@ function NextPlaysCard({ t, recs, recsLoad, recsErr, items, onGenerate, onOpenRe
                 ))}
                 {diff.changed.map(r => (
                   <div key={r.id} style={{fontSize:11,color:t.textSub,fontFamily:t.sans,display:"flex",gap:6,paddingLeft:4}}>
-                    <span style={{color:t.textMuted}}>↕</span>
+                    <span style={{color:t.textMuted}}>±</span>
                     <span>{r.title}</span>
                   </div>
                 ))}
@@ -749,7 +760,7 @@ function NextPlaysCard({ t, recs, recsLoad, recsErr, items, onGenerate, onOpenRe
     <div style={{...gCd(t),display:"flex",flexDirection:"column",gap:12,border:"1px solid "+t.goldBorder}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <span style={{fontSize:18,color:t.gold}}>◆</span>
+          <span style={{color:t.gold,display:"inline-flex"}}><IconDiamond size={15}/></span>
           <span style={{fontSize:13,fontWeight:600,fontFamily:t.serif,color:t.text,letterSpacing:"0.02em"}}>Next Plays</span>
           <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.04em",textTransform:"uppercase"}}>
             AI-recommended experiments
@@ -758,8 +769,8 @@ function NextPlaysCard({ t, recs, recsLoad, recsErr, items, onGenerate, onOpenRe
         <button onClick={onGenerate} disabled={recsLoad}
           style={{...gG(t),fontSize:11,padding:"5px 11px",opacity:recsLoad?0.6:1}}>
           {recsLoad
-            ? <><span style={{display:"inline-block",animation:"spin 1s linear infinite"}}>⟳</span> Generating…</>
-            : <>✦ Generate</>}
+            ? <><IconSpinner size={12}/> Generating…</>
+            : <><IconSparkle size={12}/> Generate</>}
         </button>
       </div>
 
@@ -798,10 +809,59 @@ function NextPlaysCard({ t, recs, recsLoad, recsErr, items, onGenerate, onOpenRe
 // trace, and cited learnings. Actions: Add to backlog | Dismiss.
 
 
+// -- Stat tiles ----------------------------------------------------------------
+//
+// Split into the four that answer "how is the portfolio doing" and the six that
+// answer "what is in it". The second group is counts and averages — real, worth
+// having, and not what anyone opens the dashboard to read.
+//
+// "Projected Impact" is renamed. The same figure was called four things across
+// the product — "Projected Impact" on this tile, "Revenue impacted" in the
+// README, "realised" in the contribution breakdown, and "Projected impact from
+// completed work" in the client readout — which is untenable in a product whose
+// pitch is defensible measurement. It is "Measured impact" everywhere now, and
+// the sublabel says when it still contains an estimate.
+const PRIMARY_TILES = (dash) => [
+  { l:"Measured impact", v:fmtCur(dash.revImpacted), s:dash.revImpactedProjected?"completed · includes estimates":"completed · actuals", hero:true },
+  { l:"Revenue at risk",  v:fmtCur(dash.revAtRisk),  s:"running now" },
+  { l:"Win rate",         v:dash.winRate!==null?dash.winRate+"%":"—", s:dash.wins+"/"+dash.closed+" closed" },
+  { l:"Closed ROI",       v:dash.closedROI!==null?dash.closedROI+"x":"—", s:"actual revenue / cost" },
+];
+
+const SECONDARY_TILES = (dash) => [
+  { l:"Running",        v:dash.running,   s:" " },
+  { l:"Draft pipeline", v:dash.pipeline,  s:" " },
+  { l:"Completed",      v:dash.completed, s:" " },
+  { l:"Killed",         v:dash.killed,    s:" " },
+  { l:"Avg to close",   v:dash.avgDays||"—", s:"days, completed" },
+  { l:"Avg ICE",        v:dash.avgIce||"—",  s:"all initiatives" },
+];
+
+function StatTile({ t, m, index, big }) {
+  const isMoney = typeof m.v === "string" && /^[^\d-]*[\d]/.test(m.v) && !/^\d+$/.test(m.v);
+  const isPct   = typeof m.v === "string" && m.v.endsWith("%");
+  const isMulti = typeof m.v === "string" && m.v.endsWith("x");
+  const isFinancial = (typeof m.v === "string" && m.v !== "—" && (isMoney || isPct || isMulti));
+  const p = tile(t, t.goldFill, index);
+  return (
+    <div className={p.className} style={{...p.style,
+      background:m.hero?t.goldBg:t.surface,
+      border:"1px solid "+(m.hero?t.goldBorder:t.border),
+      borderRadius:t.r.lg,padding:big?"16px 18px":"14px 16px",boxShadow:t.shadow,
+      minHeight:big?104:96,display:"flex",flexDirection:"column"}}>
+      <div style={{fontSize:9.5,letterSpacing:"0.1em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,fontWeight:600,marginBottom:"auto",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>{m.l}</div>
+      <div style={{fontSize:big?t.fs.display:t.fs.figure,fontWeight:700,color:isFinancial?t.gold:t.text,fontFamily:t.mono,lineHeight:1,letterSpacing:"-0.03em",marginTop:9}}>{m.v}</div>
+      {m.s&&m.s!==" "&&<div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginTop:7,whiteSpace:"nowrap",letterSpacing:"0.02em"}}>{m.s}</div>}
+    </div>
+  );
+}
+
 export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetrics,onLog,onImport,dRange,setDRange,cFrom,cTo,setCFrom,setCTo,onGo,recs,recsLoad,recsErr,items,onGenerateRecs,onOpenRec,showToast,onSaveItems}) {
   const maxCat  = Math.max(...Object.values(dash.catCounts),1);
   const maxType = Math.max(...Object.values(dash.typeCounts),1);
   const [showStandup, setShowStandup] = useState(false);
+  const [showAllTiles, setShowAllTiles] = useState(false);
+  const [showComposition, setShowComposition] = useState(false);
 
   // Forward pipeline against the north-star gap.
   //
@@ -891,7 +951,10 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
             : {padding:"10px 14px",background:t.surface,border:"1px solid "+t.border,borderRadius:6}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:hasNudges?8:0}}>
               <div style={{fontSize:10,fontWeight:700,color:hasNudges?t.warn:t.textMuted,fontFamily:t.mono,letterSpacing:"0.08em",textTransform:"uppercase"}}>
-                {hasNudges ? `⚡ ${nudges.length} initiative${nudges.length!==1?"s":""} need attention` : "⚡ This week's focus"}
+                <span style={{display:"inline-flex",alignItems:"center",gap:6}}>
+                  {hasNudges?<IconAlert size={12}/>:<IconBolt size={12}/>}
+                  {hasNudges ? `${nudges.length} initiative${nudges.length!==1?"s":""} need attention` : "This week's focus"}
+                </span>
               </div>
               <button onClick={()=>setShowStandup(true)} style={{...gGh(t),fontSize:11,padding:"3px 10px"}}>Weekly standup</button>
             </div>
@@ -956,17 +1019,49 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
       {/* Business Health */}
       <BusinessHealthPanel t={t} settings={settings} weeklyMetrics={weeklyMetrics} activeBrand={activeBrand} brands={brands}/>
 
-      {/* Executive summary */}
-      <div style={{display:"flex",justifyContent:"flex-end"}}>
-        <button style={{...gGh(t),fontSize:11,padding:"4px 10px"}}
+      {/* Scope bar.
+        *
+        * The range control used to sit seventh down the page, below the north
+        * star, the attention nudges, Next Plays, Weekly Pulse and Business
+        * Health — none of which it governs — and above the ten tiles and six
+        * analytical panels, all of which it does. Nothing said so, so a reader
+        * could not tell which numbers on the page were scoped and which were
+        * not. It now sits at the head of the section it actually filters, and
+        * says what it filters.
+        *
+        * The executive summary button came with it: it was a right-floated
+        * control belonging to no section, sitting between two panels, and it is
+        * one of the most valuable actions in the product. */}
+      <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",gap:12,flexWrap:"wrap",
+        borderTop:"1px solid "+t.border,paddingTop:14,marginTop:2}}>
+        <div>
+          <div style={{...gSL(t),marginBottom:6}}>Portfolio results</div>
+          <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+            <div role="group" aria-label="Date range" style={{display:"flex",gap:2,background:t.surfaceAlt,padding:3,borderRadius:t.r.md,border:"1px solid "+t.border}}>
+              {[["thisMonth","This month"],["lastMonth","Last month"],["custom","Custom"]].map(([v,l])=>(
+                <button key={v} onClick={()=>setDRange(v)} aria-pressed={dRange===v}
+                  style={{fontSize:12,padding:"5px 12px",borderRadius:t.r.sm,cursor:"pointer",fontFamily:t.sans,fontWeight:dRange===v?600:500,background:dRange===v?t.gold:"transparent",border:"none",color:dRange===v?t.goldText:t.textSub}}>{l}</button>
+              ))}
+            </div>
+            {dRange==="custom"&&<>
+              <input type="date" aria-label="Range start" value={cFrom} onChange={e=>setCFrom(e.target.value)} style={{fontSize:12,padding:"6px 9px",borderRadius:t.r.md,border:"1px solid "+t.border,background:t.inputBg,color:t.text,fontFamily:t.mono}}/>
+              <span style={{color:t.textMuted,fontSize:12}}>to</span>
+              <input type="date" aria-label="Range end" value={cTo} onChange={e=>setCTo(e.target.value)} style={{fontSize:12,padding:"6px 9px",borderRadius:t.r.md,border:"1px solid "+t.border,background:t.inputBg,color:t.text,fontFamily:t.mono}}/>
+            </>}
+          </div>
+          <div style={{fontSize:11,color:t.textMuted,fontFamily:t.sans,marginTop:6}}>
+            Scopes everything below this line. The panels above it read the latest logged week.
+          </div>
+        </div>
+        <button style={gGh(t,"sm")}
           onClick={()=>{
             const retailerLabel = activeBrand==="all"?"All retailers":brandName(activeBrand,brands);
-            const date = new Date().toLocaleDateString("en-CA",{month:"long",day:"numeric",year:"numeric"});
+            const date = fmtDateLong();
             const headline = dash.revImpacted>0
               ? fmtCur(dash.revImpacted)+" in measured revenue impact from completed work this period."
               : (dash.running+dash.pipeline)+" initiatives in motion; "+fmtCur(dash.revAtRisk)+" of revenue in play.";
             const text = [
-              "WEEKLY GROWTH UPDATE · "+retailerLabel,
+              ((settings.companyName||"Portfolio").toUpperCase())+" — WEEKLY GROWTH UPDATE · "+retailerLabel,
               date,
               "",
               headline,
@@ -978,7 +1073,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
               "",
               "RESULTS",
               "• Win rate: "+(dash.winRate!==null?dash.winRate+"% ("+dash.wins+" of "+dash.closed+" closed)":"no closed initiatives yet"),
-              "• Projected Impact (completed): "+fmtCur(dash.revImpacted),
+              "• Measured impact (completed): "+fmtCur(dash.revImpacted),
               "• ROI on closed work: "+(dash.closedROI!==null?dash.closedROI+"x return":"not yet measurable"),
               "• Avg time to close: "+(dash.avgDays?dash.avgDays+" days":"n/a"),
               "",
@@ -991,50 +1086,37 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
             ].join("\n");
             try { navigator.clipboard.writeText(text); showToast("Executive summary copied. Ready to paste.", "success"); } catch { showToast("Couldn't copy to clipboard.", "error"); }
           }}>
-          &#128203; Copy executive summary
+          <IconCopy size={13}/> Copy executive summary
         </button>
       </div>
 
-      {/* Range */}
-      <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-        <div style={{display:"flex",gap:2,background:t.surfaceAlt,padding:3,borderRadius:9,border:"1px solid "+t.border}}>
-          {[["thisMonth","This month"],["lastMonth","Last month"],["custom","Custom"]].map(([v,l])=>(
-            <button key={v} onClick={()=>setDRange(v)} style={{fontSize:12,padding:"5px 12px",borderRadius:6,cursor:"pointer",fontFamily:t.sans,fontWeight:dRange===v?600:500,background:dRange===v?t.gold:"transparent",border:"none",color:dRange===v?t.goldText:t.textSub}}>{l}</button>
-          ))}
-        </div>
-        {dRange==="custom"&&<>
-          <input type="date" value={cFrom} onChange={e=>setCFrom(e.target.value)} style={{fontSize:12,padding:"6px 9px",borderRadius:9,border:"1px solid "+t.border,background:t.inputBg,color:t.text,fontFamily:t.mono}}/>
-          <span style={{color:t.textMuted,fontSize:12}}>to</span>
-          <input type="date" value={cTo} onChange={e=>setCTo(e.target.value)} style={{fontSize:12,padding:"6px 9px",borderRadius:9,border:"1px solid "+t.border,background:t.inputBg,color:t.text,fontFamily:t.mono}}/>
-        </>}
+      {/* KPIs.
+        *
+        * Ten tiles at near-equal weight, with only the first marked `hero`, is
+        * the same as no hierarchy at all — Stripe's dashboard leads with three
+        * numbers and makes you ask for the rest. The four that answer "how is
+        * the portfolio doing" lead; the six that answer "what is in it" are a
+        * click away and remembered per session. */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:10}}>
+        {PRIMARY_TILES(dash).map((m,mi)=>(
+          <StatTile key={m.l} t={t} m={m} index={mi} big/>
+        ))}
       </div>
 
-      {/* KPIs */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:10}}>
-        {[
-          {l:"Projected Impact", v:fmtCur(dash.revImpacted), s:dash.revImpactedProjected?"from completed (projected)":"from completed", hero:true},
-          {l:"Revenue at risk",  v:fmtCur(dash.revAtRisk),   s:"running now"},
-          {l:"Completed",        v:dash.completed,            s:" "},
-          {l:"Killed",           v:dash.killed,               s:" "},
-          {l:"Draft pipeline",   v:dash.pipeline,             s:" "},
-          {l:"Running",          v:dash.running,              s:" "},
-          {l:"Win rate",         v:dash.winRate!==null?dash.winRate+"%":"—", s:dash.wins+"/"+dash.closed+" closed"},
-          {l:"Avg to close",     v:dash.avgDays||"—",         s:"days, completed"},
-          {l:"Avg ICE",          v:dash.avgIce||"—",          s:"all initiatives"},
-          {l:"Closed ROI",        v:dash.closedROI!==null?dash.closedROI+"x":"—", s:"actual rev / cost"},
-        ].map((m,mi)=>{
-          const isMoney = typeof m.v === "string" && m.v.startsWith("$");
-          const isPct   = typeof m.v === "string" && m.v.endsWith("%");
-          const isMulti = typeof m.v === "string" && m.v.endsWith("x");
-          const isFinancial = isMoney || isPct || isMulti;
-          return (
-          <div key={m.l} {...(()=>{const p=tile(t,t.goldFill,mi);return{className:p.className,style:{...p.style,background:m.hero?t.goldBg:t.surface,border:"1px solid "+(m.hero?t.goldBorder:t.border),borderRadius:12,padding:"14px 16px",boxShadow:t.shadow,minHeight:96,display:"flex",flexDirection:"column"}};})()}>
-            <div style={{fontSize:9.5,letterSpacing:"0.1em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,fontWeight:600,marginBottom:"auto",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>{m.l}</div>
-            <div style={{fontSize:26,fontWeight:700,color:isFinancial?t.gold:t.text,fontFamily:t.mono,lineHeight:1,letterSpacing:"-0.03em",marginTop:9}}>{m.v}</div>
-            {m.s&&m.s!==" "&&<div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginTop:7,whiteSpace:"nowrap",letterSpacing:"0.02em"}}>{m.s}</div>}
+      <div>
+        <button onClick={()=>setShowAllTiles(x=>!x)} aria-expanded={showAllTiles}
+          style={{background:"none",border:"none",padding:"2px 0",cursor:"pointer",display:"flex",alignItems:"center",gap:6,
+            color:t.textMuted,fontSize:11.5,fontFamily:t.sans}}>
+          {showAllTiles?<IconChevronDown size={12}/>:<IconChevronRight size={12}/>}
+          {showAllTiles?"Hide portfolio counts":"Portfolio counts, quality and duration"}
+        </button>
+        {showAllTiles&&(
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:10,marginTop:10}}>
+            {SECONDARY_TILES(dash).map((m,mi)=>(
+              <StatTile key={m.l} t={t} m={m} index={mi}/>
+            ))}
           </div>
-          );
-        })}
+        )}
       </div>
 
       {/* Funnel coverage map — diagnostic: where work & revenue sit across the funnel */}
@@ -1077,7 +1159,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
       {/* Calibration card */}
       <div style={{...gCd(t),border:"1px solid "+(dash.calibration!==null?(dash.calibration>=80?t.goldBorder:dash.calibration>=50?t.warnBorder:t.border):t.border)}}>
         <div style={gSL(t)}>Revenue estimate calibration</div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16,alignItems:"center",marginBottom:dash.totalEstCost>0?12:0}}>
+        <div className="gos-grid-3" style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16,alignItems:"center",marginBottom:dash.totalEstCost>0?12:0}}>
           <div>
             <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginBottom:2}}>Total estimated</div>
             <div style={{fontSize:22,fontWeight:700,color:t.text,fontFamily:t.mono,letterSpacing:"-0.02em"}}>{fmtCur(dash.totalEstimated)}</div>
@@ -1095,7 +1177,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
           </div>
         </div>
         {dash.totalEstCost>0&&(
-          <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid "+t.border,display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16}}>
+          <div className="gos-grid-3" style={{marginTop:12,paddingTop:12,borderTop:"1px solid "+t.border,display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16}}>
             <div>
               <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginBottom:2}}>Total est. cost</div>
               <div style={{fontSize:18,fontWeight:700,color:t.text,fontFamily:t.mono}}>{fmtCur(dash.totalEstCost)}</div>
@@ -1115,71 +1197,90 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
         )}
       </div>
 
-      {/* Velocity + Category + Type */}
-      <div style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) minmax(0,1fr)",gap:12}}>
-        <div style={gCd(t)}>
-          <div style={gSL(t)}>Velocity · last 8 weeks</div>
-          <div style={{display:"flex",flexDirection:"column",gap:12}}>
-            {[{label:"Started / week",vals:dash.vel.started,color:t.teal},{label:"Closed / week",vals:dash.vel.closed,color:t.gold}].map(row=>(
-              <div key={row.label}>
-                <div style={{fontSize:11,color:t.textMuted,fontFamily:t.sans,marginBottom:4}}>{row.label}</div>
-                <div style={{display:"flex",alignItems:"center",gap:10}}>
-                  <Spark vals={row.vals} color={row.color} w={120} h={26}/>
-                  <span style={{fontSize:20,fontWeight:700,color:t.text,fontFamily:t.mono}}>{row.vals[row.vals.length-1]}</span>
+      {/* Portfolio composition.
+        *
+        * Velocity, category mix, type mix and outcome counts are diagnostics
+        * you consult when a number above them looks wrong — not things anyone
+        * opens the dashboard to read. They were four full-width panels at the
+        * foot of a fifteen-panel scroll, which is a lot of page for a question
+        * nobody asked yet. */}
+      <div>
+        <button onClick={()=>setShowComposition(x=>!x)} aria-expanded={showComposition}
+          style={{background:"none",border:"none",padding:"2px 0",cursor:"pointer",display:"flex",alignItems:"center",gap:6,
+            color:t.textMuted,fontSize:11.5,fontFamily:t.sans}}>
+          {showComposition?<IconChevronDown size={12}/>:<IconChevronRight size={12}/>}
+          {showComposition?"Hide composition":"Velocity, category, type and outcome mix"}
+        </button>
+        {showComposition&&(
+          <div style={{display:"flex",flexDirection:"column",gap:14,marginTop:12}}>
+        {/* Velocity + Category + Type */}
+        <div className="gos-grid-2" style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) minmax(0,1fr)",gap:12}}>
+          <div style={gCd(t)}>
+            <div style={gSL(t)}>Velocity · last 8 weeks</div>
+            <div style={{display:"flex",flexDirection:"column",gap:12}}>
+              {[{label:"Started / week",vals:dash.vel.started,color:t.teal},{label:"Closed / week",vals:dash.vel.closed,color:t.gold}].map(row=>(
+                <div key={row.label}>
+                  <div style={{fontSize:11,color:t.textMuted,fontFamily:t.sans,marginBottom:4}}>{row.label}</div>
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <Spark vals={row.vals} color={row.color} w={120} h={26}/>
+                    <span style={{fontSize:20,fontWeight:700,color:t.text,fontFamily:t.mono}}>{row.vals[row.vals.length-1]}</span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+          </div>
+          <div style={gCd(t)}>
+            <div style={gSL(t)}>By category</div>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {cats.map((cat,ci)=>{
+                const n=dash.catCounts[cat]||0,pct=maxCat>0?Math.round((n/maxCat)*100):0;
+                return(
+                  <div key={cat} className="gos-charge" style={{padding:"1px 0"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
+                      <span style={{fontSize:12,color:t.textSub,fontFamily:t.sans}}>{cat}</span>
+                      <span style={{fontSize:12,color:t.textMuted,fontFamily:t.mono}}>{n}</span>
+                    </div>
+                    <ChargeBar t={t} pct={pct} height={5} muted={n===0} index={ci}/>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
+
+        {/* Type breakdown */}
         <div style={gCd(t)}>
-          <div style={gSL(t)}>By category</div>
+          <div style={gSL(t)}>By initiative type</div>
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            {cats.map((cat,ci)=>{
-              const n=dash.catCounts[cat]||0,pct=maxCat>0?Math.round((n/maxCat)*100):0;
+            {INIT_TYPES.map((tp,ti)=>{
+              const n=dash.typeCounts[tp]||0,pct=maxType>0?Math.round((n/maxType)*100):0;
               return(
-                <div key={cat} className="gos-charge" style={{padding:"1px 0"}}>
+                <div key={tp} className="gos-charge" style={{padding:"1px 0"}}>
                   <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
-                    <span style={{fontSize:12,color:t.textSub,fontFamily:t.sans}}>{cat}</span>
+                    <span style={{fontSize:12,color:t.textSub,fontFamily:t.sans}}>{tp}</span>
                     <span style={{fontSize:12,color:t.textMuted,fontFamily:t.mono}}>{n}</span>
                   </div>
-                  <ChargeBar t={t} pct={pct} height={5} muted={n===0} index={ci}/>
+                  <ChargeBar t={t} pct={pct} height={5} muted={n===0} index={ti}/>
                 </div>
               );
             })}
           </div>
         </div>
-      </div>
 
-      {/* Type breakdown */}
-      <div style={gCd(t)}>
-        <div style={gSL(t)}>By initiative type</div>
-        <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {INIT_TYPES.map((tp,ti)=>{
-            const n=dash.typeCounts[tp]||0,pct=maxType>0?Math.round((n/maxType)*100):0;
-            return(
-              <div key={tp} className="gos-charge" style={{padding:"1px 0"}}>
-                <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
-                  <span style={{fontSize:12,color:t.textSub,fontFamily:t.sans}}>{tp}</span>
-                  <span style={{fontSize:12,color:t.textMuted,fontFamily:t.mono}}>{n}</span>
-                </div>
-                <ChargeBar t={t} pct={pct} height={5} muted={n===0} index={ti}/>
+        {/* Outcome breakdown */}
+        <div style={gCd(t)}>
+          <div style={gSL(t)}>Outcome breakdown · all closed</div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            {OUTCOMES.map(o=>{const c=(dk?OD:OL)[o]||{};return(
+              <div key={o} style={{background:c.bg||t.surfaceAlt,border:"1px solid "+(c.border||t.border),borderRadius:6,padding:"8px 14px",minWidth:80}}>
+                <div style={{fontSize:20,fontWeight:700,color:c.text||t.text,fontFamily:t.mono}}>{dash.outCounts[o]||0}</div>
+                <div style={{fontSize:11,color:c.text||t.textMuted,opacity:0.85,fontFamily:t.sans}}>{o}</div>
               </div>
-            );
-          })}
+            );})}
+          </div>
         </div>
-      </div>
-
-      {/* Outcome breakdown */}
-      <div style={gCd(t)}>
-        <div style={gSL(t)}>Outcome breakdown · all closed</div>
-        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-          {OUTCOMES.map(o=>{const c=(dk?OD:OL)[o]||{};return(
-            <div key={o} style={{background:c.bg||t.surfaceAlt,border:"1px solid "+(c.border||t.border),borderRadius:6,padding:"8px 14px",minWidth:80}}>
-              <div style={{fontSize:20,fontWeight:700,color:c.text||t.text,fontFamily:t.mono}}>{dash.outCounts[o]||0}</div>
-              <div style={{fontSize:11,color:c.text||t.textMuted,opacity:0.85,fontFamily:t.sans}}>{o}</div>
-            </div>
-          );})}
-        </div>
+          </div>
+        )}
       </div>
 
       <button style={{...gGh(t),alignSelf:"flex-start"}} onClick={onGo}>View initiatives</button>

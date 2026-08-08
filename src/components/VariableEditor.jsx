@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { gG, gGh, gI, gSl, gSL } from "./styles.js";
 import { Modal } from "./Modal.jsx";
+import { IconCheck } from "./icons.jsx";
 import {
   DIMENSION_FAMILIES, listChannels, listLevels, templateFor,
   dimensionKeyFrom, validateCustomDimension, validateVocabValue, normKey,
@@ -242,7 +243,7 @@ export function VariableEditor({ t, dk, schema, dimension, onSave, onClose }) {
                       color: on ? t.goldText : t.textSub,
                       fontWeight: on ? 600 : 500,
                     }}>
-                    {on ? "✓ " : ""}{lv.label}
+                    {on && <IconCheck size={11} style={{display:"inline-block",verticalAlign:"-1px",marginRight:4}}/>}{lv.label}
                     <span style={{ fontFamily: t.mono, fontSize: 9.5, opacity: 0.75, marginLeft: 5 }}>
                       {slots}{on ? "+1" : ""}
                     </span>

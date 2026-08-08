@@ -1,23 +1,85 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Modal } from "./Modal.jsx";
 import { FR } from "./FR.jsx";
 import { gG, gGh, gI } from "./styles.js";
+import { IconClose, IconDownload, IconImport, IconRefresh, IconPlus } from "./icons.jsx";
+import { iconFor, ICON_REGISTRY } from "./iconRegistry.js";
 import { DEFAULT_AGENTS, DEFAULT_SETTINGS, brandColor, catColor } from "../constants.js";
+
+// Currencies the shipped formatter is checked against. The list is short on
+// purpose — it covers the markets the ICP sells into, and an operator outside
+// them is better served by us adding one than by a free-text box that silently
+// produces "XYZ 1.4M".
+const CURRENCIES = [
+  { code:"USD", label:"US dollar (USD)" },
+  { code:"CAD", label:"Canadian dollar (CAD)" },
+  { code:"GBP", label:"Pound sterling (GBP)" },
+  { code:"EUR", label:"Euro (EUR)" },
+  { code:"AUD", label:"Australian dollar (AUD)" },
+  { code:"NZD", label:"New Zealand dollar (NZD)" },
+];
+const LOCALES = [
+  { code:"en-CA", label:"English (Canada) — Aug 12, 2026" },
+  { code:"en-US", label:"English (US) — Aug 12, 2026" },
+  { code:"en-GB", label:"English (UK) — 12 Aug 2026" },
+  { code:"en-AU", label:"English (Australia) — 12 Aug 2026" },
+  { code:"de-DE", label:"German — 12. Aug. 2026" },
+  { code:"fr-FR", label:"French — 12 août 2026" },
+];
 
 // -- Settings ------------------------------------------------------------------
 export function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onRestoreBackup,onResetDemo}) {
   const [local,setLocal]=useState({...settings});
   const [newCat,setNewCat]=useState("");
+  const [confirmDiscard,setConfirmDiscard]=useState(false);
   const f=(k,v)=>setLocal(p=>({...p,[k]:v}));
   const addCat=()=>{const c=newCat.trim();if(!c||local.categories.includes(c))return;f("categories",[...local.categories,c]);setNewCat("");};
+
+  // Nine sections of editable state lived in this component and a click on the
+  // backdrop threw all of it away without asking — brand briefs, agent lenses,
+  // health-metric targets. Reconfiguring five metrics and then mis-clicking the
+  // scrim cost ten minutes. Every exit now goes through one guarded path.
+  const dirty = useMemo(()=>JSON.stringify(local)!==JSON.stringify(settings),[local,settings]);
+  const requestClose = ()=>{ if(dirty) setConfirmDiscard(true); else onClose(); };
+
+  if (confirmDiscard) {
+    return (
+      <Modal t={t} dk={dk} onClose={()=>setConfirmDiscard(false)} title="Discard settings changes?">
+        <div style={{fontSize:13,color:t.textSub,fontFamily:t.serif,lineHeight:1.6,marginBottom:18}}>
+          You have unsaved changes to this workspace's settings. Closing now discards them.
+        </div>
+        <div style={{display:"flex",justifyContent:"flex-end",gap:8}}>
+          <button style={gGh(t)} onClick={()=>setConfirmDiscard(false)}>Keep editing</button>
+          <button style={gG(t)} onClick={()=>onSave(local)}>Save and close</button>
+          <button style={{...gGh(t),color:t.red,borderColor:t.red}} onClick={onClose}>Discard</button>
+        </div>
+      </Modal>
+    );
+  }
+
   return (
-    <Modal t={t} dk={dk} onClose={onClose} wide title="Settings">
+    <Modal t={t} dk={dk} onClose={onClose} onRequestClose={requestClose} wide title="Settings">
       <div style={{display:"flex",flexDirection:"column",gap:14}}>
         <FR label="Company / workspace name" t={t}><input style={gI(t)} value={local.companyName} onChange={e=>f("companyName",e.target.value)}/></FR>
         <FR label="Business model (one line)" t={t}><input style={gI(t)} value={local.businessModel} onChange={e=>f("businessModel",e.target.value)}/></FR>
+        {/* Money and dates were hardcoded to a dollar sign and en-CA in four
+            separate formatters, in a product whose central artifact is a revenue
+            claim a client forwards to their board. */}
+        <div className="gos-grid-2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <FR label="Currency" t={t} hint="Used everywhere a figure is shown or exported.">
+            <select style={{...gI(t),cursor:"pointer"}} value={local.currency||"USD"} onChange={e=>f("currency",e.target.value)}>
+              {CURRENCIES.map(c=><option key={c.code} value={c.code}>{c.label}</option>)}
+            </select>
+          </FR>
+          <FR label="Date format" t={t} hint="Also sets thousands separators.">
+            <select style={{...gI(t),cursor:"pointer"}} value={local.locale||"en-CA"} onChange={e=>f("locale",e.target.value)}>
+              {LOCALES.map(l=><option key={l.code} value={l.code}>{l.label}</option>)}
+            </select>
+          </FR>
+        </div>
         <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
           <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:10,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>North star metric</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+          <div className="gos-grid-3" style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
             <FR label="Metric name" t={t}><input style={gI(t)} value={local.northStarMetric} onChange={e=>f("northStarMetric",e.target.value)}/></FR>
             <FR label="Current value" t={t}><input style={gI(t)} value={local.northStarCurrent} onChange={e=>f("northStarCurrent",e.target.value)}/></FR>
             <FR label="Target" t={t}><input style={gI(t)} value={local.northStarTarget} onChange={e=>f("northStarTarget",e.target.value)}/></FR>
@@ -53,7 +115,7 @@ export function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onR
                     style={{background:"none",border:"none",color:t.textMuted,cursor:"pointer",fontSize:14,padding:"0 4px"}}>&#10005;</button>}
                 </div>
                 {/* Brief fields */}
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+                <div className="gos-grid-2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
                   <div>
                     <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>WHAT THEY SELL</label>
                     <input style={{...gI(t),fontSize:11}} value={b.whatTheySell||""} onChange={e=>upd("whatTheySell",e.target.value)}
@@ -89,7 +151,7 @@ export function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onR
             );})}
           </div>
           <button onClick={()=>{const newId="brand-"+Date.now();setLocal(p=>({...p,brands:[...(p.brands||[]),{id:newId,name:"New retailer"}]}));}}
-            style={{...gGh(t),fontSize:11}}>+ Add retailer</button>
+            style={gGh(t,"sm")}><IconPlus size={12}/> Add retailer</button>
         </div>
         <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
           <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:4,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>C-Suite Debate Agents</div>
@@ -100,9 +162,20 @@ export function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onR
             {(local.agents||DEFAULT_AGENTS).map((agent,i)=>(
               <div key={agent.id} style={{padding:"10px 12px",background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:6,display:"flex",flexDirection:"column",gap:8}}>
                 <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                  <input style={{...gI(t),width:44,textAlign:"center",padding:"4px",fontSize:18,flexShrink:0}}
-                    value={agent.icon}
-                    onChange={e=>{const a=[...(local.agents||DEFAULT_AGENTS)];a[i]={...a[i],icon:e.target.value};setLocal(p=>({...p,agents:a}));}}/>
+                  {/* This was a 44px text input whose value was an emoji
+                      character — the avatar system was "paste a glyph in a box".
+                      It is a list of the icons the app actually ships. */}
+                  {(()=>{ const AgentIcon = iconFor(agent.icon); return (
+                    <span style={{width:30,height:30,borderRadius:t.r.sm,background:t.surface,border:"1px solid "+t.border,
+                      display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,color:agent.color}}>
+                      <AgentIcon size={15}/>
+                    </span>
+                  ); })()}
+                  <select aria-label="Agent icon" style={{...gI(t),width:104,flexShrink:0,cursor:"pointer",fontSize:11}}
+                    value={ICON_REGISTRY[agent.icon] ? agent.icon : "briefcase"}
+                    onChange={e=>{const a=[...(local.agents||DEFAULT_AGENTS)];a[i]={...a[i],icon:e.target.value};setLocal(p=>({...p,agents:a}));}}>
+                    {Object.keys(ICON_REGISTRY).map(k=><option key={k} value={k}>{k}</option>)}
+                  </select>
                   <input style={{...gI(t),flex:"0 0 80px",fontWeight:700}}
                     value={agent.label}
                     onChange={e=>{const a=[...(local.agents||DEFAULT_AGENTS)];a[i]={...a[i],label:e.target.value};setLocal(p=>({...p,agents:a}));}}
@@ -110,7 +183,7 @@ export function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onR
                   <div style={{width:20,height:20,borderRadius:"50%",background:agent.color,flexShrink:0,border:"2px solid "+t.border}}/>
                   {(local.agents||DEFAULT_AGENTS).length>2&&(
                     <button onClick={()=>setLocal(p=>({...p,agents:(p.agents||DEFAULT_AGENTS).filter((_,j)=>j!==i)}))}
-                      style={{background:"none",border:"none",color:t.textMuted,cursor:"pointer",fontSize:14,padding:"0 4px",marginLeft:"auto"}}>✕</button>
+                      style={{background:"none",border:"none",color:t.textMuted,cursor:"pointer",padding:"0 4px",marginLeft:"auto",display:"inline-flex"}} aria-label="Remove agent"><IconClose size={13}/></button>
                   )}
                 </div>
                 <input style={gI(t)} value={agent.lens}
@@ -123,10 +196,10 @@ export function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onR
             ))}
           </div>
           <div style={{display:"flex",gap:6}}>
-            <button onClick={()=>{const newA={id:"agent-"+Date.now(),label:"New",icon:"💼",color:"#888888",lens:"",blindspot:""};setLocal(p=>({...p,agents:[...(p.agents||DEFAULT_AGENTS),newA]}));}}
-              style={{...gGh(t),fontSize:11}}>+ Add agent</button>
+            <button onClick={()=>{const newA={id:"agent-"+Date.now(),label:"New",icon:"briefcase",color:"#888888",lens:"",blindspot:""};setLocal(p=>({...p,agents:[...(p.agents||DEFAULT_AGENTS),newA]}));}}
+              style={gGh(t,"sm")}><IconPlus size={12}/> Add agent</button>
             <button onClick={()=>setLocal(p=>({...p,agents:DEFAULT_AGENTS}))}
-              style={{...gGh(t),fontSize:11}}>Reset to defaults</button>
+              style={gGh(t,"sm")}>Reset to defaults</button>
           </div>
         </div>
         <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
@@ -141,7 +214,9 @@ export function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onR
                 <div key={metric.key} style={{padding:"10px 12px",background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:6,display:"flex",flexDirection:"column",gap:8,opacity:metric.enabled?1:0.55}}>
                   <div style={{display:"flex",gap:8,alignItems:"center"}}>
                     <button onClick={()=>updhm("enabled",!metric.enabled)}
-                      style={{flexShrink:0,width:34,height:20,borderRadius:10,cursor:"pointer",border:"none",
+                      role="switch" aria-checked={metric.enabled}
+                      aria-label={(metric.enabled?"Disable ":"Enable ")+(metric.label||"metric")}
+                      style={{flexShrink:0,width:34,height:20,borderRadius:t.r.pill,cursor:"pointer",border:"none",
                         background:metric.enabled?t.teal:t.border,position:"relative",transition:"background 0.15s"}}>
                       <span style={{position:"absolute",top:3,left:metric.enabled?16:3,width:14,height:14,borderRadius:"50%",background:"#fff",transition:"left 0.15s"}}/>
                     </button>
@@ -155,7 +230,7 @@ export function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onR
                       {metric.calculationNote}
                     </div>
                   )}
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                  <div className="gos-grid-2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                     <div>
                       <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>
                         {metric.isCalculated?"MANUAL FALLBACK":"CURRENT VALUE"}
@@ -188,7 +263,7 @@ export function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onR
             })}
           </div>
           {(local.healthMetrics||DEFAULT_SETTINGS.healthMetrics).length<8&&(
-            <button style={{...gGh(t),fontSize:11}} onClick={()=>{
+            <button style={gGh(t,"sm")} onClick={()=>{
               const hm=local.healthMetrics||DEFAULT_SETTINGS.healthMetrics;
               if(hm.length>=8)return;
               setLocal(p=>({...p,healthMetrics:[...hm,{key:"metric_"+Date.now(),label:"Custom Metric",enabled:true,isCalculated:false,calculationNote:"",manualValue:null,target:null,higherIsBetter:true}]}));
@@ -199,9 +274,9 @@ export function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onR
           <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:10,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Backup &amp; restore</div>
           <p style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,lineHeight:1.6,margin:"0 0 10px"}}>Download a full snapshot of your data (initiatives, settings, debates, weekly metrics) as a JSON file. Keep a copy somewhere safe. This is the only off-device record until cloud sync ships.</p>
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-            <button onClick={onDownloadBackup} style={{...gG(t),fontSize:12}}>&#8659; Download backup</button>
-            <label style={{...gGh(t),fontSize:12,cursor:"pointer"}}>
-              &#8645; Restore from backup
+            <button onClick={onDownloadBackup} style={gG(t)}><IconDownload size={13}/> Download backup</button>
+            <label style={{...gGh(t),cursor:"pointer"}}>
+              <IconImport size={13}/> Restore from backup
               <input type="file" accept="application/json,.json" style={{display:"none"}}
                 onChange={e=>{ const f=e.target.files?.[0]; if(f){onRestoreBackup(f); e.target.value="";} }}/>
             </label>
@@ -210,18 +285,17 @@ export function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onR
         <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
           <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:8,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Demo data</div>
           <p style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,lineHeight:1.6,margin:"0 0 10px"}}>Reload the built-in demo initiatives and weekly metrics. Replaces all current initiatives and weekly pulse data.</p>
-          <button onClick={onResetDemo} style={{...gGh(t),fontSize:12}}>&#8635; Reset to demo data</button>
+          <button onClick={onResetDemo} style={gGh(t)}><IconRefresh size={13}/> Reset to demo data</button>
         </div>
-        <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-            <div style={{fontSize:12,fontWeight:700,color:t.textSub,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Data sources</div>
-            <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,background:t.border,padding:"2px 6px",borderRadius:3}}>Placeholder · coming soon</span>
-          </div>
-          <p style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,lineHeight:1.6,margin:"0 0 8px"}}>Planned: Google Sheets (pulling from GA4, Looker, Meta Ads), BigQuery, direct GA4 and Meta Ads APIs. Paste data manually in the initiative form for now.</p>
-          <div style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,padding:"10px 12px",background:t.surfaceAlt,borderRadius:4,border:"1px dashed "+t.border}}>No data sources connected yet.</div>
-        </div>
-        <div style={{display:"flex",gap:8,justifyContent:"flex-end",paddingTop:4}}>
-          <button style={gGh(t)} onClick={onClose}>Cancel</button>
+        {/* A "Data sources" section badged "Placeholder · coming soon", whose
+            content was a roadmap paragraph and an empty state reading "No data
+            sources connected yet", used to sit here. Roadmap honesty belongs in
+            the README; inside a client-facing tool an empty section is not a
+            plan, it is a gap. It comes back when there is something to connect.
+            See ROADMAP Phase 2. */}
+        <div style={{display:"flex",gap:8,justifyContent:"flex-end",alignItems:"center",paddingTop:4}}>
+          {dirty&&<span style={{marginRight:"auto",fontSize:11,color:t.textMuted,fontFamily:t.mono}}>unsaved changes</span>}
+          <button style={gGh(t)} onClick={requestClose}>Cancel</button>
           <button style={gG(t)} onClick={()=>{ onSave(local); }}>Save settings</button>
         </div>
       </div>

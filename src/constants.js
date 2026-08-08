@@ -52,6 +52,11 @@ export const DEFAULT_SETTINGS = {
   northStarMetric:  NORTH_STAR_METRIC,
   northStarCurrent: NORTH_STAR_CURRENT,
   northStarTarget:  NORTH_STAR_TARGET,
+  // Money and dates. Optional-with-fallback like `namingSchema` above: a
+  // workspace saved before these existed has neither key and resolves to the
+  // shipped default, so nothing needs migrating.
+  currency:         "USD",
+  locale:           "en-CA",
   categories:       CATEGORIES,
   dataSources:      [],
   brands:           (CONFIG_BRANDS||[]).map(applyBrandBriefDefaults),
@@ -75,7 +80,7 @@ export const BLOCKERS  = ["None","Waiting on Engineering","Waiting on Creative",
 
 // Weekly metrics — source definitions and their fields
 export const METRIC_SOURCES = [
-  { id:"manual",      label:"Manual",       icon:"✏️",
+  { id:"manual",      label:"Manual",       icon:"pencil",
     fields:[
       {key:"revenue",     label:"Revenue ($)",          type:"number", hint:"Total revenue this period"},
       {key:"spend",       label:"Ad Spend ($)",          type:"number", hint:"Total paid media spend"},
@@ -90,7 +95,7 @@ export const METRIC_SOURCES = [
       {key:"notes",         label:"Notes",                       type:"text",   hint:"Any context for this week"},
     ]
   },
-  { id:"meta",        label:"Meta Ads",     icon:"📘",
+  { id:"meta",        label:"Meta Ads",     icon:"megaphone",
     fields:[
       {key:"spend",       label:"Spend ($)",             type:"number", hint:"Total Meta spend"},
       {key:"revenue",     label:"Revenue ($)",           type:"number", hint:"Attributed revenue"},
@@ -104,7 +109,7 @@ export const METRIC_SOURCES = [
       {key:"notes",       label:"Notes",                 type:"text",   hint:"Campaign context"},
     ]
   },
-  { id:"ga4",         label:"Google Analytics (GA4)", icon:"📊",
+  { id:"ga4",         label:"Google Analytics (GA4)", icon:"chart",
     fields:[
       {key:"sessions",    label:"Sessions",              type:"number", hint:"Total sessions"},
       {key:"traffic",     label:"Users",                 type:"number", hint:"Total users"},
@@ -116,7 +121,7 @@ export const METRIC_SOURCES = [
       {key:"notes",       label:"Notes",                 type:"text",   hint:"Any anomalies or context"},
     ]
   },
-  { id:"google_ads",  label:"Google Ads",   icon:"🔵",
+  { id:"google_ads",  label:"Google Ads",   icon:"target",
     fields:[
       {key:"spend",       label:"Spend ($)",             type:"number", hint:"Total Google Ads spend"},
       {key:"revenue",     label:"Conv. Value ($)",       type:"number", hint:"Total conversion value"},
@@ -178,6 +183,45 @@ export const METRIC_CSV_ALIASES = {
   "notes":"notes","note":"notes","comment":"notes","comments":"notes",
 };
 
+// -- Non-colour tokens ---------------------------------------------------------
+//
+// The palette was the only part of the design system that existed as tokens, and
+// the audit measured what the absence of the rest had cost: thirteen distinct
+// border radii (1 through 20), twenty-four font sizes including six half-steps,
+// and around sixty different button padding pairs across a hundred and seventy
+// buttons. Nothing quite lined up, the same button was four sizes on four
+// screens, and one view could hold four corner radii.
+//
+// These scales cap the vocabulary. They are merged into the theme object below
+// so every component already receives them — `t.r.md`, `t.fs.body` — without a
+// second import at four hundred call sites.
+//
+// The scales are deliberately short. A scale with a value for every situation is
+// the same as no scale, which is what the codebase already had.
+export const RADIUS = {
+  xs:   4,    // chips, badges, inline tags
+  sm:   6,    // inputs inside a card, small controls
+  md:   9,    // buttons, inputs, segmented controls
+  lg:   12,   // cards, panels, modals
+  pill: 999,  // tracks, capsules, avatars
+};
+
+// Type scale. Numerals and micro-labels sit at the bottom, prose in the middle,
+// figures at the top. The half-steps are gone: 12.5 and 13 were never a
+// deliberate distinction, they were two people picking a number.
+export const FS = {
+  micro:   10,   // uppercase mono labels, badge text
+  small:   11,   // metadata strips, table cells, hints
+  body:    12.5, // default UI text and control labels
+  medium:  14,   // card titles, list item leads
+  large:   17,   // view titles, section heads
+  figure:  22,   // stat tile values, panel figures
+  display: 28,   // hero figures
+};
+
+// Spacing. A 4px base, because every existing value in the app rounds to it.
+export const SP = { xs:4, sm:6, md:10, lg:14, xl:20, xxl:28 };
+
 export const FONT_SANS  = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, system-ui, sans-serif";
 export const FONT_MONO  = "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, 'Liberation Mono', monospace";
 // Reading face: headings, titles, and copy read as sentences. Numerals never
@@ -207,10 +251,20 @@ export const FONT_SERIF = "'Lora', ui-serif, Georgia, 'Times New Roman', serif";
 //
 // Every pairing below is checked against WCAG AA (4.5:1) — see `npm run
 // check:contrast`, which fails the build if a pairing regresses.
+//
+// 3. `textMuted` is content, not decoration, and is held to AA like everything
+//    else. It used to be waived to AA Large (3:1) on the stated grounds that it
+//    was "micro-label only", and the code never honoured that: it is the app's
+//    most-used ink — the label colour for every form field, every table header,
+//    half the table cells in Weekly Pulse — at 9–11px in a hundred and ninety
+//    places, where AA Large does not apply at all. The light value measured
+//    4.05:1 on `bg`. It is now #6A675F (4.70:1) and the gate checks it at 4.5.
+//    `textFaint` is the genuinely decorative tier, and the waiver moved to it,
+//    where it names the thing it actually applies to.
 export const TL = {
   bg:"#EDEAE3", surface:"#FFFFFF", surfaceAlt:"#F7F5EF",
   border:"#E0DCD2", borderSoft:"#EDEAE3",
-  text:"#1A1815", textSub:"#57554E", textMuted:"#74716A",
+  text:"#1A1815", textSub:"#57554E", textMuted:"#6A675F", textFaint:"#807D75",
   gold:"#856310", goldFill:"#C9A227", goldSoft:"#D8B94E", goldText:"#1A1815",
   goldBg:"#FBF6E7", goldBorder:"#E3D08F",
   teal:"#0F7A5A", tealBg:"#E2F2EC", red:"#B23A20", redBg:"#FBEAE5",
@@ -224,11 +278,12 @@ export const TL = {
   shadow:"0 1px 2px rgba(40,38,30,0.04), 0 4px 14px rgba(40,38,30,0.06)",
   shadowHi:"0 2px 6px rgba(40,38,30,0.06), 0 12px 30px rgba(40,38,30,0.10)",
   mono:FONT_MONO, sans:FONT_SANS, serif:FONT_SERIF,
+  r:RADIUS, fs:FS, sp:SP,
 };
 export const TD = {
   bg:"#0E0F12", surface:"#16181D", surfaceAlt:"#1D2026",
   border:"#2C303A", borderSoft:"#232730",
-  text:"#F2F3F5", textSub:"#A8ADB8", textMuted:"#868C99",
+  text:"#F2F3F5", textSub:"#A8ADB8", textMuted:"#868C99", textFaint:"#6E747F",
   gold:"#E8C765", goldFill:"#E8C765", goldSoft:"#F0D68C", goldText:"#0E0F12",
   goldBg:"#221E14", goldBorder:"#5C4E28",
   teal:"#43C79A", tealBg:"#10241E", red:"#E8836B", redBg:"#2A1512",
@@ -238,6 +293,7 @@ export const TD = {
   shadow:"0 1px 2px rgba(0,0,0,0.4), 0 4px 16px rgba(0,0,0,0.35)",
   shadowHi:"0 2px 8px rgba(0,0,0,0.5), 0 14px 36px rgba(0,0,0,0.5)",
   mono:FONT_MONO, sans:FONT_SANS, serif:FONT_SERIF,
+  r:RADIUS, fs:FS, sp:SP,
 };
 
 // Status / outcome badges. The dark variants use cool-neutral tint bases to sit
@@ -285,12 +341,74 @@ export const ICE_MODERATE = 11;
 export const iceColor = (s, t) =>
   s === null ? t.textMuted : s >= ICE_STRONG ? t.gold : s >= ICE_MODERATE ? t.textSub : t.textMuted;
 
+// -- Money and dates -----------------------------------------------------------
+//
+// There were four currency formatters and they disagreed. `$2,400,000` rendered
+// as "$2.4M" on the dashboard, "$2400k" in Triage (which had its own local copy
+// with no millions branch), "$2400k" again in the funnel map (a third copy, with
+// a decimal place the others did not have), and "$2,400,000" in the AI context.
+// Triage also had its own `fmtDate` that dropped the year, so one initiative
+// showed "Aug 12" there and "Aug 12, 2026" everywhere else.
+//
+// The dollar sign and the en-CA locale were also hardcoded in all four, in a
+// product whose core artifact is a revenue claim a client forwards to their
+// board. A UK brand read its own numbers in dollars.
+//
+// So: one formatter, and the currency and locale are settings. They are applied
+// once at load through `setNumberFormat` rather than threaded through the ~140
+// call sites as arguments — the same shape `applyRouting` uses for model
+// assignments, and for the same reason: it is deployment configuration that
+// every call site would otherwise have to carry.
+let NUM_FMT = { currency: "USD", locale: "en-CA" };
+let CUR_SYMBOL = "$";
+
+function resolveSymbol(locale, currency) {
+  try {
+    const parts = new Intl.NumberFormat(locale, { style: "currency", currency, maximumFractionDigits: 0 })
+      .formatToParts(0);
+    return parts.find(p => p.type === "currency")?.value || "$";
+  } catch {
+    // An invalid currency code from a hand-edited settings blob should degrade
+    // to a dollar sign, not throw inside a render.
+    return "$";
+  }
+}
+
+/** Apply the workspace's currency and locale. Called once, when settings load. */
+export function setNumberFormat({ currency, locale } = {}) {
+  NUM_FMT = {
+    currency: currency || NUM_FMT.currency,
+    locale:   locale   || NUM_FMT.locale,
+  };
+  CUR_SYMBOL = resolveSymbol(NUM_FMT.locale, NUM_FMT.currency);
+  return NUM_FMT;
+}
+
+export const currencySymbol = () => CUR_SYMBOL;
+
+/** Compact money: "£1.4M", "€320k", "$480". Zero reads as an em dash. */
 export const fmtCur = (n) => {
-  if (n === 0) return "—";
+  if (!n || n === 0) return "—";
   const abs = Math.abs(n);
-  const s = abs >= 1000000 ? "$"+(abs/1000000).toFixed(1)+"M" : abs >= 1000 ? "$"+Math.round(abs/1000)+"k" : "$"+abs;
+  const s = abs >= 1000000 ? CUR_SYMBOL+(abs/1000000).toFixed(1)+"M"
+          : abs >= 1000    ? CUR_SYMBOL+Math.round(abs/1000)+"k"
+          :                  CUR_SYMBOL+Math.round(abs);
   return n < 0 ? "-"+s : s;
 };
+
+/** Money at one decimal in the thousands band, for dense breakdown rows. */
+export const fmtCurFine = (n) => {
+  if (!n || n === 0) return CUR_SYMBOL+"0";
+  const abs = Math.abs(n);
+  const s = abs >= 1000000 ? CUR_SYMBOL+(abs/1000000).toFixed(1)+"M"
+          : abs >= 1000    ? CUR_SYMBOL+(Math.round(abs/100)/10)+"k"
+          :                  CUR_SYMBOL+Math.round(abs).toLocaleString(NUM_FMT.locale);
+  return n < 0 ? "-"+s : s;
+};
+
+/** Full money, grouped: "£2,400,000". For prose and exported text. */
+export const fmtCurFull = (n) =>
+  CUR_SYMBOL + Math.round(Math.abs(n || 0)).toLocaleString(NUM_FMT.locale) ;
 
 // Parse a north star display string (e.g. "$1.4M/mo", "$320k", "42000") into a
 // raw number. Returns null if unparseable.
@@ -362,7 +480,11 @@ export function resolveNorthStar(activeBrand, brands, settings, weeklyMetrics) {
   };
 }
 
-export const fmtDate = (d) => d ? new Date(d+"T12:00:00").toLocaleDateString("en-CA",{month:"short",day:"numeric",year:"numeric"}) : "—";
+export const fmtDate = (d) => d ? new Date(d+"T12:00:00").toLocaleDateString(NUM_FMT.locale,{month:"short",day:"numeric",year:"numeric"}) : "—";
+/** Same date, no year. For dense strips where the year is already established. */
+export const fmtDateShort = (d) => d ? new Date(d+"T12:00:00").toLocaleDateString(NUM_FMT.locale,{month:"short",day:"numeric"}) : "—";
+/** Long form, for document headers and exported readouts. */
+export const fmtDateLong = (d) => (d ? new Date(d+"T12:00:00") : new Date()).toLocaleDateString(NUM_FMT.locale,{month:"long",day:"numeric",year:"numeric"});
 export const parseD  = (d) => d ? new Date(d+"T12:00:00") : null;
 export const somM    = (d) => new Date(d.getFullYear(), d.getMonth(), 1);
 export const eomM    = (d) => new Date(d.getFullYear(), d.getMonth()+1, 0, 23, 59, 59);

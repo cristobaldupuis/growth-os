@@ -5,6 +5,7 @@ import { METRIC_SOURCES, fmtCur, parseMetricsCSV } from "../constants.js";
 import { splitCSVLine } from "../services/csvLine.js";
 import { detectCsvShape, parsePerformanceCSV, mergePerformanceRows, attachInitiatives } from "../services/performance.js";
 import { resolveSchema, listChannels } from "../services/naming.js";
+import { IconCheck } from "./icons.jsx";
 
 // Weekly metrics CSV import modal
 // -- Metrics import ------------------------------------------------------------
@@ -125,7 +126,7 @@ export function MetricsImportModal({t, dk, weeklyMetrics, perfRows, items, setti
       <div style={{display:"flex",flexDirection:"column",gap:12}}>
         {step==="done" && (
           <div style={{padding:"24px",textAlign:"center",color:t.teal,fontFamily:t.serif,fontSize:13}}>
-            ✓ Imported successfully
+            <IconCheck size={14} style={{display:"inline-block",verticalAlign:"-2px",marginRight:6}}/>Imported successfully
           </div>
         )}
 
@@ -134,7 +135,7 @@ export function MetricsImportModal({t, dk, weeklyMetrics, perfRows, items, setti
             <div onDrop={handleDrop} onDragOver={e=>e.preventDefault()}
               style={{border:"2px dashed "+t.border,borderRadius:8,padding:"28px",textAlign:"center",cursor:"pointer",background:t.surfaceAlt}}
               onClick={()=>document.getElementById("metrics-csv-input").click()}>
-              <div style={{fontSize:28,marginBottom:8}}>📂</div>
+              <div style={{fontSize:28,marginBottom:8}}></div>
               <div style={{fontSize:13,color:t.text,marginBottom:4}}>Drop your CSV here or click to upload</div>
               <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>Header-driven, so column order doesn't matter. The shape is detected from the headers.</div>
               <input id="metrics-csv-input" type="file" accept=".csv" style={{display:"none"}} onChange={handleFile}/>

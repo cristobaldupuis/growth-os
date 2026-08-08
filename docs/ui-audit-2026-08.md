@@ -1,5 +1,16 @@
 # UI / UX / usability audit — August 2026
 
+> **Status: remediated, August 2026.** Eighteen of the twenty recommendations
+> below are shipped; see ROADMAP Phase 1.7 for the closing list and DECISIONS.md
+> for the three entries this pass produced. Two are deliberately open and named
+> at the foot of that section: Settings as a page (which is also where the
+> taxonomy editor belongs), and backfilling the seeded portfolio so the demo
+> models the pre-registration discipline the product sells.
+>
+> The findings are left as written rather than edited into the past tense. An
+> audit that gets rewritten once it is fixed stops being evidence of what was
+> wrong, and the *why* below is the part worth keeping.
+
 Third audit pass. The first two (Phase 1.5, July 2026) were about *correctness*:
 metrics that were wrong, contrast that failed, a credential in the bundle, saves
 that silently vanished. Those are closed and the app is materially better for it.

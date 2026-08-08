@@ -1,5 +1,11 @@
 // =============================================================================
-// GROWTH OS — DEPLOYMENT CONFIG
+// MARKETERS LAB — DEPLOYMENT CONFIG
+//
+// `icon` values name an entry in components/iconRegistry.js. They used to be
+// emoji for agents (which rendered in three different illustration styles
+// across operating systems and could not be themed) and `ti-*` class names for
+// templates — dead references to a Tabler webfont that was removed from the
+// build, so nothing had rendered them for months.
 // =============================================================================
 // This file contains everything that changes between deployments.
 // To create a new instance (e.g. for a different client):
@@ -110,7 +116,7 @@ export const AGENTS = [
   {
     id:        "cmo",
     label:     "CMO",
-    icon:      "📣",
+    icon:      "megaphone",
     color:     "#2878a0",
     lens:      "brand narrative, paid acquisition efficiency, creative testing, channel mix, top-of-funnel demand generation, and customer perception",
     blindspot: "often underweights unit economics and margin impact of acquisition spend",
@@ -118,7 +124,7 @@ export const AGENTS = [
   {
     id:        "cfo",
     label:     "CFO",
-    icon:      "📊",
+    icon:      "chart",
     color:     "#C9A227",
     lens:      "contribution margin, CAC payback, gross profit per order, pricing architecture, promotional discount discipline, and cash flow timing",
     blindspot: "often underweights long-term compounding of brand and LTV investments",
@@ -126,7 +132,7 @@ export const AGENTS = [
   {
     id:        "cgo",
     label:     "CGO",
-    icon:      "🚀",
+    icon:      "rocket",
     color:     "#208050",
     lens:      "customer lifetime value, cohort retention, subscription velocity, referral loops, repeat purchase rate, and omnichannel expansion",
     blindspot: "often underweights operational complexity and supply chain constraints of growth initiatives",
@@ -134,7 +140,7 @@ export const AGENTS = [
   {
     id:        "coo",
     label:     "COO",
-    icon:      "⚙️",
+    icon:      "settings",
     color:     "#7040a0",
     lens:      "inventory velocity, fulfilment cost per order, shelf-life risk, supplier lead times, SKU rationalisation, and operational scalability",
     blindspot: "often underweights brand equity and customer experience trade-offs of operational decisions",
@@ -150,7 +156,7 @@ export const TEMPLATES = [
   {
     id:          "ab",
     label:       "A/B Test",
-    icon:        "ti-test-pipe",
+    icon:        "flask",
     initType:    "A/B Test",
     description: "Split traffic between two variants to measure conversion impact.",
     defaults: {
@@ -164,7 +170,7 @@ export const TEMPLATES = [
   {
     id:          "channel",
     label:       "Channel Experiment",
-    icon:        "ti-speakerphone",
+    icon:        "megaphone",
     initType:    "Campaign",
     description: "Test a new or underinvested acquisition or retention channel.",
     defaults: {
@@ -178,7 +184,7 @@ export const TEMPLATES = [
   {
     id:          "pricing",
     label:       "Pricing / Promo",
-    icon:        "ti-tag",
+    icon:        "target",
     initType:    "Campaign",
     description: "Test price point, discount structure, or promotional mechanic.",
     defaults: {
@@ -192,7 +198,7 @@ export const TEMPLATES = [
   {
     id:          "landing",
     label:       "Landing Page / PDP",
-    icon:        "ti-layout",
+    icon:        "grid",
     initType:    "A/B Test",
     description: "Test content, layout, or trust signals on a conversion-driving page.",
     defaults: {
@@ -206,7 +212,7 @@ export const TEMPLATES = [
   {
     id:          "lifecycle",
     label:       "Lifecycle / CRM",
-    icon:        "ti-mail",
+    icon:        "archive",
     initType:    "Campaign",
     description: "Test a new email, SMS, or retention flow targeting a specific segment.",
     defaults: {
@@ -220,7 +226,7 @@ export const TEMPLATES = [
   {
     id:          "merch",
     label:       "Merch / Assortment",
-    icon:        "ti-shirt",
+    icon:        "briefcase",
     initType:    "Process",
     description: "Test a merchandising change — bundle, sequencing, curation, or OOS handling.",
     defaults: {

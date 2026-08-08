@@ -60,6 +60,21 @@ Commercial thesis, ICP and pricing: [docs/commercial.md](./docs/commercial.md).
 
 ## What's new
 
+- **Addressable, searchable, keyboard-reachable** — every view and initiative has
+  a URL, so Back works and a link to `NH-003` can be pasted into Slack. ⌘K opens
+  a palette over initiative titles, ids, hypotheses and learnings. Every dialog
+  closes on Escape, traps focus, and gives it back
+- **Pre-registration is enforced** — observation, hypothesis and success metric
+  carried an asterisk and were not actually required. New initiatives cannot be
+  saved without them, with inline reasons; records predating the fields are
+  flagged rather than blocked. Leaving the editor with unsaved edits now asks
+- **One icon set, no emoji in the chrome** — ~40 `currentColor` stroke icons on a
+  16px grid, so the interface looks the same on macOS and Windows and follows
+  the theme. Agent avatars are a named icon rather than a character typed into a
+  text box
+- **Currency and locale are settings** — one money formatter and one date
+  formatter, replacing four that disagreed on what `$2,400,000` looks like and
+  hardcoded a dollar sign
 - **Creative Studio** — brief and produce creative against an initiative, so every asset is born attached to a hypothesis. Briefs are grounded in the brand brief and closed learnings and must state what result would falsify the direction; anything the brand brief doesn't support is routed to `claimsToVerify` rather than asserted. Variants come back as validated naming segments, and ad names are assembled in code
 - **Campaign nomenclature engine** — the ad naming convention lives in settings as an ordered segment list with controlled vocabularies. `src/services/naming.js` builds, parses and validates against it, and its trailing `Initiative` segment carries an initiative's `trackingTag` — which is how a performance row finds its way back to the experiment that produced it
 - **Admin model console** — an operator-only surface at `/admin` (separate bundle, password-gated) that points each of six feature groups at a model, across Anthropic, Gemini, OpenAI and open weights. Groups declare a capability floor both the picker and the server enforce, so the debate group cannot be pointed at a model without tool calling. Includes a test bench that runs a group's real prompt against your own portfolio through up to four models at once

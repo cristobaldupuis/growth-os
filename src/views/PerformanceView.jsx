@@ -10,6 +10,7 @@ import { interactive, tile } from "../components/motion.js";
 import { ChargeBar } from "../components/ChargeBar.jsx";
 import { NameBuilder } from "../components/NameBuilder.jsx";
 import { VariableEditor } from "../components/VariableEditor.jsx";
+import { Modal } from "../components/Modal.jsx";
 import { availableDimensions, defaultDimension, rollupByInitiative, deriveRatios, ADDITIVE_METRICS, PERF_ROW_LIMIT } from "../services/performance.js";
 
 // -- Performance -----------------------------------------------------------------
@@ -77,6 +78,7 @@ function Empty({ t, title, body, action }) {
 export function PerformanceView({ t, dk, items, settings, perfRows, onImport, onClear, onAssignNames, onSaveSettings, showToast, initialTab, initialInitiativeId }) {
   const schema = resolveSchema(settings);
   const [tab, setTab] = useState(initialTab || "breakdown");
+  const [pendingRemove, setPendingRemove] = useState(null);
   const [dimKey, setDimKey] = useState("");
   const [sortBy, setSortBy] = useState("spend");
   const [convChannel, setConvChannel] = useState(listChannels(schema)[0]?.id || "meta");
@@ -572,15 +574,14 @@ export function PerformanceView({ t, dk, items, settings, perfRows, onImport, on
                         {d.custom && (
                           <>
                             <button onClick={() => setEditor({ dimension: d })} style={{ ...gGh(t), fontSize: 11, padding: "3px 9px" }}>Edit</button>
-                            <button
-                              onClick={() => {
-                                const used = d.usage.length;
-                                const warn = used > 0
-                                  ? `Remove ${d.label}? It sits in ${used} template${used !== 1 ? "s" : ""}, and every name already built from ${used !== 1 ? "them" : "it"} will stop parsing.`
-                                  : `Remove ${d.label}? It is in no template, so nothing already built is affected.`;
-                                if (window.confirm(warn)) saveCustom(removeCustomDimension(custom, d.key), `${d.label} removed from the taxonomy.`);
-                              }}
-                              style={{ ...gGh(t), fontSize: 11, padding: "3px 9px", color: t.warn }}>Remove</button>
+                            {/* The last native confirm() in the product. It is
+                                the app's second-most destructive action — every
+                                ad name already built from this dimension stops
+                                parsing — and it was announcing that in a dialog
+                                the browser draws, with the app's own modal
+                                pattern sitting unused two files away. */}
+                            <button onClick={() => setPendingRemove(d)}
+                              style={{ ...gGh(t, "sm"), color: t.warn }}>Remove</button>
                           </>
                         )}
                       </span>
@@ -708,6 +709,23 @@ export function PerformanceView({ t, dk, items, settings, perfRows, onImport, on
             );
           })}
         </>
+      )}
+
+      {pendingRemove && (
+        <Modal t={t} dk={dk} title={"Remove " + pendingRemove.label + "?"} onClose={()=>setPendingRemove(null)}>
+          <div style={{fontSize:13,color:t.textSub,fontFamily:t.serif,lineHeight:1.6,marginBottom:18}}>
+            {pendingRemove.usage.length > 0
+              ? <>This dimension sits in <strong style={{color:t.text}}>{pendingRemove.usage.length} template{pendingRemove.usage.length!==1?"s":""}</strong>. Every ad name already built from {pendingRemove.usage.length!==1?"them":"it"} will stop parsing, and the spend on those rows will fall out of the breakdown into the unparsed bucket.</>
+              : <>This dimension is in no template, so nothing already built is affected.</>}
+          </div>
+          <div style={{display:"flex",justifyContent:"flex-end",gap:8}}>
+            <button style={gGh(t)} onClick={()=>setPendingRemove(null)}>Cancel</button>
+            <button style={{...gG(t),background:t.red,borderColor:t.red,color:"#fff"}}
+              onClick={()=>{ saveCustom(removeCustomDimension(custom, pendingRemove.key), `${pendingRemove.label} removed from the taxonomy.`); setPendingRemove(null); }}>
+              Remove dimension
+            </button>
+          </div>
+        </Modal>
       )}
 
       {editor && (

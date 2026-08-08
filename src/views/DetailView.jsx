@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { STATUSES, SL, SD, OL, OD, iceScore, iceColor, fmtCur, fmtDate } from "../constants.js";
-import { gG, gGh, gI, gTA, gSl, gSc, gSL } from "../components/styles.js";
+import { IconEdit, IconTrash, IconAlert, IconCopy } from "../components/icons.jsx";
+import { gG, gGh, gGd, gI, gTA, gSl, gSc, gSL } from "../components/styles.js";
 import { SBdg, OBdg, CBdg, TBdg, BlockerBadge, ICEChip } from "../components/badges.jsx";
 import { EAlert } from "../components/EAlert.jsx";
 import { renderProse } from "../components/text.jsx";
@@ -29,8 +30,13 @@ export function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResu
           {item.owner&&<div style={{fontSize:13,color:t.textMuted,marginTop:5,fontFamily:t.serif}}>{item.owner}</div>}
         </div>
         <div style={{display:"flex",gap:6}}>
-          <button style={gGh(t)} onClick={onEdit}><span style={{fontSize:12}}>&#9998;</span> Edit</button>
-          <button style={{...gGh(t),color:t.red,borderColor:t.red}} onClick={()=>{if(confirm("Delete this initiative?"))onDelete();}}><span style={{fontSize:12}}>&#128465;</span></button>
+          <button style={gGh(t)} onClick={onEdit}><IconEdit size={13}/> Edit</button>
+          {/* Was an unlabelled icon-only button firing a native confirm() that
+              did not name what it was deleting. The confirmation moved up to
+              App, where it can name the initiative and offer an undo. */}
+          <button style={gGd(t)} onClick={onDelete} title="Delete this initiative" aria-label="Delete this initiative">
+            <IconTrash size={13}/>
+          </button>
         </div>
       </div>
 
@@ -42,7 +48,7 @@ export function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResu
             <button key={s} onClick={()=>onStatus(s)} style={{fontSize:12,padding:"5px 13px",borderRadius:4,cursor:"pointer",fontWeight:600,background:act?c.bg:(t.surfaceAlt),border:"1px solid "+(act?c.border:t.border),color:act?c.text:t.textMuted}}>{s}</button>
           );})}
           {(item.status==="Completed"||item.status==="Killed")&&(
-            <button style={gG(t)} onClick={onResults}><span style={{fontSize:12}}>&#128203;</span> {item.results?"Edit results":"Log results"}</button>
+            <button style={gG(t)} onClick={onResults}><IconCopy size={13}/> {item.results?"Edit results":"Log results"}</button>
           )}
         </div>
       </div>
@@ -50,7 +56,7 @@ export function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResu
       {/* Blocker warning — full-width attention strip */}
       {item.blocker&&item.blocker!=="None"&&(
         <div style={{background:t.warnBg,border:"2px solid "+t.warnBorder,borderRadius:6,padding:"10px 16px",display:"flex",alignItems:"center",gap:10}}>
-          <span style={{fontSize:20,flexShrink:0}}>⚠️</span>
+          <span style={{color:t.warn,flexShrink:0,display:"inline-flex"}}><IconAlert size={19}/></span>
           <div>
             <div style={{fontSize:12,fontWeight:800,color:t.warn,letterSpacing:"0.04em",fontFamily:t.mono,textTransform:"uppercase"}}>BLOCKED</div>
             <div style={{fontSize:14,fontWeight:600,color:t.warn,fontFamily:t.serif}}>{item.blocker}</div>
@@ -65,19 +71,19 @@ export function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResu
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
             {item.observation&&(
               <div>
-                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>📊 Observation · what data prompted this?</div>
+                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>Observation · what data prompted this?</div>
                 <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:13}}>{item.observation}</p>
               </div>
             )}
             {item.hypothesis&&(
               <div style={{borderLeft:"3px solid "+t.gold,paddingLeft:12}}>
-                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>💡 Hypothesis · if we do X, then Y…</div>
+                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>Hypothesis · if we do X, then Y…</div>
                 <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:14,fontWeight:600}}>{item.hypothesis}</p>
               </div>
             )}
             {item.successMetric&&(
               <div>
-                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>🎯 Success metric · what KPI determines a win?</div>
+                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>Success metric · what KPI determines a win?</div>
                 <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:13}}>{item.successMetric}</p>
               </div>
             )}

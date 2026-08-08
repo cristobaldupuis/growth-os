@@ -118,7 +118,7 @@ export function cadenceFor(item, window, today = new Date()) {
 /** A short human range for the window, e.g. "wk 19–32" style hover context. */
 export function windowLabel(window) {
   if (!window || window.length === 0) return "";
-  const fmt = (d) => d.toLocaleDateString("en-CA", { month:"short", day:"numeric" });
+  const fmt = (d) => d.toLocaleDateString(undefined, { month:"short", day:"numeric" });
   return fmt(window[0].monday) + " – " + fmt(window[window.length - 1].monday);
 }
 

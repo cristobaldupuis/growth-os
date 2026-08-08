@@ -13,8 +13,30 @@
  * If you need a colour here, you want a token in constants.js instead.
  */
 
+/* The canvas colour, resolved from the app's own theme rather than the OS.
+ *
+ * This used to be a bare `color-scheme: light dark`, which tells the browser to
+ * paint its canvas from the *system* preference — while the app's theme is a
+ * manual toggle read asynchronously from the store after React mounts. A user
+ * on a light OS with the app in dark mode got a full white frame on every load,
+ * and the flash was worse on a cold cache, which is exactly when a first-time
+ * visitor sees it.
+ *
+ * `data-theme` is stamped on <html> by an inline script in index.html before
+ * this file is even parsed, and re-stamped by the theme toggle. The declarations
+ * below are the durable version of what that script sets inline. */
+:root,
+:root[data-theme="light"] {
+  color-scheme: light;
+  background: #EDEAE3;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  background: #0E0F12;
+}
+
 :root {
-  color-scheme: light dark;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;

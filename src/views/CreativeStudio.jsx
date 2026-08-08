@@ -609,7 +609,7 @@ export function CreativeStudio({
                           <span>~{Math.round(seconds)}s spoken</span>
                           {VIDEO_TIER_LIST.map(x => (
                             <span key={x.key} style={{ color: x.key === tierKey ? t.gold : t.textMuted, fontWeight: x.key === tierKey ? 700 : 400 }}>
-                              {x.key === tierKey ? "▸ " : ""}{x.key.toLowerCase()} {usd(estimateVideoCostUsd(vidScript, x))}
+                              {x.key === tierKey ? "· " : ""}{x.key.toLowerCase()} {usd(estimateVideoCostUsd(vidScript, x))}
                             </span>
                           ))}
                         </div>

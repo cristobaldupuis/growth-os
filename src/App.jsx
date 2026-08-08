@@ -61,6 +61,7 @@ const CreativeStudio    = lazy(() => import("./views/CreativeStudio.jsx").then(m
 const PerformanceView   = lazy(() => loadPerformanceView().then(m => ({ default: m.PerformanceView })));
 const CopilotPanel      = lazy(() => import("./views/CopilotPanel.jsx").then(m => ({ default: m.CopilotPanel })));
 const ClientReadoutView = lazy(() => import("./views/ClientReadoutView.jsx").then(m => ({ default: m.ClientReadoutView })));
+const SettingsView      = lazy(() => import("./views/SettingsView.jsx").then(m => ({ default: m.SettingsView })));
 import { applyRouting } from "./services/ai/models.js";
 import { callExpandHypothesis } from "./services/ai/callExpandHypothesis.js";
 import { callSuggestICE } from "./services/ai/callSuggestICE.js";
@@ -79,7 +80,6 @@ import { FR } from "./components/FR.jsx";
 import { MetricsLogModal } from "./components/MetricsLogModal.jsx";
 import { MetricsImportModal } from "./components/MetricsImportModal.jsx";
 import { NextPlaysModal } from "./components/NextPlaysModal.jsx";
-import { SettingsModal } from "./components/SettingsModal.jsx";
 import { DashView } from "./views/DashView.jsx";
 import { DetailView } from "./views/DetailView.jsx";
 import { FormView } from "./views/FormView.jsx";
@@ -554,7 +554,9 @@ export default function App() {
   const [pendS,     setPendS]     = useState(null);
   const [confC,     setConfC]     = useState(75);
   const [showTpl,   setShowTpl]   = useState(false);
-  const [showSet,   setShowSet]   = useState(false);
+  // Which Settings section is open. Part of the URL, so "#/settings/naming"
+  // is a link somebody can send.
+  const [settingsSection, setSettingsSection] = useState("workspace");
   const [onboarding, setOnboarding] = useState(false);
   const [showCapture, setShowCapture] = useState(false);
   const [captureText, setCaptureText] = useState("");
@@ -739,7 +741,7 @@ export default function App() {
     const apply = () => {
       const r = parseHash(window.location.hash);
       if (r.selId) setSelId(r.selId);
-      if (r.tab)   setPerfTab(r.tab);
+      if (r.tab)   { setPerfTab(r.tab); setSettingsSection(r.tab); }
       setNav(r.nav);
     };
     apply();
@@ -749,9 +751,9 @@ export default function App() {
 
   useEffect(() => {
     if (!loaded) return;
-    const next = formatHash({ nav, selId, tab: nav === "performance" ? perfTab : null });
+    const next = formatHash({ nav, selId, tab: nav === "performance" ? perfTab : nav === "settings" ? settingsSection : null });
     if (next && next !== window.location.hash) window.location.hash = next;
-  }, [nav, selId, perfTab, loaded]);
+  }, [nav, selId, perfTab, settingsSection, loaded]);
 
   const saveItems    = d => { const stamped = stampUpdatedAt(d, items); setItems(stamped); store.set(KEY_ITEMS,JSON.stringify(stamped)); };
   const saveSettings = s => { setSettings(s); store.set(KEY_SETTINGS,JSON.stringify(s)); };
@@ -1489,7 +1491,11 @@ export default function App() {
   };
 
   return (
-    <div style={{background:t.bg,minHeight:"100vh",fontFamily:t.sans,color:t.text}}>
+    <div style={{background:t.bg,minHeight:"100vh",fontFamily:t.sans,color:t.text,
+      // Theme values the stylesheet needs. A media query cannot read a JS
+      // object, and the button interaction below has to work in both themes
+      // without each of 173 buttons opting in by hand.
+      "--gos-shadow":t.shadow, "--gos-shadow-hi":t.shadowHi, "--gos-gold":t.gold}}>
       {/* The Tabler icon webfont used to be @import-ed here from jsdelivr. Nothing
         * in the app ever rendered a `ti ti-*` class, so it was a render-blocking
         * third-party request buying nothing — and one more origin to justify if a
@@ -1523,7 +1529,36 @@ export default function App() {
         +"@media(max-width:640px){.gos-filters{flex-direction:column;align-items:stretch !important}.gos-filters>*{width:100%}.gos-filters select,.gos-filters input{min-width:0 !important;width:100% !important}}"
         // Labels that are noise once the screen is narrow enough that the icon
         // has to carry the button on its own.
-        +"@media(max-width:560px){.gos-hide-sm{display:none}}"}</style>
+        +"@media(max-width:560px){.gos-hide-sm{display:none}}"
+        // Settings section rail: a 196px column beside content works down to a
+        // tablet; below that it becomes a scrolling row above the content, so
+        // the sections stay visible without eating half a phone's width.
+        +"@media(max-width:760px){.gos-settings-rail{width:100% !important;position:static !important;flex-direction:row !important;overflow-x:auto;gap:6px !important;padding-bottom:4px}.gos-settings-rail button{width:auto !important;white-space:nowrap;flex-shrink:0}}"
+        // -- Buttons answer the pointer -------------------------------------
+        //
+        // Cards, rows and stat tiles all had a hover state; buttons had none,
+        // except three in the sidebar that recoloured their own border through
+        // hand-written onMouseEnter handlers. So the most-clicked elements in
+        // the product were the least responsive ones.
+        //
+        // Done here rather than in the style helpers because a helper returns
+        // an inline style object and `:hover` cannot be expressed in one. The
+        // selector excludes anything already in the interaction layer, so a nav
+        // item keeps its rail-and-tint and does not also lift.
+        //
+        // `saturate` rather than `brightness`: a brightness lift reads well on
+        // the gold primary but goes the wrong way on a near-white secondary in
+        // light mode, where hover should feel like the surface coming forward
+        // rather than washing out. Saturation deepens the accent and leaves the
+        // greys alone, and the lift plus shadow is what carries the state in
+        // both themes. The global prefers-reduced-motion block in index.css
+        // collapses the movement and leaves the colour.
+        +"button:not(:disabled):not(.gos-int):not(.gos-tile){transition:transform .13s cubic-bezier(.2,.7,.3,1),box-shadow .16s ease,filter .16s ease}"
+        +"button:not(:disabled):not(.gos-int):not(.gos-tile):hover{transform:translateY(-1px);box-shadow:var(--gos-shadow-hi);filter:saturate(1.14)}"
+        +"button:not(:disabled):not(.gos-int):not(.gos-tile):focus-visible{box-shadow:var(--gos-shadow-hi)}"
+        // The press. Returns to rest and dips a hair below it, so a click reads
+        // as a click rather than as the hover state blinking off.
+        +"button:not(:disabled):not(.gos-int):not(.gos-tile):active{transform:translateY(0.5px);box-shadow:none;filter:saturate(1.04)}"}</style>
 
       {/* Onboarding — first run only */}
       {onboarding&&(
@@ -1608,7 +1643,7 @@ export default function App() {
             if(a==="new")           { requestNav("initiatives"); setShowTpl(true); }
             else if(a==="capture")  setShowCapture(true);
             else if(a==="signal")   setShowCopilot(true);
-            else if(a==="settings") setShowSet(true);
+            else if(a==="settings") requestNav("settings");
           }}
         />
       )}
@@ -1705,7 +1740,7 @@ export default function App() {
             demoMode={DEMO_MODE} onResetDemo={()=>setShowResetConfirm(true)}
             onTour={()=>{setTourStep(0);setShowTour(true);}}
             onSignal={()=>setShowCopilot(true)} onGuide={()=>setGuideSection(true)}
-            onSettings={()=>setShowSet(true)} onToggleTheme={toggleDk}/>
+            onSettings={()=>requestNav("settings")} onToggleTheme={toggleDk}/>
         </aside>
 
         {/* Mobile drawer */}
@@ -1718,7 +1753,7 @@ export default function App() {
                 demoMode={DEMO_MODE} onResetDemo={()=>{setNavOpen(false);setShowResetConfirm(true);}}
                 onTour={()=>{setNavOpen(false);setTourStep(0);setShowTour(true);}}
                 onSignal={()=>{setNavOpen(false);setShowCopilot(true);}} onGuide={()=>{setNavOpen(false);setGuideSection(true);}}
-                onSettings={()=>{setNavOpen(false);setShowSet(true);}} onToggleTheme={toggleDk}
+                onSettings={()=>{setNavOpen(false);requestNav("settings");}} onToggleTheme={toggleDk}
                 onClose={()=>setNavOpen(false)}/>
             </div>
           </div>
@@ -1817,13 +1852,22 @@ export default function App() {
       {nav==="library"&&<LearningLibrary items={items} t={t} dk={dk} cats={cats} brands={brands} activeBrand={activeBrand} settings={settings} view={libView} onView={saveLibView} onViewInitiative={(id)=>goDetail(id,"library")} onReplicate={(item)=>{const base=mkDefault(cats,activeBrand);setForm({...base,title:"[Replicate] "+item.title,hypothesis:"Based on learning from: "+item.title+". Original: "+item.hypothesis,category:item.category,initType:item.initType,ice:{...item.ice},revenueImpact:item.revenueImpact,notes:"Replicated from initiative "+item.id+". Original learning: "+item.results.keyLearning});setNav("form");}}/>}
       {nav==="creative"&&<CreativeStudio t={t} dk={dk} items={items} brands={brands} activeBrand={activeBrand} settings={settings}
         creative={creative} onSaveCreative={saveCreative} onSaveItems={saveItems} showToast={showToast}/>}
-      {nav==="performance"&&<PerformanceView t={t} dk={dk} items={items} settings={settings} perfRows={perfRows}
+      {nav==="performance"&&<PerformanceView t={t} items={items} settings={settings} perfRows={perfRows}
         initialTab={perfTab} initialInitiativeId={builderInit} showToast={showToast}
         onAssignNames={(id,adNames)=>saveItems(items.map(e=>e.id===id?{...e,adNames}:e))}
-        onSaveSettings={saveSettings}
         onImport={()=>setShowMetricsImport(true)}
+        onOpenConvention={()=>{ setSettingsSection("naming"); requestNav("settings"); }}
         onClear={()=>{savePerf([]); showToast("Imported performance data cleared.","success");}}/>}
       {nav==="readout"&&<ClientReadoutView t={t} dk={dk} dash={dash} items={items} brands={brands} activeBrand={activeBrand} cats={cats} weeklyMetrics={weeklyMetrics} settings={settings}/>}
+      {nav==="settings"&&(
+        <SettingsView t={t} dk={dk} settings={settings} showToast={showToast}
+          initialSection={settingsSection}
+          onSave={s=>{saveSettings(s);}}
+          onClose={()=>requestNav("dashboard")}
+          onDownloadBackup={() => { handleDownloadBackup(items, settings, debates, weeklyMetrics, recs, creative, perfRows); try { localStorage.setItem("gos_last_backup", new Date().toISOString()); } catch { /* the backup itself succeeded; only the reminder timestamp failed */ } }}
+          onRestoreBackup={(file) => handleRestoreBackup(file, showToast, setRestorePayload)}
+          onResetDemo={handleResetDemoData}/>
+      )}
 
       {nav==="initiatives"&&(
         <div style={{padding:"16px 20px"}}>
@@ -2016,7 +2060,6 @@ export default function App() {
         </Modal>
       )}
 
-      {showSet&&<SettingsModal t={t} dk={dk} settings={settings} onSave={s=>{saveSettings(s);setShowSet(false);}} onClose={()=>setShowSet(false)} onDownloadBackup={() => { handleDownloadBackup(items, settings, debates, weeklyMetrics, recs, creative, perfRows); try { localStorage.setItem("gos_last_backup", new Date().toISOString()); } catch { /* the backup itself succeeded; only the reminder timestamp failed */ } }} onRestoreBackup={(file) => handleRestoreBackup(file, showToast, setRestorePayload)} onResetDemo={handleResetDemoData}/>}
 
       {guideSection&&(
         <GuideDrawer t={t} dk={dk} openSection={guideSection} onClose={()=>setGuideSection(null)}
@@ -2024,7 +2067,7 @@ export default function App() {
           onNavigate={(action)=>{
             setGuideSection(null);
             if(action==="signal")        setShowCopilot(true);
-            else if(action==="settings") setShowSet(true);
+            else if(action==="settings") requestNav("settings");
             else                         setNav(action); // dashboard | library | initiatives | triage
           }}/>
       )}

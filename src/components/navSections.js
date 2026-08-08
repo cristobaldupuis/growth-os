@@ -55,11 +55,19 @@ export const NAV_SECTIONS = [
   },
 ];
 
+// Destinations that are real views but not rail items. Settings is reached from
+// the gear in the rail foot rather than from the section list — it is a place
+// you go occasionally, and a rail item for it would sit next to seven things
+// you go to daily — but it still needs a name for the header and the title.
+export const OFF_RAIL = {
+  settings: { key:"settings", label:"Settings", lab:null, blurb:"workspace, brands, convention, data" },
+};
+
 /** Flat lookup so other code can name a view without knowing its section. */
 export const NAV_INDEX = NAV_SECTIONS.reduce((acc, s) => {
   s.items.forEach(i => { acc[i.key] = i; });
   return acc;
-}, {});
+}, { ...OFF_RAIL });
 
 /**
  * The plain label for a nav key, falling back to the key itself for views that

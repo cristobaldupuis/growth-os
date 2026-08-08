@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
-import { Modal } from "./Modal.jsx";
-import { FR } from "./FR.jsx";
-import { gG, gGh, gI } from "./styles.js";
-import { IconClose, IconDownload, IconImport, IconRefresh, IconPlus } from "./icons.jsx";
-import { iconFor, ICON_REGISTRY } from "./iconRegistry.js";
+import { Modal } from "../components/Modal.jsx";
+import { TaxonomyEditor } from "../components/TaxonomyEditor.jsx";
+import { FR } from "../components/FR.jsx";
+import { gG, gGh, gI, gOff } from "../components/styles.js";
+import { IconClose, IconDownload, IconImport, IconRefresh, IconPlus } from "../components/icons.jsx";
+import { iconFor, ICON_REGISTRY } from "../components/iconRegistry.js";
 import { DEFAULT_AGENTS, DEFAULT_SETTINGS, brandColor, catColor } from "../constants.js";
 
 // Currencies the shipped formatter is checked against. The list is short on
@@ -27,8 +28,37 @@ const LOCALES = [
   { code:"fr-FR", label:"French — 12 août 2026" },
 ];
 
+// The sections, in the order an operator meets them. `hint` is what the section
+// settles, because a left rail of eight nouns is a filing cabinet and a rail of
+// eight questions is navigation.
+const SECTIONS = [
+  { key:"workspace",  label:"Workspace",   hint:"name, model, currency" },
+  { key:"northstar",  label:"North star",  hint:"the metric everything moves" },
+  { key:"categories", label:"Categories",  hint:"how work is filed" },
+  { key:"brands",     label:"Retailers",   hint:"briefs the AI reads" },
+  { key:"naming",     label:"Naming convention", hint:"the ad-name grammar" },
+  { key:"agents",     label:"Debate agents",     hint:"who argues in Signal" },
+  { key:"health",     label:"Health metrics",    hint:"portfolio guardrails" },
+  { key:"data",       label:"Data",        hint:"backup, restore, demo" },
+];
+
 // -- Settings ------------------------------------------------------------------
-export function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onRestoreBackup,onResetDemo}) {
+//
+// Was a modal: nine sections stacked in a 560px box capped at 88vh, with no
+// sub-navigation, no anchors and no search — so reconfiguring five health
+// metrics meant scrolling past four unrelated sections inside a
+// viewport-constrained window, and a backdrop click threw the lot away.
+//
+// It is a page now, with the sections down the left, which is the same call
+// Stripe and Twilio both made and for the same reason: settings is not a
+// question you answer and dismiss, it is a place you go.
+//
+// The naming convention moved in with it. It is the product's headline
+// differentiator and it was living at Performance → Taxonomy, two levels deep
+// inside a view named after something else, while the README said the
+// convention "lives in settings" — true of the data, and false of the address.
+export function SettingsView({t,dk,settings,onSave,onClose,onDownloadBackup,onRestoreBackup,onResetDemo,showToast,initialSection}) {
+  const [sec,setSec] = useState(initialSection || "workspace");
   const [local,setLocal]=useState({...settings});
   const [newCat,setNewCat]=useState("");
   const [confirmDiscard,setConfirmDiscard]=useState(false);
@@ -58,8 +88,32 @@ export function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onR
   }
 
   return (
-    <Modal t={t} dk={dk} onClose={onClose} onRequestClose={requestClose} wide title="Settings">
-      <div style={{display:"flex",flexDirection:"column",gap:14}}>
+    <div style={{padding:"16px 20px",display:"flex",gap:20,alignItems:"flex-start",flexWrap:"wrap"}}>
+
+      {/* Section rail */}
+      <nav aria-label="Settings sections" className="gos-settings-rail"
+        style={{width:196,flexShrink:0,position:"sticky",top:70,display:"flex",flexDirection:"column",gap:2}}>
+        {SECTIONS.map(x=>{
+          const on = sec===x.key;
+          return (
+            <button key={x.key} onClick={()=>setSec(x.key)} aria-current={on?"page":undefined}
+              style={{textAlign:"left",padding:"8px 10px",borderRadius:t.r.sm,cursor:"pointer",
+                background:on?t.surface:"transparent",
+                border:"1px solid "+(on?t.border:"transparent"),
+                boxShadow:on?t.shadow:"none",display:"block",width:"100%"}}>
+              <span style={{display:"block",fontSize:13,fontWeight:on?600:500,color:on?t.text:t.textSub,fontFamily:t.sans}}>{x.label}</span>
+              <span style={{display:"block",fontSize:10.5,color:on?t.gold:t.textMuted,fontFamily:t.sans,marginTop:1}}>{x.hint}</span>
+            </button>
+          );
+        })}
+      </nav>
+
+      <div style={{flex:1,minWidth:0,display:"flex",flexDirection:"column",gap:14}}>
+        {sec==="naming" && (
+          <TaxonomyEditor t={t} dk={dk} settings={settings} showToast={showToast}
+            onSaveSettings={(next)=>{ setLocal(next); onSave(next); }}/>
+        )}
+        {sec==="workspace" && (<>
         <FR label="Company / workspace name" t={t}><input style={gI(t)} value={local.companyName} onChange={e=>f("companyName",e.target.value)}/></FR>
         <FR label="Business model (one line)" t={t}><input style={gI(t)} value={local.businessModel} onChange={e=>f("businessModel",e.target.value)}/></FR>
         {/* Money and dates were hardcoded to a dollar sign and en-CA in four
@@ -77,6 +131,8 @@ export function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onR
             </select>
           </FR>
         </div>
+        </>)}
+        {sec==="northstar" && (
         <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
           <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:10,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>North star metric</div>
           <div className="gos-grid-3" style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
@@ -85,6 +141,8 @@ export function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onR
             <FR label="Target" t={t}><input style={gI(t)} value={local.northStarTarget} onChange={e=>f("northStarTarget",e.target.value)}/></FR>
           </div>
         </div>
+        )}
+        {sec==="categories" && (
         <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
           <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:10,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Categories</div>
           <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}}>
@@ -99,6 +157,8 @@ export function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onR
             <button style={gG(t)} onClick={addCat}>Add</button>
           </div>
         </div>
+        )}
+        {sec==="brands" && (
         <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
           <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:10,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Retailers / Partners</div>
           <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:10}}>
@@ -153,6 +213,8 @@ export function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onR
           <button onClick={()=>{const newId="brand-"+Date.now();setLocal(p=>({...p,brands:[...(p.brands||[]),{id:newId,name:"New retailer"}]}));}}
             style={gGh(t,"sm")}><IconPlus size={12}/> Add retailer</button>
         </div>
+        )}
+        {sec==="agents" && (
         <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
           <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:4,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>C-Suite Debate Agents</div>
           <p style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,lineHeight:1.5,margin:"0 0 10px"}}>
@@ -202,6 +264,8 @@ export function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onR
               style={gGh(t,"sm")}>Reset to defaults</button>
           </div>
         </div>
+        )}
+        {sec==="health" && (
         <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
           <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:4,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Health Metrics</div>
           <p style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,lineHeight:1.5,margin:"0 0 10px"}}>
@@ -270,6 +334,8 @@ export function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onR
             }}>+ Add metric</button>
           )}
         </div>
+        )}
+        {sec==="data" && (
         <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
           <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:10,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Backup &amp; restore</div>
           <p style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,lineHeight:1.6,margin:"0 0 10px"}}>Download a full snapshot of your data (initiatives, settings, debates, weekly metrics) as a JSON file. Keep a copy somewhere safe. This is the only off-device record until cloud sync ships.</p>
@@ -282,23 +348,34 @@ export function SettingsModal({t,dk,settings,onSave,onClose,onDownloadBackup,onR
             </label>
           </div>
         </div>
+        )}
+        {sec==="data" && (
         <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
           <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:8,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Demo data</div>
           <p style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,lineHeight:1.6,margin:"0 0 10px"}}>Reload the built-in demo initiatives and weekly metrics. Replaces all current initiatives and weekly pulse data.</p>
           <button onClick={onResetDemo} style={gGh(t)}><IconRefresh size={13}/> Reset to demo data</button>
         </div>
+        )}
         {/* A "Data sources" section badged "Placeholder · coming soon", whose
             content was a roadmap paragraph and an empty state reading "No data
             sources connected yet", used to sit here. Roadmap honesty belongs in
             the README; inside a client-facing tool an empty section is not a
             plan, it is a gap. It comes back when there is something to connect.
             See ROADMAP Phase 2. */}
-        <div style={{display:"flex",gap:8,justifyContent:"flex-end",alignItems:"center",paddingTop:4}}>
-          {dirty&&<span style={{marginRight:"auto",fontSize:11,color:t.textMuted,fontFamily:t.mono}}>unsaved changes</span>}
-          <button style={gGh(t)} onClick={requestClose}>Cancel</button>
-          <button style={gG(t)} onClick={()=>{ onSave(local); }}>Save settings</button>
-        </div>
+        {/* The taxonomy editor writes through on every edit, so the save bar
+          * would be lying if it appeared there. Every other section is a draft
+          * until saved. */}
+        {sec!=="naming" && (
+          <div style={{display:"flex",gap:8,justifyContent:"flex-end",alignItems:"center",paddingTop:4,
+            position:"sticky",bottom:0,background:t.bg,paddingBottom:12,borderTop:"1px solid "+t.borderSoft,marginTop:4}}>
+            {dirty
+              ? <span style={{marginRight:"auto",fontSize:11,color:t.warn,fontFamily:t.mono}}>unsaved changes</span>
+              : <span style={{marginRight:"auto",fontSize:11,color:t.textMuted,fontFamily:t.mono}}>saved</span>}
+            <button style={gGh(t)} onClick={requestClose}>{dirty?"Discard":"Close"}</button>
+            <button style={{...gG(t),...(dirty?null:gOff)}} disabled={!dirty} onClick={()=>{ onSave(local); }}>Save settings</button>
+          </div>
+        )}
       </div>
-    </Modal>
+    </div>
   );
 }

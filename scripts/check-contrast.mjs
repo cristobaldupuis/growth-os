@@ -97,6 +97,42 @@ for (const [themeName, TY, T] of [["light", TYPE_L, TL], ["dark", TYPE_D, TD]]) 
 }
 
 const worst = [...results].sort((a, b) => a.ratio - b.ratio).slice(0, 5);
+// -- The contribution ramp -----------------------------------------------------
+//
+// Not a text check. The three segments of the stacked contribution bar encode a
+// certainty ramp — measured, probable, speculative — and the property that
+// matters is that a reader can tell them apart where they touch. They could
+// not: `gold` against `warn` measured 1.07:1 in light mode, so the two most
+// important segments of the bar were the same colour, and the third was grey.
+//
+// The check is on luminance, not hue, and that is the point. Teal against gold
+// separates beautifully for most readers and collapses for a deuteranopic one,
+// so a ramp that steps only in hue is a ramp that disappears for roughly one man
+// in twelve. Requiring a lightness step means the bar survives being read in
+// greyscale — which is also how it prints, and how it lands in a screenshot
+// pasted into a deck.
+//
+// 1.4:1 is not a WCAG number, because WCAG has nothing to say about two
+// adjacent blocks of colour. It is the floor that keeps a boundary visible in
+// a 10px bar, and it exists so this cannot quietly regress the way the gold
+// pairing did.
+const ADJACENT = 1.4;
+for (const [themeName, T] of [["light", TL], ["dark", TD]]) {
+  const p = (s) => `${themeName}/ramp ${s}`;
+  const ramp = [
+    ["measured", T.rampMeasured],
+    ["inflight", T.rampInflight],
+    ["pipeline", T.rampPipeline],
+  ];
+  for (let i = 0; i < ramp.length - 1; i++) {
+    check(p(`${ramp[i][0]} vs ${ramp[i+1][0]}`), ramp[i][1], ramp[i+1][1], ADJACENT);
+  }
+  // Every segment has to be visible against the empty remainder of the track.
+  for (const [label, value] of ramp) {
+    check(p(`${label} on track`), value, T.rampTrack, ADJACENT);
+  }
+}
+
 console.log(`Checked ${results.length} pairings against WCAG AA.`);
 console.log("Tightest five:");
 for (const r of worst) {

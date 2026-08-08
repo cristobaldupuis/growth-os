@@ -12,12 +12,16 @@
 //
 // ## Why existing initiatives are flagged rather than blocked
 //
-// All thirty-eight seeded demo initiatives predate these fields and carry
-// neither an observation nor a success metric. Hard-blocking would make every
-// one of them uneditable, so the first thing a new user does — open one and
-// change a date — would fail. Legacy records get the same red fields and a
-// banner naming what is missing and why, and can still be saved. New ones
-// cannot.
+// The rule was written when all thirty-eight seeded initiatives predated these
+// fields, and hard-blocking would have made every one of them uneditable — the
+// first thing a new user did, open one and change a date, would have failed.
+// The seed has since been backfilled and no longer trips this path, but the
+// path stays: a CSV import can carry rows with no observation, a JSON restore
+// can carry a workspace recorded before the fields existed, and a real customer
+// portfolio will have history that predates the discipline. Making those
+// records uneditable would punish the operator for the product's own change of
+// mind. They get the same red fields and a banner naming what is missing and
+// why, and can still be saved. New ones cannot.
 //
 // Lives outside FormView.jsx so the view file exports only components, which is
 // what Fast Refresh needs — the same split as navSections.js and tourSteps.js.

@@ -1,8 +1,8 @@
 import { PROXY_URL, AI_HEADERS, proxyError } from "./_shared.js";
-import { MODELS, EFFORT, buildRequest } from "./models.js";
+import { EFFORT, buildRequest, modelFor } from "./models.js";
 
 // Single agent turn with tool use — agentic: agent decides what data to fetch
-export async function callAgentTurn(agent, portfolioCtx, userContext, messageHistory, portfolioTools, isFirstTurn) {
+export async function callAgentTurn(agent, portfolioCtx, userContext, messageHistory, portfolioTools, isFirstTurn, modelOverride) {
 
   const mandates = {
     "CMO":  "Your mandate: argue for investment in growth and acquisition even when the data is early or mixed. You believe underinvestment is a bigger risk than overspend. Push back hard on anyone who says 'wait for more data' or 'protect margin first'.",
@@ -41,7 +41,7 @@ Max 180 words per turn. No filler. Speak like a real boardroom executive who has
     const resp = await fetch(PROXY_URL, {
       method:"POST", headers:AI_HEADERS(),
       body: JSON.stringify({
-        ...buildRequest({model:MODELS.REASONING, maxTokens:600, system:sys, effort:EFFORT.LOW, cacheSystem:true}),
+        ...buildRequest({model:modelFor("debate", modelOverride), maxTokens:600, system:sys, effort:EFFORT.LOW, cacheSystem:true}),
       tools: portfolioTools.definitions,
         messages: currentMessages,
       }),

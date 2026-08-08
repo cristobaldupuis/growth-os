@@ -6,7 +6,7 @@ import { fmtDate } from "../constants.js";
 import { resolveSchema, buildNameSet, templateFor, listChannels, listLevels, suggestTrackingTag, NA } from "../services/naming.js";
 import { callCreativeBrief } from "../services/ai/callCreativeBrief.js";
 import { callCreativeVariants } from "../services/ai/callCreativeVariants.js";
-import { callGenerateImage, buildImagePrompt, IMAGE_ASPECTS, IMAGE_MODELS } from "../services/ai/callGenerateImage.js";
+import { callGenerateImage, buildImagePrompt, IMAGE_ASPECTS } from "../services/ai/callGenerateImage.js";
 import {
   callGenerateVideo, pollVideoJob, buildVideoScript, VIDEO_TIERS, VIDEO_TIER_LIST,
   estimateSpokenSeconds, estimateVideoCostUsd, VIDEO_POLL_INTERVAL_MS, VIDEO_POLL_TIMEOUT_MS,
@@ -206,7 +206,10 @@ export function CreativeStudio({
     setImgErr({ ...imgErr, [idx]: "" });
     try {
       const prompt = buildImagePrompt(brief, variant, brand);
-      const img = await callGenerateImage({ prompt, aspectRatio: aspect, model: IMAGE_MODELS.FAST });
+      // No explicit model: the `image` feature group decides, so repointing image
+      // generation in the admin console reaches this button. It defaults to
+      // IMAGE_MODELS.FAST, which is what this call passed before routing existed.
+      const img = await callGenerateImage({ prompt, aspectRatio: aspect });
       setImages({ ...images, [idx]: { ...img, aspect } });
     } catch (e) {
       setImgErr({ ...imgErr, [idx]: e.message || "Could not generate an image." });

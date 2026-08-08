@@ -14,7 +14,8 @@ Built to demonstrate how a Director of Growth thinks about velocity, incremental
 
 - **Creative Studio** — brief and produce creative against an initiative, so every asset is born attached to a hypothesis. Briefs are grounded in the brand brief and closed learnings and must state what result would falsify the direction; anything the brand brief doesn't support is routed to `claimsToVerify` rather than asserted. Variants come back as validated naming segments, and ad names are assembled in code
 - **Campaign nomenclature engine** — the ad naming convention lives in settings as an ordered segment list with controlled vocabularies. `src/services/naming.js` builds, parses and validates against it, and its trailing `Initiative` segment carries an initiative's `trackingTag` — which is how a performance row finds its way back to the experiment that produced it
-- **Model tiering** — reasoning calls (debate, synthesis, candidate generation) run on `claude-sonnet-5`; schema-shaped transformations (quick capture, hypothesis expansion, ICE assist) run on `claude-haiku-4-5`. Adaptive thinking throughout, prompt caching on the flows that reuse a system prefix
+- **Admin model console** — an operator-only surface at `/admin` (separate bundle, password-gated) that points each of six feature groups at a model, across Anthropic, Gemini and OpenAI. Groups declare a capability floor both the picker and the server enforce, so the debate group cannot be pointed at a model without tool calling. Includes a test bench that runs a group's real prompt against your own portfolio through up to four models at once
+- **Model tiering** — model choice is grouped by what the call has to do well, not set per feature: reasoning groups (debate, portfolio analysis, creative direction) default to `claude-sonnet-5`; capture and framing defaults to `claude-haiku-4-5`. Adaptive thinking throughout, prompt caching on the flows that reuse a system prefix
 - **Accessible palette, enforced** — light-mode gold now passes WCAG AA (it previously measured 2.42:1 on white, applied to the dashboard's largest figures); dark surfaces moved from warm brown to cool charcoal so the accent reads as gold rather than mud. `npm run check:contrast` fails CI on regression
 - **No browser-held API credential** — the proxy authorises on origin and bounds cost by request shape instead of a `VITE_`-prefixed secret that shipped inside the bundle
 - **Storage failures are visible** — a full browser store used to produce saves that silently vanished on reload; it now raises a persistent banner with a one-click backup
@@ -157,6 +158,30 @@ All AI features run through a server-side proxy — your API key is never expose
 | Learning Synthesis | Scans all closed initiatives and produces Patterns, Gaps, Lessons, Do Next |
 | Signal AI | Autonomous C-Suite debate — see above |
 
+### Which model runs what
+
+Model choice is a routing decision rather than a code literal. Features are grouped
+by what the call has to do well, and each group is pointed at one model from the
+admin console at `/admin`:
+
+| Group | Covers | Optimised for |
+|---|---|---|
+| Capture & Framing | Quick Capture, Hypothesis Expansion, ICE Assist | JSON reliability, cost, latency — the operator supplies the judgement and reviews the output |
+| Portfolio Analysis | Next Plays (both passes), Learning Synthesis, Ask the Library | Long-context faithfulness; must not invent learning IDs |
+| Signal AI Debate | Agent turns, Moderator, Debate synthesis | Persona adherence and willingness to disagree. **Requires tool use** |
+| Creative Direction | Creative Brief, Ad Variants | Copy craft, brand voice, claim safety |
+| Image Generation | Creative Studio key frames | Frame quality per cent spent |
+| Video Generation | Talking-head renders | Default provider only — the per-render tier stays an operator choice in Creative Studio |
+
+Each group declares a capability floor that both the picker and the server enforce,
+so the debate group cannot be pointed at a model without tool calling, and a
+whole-portfolio prompt cannot be pointed at a short-context model. Providers wired
+today: Anthropic, Google Gemini, OpenAI.
+
+The console also carries a **test bench** — it runs a group's real production
+prompt, against your own portfolio, through up to four models at once, so an
+assignment is made from output rather than reputation. See `src/admin/probes.js`.
+
 ---
 
 ## Brand briefs
@@ -211,12 +236,23 @@ src/
     seedRebase.js      # Shifts each config's authored demo timeline onto today, derives weekly figures
     cadence.js         # Rolling activity windows for the initiative rails
     ai/
-      models.js        # Model tier selection, effort, prompt-cache policy
+      registry.js      # Which models exist, what each supports, which feature group each serves
+      models.js        # Request building, routing resolution, effort, prompt-cache policy
       call*.js         # One file per AI feature
+  admin/               # The model console — a SEPARATE Vite entry, never bundled into the app
+    AdminApp.jsx       # Login, routing cards, shell
+    BenchPanel.jsx     # Side-by-side model comparison
+    probes.js          # How each group is exercised — calls the real prompts, no copies
+    theme.js           # Its own visual language, deliberately not the product's
 api/
-  proxy.js             # Serverless Anthropic proxy — origin allowlist, request-shape bounds, durable rate limiting
+  proxy.js             # Serverless text proxy — origin allowlist, request-shape bounds, durable rate limiting
+  _adapters.js         # Per-provider request/response translation, normalised to the Anthropic shape
   image.js             # Gemini image generation, bounded on count rather than tokens
   video.js             # Talking-head avatar render — submit/poll, bounded on script length
+  admin.js             # Model console backend — session, routing read/write, provider model lists
+  routing.js           # Public read of group → model, fetched by the app at boot
+  _session.js          # HMAC-signed admin session cookie
+  _routing.js          # Routing persistence (Upstash), soft on read, explicit on write
 scripts/
   check-contrast.mjs   # Fails the build if any themed pairing drops below WCAG AA
 ```
@@ -301,6 +337,24 @@ VEED_API_KEY=your_key
 #   printf '%s' 'you@example.com:your_key' | base64
 DID_API_KEY=your_base64_encoded_pair
 
+# --- Admin model console (/admin) ---------------------------------------------
+#
+# Both are required for the console to be reachable. If ADMIN_PASSWORD is unset
+# the console is disabled rather than open — an admin surface that defaults to no
+# password because someone forgot to configure one is worse than no admin surface.
+# The app itself is unaffected either way and runs on the committed defaults.
+#
+# ADMIN_SESSION_SECRET signs the session cookie. Any long random string; changing
+# it invalidates every existing session, which is also how you revoke one.
+#   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+ADMIN_PASSWORD=a_long_random_password
+ADMIN_SESSION_SECRET=a_long_random_string
+
+# Optional. Lets the console route a feature group to OpenAI. Without it, OpenAI
+# models appear in the picker but calls return a clear "not configured" error.
+# Gemini text reuses GEMINI_API_KEY above.
+OPENAI_API_KEY=your_key
+
 # Optional. Comma-separated origins the proxy will accept. Defaults to the
 # canonical deployment, so a missing value fails closed rather than opening up.
 ALLOWED_ORIGINS=https://your-deployment.vercel.app
@@ -308,12 +362,20 @@ ALLOWED_ORIGINS=https://your-deployment.vercel.app
 # Optional but strongly recommended in production. Without these the proxy
 # falls back to an in-memory rate limiter, which on serverless is per-instance
 # and resets on cold start — i.e. effectively no limit at all.
+#
+# These also store the admin console's model routing. Without them the console
+# still runs and the bench still works, but a routing change cannot be saved —
+# the console says so rather than appearing to save.
 UPSTASH_REDIS_REST_URL=...
 UPSTASH_REDIS_REST_TOKEN=...
 ```
 
 Note there is deliberately no client-side secret. Anything prefixed `VITE_` is
 compiled into the browser bundle and is not a secret.
+
+**One caveat for local development:** `npm run dev` serves the Vite bundle but not
+the `api/` functions, so `/admin` will load and then fail to reach `/api/admin`.
+Use `vercel dev` when working on the console or anything else under `api/`.
 
 ---
 

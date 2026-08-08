@@ -1,5 +1,5 @@
 import { PROXY_URL, AI_HEADERS, safeParseJSON, proxyError } from "./_shared.js";
-import { MODELS, EFFORT, buildRequest } from "./models.js";
+import { EFFORT, buildRequest, modelFor } from "./models.js";
 
 // -- Creative variants ---------------------------------------------------------
 //
@@ -29,7 +29,7 @@ import { MODELS, EFFORT, buildRequest } from "./models.js";
 // each angle into concrete scripted variants against a schema. That is a
 // transformation, and the operator reviews every variant before it is used.
 
-export async function callCreativeVariants(brief, initiative, brand, schema, opts) {
+export async function callCreativeVariants(brief, initiative, brand, schema, opts, modelOverride) {
   const perAngle = (opts && opts.perAngle) || 2;
   const channel  = (opts && opts.channel) || "meta";
 
@@ -112,7 +112,7 @@ export async function callCreativeVariants(brief, initiative, brand, schema, opt
 
   const resp = await fetch(PROXY_URL, {
     method:"POST", headers:AI_HEADERS(),
-    body:JSON.stringify({ ...buildRequest({ model:MODELS.STRUCTURED, maxTokens:3400, system:sys, effort:EFFORT.LOW }),
+    body:JSON.stringify({ ...buildRequest({ model:modelFor("creative", modelOverride), maxTokens:3400, system:sys, effort:EFFORT.LOW }),
       messages:[{ role:"user", content:user }] }),
   });
   if (!resp.ok) throw new Error(await proxyError(resp));

@@ -1,4 +1,3 @@
-
 {
   "functions": {
     "api/proxy.js": {
@@ -12,6 +11,17 @@
     "api/video.js": {
       "memory": 128,
       "maxDuration": 30
+    },
+    "api/admin.js": {
+      "memory": 128,
+      "maxDuration": 15
+    },
+    "api/routing.js": {
+      "memory": 128,
+      "maxDuration": 10
     }
-  }
+  },
+  "rewrites": [
+    { "source": "/admin", "destination": "/admin.html" }
+  ]
 }

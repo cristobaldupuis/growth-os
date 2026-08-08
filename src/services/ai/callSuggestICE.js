@@ -1,7 +1,7 @@
 import { PROXY_URL, AI_HEADERS, safeParseJSON, proxyError } from "./_shared.js";
-import { MODELS, EFFORT, buildRequest } from "./models.js";
+import { EFFORT, buildRequest, modelFor } from "./models.js";
 
-export async function callSuggestICE(form, settings, dataCtx) {
+export async function callSuggestICE(form, settings, dataCtx, modelOverride) {
 
   const sys = [
     "You help growth teams score initiatives using ICE for "+settings.companyName+",",
@@ -24,7 +24,7 @@ export async function callSuggestICE(form, settings, dataCtx) {
   ].join(". ");
   const resp = await fetch(PROXY_URL, {
     method:"POST", headers:AI_HEADERS(),
-    body:JSON.stringify({ ...buildRequest({model:MODELS.STRUCTURED, maxTokens:400, system:sys, effort:EFFORT.LOW}),
+    body:JSON.stringify({ ...buildRequest({model:modelFor("capture", modelOverride), maxTokens:400, system:sys, effort:EFFORT.LOW}),
       messages:[{role:"user", content:user}] }),
   });
   if (!resp.ok) throw new Error(await proxyError(resp));

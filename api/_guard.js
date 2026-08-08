@@ -94,18 +94,27 @@ async function redisRateLimit(key, max, window) {
  * Split from the rate limit rather than fused with it because video.js has to
  * read `action` off the body in between — which bucket and which ceiling apply
  * is decided by whether the call is a submit or a poll.
+ *
+ * `methods` defaults to POST-only, which is what the three provider proxies want:
+ * they all take a body and none is safely repeatable from a URL. api/routing.js
+ * is the exception — it is a plain read of which model serves which feature
+ * group, fetched by the app at boot, so it opts into GET rather than being forced
+ * to POST an empty body to satisfy a default it has no reason to share. Note that
+ * browsers omit `Origin` on same-origin GETs, so that endpoint authorises on the
+ * Referer fallback below; it exposes nothing a visitor could not infer from the
+ * model IDs in their own network tab either way.
  */
-export function guardEntry(req, res, { maxBodyBytes }) {
+export function guardEntry(req, res, { maxBodyBytes, methods = ["POST"] }) {
   const origin = req.headers.origin;
   if (origin && ALLOWED_ORIGINS.includes(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Vary", "Origin");
   }
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", [...methods, "OPTIONS"].join(", "));
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
   if (req.method === "OPTIONS") { res.status(200).end(); return true; }
-  if (req.method !== "POST") { res.status(405).json({ error: "Method not allowed" }); return true; }
+  if (!methods.includes(req.method)) { res.status(405).json({ error: "Method not allowed" }); return true; }
   if (!originAllowed(req)) { res.status(403).json({ error: "Forbidden" }); return true; }
 
   const contentLength = Number(req.headers["content-length"] || 0);

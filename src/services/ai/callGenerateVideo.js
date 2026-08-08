@@ -1,4 +1,5 @@
 import { AI_HEADERS, proxyError } from "./_shared.js";
+import { modelFor } from "./models.js";
 
 // -- Video generation (talking-head avatar) ------------------------------------
 //
@@ -71,6 +72,13 @@ export const VIDEO_TIERS = {
 // has a reason to pick. It remains in the adapter map so re-promoting it is a
 // one-line change here if that pricing relationship inverts again.
 export const VIDEO_TIER_LIST = Object.entries(VIDEO_TIERS).map(([key, tier]) => ({ key, ...tier }));
+
+/**
+ * The tier that renders on `provider`, or null. Mirrors `tierForProvider` in
+ * api/video.js — D-ID is reachable but is not a named tier, so this can miss.
+ */
+export const tierForProvider = (provider) =>
+  Object.values(VIDEO_TIERS).find(t => t.provider === provider) || null;
 
 // Note the tier asymmetry: HeyGen renders to the dimensions it is given, but
 // Fabric animates a still and inherits that image's aspect, so on PREMIUM this
@@ -199,15 +207,29 @@ export function estimateVideoCostUsd(script, tier = VIDEO_TIERS.STANDARD) {
  * here so that exactly one place in the client knows the mapping, and so the
  * wire contract with api/video.js stays what it already was.
  *
+ * ## How this interacts with the `video` routing group
+ *
+ * Video is the one group where the product deliberately puts the choice in front
+ * of the operator at the moment of spend — the tier picker in CreativeStudio asks
+ * "is this clip worth nine times the money", which is a per-render judgement, not
+ * a deployment setting. So an explicit `tier` always wins, and the routing group
+ * only decides the default for a caller that does not pick one (the admin test
+ * bench, and any future caller that has no operator in the loop). Worth being
+ * clear about rather than presenting the console's video knob as more authoritative
+ * than it is.
+ *
  * estimatedCostUsd comes back from the proxy, which computes it with this same
  * module's estimator — one formula, so the number the operator was shown before
  * clicking cannot drift from the number recorded against the submitted job.
  */
-export async function callGenerateVideo({ script, cta, avatarId, voiceId, aspectRatio = "9:16", tier = VIDEO_TIERS.STANDARD }) {
+export async function callGenerateVideo({ script, cta, avatarId, voiceId, aspectRatio = "9:16", tier }) {
+  // No tier from the caller: fall back to whatever the `video` group is routed to,
+  // then to STANDARD if that provider has no named tier (D-ID).
+  const provider = tier ? tier.provider : modelFor("video");
   const resp = await fetch(VIDEO_PROXY_URL, {
     method: "POST",
     headers: AI_HEADERS(),
-    body: JSON.stringify({ action: "submit", provider: tier.provider, script, cta, avatarId, voiceId, aspectRatio }),
+    body: JSON.stringify({ action: "submit", provider, script, cta, avatarId, voiceId, aspectRatio }),
   });
   if (!resp.ok) throw new Error(await proxyError(resp));
   const data = await resp.json();

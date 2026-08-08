@@ -1,5 +1,5 @@
 import { PROXY_URL, AI_HEADERS, safeParseJSON, proxyError } from "./_shared.js";
-import { MODELS, EFFORT, buildRequest } from "./models.js";
+import { EFFORT, buildRequest, modelFor } from "./models.js";
 
 // -- Creative brief ------------------------------------------------------------
 //
@@ -21,7 +21,7 @@ import { MODELS, EFFORT, buildRequest } from "./models.js";
 // anything, and the point of running creative through an experiment ledger is
 // that each round of assets settles a question.
 
-export async function callCreativeBrief(initiative, brand, learningsIndex, settings, schema) {
+export async function callCreativeBrief(initiative, brand, learningsIndex, settings, schema, modelOverride) {
   const learningsBlock = (learningsIndex || []).length === 0
     ? "  (no closed initiatives yet — the brief must rest on the brand brief and hypothesis alone, and should say so in `evidenceGaps`)"
     : learningsIndex.slice(0, 25).map(l => {
@@ -96,7 +96,7 @@ export async function callCreativeBrief(initiative, brand, learningsIndex, setti
 
   const resp = await fetch(PROXY_URL, {
     method:"POST", headers:AI_HEADERS(),
-    body:JSON.stringify({ ...buildRequest({ model:MODELS.REASONING, maxTokens:2600, system:sys, effort:EFFORT.HIGH, cacheSystem:true }),
+    body:JSON.stringify({ ...buildRequest({ model:modelFor("creative", modelOverride), maxTokens:2600, system:sys, effort:EFFORT.HIGH, cacheSystem:true }),
       messages:[{ role:"user", content:user }] }),
   });
   if (!resp.ok) throw new Error(await proxyError(resp));

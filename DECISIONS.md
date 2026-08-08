@@ -355,6 +355,44 @@ Signal AI is the opposite case and the reason the tiering is not uniform. Its en
 
 **Forcing condition:** if debate quality is ever observed to degrade, check the tier before the prompt — the split above is the first thing to re-examine.
 
+**Superseded in part** by "Model routing is a group-level operator decision" below. The reasoning above about *what each class of call needs* is unchanged and is now encoded in the feature groups; what changed is that the mapping from call to model is data rather than a literal, and the unit of choice is a group rather than a tier.
+
+---
+
+## Model routing is a group-level operator decision, not a per-call literal
+
+**Decision:** Which model serves which feature is data, held in `src/services/ai/registry.js` and overridable at runtime from an admin console. Features are switched in six groups — `capture`, `analysis`, `debate`, `creative`, `image`, `video` — not individually. Each group declares a capability floor (`requires`) that is enforced both in the console's picker and server-side in `validateRouting` before anything is persisted. `api/proxy.js` derives its model allowlist from the same catalogue rather than keeping a second list.
+
+**Why groups rather than per-feature:** Twelve independent model choices is not a decision anyone can hold in their head, and most of them are not real choices — Quick Capture, Hypothesis Expansion and ICE Assist fail in exactly the same way (schema drift on a transformation the operator reviews anyway), so there is no useful world in which they run on different models. Grouping by what the call has to do well makes each choice defensible and gives it a stated axis to be judged on.
+
+Grouping by *job* rather than by cost tier is the specific thing worth noting, because the two do not coincide. Ad copy and portfolio analysis were both "the expensive tier" under the old split, but the model you would pick for a hook worth testing is not obviously the one you would pick for finding a non-obvious pattern across forty closed initiatives. Separating `creative` from `analysis` is what makes that question askable at all.
+
+**Why capability floors are enforced rather than advised:** `callAgentTurn` hands the model portfolio tools and expects it to decide what to fetch mid-turn. Point the debate group at a model without tool calling and it does not error — it argues from whatever happened to be in the prompt, which reads as a quality regression and gets blamed on the model. That failure is invisible, so the floor is structural: a tool-less model is absent from the picker and rejected by the API. Same reasoning puts `longContext` on `analysis` and `debate`.
+
+**Cost consequence, accepted deliberately:** `callExpandRecommendation` and `callCreativeVariants` ran on Haiku as individual calls. Under group routing they inherit their group's model and default to Sonnet, so both get dearer. That is what "switch by group, not by feature" means; keeping a per-call exception would have reintroduced exactly the per-feature complexity the grouping exists to remove. Both groups can be set back to Haiku from the console. Recorded here rather than absorbed quietly — a cost increase nobody chose is worse than one they did.
+
+**Why the store fails soft on read and loud on write:** A routing read that fails serves the committed defaults, because those are a known-good configuration that shipped — degrading to "what the last deploy chose" beats taking every AI feature offline. This is the opposite of `api/_guard.js`'s rate limiter, which fails closed, and the asymmetry is deliberate: an unbounded proxy is worse than an outage, but a missing *preference* is not. Writes report `durable:false` when there is nowhere to persist, because reporting a save that evaporates is the same class of bug `store.js` was rewritten to stop doing in the browser.
+
+**Model ids for non-Anthropic providers are marked `unverified` until confirmed.** Two Gemini ids are transcriptions of names, and the OpenAI entry is a placeholder. A guessed id fails as a 404 the first time someone generates something real, so the console flags them and offers a Verify action that asks the provider for its own model list. The adapters do not change when an id does.
+
+**Forcing condition:** if a fourth or fifth group appears, or if a single group starts needing two models (a "light" and a "heavy" slot), the grouping has stopped matching the work — revisit the axis rather than adding slots. If model choice ever needs to differ per client rather than per deployment, this needs a tenant key and moves with the Supabase migration.
+
+---
+
+## The admin console is a separate bundle behind a server-verified password
+
+**Decision:** The model console is a second Vite entry (`admin.html` → `src/admin/`), reachable at `/admin`, gated by `ADMIN_PASSWORD` with an HMAC-signed `HttpOnly; Secure; SameSite=Strict` session cookie. It has its own visual language and imports nothing from `src/views/`, `src/components/styles.js` or `constants.js` beyond data.
+
+**Why a separate entry rather than a route:** There is no router (see "Modular React with no router" above), so a route would have meant a `nav` state in `App.jsx` and the console shipping inside the client bundle. A separate entry makes the exclusion structural rather than a convention every future edit has to remember — verified in the build by asserting no console-only string appears in any chunk `index.html` loads. It is also the honest answer to "this is not part of the product": a client using Growth OS should not download the control panel that decides what their session runs on.
+
+**Why there is auth here when the app has none:** The "Config-first per-client deployment (no multi-tenant auth)" decision stands for the app — one client per deployment, their portfolio is the only thing in it, and gating a view of your own data buys nothing. The console is a different kind of surface. It changes what every visitor's session runs on, and the test bench spends real money across four providers on each run. "No auth" is defensible for the first and not for the second.
+
+**What this explicitly does not close:** the forcing condition under "Proxy authentication" — real per-user auth on the proxy, triggered by the first deployment holding real client data. This is an operator gate on one control surface, not per-user accountability. The console notably gets **no** privileged path to the providers: the bench calls `/api/proxy` through the same `validateBody` ceilings and the same rate limiter as the app, because the thing most likely to spend in bulk should not be the one thing exempt from the controls that bound spend.
+
+**Why a signed cookie rather than a stored session:** a session table would need the store reachable on every request, and routing persistence is already best-effort. An HMAC cookie needs no storage — the signature proves the server issued it and the embedded expiry bounds it. The tradeoff is that it cannot be revoked before it expires, which is why the TTL is twelve hours; rotating `ADMIN_SESSION_SECRET` is the revocation path.
+
+**Forcing condition:** a second person needing console access. At that point "one shared password" stops being adequate and this should move to the same auth that gates the app, per the proxy-authentication trigger.
+
 ---
 
 ## Gold stays the accent; the dark surfaces were the problem

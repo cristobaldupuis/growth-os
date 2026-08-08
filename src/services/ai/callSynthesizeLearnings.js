@@ -1,7 +1,7 @@
 import { PROXY_URL, AI_HEADERS, proxyError } from "./_shared.js";
-import { MODELS, EFFORT, buildRequest } from "./models.js";
+import { EFFORT, buildRequest, modelFor } from "./models.js";
 
-export async function callSynthesizeLearnings(learnings, settings) {
+export async function callSynthesizeLearnings(learnings, settings, modelOverride) {
   const lines = learnings.map((l,i)=>String(i+1)+". ["+l.outcome+"]["+l.category+"]["+l.retailer+"] "+l.learning).join("\n");
   const retailers = [...new Set(learnings.map(l=>l.retailer))].join(", ");
   const sys = [
@@ -25,7 +25,7 @@ export async function callSynthesizeLearnings(learnings, settings) {
   ].join(" ");
   const resp = await fetch(PROXY_URL, {
     method:"POST", headers:AI_HEADERS(),
-    body:JSON.stringify({ ...buildRequest({model:MODELS.REASONING, maxTokens:1200, system:sys, effort:EFFORT.LOW}),
+    body:JSON.stringify({ ...buildRequest({model:modelFor("analysis", modelOverride), maxTokens:1200, system:sys, effort:EFFORT.LOW}),
       messages:[{role:"user", content:"Learnings to synthesize:\n"+lines}] }),
   });
   if (!resp.ok) throw new Error(await proxyError(resp));

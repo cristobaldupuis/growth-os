@@ -38,15 +38,22 @@
 // change. This file is the hardened single-tenant version, not multi-tenant auth.
 
 import { guardEntry, guardRateLimit, clientIp } from "./_guard.js";
+import { TEXT_MODEL_IDS, modelById } from "../src/services/ai/registry.js";
+import { adapters } from "./_adapters.js";
 
-const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
-
-// Only models this app actually calls. An allowlist means a leaked request can't
-// be edited to invoke something with a different cost profile.
-export const ALLOWED_MODELS = new Set([
-  "claude-sonnet-5",
-  "claude-haiku-4-5",
-]);
+// Only models this app can route to. An allowlist means a leaked request can't be
+// edited to invoke something with a different cost profile.
+//
+// Derived from the registry rather than hand-kept, because the two lists have to
+// agree and there is no way to notice that they don't until a feature 400s in
+// production: the admin console offers exactly what the catalogue holds, so a
+// model in the catalogue but missing here would be selectable and immediately
+// broken. One list, and adding a model is one edit.
+//
+// The registry being the *source* of the allowlist does not make it a weaker
+// control. Nothing a request carries can add to it — a body naming an unlisted
+// model is still rejected here, before any upstream call.
+export const ALLOWED_MODELS = new Set(TEXT_MODEL_IDS);
 
 export const MAX_TOKENS_CEILING = 4000;   // highest max_tokens any feature legitimately needs
 const MAX_BODY_BYTES     = 512 * 1024;
@@ -85,33 +92,41 @@ export default async function handler(req, res) {
   const invalid = validateBody(req.body);
   if (invalid) return res.status(400).json({ error: invalid });
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: "API key not configured" });
+  // Which provider serves this model is a registry fact, not something the request
+  // gets to state. A body cannot name a provider, only a model, and an unlisted
+  // model was already rejected by validateBody above.
+  const entry = modelById(req.body.model);
+  const adapter = adapters[entry?.provider];
+  if (!adapter) {
+    console.error("No adapter for provider", entry?.provider, "of model", req.body.model);
+    return res.status(500).json({ error: "This model has no provider adapter configured." });
+  }
+
+  const apiKey = process.env[adapter.keyVar];
+  if (!apiKey) return res.status(500).json({ error: `${adapter.keyVar} is not configured.` });
 
   try {
-    const upstream = await fetch(ANTHROPIC_API, {
+    const upstream = await fetch(adapter.endpoint(req.body.model), {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify(req.body),
+      headers: adapter.headers(apiKey),
+      body: JSON.stringify(adapter.toRequest(req.body)),
     });
 
     const data = await upstream.json();
     if (!upstream.ok) {
       // Log the upstream detail server-side; return a generic shape so provider
       // error text (which can echo request content) isn't handed to the browser.
-      console.error("Anthropic error", upstream.status, data?.error?.type, data?.error?.message);
+      console.error("Upstream error", entry.provider, upstream.status, adapter.errorOf(data));
       return res.status(upstream.status).json({
-        error: data?.error?.message || "Upstream request failed",
+        error: adapter.errorOf(data) || "Upstream request failed",
         type: data?.error?.type,
       });
     }
-    return res.status(200).json(data);
+    // Normalised into the Anthropic response shape regardless of provider, so no
+    // call site has to know which one answered. See api/_adapters.js.
+    return res.status(200).json(adapter.fromResponse(data));
   } catch (err) {
-    console.error("Proxy error:", err);
+    console.error("Proxy error:", entry.provider, err);
     return res.status(502).json({ error: "Upstream request failed" });
   }
 }

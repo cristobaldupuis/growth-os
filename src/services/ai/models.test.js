@@ -14,7 +14,8 @@
 //
 // Run with: node src/services/ai/models.test.js
 import assert from "node:assert/strict";
-import { MODELS, EFFORT, buildRequest, capabilitiesFor } from "./models.js";
+import { MODELS, EFFORT, buildRequest, capabilitiesFor, modelFor, applyRouting, currentRouting } from "./models.js";
+import { DEFAULT_ROUTING } from "./registry.js";
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -114,6 +115,52 @@ test("tools pass through when supplied", () => {
   const tools = [{ name: "get_portfolio_summary" }];
   const body = buildRequest({ model: MODELS.REASONING, maxTokens: 100, system: "s", tools });
   assert.deepEqual(body.tools, tools);
+});
+
+// -- Routing resolution --------------------------------------------------------
+//
+// These run last on purpose: applyRouting mutates module state, so anything
+// asserting on default behaviour has to come before it.
+
+test("modelFor serves the committed defaults before any routing arrives", () => {
+  // The property App.jsx's fire-and-forget boot fetch depends on. If this returned
+  // undefined, an AI call that beat the fetch would send `model: undefined`.
+  for (const [group, expected] of Object.entries(DEFAULT_ROUTING)) {
+    assert.equal(modelFor(group), expected);
+  }
+});
+
+test("modelFor prefers an explicit override over the routing", () => {
+  assert.equal(modelFor("capture", "claude-opus-5"), "claude-opus-5");
+});
+
+test("modelFor ignores an empty-string override rather than sending it", () => {
+  // "" is what an unfilled form field arrives as; it must not become the model id.
+  assert.equal(modelFor("capture", ""), DEFAULT_ROUTING.capture);
+});
+
+test("modelFor throws on a non-string override", () => {
+  // Guards the stale-extra-argument case — see the note on modelFor.
+  assert.throws(() => modelFor("capture", { id: "x" }), /must be a model id string/);
+  assert.throws(() => modelFor("capture", ["claude-opus-5"]), /must be a model id string/);
+});
+
+test("applyRouting installs a valid assignment and reports nothing dropped", () => {
+  const dropped = applyRouting({ capture: "claude-opus-5" });
+  assert.deepEqual(dropped, []);
+  assert.equal(modelFor("capture"), "claude-opus-5");
+  assert.equal(modelFor("analysis"), DEFAULT_ROUTING.analysis, "other groups keep their default");
+});
+
+test("applyRouting reports and discards an unusable assignment", () => {
+  const dropped = applyRouting({ debate: "gemini-2.5-flash-image" });
+  assert.deepEqual(dropped, ["debate"]);
+  assert.equal(modelFor("debate"), DEFAULT_ROUTING.debate);
+});
+
+test("applyRouting(null) restores every group to its default", () => {
+  applyRouting(null);
+  assert.deepEqual(currentRouting(), DEFAULT_ROUTING);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

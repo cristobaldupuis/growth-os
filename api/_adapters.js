@@ -47,6 +47,7 @@
 
 const GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/models";
 const OPENAI_API = "https://api.openai.com/v1/chat/completions";
+const OPENROUTER_API = "https://openrouter.ai/api/v1/chat/completions";
 
 /** `system` may be a string or Anthropic cache-block form. Flatten either to text. */
 function systemText(system) {
@@ -224,6 +225,22 @@ function openaiRequest(body) {
   return req;
 }
 
+// -- OpenRouter ----------------------------------------------------------------
+//
+// OpenRouter is OpenAI-compatible, so it reuses both translations above rather
+// than getting its own pair. The one thing that does not carry over is the output
+// ceiling: `max_completion_tokens` is OpenAI's current spelling, and a
+// compatibility layer that does not recognise it will not error — it will accept
+// the request with no ceiling at all and bill whatever the model chooses to
+// write. That is the one failure here worth engineering against, so the older
+// `max_tokens` is sent alongside it. Both name the same number, so whichever the
+// host reads gives the same answer.
+function openrouterRequest(body) {
+  const req = openaiRequest(body);
+  req.max_tokens = body.max_tokens;
+  return req;
+}
+
 function openaiResponse(json) {
   const choice = json?.choices?.[0];
   const msg = choice?.message || {};
@@ -288,8 +305,25 @@ export const adapters = {
     fromResponse: openaiResponse,
     errorOf: (json) => json?.error?.message,
   },
+
+  // Open-weights models we do not host ourselves. Named for the host rather than
+  // the model, because the host is what the key and the endpoint belong to — a
+  // second open-weights model served from here is a catalogue entry, not another
+  // adapter.
+  openrouter: {
+    keyVar: "OPENROUTER_API_KEY",
+    endpoint: () => OPENROUTER_API,
+    headers: (key) => ({ "Content-Type": "application/json", Authorization: `Bearer ${key}` }),
+    toRequest: openrouterRequest,
+    // Same wire shape as OpenAI, including `choices[0].message.tool_calls`.
+    fromResponse: openaiResponse,
+    errorOf: (json) => json?.error?.message,
+  },
 };
 
 // Exported for the unit tests, which assert the translation both ways rather than
 // going near a network.
-export const _internal = { geminiRequest, geminiResponse, openaiRequest, openaiResponse, toolNamesById, systemText };
+export const _internal = {
+  geminiRequest, geminiResponse, openaiRequest, openaiResponse, openrouterRequest,
+  toolNamesById, systemText,
+};

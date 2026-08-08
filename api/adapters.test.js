@@ -293,3 +293,47 @@ test("every text model in the catalogue has an adapter", async () => {
 test("the gemini endpoint embeds the model id", () => {
   assert.match(adapters.gemini.endpoint("gemini-3.1-pro"), /models\/gemini-3\.1-pro:generateContent$/);
 });
+
+// -- OpenRouter ----------------------------------------------------------------
+//
+// The OpenAI-compatible hosts differ from OpenAI itself in exactly one way that
+// costs money. `max_completion_tokens` is OpenAI's current spelling for the output
+// ceiling; a compatibility layer that only knows the older `max_tokens` does not
+// reject the unknown field, it accepts the request with no ceiling at all. The
+// failure is a bill, not an error, so it is worth a test rather than a comment.
+
+test("the openrouter request carries an output ceiling under both spellings", () => {
+  const req = adapters.openrouter.toRequest({ ...BASE, model: "thinkingmachines/inkling" });
+  assert.equal(req.max_tokens, BASE.max_tokens,
+    "a host that only knows max_tokens must still see a ceiling");
+  assert.equal(req.max_completion_tokens, BASE.max_tokens,
+    "and one that only knows max_completion_tokens must see the same number");
+});
+
+test("the openrouter request is otherwise the OpenAI translation", () => {
+  // Reuse, not a second implementation — if these diverge, the tool-loop tests
+  // above stop covering the OpenRouter path and nothing says so.
+  const body = { ...BASE, model: "thinkingmachines/inkling" };
+  const openrouter = adapters.openrouter.toRequest(body);
+  const openai = adapters.openai.toRequest(body);
+  const { max_tokens: _ceiling, ...rest } = openrouter;
+  assert.deepEqual(rest, openai);
+});
+
+test("the openrouter response reads the OpenAI tool-call shape", () => {
+  // The debate loop branches on this value. A host answering in the OpenAI shape
+  // must still produce "tool_use", or the agent argues from the prompt instead of
+  // from the portfolio and it reads as a model regression.
+  const out = adapters.openrouter.fromResponse({
+    choices: [{
+      finish_reason: "tool_calls",
+      message: {
+        content: null,
+        tool_calls: [{ id: "call_1", function: { name: "get_portfolio_summary", arguments: "{}" } }],
+      },
+    }],
+  });
+  assert.equal(out.stop_reason, "tool_use");
+  assert.equal(out.content[0].type, "tool_use");
+  assert.equal(out.content[0].name, "get_portfolio_summary");
+});

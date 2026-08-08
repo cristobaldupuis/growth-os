@@ -72,7 +72,11 @@ export const MODEL_CATALOGUE = [
     label: "Claude Opus 5",
     modality: "text",
     blurb: "Strongest reasoning. The reach model for a group whose output is the product.",
-    caps: { tools: true, json: true, adaptiveThinking: true, effort: true, cacheMinTokens: 1024, longContext: true },
+    // 512, not 1024: Opus 5 halved the minimum cacheable prefix. Getting this
+    // wrong is silent in both directions — too high and buildRequest declines to
+    // mark a breakpoint that would have worked, too low and it marks one the
+    // provider ignores. Neither errors, so it is only ever caught by reading it.
+    caps: { tools: true, json: true, adaptiveThinking: true, effort: true, cacheMinTokens: 512, longContext: true },
   },
   {
     id: "claude-sonnet-5",
@@ -95,15 +99,21 @@ export const MODEL_CATALOGUE = [
 
   // -- Google Gemini text -----------------------------------------------------
   //
-  // ## These two ids are UNCONFIRMED and that is deliberate
+  // ## These ids are UNCONFIRMED and that is deliberate
   //
   // They are transcriptions of the model names the operator asked to evaluate, not
   // ids read off Google's model list. An id guessed from a marketing name fails as
   // a 404 the first time someone tries to generate something real, which is the
-  // worst place to discover it — so both are flagged `unverified` and the console
+  // worst place to discover it — so each is flagged `unverified` and the console
   // puts a Verify button next to them that asks the provider directly. Clear the
   // flag once Verify says the provider lists them; correct the string here if it
   // does not. This is one line either way.
+  //
+  // `gemini-3.1-pro` is the one to check first. Google's current Pro tier is
+  // widely reported to be published as `gemini-3.1-pro-preview` — a preview
+  // suffix rather than a rename — and 3.5 Pro is announced but had no public id
+  // as of this edit. If Verify comes back absent, try the `-preview` string
+  // before assuming the tier moved.
   //
   // `adaptiveThinking` and `effort` are false because those are Anthropic request
   // parameters — see the note at the top of api/_adapters.js for why the capability
@@ -128,20 +138,92 @@ export const MODEL_CATALOGUE = [
     blurb: "Fast and cheap tier. A candidate for Capture & Framing; verify the id first.",
     caps: { tools: true, json: true, adaptiveThinking: false, effort: false, cacheMinTokens: Infinity, longContext: false },
   },
+  {
+    id: "gemini-3.5-flash-lite",
+    provider: "gemini",
+    label: "Gemini 3.5 Flash Lite",
+    modality: "text",
+    unverified: true,
+    blurb: "Google's cheapest tier. High-throughput transformation work; verify the id first.",
+    caps: { tools: true, json: true, adaptiveThinking: false, effort: false, cacheMinTokens: Infinity, longContext: false },
+  },
+  //
+  // Gemini Spark is deliberately absent. It is an agentic assistant product —
+  // an always-on agent reached through Gmail and Chrome on a Google-run VM,
+  // plus an on-device Android component — not a model served by
+  // `generativelanguage.googleapis.com/.../generateContent`. There is no id to
+  // put here, so an entry would be a guaranteed 404 sitting inside the proxy's
+  // allowlist. If a Spark-branded generateContent id ever ships, it is one
+  // entry; until then this comment is the record of why the gap is intentional.
 
   // -- OpenAI text ------------------------------------------------------------
   //
-  // Same caveat, more strongly: no OpenAI model id was specified, so this is a
-  // placeholder carrying the adapter rather than a confirmed model. Run Verify to
-  // see what the account actually offers and correct the id here. The adapter in
-  // api/_adapters.js is complete and does not change when the id does.
+  // The GPT-5.6 family, which replaced the GPT-5.1 placeholder that previously
+  // stood here. Sol / Terra / Luna are capability tiers rather than generations,
+  // so the three move on their own cadence and are listed separately — a single
+  // "GPT-5.6" entry would not be routable.
+  //
+  // Same caveat as Gemini and for the same reason: these ids are transcribed from
+  // the family's published naming, not read off this account's /v1/models. Run
+  // Verify before pointing a group at one. The adapter in api/_adapters.js is
+  // complete and does not change when an id does.
+  //
+  // `longContext` is a judgement about what this app asks of a model, not a spec
+  // sheet reading — see the note on the Haiku entry. Luna is the cheap
+  // high-volume tier, so it is marked false to keep it out of Portfolio Analysis
+  // and the debate, where a whole-portfolio prompt has to be read faithfully.
   {
-    id: "gpt-5.1",
+    id: "gpt-5.6-sol",
     provider: "openai",
-    label: "OpenAI GPT-5.1",
+    label: "OpenAI GPT-5.6 Sol",
     modality: "text",
     unverified: true,
-    blurb: "Placeholder id — run Verify to list what the account offers, then correct it here.",
+    blurb: "OpenAI's flagship tier — reasoning, coding, careful refinement. Verify the id first.",
+    caps: { tools: true, json: true, adaptiveThinking: false, effort: false, cacheMinTokens: Infinity, longContext: true },
+  },
+  {
+    id: "gpt-5.6-terra",
+    provider: "openai",
+    label: "OpenAI GPT-5.6 Terra",
+    modality: "text",
+    unverified: true,
+    blurb: "Balanced tier at roughly half Sol's price. The sensible first thing to bench.",
+    caps: { tools: true, json: true, adaptiveThinking: false, effort: false, cacheMinTokens: Infinity, longContext: true },
+  },
+  {
+    id: "gpt-5.6-luna",
+    provider: "openai",
+    label: "OpenAI GPT-5.6 Luna",
+    modality: "text",
+    unverified: true,
+    blurb: "Fastest and cheapest tier. A candidate for Capture & Framing; verify the id first.",
+    caps: { tools: true, json: true, adaptiveThinking: false, effort: false, cacheMinTokens: Infinity, longContext: false },
+  },
+
+  // -- Open weights, served through OpenRouter ---------------------------------
+  //
+  // Inkling is Thinking Machines Lab's open-weights model (Apache 2.0, ~1M
+  // context, multimodal in / text out). It is worth having reachable for one
+  // specific reason: every other text model here is a hosted product whose
+  // behaviour can change under a fixed id, and an open-weights model with
+  // published weights is the only one in the list that can be pinned exactly, or
+  // moved onto our own infrastructure, if a group's output ever has to be
+  // reproducible.
+  //
+  // There is no first-party Thinking Machines endpoint, so it reaches us through
+  // a host. OpenRouter is the one wired here because its API is OpenAI-compatible
+  // — which makes this a routing entry plus a base URL rather than a fourth
+  // request/response translation — and because it publishes a model list, so the
+  // console's Verify action works on it exactly as it does for the other two.
+  // Together, Fireworks, Baseten and Modal serve the same weights; switching host
+  // is the `openrouter` adapter's endpoint and key, not anything in this file.
+  {
+    id: "thinkingmachines/inkling",
+    provider: "openrouter",
+    label: "Inkling (Thinking Machines, via OpenRouter)",
+    modality: "text",
+    unverified: true,
+    blurb: "Open weights, long context, cheap. Needs OPENROUTER_API_KEY; verify the id first.",
     caps: { tools: true, json: true, adaptiveThinking: false, effort: false, cacheMinTokens: Infinity, longContext: true },
   },
 

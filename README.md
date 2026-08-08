@@ -14,7 +14,7 @@ Built to demonstrate how a Director of Growth thinks about velocity, incremental
 
 - **Creative Studio** — brief and produce creative against an initiative, so every asset is born attached to a hypothesis. Briefs are grounded in the brand brief and closed learnings and must state what result would falsify the direction; anything the brand brief doesn't support is routed to `claimsToVerify` rather than asserted. Variants come back as validated naming segments, and ad names are assembled in code
 - **Campaign nomenclature engine** — the ad naming convention lives in settings as an ordered segment list with controlled vocabularies. `src/services/naming.js` builds, parses and validates against it, and its trailing `Initiative` segment carries an initiative's `trackingTag` — which is how a performance row finds its way back to the experiment that produced it
-- **Admin model console** — an operator-only surface at `/admin` (separate bundle, password-gated) that points each of six feature groups at a model, across Anthropic, Gemini and OpenAI. Groups declare a capability floor both the picker and the server enforce, so the debate group cannot be pointed at a model without tool calling. Includes a test bench that runs a group's real prompt against your own portfolio through up to four models at once
+- **Admin model console** — an operator-only surface at `/admin` (separate bundle, password-gated) that points each of six feature groups at a model, across Anthropic, Gemini, OpenAI and open weights. Groups declare a capability floor both the picker and the server enforce, so the debate group cannot be pointed at a model without tool calling. Includes a test bench that runs a group's real prompt against your own portfolio through up to four models at once
 - **Model tiering** — model choice is grouped by what the call has to do well, not set per feature: reasoning groups (debate, portfolio analysis, creative direction) default to `claude-sonnet-5`; capture and framing defaults to `claude-haiku-4-5`. Adaptive thinking throughout, prompt caching on the flows that reuse a system prefix
 - **Accessible palette, enforced** — light-mode gold now passes WCAG AA (it previously measured 2.42:1 on white, applied to the dashboard's largest figures); dark surfaces moved from warm brown to cool charcoal so the accent reads as gold rather than mud. `npm run check:contrast` fails CI on regression
 - **No browser-held API credential** — the proxy authorises on origin and bounds cost by request shape instead of a `VITE_`-prefixed secret that shipped inside the bundle
@@ -176,7 +176,15 @@ admin console at `/admin`:
 Each group declares a capability floor that both the picker and the server enforce,
 so the debate group cannot be pointed at a model without tool calling, and a
 whole-portfolio prompt cannot be pointed at a short-context model. Providers wired
-today: Anthropic, Google Gemini, OpenAI.
+today: Anthropic (Opus 5, Sonnet 5, Haiku 4.5), Google Gemini (3.1 Pro, 3.6 Flash,
+3.5 Flash Lite), OpenAI (GPT-5.6 Sol, Terra and Luna), and open weights served
+through OpenRouter (Inkling).
+
+Only the Anthropic ids are confirmed — the app calls them. Every other id is
+flagged `unverified` in the catalogue and carries a **Verify** button that asks the
+provider for its own model list, because an id transcribed from a marketing name
+fails as a 404 at the exact moment someone is trying to generate something real.
+Verify before you route a group, not after.
 
 The console also carries a **test bench** — it runs a group's real production
 prompt, against your own portfolio, through up to four models at once, so an
@@ -354,6 +362,15 @@ ADMIN_SESSION_SECRET=a_long_random_string
 # models appear in the picker but calls return a clear "not configured" error.
 # Gemini text reuses GEMINI_API_KEY above.
 OPENAI_API_KEY=your_key
+
+# Optional. Lets the console route a feature group to an open-weights model
+# (Inkling) served through OpenRouter, and lets Verify check its id. Same
+# behaviour without it: the model is selectable and returns a clear "not
+# configured" error rather than failing obscurely. OpenRouter is one host among
+# several serving these weights — moving to Together, Fireworks or your own
+# inference is the endpoint and key in api/_adapters.js, not a code change
+# anywhere else.
+OPENROUTER_API_KEY=your_key
 
 # Optional. Comma-separated origins the proxy will accept. Defaults to the
 # canonical deployment, so a missing value fails closed rather than opening up.

@@ -43,7 +43,7 @@ const RATE_LIMIT_MAX = 40;
 // Provider model-list endpoints, used only by the `listModels` action so a
 // catalogue ID can be checked against what the provider actually offers. Anthropic
 // IDs are confirmed by the app already calling them, so there is nothing to
-// verify there; these are the two whose IDs are seeded unverified.
+// verify there; these are the providers whose IDs are seeded unverified.
 const MODEL_LIST_ENDPOINTS = {
   gemini: {
     url: () => `https://generativelanguage.googleapis.com/v1beta/models?key=${process.env.GEMINI_API_KEY}`,
@@ -55,6 +55,16 @@ const MODEL_LIST_ENDPOINTS = {
     url: () => "https://api.openai.com/v1/models",
     keyVar: "OPENAI_API_KEY",
     headers: () => ({ Authorization: `Bearer ${process.env.OPENAI_API_KEY}` }),
+    extract: (json) => (json?.data || []).map(m => String(m.id)),
+  },
+  // OpenRouter's list is public, but the key is still required here so that
+  // "Verify says present" cannot mean anything other than "this deployment can
+  // call it" — a verified id we have no credential for is the same 500 at spend
+  // time as an unverified one, just with a green tick in front of it.
+  openrouter: {
+    url: () => "https://openrouter.ai/api/v1/models",
+    keyVar: "OPENROUTER_API_KEY",
+    headers: () => ({ Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}` }),
     extract: (json) => (json?.data || []).map(m => String(m.id)),
   },
 };

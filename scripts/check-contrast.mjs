@@ -10,10 +10,20 @@
 import { TL, TD, SL, SD, OL, OD, TYPE_L, TYPE_D } from "../src/constants.js";
 
 const AA = 4.5;
-// AA Large (3:1) is the bar for text at >=24px bold / >=18.66px regular. The
-// only tokens allowed to sit in that band are the two muted label greys, which
-// are used exclusively for uppercase micro-labels that are decorative context
-// rather than content.
+// AA Large (3:1) is the bar for text at >=24px bold / >=18.66px regular.
+//
+// This waiver used to apply to `textMuted`, on the stated grounds that it was
+// "micro-label only … decorative context rather than content". The code never
+// honoured that: `textMuted` is the most-used ink in the app — the label colour
+// for every form field via FR, every table header, half the Weekly Pulse cells,
+// the sublabel under every stat tile — appearing at 9–11px in a hundred and
+// ninety places, which is a band where AA Large does not apply at all. The
+// waiver was the one place the palette was not held to the standard this file
+// exists to enforce, and it was hiding a 4.05:1 pairing.
+//
+// `textMuted` is now checked at AA like every other ink. The waiver moved to
+// `textFaint`, which is genuinely decorative — and, crucially, is checked
+// against the surfaces it is allowed on rather than being exempt everywhere.
 const AA_LARGE = 3;
 
 const chan = (c) => {
@@ -51,9 +61,14 @@ for (const [themeName, T] of [["light", TL], ["dark", TD]]) {
   for (const surf of ["surface", "surfaceAlt", "bg"]) {
     check(p(`text on ${surf}`), T.text, T[surf]);
     check(p(`textSub on ${surf}`), T.textSub, T[surf]);
-    // Muted is micro-label only — held to AA Large.
-    check(p(`textMuted on ${surf}`), T.textMuted, T[surf], AA_LARGE);
+    // Muted carries real content — labels, headers, cells — at small sizes.
+    check(p(`textMuted on ${surf}`), T.textMuted, T[surf]);
+    // Faint is the decorative tier, and the only token allowed the large waiver.
+    check(p(`textFaint on ${surf}`), T.textFaint, T[surf], AA_LARGE);
   }
+  // Muted also lands on the gold panel background (north star, readout header,
+  // "Ask the library"), which is a lighter surface than any of the three above.
+  check(p("textMuted on goldBg"), T.textMuted, T.goldBg);
   // `gold` is an ink token: it must be readable everywhere it is set as `color`.
   // This is the specific check that the old palette failed.
   for (const surf of ["surface", "surfaceAlt", "bg", "goldBg"]) {

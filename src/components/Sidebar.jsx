@@ -1,5 +1,9 @@
 import { NAV_SECTIONS } from "./navSections.js";
 import { interactive } from "./motion.js";
+import {
+  IconFlask, IconPanelClose, IconPanelOpen, IconRefresh,
+  IconSettings, IconHelp, IconSun, IconMoon, IconSparkle,
+} from "./icons.jsx";
 
 // -- Sidebar navigation --------------------------------------------------------
 //
@@ -121,14 +125,22 @@ export function Sidebar({
       {/* Wordmark — also the home control, and the tour's first anchor */}
       <div style={{ padding: collapsed ? "14px 8px 12px" : "16px 14px 14px", borderBottom:"1px solid "+t.borderSoft,
         display:"flex", alignItems:"center", gap:8, justifyContent: collapsed ? "center" : "space-between" }}>
+        {/* The mark used to be the letters "GO" beside the wordmark "GROWTH OS",
+            which DECISIONS.md retired as a customer-facing name — the shell was
+            the one place the rename pass never reached, and it sat in the most
+            looked-at 200px of the interface for the length of every demo. The
+            flask is the product's own noun: a lab is where work is expected to
+            produce evidence, which is the whole claim. */}
         <button onClick={() => { onNav("dashboard"); if (onClose) onClose(); }} title="Back to Dashboard" data-tour="logo"
           style={{ display:"flex", alignItems:"center", gap:9, padding:0, background:"transparent", border:"none", cursor:"pointer", minWidth:0, textAlign:"left" }}>
-          <span style={{ width:26, height:26, borderRadius:8, background:t.goldFill, color:t.goldText, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, fontSize:12, fontFamily:t.sans, flexShrink:0 }}>GO</span>
+          <span style={{ width:26, height:26, borderRadius:t.r.sm, background:t.goldFill, color:t.goldText, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+            <IconFlask size={15}/>
+          </span>
           {!collapsed && (
             <span style={{ display:"flex", flexDirection:"column", alignItems:"flex-start", lineHeight:1.2, minWidth:0 }}>
-              <span style={{ fontSize:13, fontWeight:700, letterSpacing:"0.1em", color:t.text, fontFamily:t.sans, whiteSpace:"nowrap" }}>GROWTH OS</span>
-              <span style={{ fontSize:9.5, color:t.textMuted, fontFamily:t.mono, letterSpacing:"0.09em", textTransform:"uppercase", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", maxWidth:118 }}>
-                Experimentation engine
+              <span style={{ fontSize:13, fontWeight:700, letterSpacing:"0.09em", color:t.text, fontFamily:t.sans, whiteSpace:"nowrap" }}>MARKETERS LAB</span>
+              <span style={{ fontSize:9.5, color:t.textMuted, fontFamily:t.mono, letterSpacing:"0.09em", textTransform:"uppercase", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", maxWidth:126 }}>
+                Experiment ledger
               </span>
             </span>
           )}
@@ -138,7 +150,7 @@ export function Sidebar({
             style={{ ...railBtn(t), width:26 }}
             onMouseEnter={e=>{e.currentTarget.style.borderColor=t.goldBorder;e.currentTarget.style.color=t.gold;}}
             onMouseLeave={e=>{e.currentTarget.style.borderColor=t.border;e.currentTarget.style.color=t.textSub;}}>
-            <span>{"⇤"}</span>
+            <IconPanelClose size={14}/>
           </button>
         )}
       </div>
@@ -149,7 +161,7 @@ export function Sidebar({
             style={{ ...railBtn(t), width:"100%" }}
             onMouseEnter={e=>{e.currentTarget.style.borderColor=t.goldBorder;e.currentTarget.style.color=t.gold;}}
             onMouseLeave={e=>{e.currentTarget.style.borderColor=t.border;e.currentTarget.style.color=t.textSub;}}>
-            <span>{"⇥"}</span>
+            <IconPanelOpen size={14}/>
           </button>
         </div>
       )}
@@ -200,7 +212,7 @@ export function Sidebar({
           style={{ fontSize:12.5, padding: collapsed ? "8px 0" : "8px 12px", borderRadius:9, cursor:"pointer", width:"100%",
             background:t.goldFill, border:"1px solid "+t.goldFill, color:t.goldText, fontWeight:600,
             fontFamily:t.sans, display:"flex", alignItems:"center", justifyContent:"center", gap:6, boxShadow:t.shadow }}>
-          {collapsed ? "✦" : "✦ Signal"}
+          <IconSparkle size={14}/>{!collapsed && "Signal"}
         </button>
 
         {!collapsed && demoMode && (
@@ -212,9 +224,9 @@ export function Sidebar({
               <span style={{ width:5, height:5, borderRadius:"50%", background:t.gold, flexShrink:0 }}/>
               Demo data
             </span>
-            <button onClick={onResetDemo} title="Reset everything to the seed portfolio"
-              style={{ width:24, height:24, borderRadius:7, cursor:"pointer", background:"transparent", border:"1px solid "+t.border, color:t.textMuted, fontSize:11, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-              <span>{"↻"}</span>
+            <button onClick={onResetDemo} title="Reset everything to the seed portfolio" aria-label="Reset demo data"
+              style={{ width:24, height:24, borderRadius:t.r.sm, cursor:"pointer", background:"transparent", border:"1px solid "+t.border, color:t.textMuted, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+              <IconRefresh size={13}/>
             </button>
             <button onClick={onTour} title="Replay the guided tour"
               style={{ height:24, padding:"0 8px", borderRadius:7, cursor:"pointer", background:"transparent", border:"1px solid "+t.border, color:t.textMuted, fontSize:10, fontWeight:600, fontFamily:t.sans, flexShrink:0 }}>
@@ -225,15 +237,15 @@ export function Sidebar({
 
         <div style={{ display:"flex", gap:6, flexDirection: collapsed ? "column" : "row" }}>
           {[
-            { fn:onGuide,       icon:"?",        title:"What can Marketers Lab do?" },
-            { fn:onSettings,    icon:"⚙",   title:"Settings" },
-            { fn:onToggleTheme, icon: dk ? "☀" : "☾", title: dk ? "Light mode" : "Dark mode" },
-          ].map((b) => (
-            <button key={b.title} onClick={b.fn} title={b.title}
-              style={{ ...railBtn(t), flex: collapsed ? "none" : 1, width: collapsed ? "100%" : undefined, height:28, borderRadius:8, fontSize:13 }}
+            { fn:onGuide,       Icon:IconHelp,            title:"What can Marketers Lab do?" },
+            { fn:onSettings,    Icon:IconSettings,        title:"Settings" },
+            { fn:onToggleTheme, Icon: dk ? IconSun : IconMoon, title: dk ? "Light mode" : "Dark mode" },
+          ].map(({ fn, Icon, title }) => (
+            <button key={title} onClick={fn} title={title} aria-label={title}
+              style={{ ...railBtn(t), flex: collapsed ? "none" : 1, width: collapsed ? "100%" : undefined, height:28, borderRadius:t.r.sm }}
               onMouseEnter={e=>{e.currentTarget.style.borderColor=t.goldBorder;e.currentTarget.style.color=t.gold;}}
               onMouseLeave={e=>{e.currentTarget.style.borderColor=t.border;e.currentTarget.style.color=t.textSub;}}>
-              <span>{b.icon}</span>
+              <Icon size={15}/>
             </button>
           ))}
         </div>

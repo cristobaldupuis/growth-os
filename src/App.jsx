@@ -14,15 +14,23 @@ import { attachInitiatives } from "./services/performance.js";
 import { Sidebar } from "./components/Sidebar.jsx";
 import { CadenceRail, CadenceLegend } from "./components/CadenceRail.jsx";
 import { cadenceWindow, cadenceFor, windowLabel, groupRollup } from "./services/cadence.js";
-import { navName, navLab } from "./components/navSections.js";
+import { navName } from "./components/navSections.js";
 import {
   applyBrandBriefDefaults, DEFAULT_AGENTS, DEFAULT_SETTINGS,
   STATUSES, STATUS_GROUP_ORDER, OUTCOMES, INIT_TYPES,
   TL, TD, SL, SD, OL, OD,
   catColor, brandColor, brandName, iceScore,
-  fmtCur, fmtDate, parseD, somM, eomM, mondayOf,
+  fmtCur, fmtDate, parseD, somM, eomM, mondayOf, setNumberFormat,
   generateInitId, mkDefault, withRunningSnapshot, computePredictionError,
 } from "./constants.js";
+import { parseHash, formatHash, titleFor } from "./services/route.js";
+import { CommandPalette } from "./components/CommandPalette.jsx";
+import {
+  IconMenu, IconArrowLeft, IconArrowRight, IconBolt, IconImport, IconDownload,
+  IconPlus, IconAlert, IconCheck, IconInfo, IconClose, IconChevronDown,
+  IconSpinner, IconDiamond, IconSearch, IconFolder,
+} from "./components/icons.jsx";
+import { useDialog } from "./components/useDialog.js";
 import { downloadCSV, itemToCSVRow, normaliseDate, parseCSV, normalizeInitiativeRecord } from "./services/csv.js";
 import { buildLearningsIndex, buildPortfolioContext } from "./services/portfolio.js";
 import { stampUpdatedAt } from "./services/items.js";
@@ -58,7 +66,7 @@ import { callSuggestICE } from "./services/ai/callSuggestICE.js";
 import { callQuickCapture } from "./services/ai/callQuickCapture.js";
 import { callGenerateCandidates } from "./services/ai/callGenerateCandidates.js";
 import { callExpandRecommendation } from "./services/ai/callExpandRecommendation.js";
-import { gG, gGh, gI, gTA, gSl, gCd } from "./components/styles.js";
+import { gG, gGh, gI, gTA, gSl, gCd, gOff } from "./components/styles.js";
 import { Bdg, SBdg, OBdg, CBdg, TBdg, BlockerBadge, ICEChip } from "./components/badges.jsx";
 import { Modal } from "./components/Modal.jsx";
 import { GuidedTour } from "./components/GuidedTour.jsx";
@@ -244,29 +252,39 @@ function GuideDrawer({ t, dk, openSection, onClose, onNavigate, nav }) {
 
   const renderCard = (s) => (
     <div key={s.id} id={"guide-sec-"+s.id}
-      style={{background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:12,padding:"16px 18px"}}>
-      <div onClick={()=>setExpanded(prev=>({...prev,[s.id]:!prev[s.id]}))}
-        style={{cursor:"pointer",display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8,marginBottom:8}}>
-        <div style={{flex:1}}>
-          <div style={{fontSize:10,letterSpacing:"0.09em",textTransform:"uppercase",color:t.gold,fontFamily:t.mono,fontWeight:700,marginBottom:6}}>{s.label}</div>
-          <div style={{fontSize:14.5,fontWeight:600,color:t.text,fontFamily:t.serif}}>{s.feature}</div>
-        </div>
-        <span style={{color:t.textMuted,fontSize:10,flexShrink:0,marginTop:4,display:"inline-block",transition:"transform 0.18s",transform:expanded[s.id]?"rotate(180deg)":"rotate(0deg)"}}>&#9660;</span>
-      </div>
+      style={{background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:t.r.lg,padding:"16px 18px"}}>
+      <button type="button" onClick={()=>setExpanded(prev=>({...prev,[s.id]:!prev[s.id]}))}
+        aria-expanded={!!expanded[s.id]} aria-controls={"guide-body-"+s.id}
+        style={{cursor:"pointer",display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8,marginBottom:8,
+          width:"100%",textAlign:"left",background:"transparent",border:"none",padding:0,font:"inherit",color:"inherit"}}>
+        <span style={{flex:1}}>
+          <span style={{display:"block",fontSize:10,letterSpacing:"0.09em",textTransform:"uppercase",color:t.gold,fontFamily:t.mono,fontWeight:700,marginBottom:6}}>{s.label}</span>
+          <span style={{display:"block",fontSize:t.fs.medium,fontWeight:600,color:t.text,fontFamily:t.serif}}>{s.feature}</span>
+        </span>
+        <span style={{color:t.textMuted,flexShrink:0,marginTop:4,display:"inline-flex",transition:"transform 0.18s",transform:expanded[s.id]?"rotate(180deg)":"rotate(0deg)"}}>
+          <IconChevronDown size={14}/>
+        </span>
+      </button>
       {expanded[s.id] && (
-        <>
+        <div id={"guide-body-"+s.id}>
           <p style={{margin:"0 0 8px",fontSize:13,color:t.textSub,lineHeight:1.6,fontFamily:t.sans}}>{s.what}</p>
           <p style={{margin:"0 0 12px",fontSize:12.5,color:t.textMuted,lineHeight:1.6,fontFamily:t.sans,fontStyle:"italic"}}>{s.why}</p>
-        </>
+        </div>
       )}
-      <button onClick={e=>{e.stopPropagation();onNavigate(s.action);}} style={{...gG(t),fontSize:11.5,padding:"5px 12px"}}>{s.cta} &#8594;</button>
+      <button onClick={e=>{e.stopPropagation();onNavigate(s.action);}} style={gG(t,"sm")}>{s.cta} <IconArrowRight size={12}/></button>
     </div>
   );
+
+  // A drawer is a dialog: same Escape, same focus trap, same return of focus.
+  // It is not a `Modal` only because it slides from the edge rather than sitting
+  // in the middle, which is a difference of presentation, not of behaviour.
+  const panelRef = useDialog({ onClose });
 
   return (
     <div style={{position:"fixed",inset:0,background:dk?"rgba(0,0,0,0.6)":"rgba(20,18,10,0.35)",zIndex:320,display:"flex",justifyContent:"flex-end"}}
       onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-      <div style={{background:t.surface,borderLeft:"1px solid "+t.border,width:"100%",maxWidth:460,height:"100%",overflowY:"auto",boxShadow:"-8px 0 32px rgba(0,0,0,0.18)",animation:"slideIn 0.2s ease"}}>
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-label="What can Marketers Lab do?" tabIndex={-1}
+        style={{background:t.surface,borderLeft:"1px solid "+t.border,width:"100%",maxWidth:460,height:"100%",overflowY:"auto",boxShadow:"-8px 0 32px rgba(0,0,0,0.18)",animation:"slideIn 0.2s ease",outline:"none"}}>
         {/* Header */}
         <div style={{position:"sticky",top:0,background:t.surface,borderBottom:"1px solid "+t.border,padding:"18px 22px",zIndex:2}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
@@ -274,7 +292,10 @@ function GuideDrawer({ t, dk, openSection, onClose, onNavigate, nav }) {
               <div style={{fontSize:16,fontWeight:600,color:t.text,fontFamily:t.serif}}>What can Marketers Lab do?</div>
               <div style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,marginTop:3}}>Every capability, grouped by what you're trying to accomplish.</div>
             </div>
-            <button onClick={onClose} style={{background:"transparent",border:"none",color:t.textMuted,cursor:"pointer",fontSize:18,lineHeight:1,flexShrink:0}}><span>&#10005;</span></button>
+            <button onClick={onClose} aria-label="Close guide"
+              style={{background:"transparent",border:"none",color:t.textMuted,cursor:"pointer",lineHeight:1,flexShrink:0,padding:2}}>
+              <IconClose size={16}/>
+            </button>
           </div>
         </div>
         {/* Sections */}
@@ -606,6 +627,8 @@ export default function App() {
   // Desktop rail collapsed to icons. Persisted — see store.js.
   const [railCollapsed, setRailCollapsed] = useState(false);
   const toggleRail = () => setRailCollapsed(c => { const next = !c; store.set(KEY_RAIL, next ? "1" : "0"); return next; });
+  // ⌘K / Ctrl-K. The app had no keyboard shortcuts and no global search at all.
+  const [showPalette, setShowPalette] = useState(false);
 
   const t    = dk ? TD : TL;
   const cats   = settings.categories || DEFAULT_SETTINGS.categories;
@@ -695,6 +718,34 @@ export default function App() {
   // Only what changed gets a new `updatedAt` — see services/items.js. Stamping
   // every item on every save made the Weekly Standup's "no update in 7+ days"
   // group permanently empty.
+  // -- Routing -----------------------------------------------------------------
+  // See services/route.js for the shape and for why it is the hash rather than
+  // the History API. Two effects, deliberately not one: the reader has to run on
+  // mount and on every back/forward, the writer only when app state moves.
+  //
+  // There is no re-entrancy guard between them and none is needed. Writing the
+  // hash fires `hashchange`, which calls `apply`, which calls setState with
+  // values identical to the ones already held — React bails out of the render,
+  // so no second write is ever queued. A guard flag here would have to be
+  // cleared on a render that does not happen.
+  useEffect(() => {
+    const apply = () => {
+      const r = parseHash(window.location.hash);
+      if (r.selId) setSelId(r.selId);
+      if (r.tab)   setPerfTab(r.tab);
+      setNav(r.nav);
+    };
+    apply();
+    window.addEventListener("hashchange", apply);
+    return () => window.removeEventListener("hashchange", apply);
+  }, []);
+
+  useEffect(() => {
+    if (!loaded) return;
+    const next = formatHash({ nav, selId, tab: nav === "performance" ? perfTab : null });
+    if (next && next !== window.location.hash) window.location.hash = next;
+  }, [nav, selId, perfTab, loaded]);
+
   const saveItems    = d => { const stamped = stampUpdatedAt(d, items); setItems(stamped); store.set(KEY_ITEMS,JSON.stringify(stamped)); };
   const saveSettings = s => { setSettings(s); store.set(KEY_SETTINGS,JSON.stringify(s)); };
   const saveDebates  = d => { setDebates(d); store.set(KEY_DEBATES,JSON.stringify(d)); };
@@ -888,6 +939,57 @@ export default function App() {
   const sel    = useMemo(()=>items.find(e=>e.id===selId),[items,selId]);
   const owners = useMemo(()=>["All",...new Set(items.map(e=>e.owner).filter(Boolean).map(o=>o.split(" (")[0].split("+")[0].trim()))],[items]);
 
+  // Seed the editor from an `#/i/<id>/edit` URL.
+  //
+  // The hash is parsed on mount, but `items` is still empty then — the store has
+  // not answered — so the id it names cannot be resolved until the data lands.
+  // This is the reconciliation, done during render rather than in an effect:
+  // React's documented pattern for state derived from other state, it commits
+  // before paint (so the editor never renders empty for a frame), and it is not
+  // the "synchronise with an external system" shape an effect is for.
+  //
+  // `seededFor` is set even when the id resolves to nothing, so a link to a
+  // deleted initiative settles instead of retrying on every render. The
+  // not-found case is handled where it belongs, in the view: it renders an
+  // explicit panel rather than silently bouncing the reader to another page.
+  const [seededFor, setSeededFor] = useState(null);
+  if (loaded && nav === "form" && selId && seededFor !== selId) {
+    setSeededFor(selId);
+    const item = items.find(e => e.id === selId);
+    if (item && (!form || form.id !== selId)) setForm({ ...item });
+  }
+
+  // The tab title follows the view, so browser history and a wall of tabs are
+  // both readable. Nothing set it before, so every entry read "Marketers Lab".
+  useEffect(() => {
+    if (!loaded) return;
+    document.title = titleFor(nav, sel);
+  }, [nav, sel, loaded]);
+
+  // Currency and locale are settings; the formatters read them from module
+  // state rather than taking them as arguments at ~140 call sites.
+  useEffect(() => {
+    setNumberFormat({ currency: settings.currency, locale: settings.locale });
+  }, [settings.currency, settings.locale]);
+
+  // ⌘K anywhere, and "/" when focus is not already in a field. Registered once,
+  // in capture, so it works over modals too.
+  useEffect(() => {
+    const onKey = (e) => {
+      const inField = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName || "")
+        || e.target?.isContentEditable;
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setShowPalette(p => !p);
+      } else if (e.key === "/" && !inField && !showPalette) {
+        e.preventDefault();
+        setShowPalette(true);
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [showPalette]);
+
   const bounds = useMemo(()=>{
     const now=new Date();
     if(dRange==="thisMonth") return {from:somM(now),to:eomM(now)};
@@ -1035,9 +1137,53 @@ export default function App() {
     return list;
   },[items,fSt,fCat,fType,fOwn,sort,activeBrand,normBrandId]);
 
+  // -- Unsaved work ------------------------------------------------------------
+  //
+  // The editor used to be abandonable in one click with no warning: the sidebar
+  // is always on screen, and clicking any destination switched `nav` away while
+  // `form` stayed in state with no route back to it. Cancel discarded silently
+  // too. Nothing was autosaved, so a half-written hypothesis was simply gone.
+  //
+  // Dirtiness is a comparison against the record the editor was opened from,
+  // not a flag set on the first keystroke — typing a character and deleting it
+  // should not arm a confirmation.
+  const formDirty = useMemo(()=>{
+    if(!form) return false;
+    const {_new, ...current} = form;
+    const baseline = _new
+      ? (()=>{ const {_new:_, id:__, createdAt:___, ...d} = mkDefault(cats, activeBrand); return d; })()
+      : (()=>{ const saved = items.find(e=>e.id===form.id); if(!saved) return null; const {createdAt:_, ...d} = saved; return d; })();
+    if(!baseline) return true;
+    const {id:_i, createdAt:_c, ...cur} = current;
+    return JSON.stringify(cur) !== JSON.stringify(baseline);
+  },[form,items,cats,activeBrand]);
+
+  // Where the user asked to go, held while they answer the confirmation.
+  const [pendingNav, setPendingNav] = useState(null);
+
+  /** Every navigation the chrome can initiate goes through here. */
+  const requestNav = useCallback((next)=>{
+    if(nav==="form" && formDirty && next!=="form"){ setPendingNav({kind:"nav", to:next}); return; }
+    setNav(next);
+  },[nav,formDirty]);
+
+  const discardForm = ()=>{
+    setForm(null); setHypReview(null); setIceReview(null); setDataCtx(""); setPendingRecAccept(null);
+  };
+
+  // The browser's own exit. Only armed while there is something to lose — an
+  // unconditional handler is the dialog everyone has learned to dismiss without
+  // reading, which is how a real warning stops working.
+  useEffect(()=>{
+    if(!(nav==="form" && formDirty)) return;
+    const onBeforeUnload = (e)=>{ e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return ()=>window.removeEventListener("beforeunload", onBeforeUnload);
+  },[nav,formDirty]);
+
   const goDetail = (id, origin)=>{ if(origin) setDetailOrigin(origin); setSelId(id); setNav("detail"); };
   const goNew    = ()=>{ setShowTpl(true); };
-  const goEdit   = item=>{setForm({...item});setNav("form");};
+  const goEdit   = item=>{setForm({...item});setSelId(item.id);setNav("form");};
 
   // When more than one status is active in the filter (the default Running+Draft,
   // "All", or any other multi-status combination), the flat list is grouped into
@@ -1073,10 +1219,17 @@ export default function App() {
   // primitive, so a card in the Register, the Library and Triage answer the
   // pointer identically. The rail colour is the item's status, which is the one
   // thing about a row worth saying in colour.
+  // A `<button>`, not a clickable `<div>`. This is the most-clicked element in
+  // the product and it was unreachable by keyboard: no tabIndex, no role, no key
+  // handler — and `tabIndex` appeared zero times in the entire codebase. The
+  // `interactive()` helper already styles `:focus-visible` correctly, so making
+  // it a real control costs nothing visually and is the whole fix.
   const renderInitiativeCard = (item,idx)=>(
-    <div key={item.id} onClick={()=>goDetail(item.id,"initiatives")}
+    <button key={item.id} type="button" onClick={()=>goDetail(item.id,"initiatives")}
+      aria-label={(item.initId?item.initId+": ":"")+item.title+" — "+item.status}
       {...(()=>{const p=interactive(t,(dk?SD:SL)[item.status]?.border||t.goldBorder,{index:idx});
-        return {className:p.className, style:{...gCd(t),...p.style,cursor:"pointer",padding:"14px 16px 14px 18px"}};})()}
+        return {className:p.className, style:{...gCd(t),...p.style,cursor:"pointer",padding:"14px 16px 14px 18px",
+          display:"block",width:"100%",textAlign:"left",font:"inherit",color:"inherit"}};})()}
       onMouseEnter={e=>{setHoverId(item.id);e.currentTarget.style.borderColor=t.goldBorder;e.currentTarget.style.boxShadow=t.shadowHi;}}
       onMouseLeave={e=>{setHoverId(null);e.currentTarget.style.borderColor=t.border;e.currentTarget.style.boxShadow=t.shadow;}}>
       {/* Row 1: title (lead) + ICE/revenue anchors */}
@@ -1117,13 +1270,14 @@ export default function App() {
           <CadenceRail rail={cadenceFor(item,cadWindow)} t={t} expanded={hoverId===item.id} windowLabel={cadLabel}/>
         </span>
       </div>
-    </div>
+    </button>
   );
 
   const startFromTemplate = tpl=>{
     const base=mkDefault(cats, activeBrand);
     const defs=tpl?tpl.defaults:{};
     setForm({...base,...defs,initType:tpl?tpl.initType:"A/B Test"});
+    setSelId(null);
     setShowTpl(false);setNav("form");
   };
 
@@ -1149,6 +1303,7 @@ export default function App() {
       }));
       setPendingRecAccept(null);
     }
+    setSelId(data.id);
     if(then==="builder"){ setPerfTab("builder"); setBuilderInit(data.id); setNav("performance"); }
     else setNav(_new?"initiatives":"detail");
     setForm(null);setHypReview(null);setIceReview(null);setDataCtx("");
@@ -1203,6 +1358,15 @@ export default function App() {
 
   // -- CSV helpers (import + export) ------------------------------------------
 
+
+  // Exports carry the workspace's own name, the way the JSON backup already
+  // did. They used to be hardcoded `GrowthOS_export_<date>.csv` — the retired
+  // product name, on a file that leaves the building and lands in a client's
+  // downloads folder.
+  const exportFilename = (kind, ext) => {
+    const slug = (settings.companyName || "MarketersLab").replace(/[^\w]+/g, "_").replace(/^_|_$/g, "");
+    return `${slug}_${kind}_${new Date().toISOString().slice(0,10)}.${ext}`;
+  };
 
   const handleExportCSV = (rowsToExport, filename) => {
     downloadCSV(rowsToExport.map(item => itemToCSVRow(item, brands)), filename);
@@ -1298,9 +1462,30 @@ export default function App() {
         * column is removed from flow entirely rather than merely narrowed — a
         * 216px fixed column on a 390px viewport is the same horizontal-overflow
         * bug the old tab strip had. */}
+      {/* The app's entire responsive system used to be the single 900px rail
+        * swap on the last line here. Every other style in the product is an
+        * inline object, and an inline object cannot hold a media query — so
+        * eighteen hard-coded `1fr 1fr` grids never collapsed, and the
+        * Initiatives filter row (five selects at 104–130px plus five status
+        * chips) stacked into six rows before the first result on a phone.
+        *
+        * These are the escape hatch: a small set of classes a component can opt
+        * into where it has a fixed grid, so the collapse lives somewhere a
+        * media query is legal. Deliberately few — this is a pressure valve, not
+        * a utility framework growing inside a style string. */}
       <style>{"@keyframes spin{to{transform:rotate(360deg)}}input[type=range]{accent-color:"+t.goldFill+"}@keyframes slideIn{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}"
         +".gos-burger{display:none}"
-        +"@media(max-width:900px){.gos-rail{display:none}.gos-burger{display:flex}}"}</style>
+        +"@media(max-width:900px){.gos-rail{display:none}.gos-burger{display:flex}}"
+        // Two-up grids fold to one column on a phone. Applied where a
+        // `1fr 1fr` was previously unconditional.
+        +"@media(max-width:640px){.gos-grid-2,.gos-grid-3{grid-template-columns:1fr !important}}"
+        +"@media(min-width:641px) and (max-width:900px){.gos-grid-3{grid-template-columns:1fr 1fr !important}}"
+        // Filter rows: let every control take a full row rather than wrapping
+        // into a ragged stack of half-width selects.
+        +"@media(max-width:640px){.gos-filters{flex-direction:column;align-items:stretch !important}.gos-filters>*{width:100%}.gos-filters select,.gos-filters input{min-width:0 !important;width:100% !important}}"
+        // Labels that are noise once the screen is narrow enough that the icon
+        // has to carry the button on its own.
+        +"@media(max-width:560px){.gos-hide-sm{display:none}}"}</style>
 
       {/* Onboarding — first run only */}
       {onboarding&&(
@@ -1349,17 +1534,57 @@ export default function App() {
         </Modal>
       )}
 
-      {/* Toast notifications */}
+      {/* Toast notifications. `role=status` with a polite live region so the
+        * message is announced rather than only seen — a toast is the app's only
+        * feedback channel for a save, an import, or a failed AI call. */}
       {toast&&(
-        <div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",zIndex:9999,
+        <div role="status" aria-live="polite"
+          style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",zIndex:9999,
           background:toast.type==="error"?t.redBg:toast.type==="success"?t.tealBg:t.surfaceAlt,
           border:"1px solid "+(toast.type==="error"?(t.red):toast.type==="success"?(t.teal):(t.border)),
           color:toast.type==="error"?(t.red):toast.type==="success"?(t.teal):(t.textSub),
-          borderRadius:8,padding:"10px 18px",fontSize:13,fontFamily:t.sans,fontWeight:600,
-          boxShadow:"0 4px 20px rgba(0,0,0,0.15)",animation:"slideIn 0.2s ease",whiteSpace:"nowrap",
-          maxWidth:"90vw",textOverflow:"ellipsis",overflow:"hidden"}}>
-          {toast.type==="error"?"⚠ ":toast.type==="success"?"✓ ":"ℹ "}{toast.msg}
+          borderRadius:t.r.md,padding:"10px 18px",fontSize:13,fontFamily:t.sans,fontWeight:600,
+          boxShadow:"0 4px 20px rgba(0,0,0,0.15)",animation:"slideIn 0.2s ease",
+          display:"flex",alignItems:"center",gap:8,
+          maxWidth:"min(90vw,520px)",lineHeight:1.45}}>
+          {toast.type==="error"?<IconAlert size={15}/>:toast.type==="success"?<IconCheck size={15}/>:<IconInfo size={15}/>}
+          <span style={{minWidth:0}}>{toast.msg}</span>
         </div>
+      )}
+
+      {/* Command palette — ⌘K, or "/" outside a field */}
+      {showPalette&&(
+        <CommandPalette
+          t={t} dk={dk} items={items}
+          onClose={()=>setShowPalette(false)}
+          onOpenInitiative={(id)=>{ setDetailOrigin("initiatives"); setSelId(id); requestNav("detail"); }}
+          onNavigate={requestNav}
+          onAction={(a)=>{
+            if(a==="new")           { requestNav("initiatives"); setShowTpl(true); }
+            else if(a==="capture")  setShowCapture(true);
+            else if(a==="signal")   setShowCopilot(true);
+            else if(a==="settings") setShowSet(true);
+          }}
+        />
+      )}
+
+      {/* Leaving the editor with unsaved edits */}
+      {pendingNav&&(
+        <Modal t={t} dk={dk} title="Discard your changes?" onClose={()=>setPendingNav(null)}>
+          <div style={{fontSize:13,color:t.textSub,fontFamily:t.serif,lineHeight:1.6,marginBottom:18}}>
+            This initiative has edits that have not been saved. Leaving now discards them.
+          </div>
+          <div style={{display:"flex",justifyContent:"flex-end",gap:8}}>
+            <button style={gGh(t)} onClick={()=>setPendingNav(null)}>Keep editing</button>
+            <button style={gG(t)} onClick={()=>{ handleSave(); setPendingNav(null); }} disabled={!form?.title}>
+              Save and leave
+            </button>
+            <button style={{...gGh(t),color:t.red,borderColor:t.red}}
+              onClick={()=>{ const to=pendingNav.to; discardForm(); setPendingNav(null); setNav(to); }}>
+              Discard
+            </button>
+          </div>
+        </Modal>
       )}
 
       {/* Restore backup confirm modal */}
@@ -1367,7 +1592,7 @@ export default function App() {
         <Modal t={t} dk={dk} onClose={()=>setRestorePayload(null)} title="Restore from backup?">
           <div style={{display:"flex",flexDirection:"column",gap:14}}>
             <div style={{padding:"10px 14px",background:t.warnBg,border:"1px solid "+t.warnBorder,borderRadius:6}}>
-              <div style={{fontSize:12,fontWeight:700,color:t.warn,fontFamily:t.mono,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.06em"}}>⚠ This will overwrite your current data</div>
+              <div style={{display:"flex",alignItems:"center",gap:7,fontSize:12,fontWeight:700,color:t.warn,fontFamily:t.mono,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.06em"}}><IconAlert size={14}/> This will overwrite your current data</div>
               <div style={{fontSize:12,color:t.textSub,fontFamily:t.serif,lineHeight:1.8}}>
                 <div>Exported: <strong style={{color:t.text}}>{restorePayload.stamp}</strong></div>
                 <div>Initiatives: <strong style={{color:t.text}}>{restorePayload.counts.items}</strong></div>
@@ -1407,7 +1632,7 @@ export default function App() {
         {/* Desktop rail */}
         <aside className="gos-rail" style={{width:railCollapsed?58:216,flexShrink:0,position:"sticky",top:0,height:"100vh",
           transition:"width .22s cubic-bezier(.2,.7,.3,1)"}}>
-          <Sidebar t={t} dk={dk} nav={nav} onNav={setNav} counts={navCounts}
+          <Sidebar t={t} dk={dk} nav={nav} onNav={requestNav} counts={navCounts}
             collapsed={railCollapsed} onToggleCollapse={toggleRail}
             brands={brands} activeBrand={activeBrand} setActiveBrand={setActiveBrand}
             demoMode={DEMO_MODE} onResetDemo={()=>setShowResetConfirm(true)}
@@ -1421,7 +1646,7 @@ export default function App() {
           <div className="gos-drawer" onClick={()=>setNavOpen(false)}
             style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,0.45)"}}>
             <div onClick={e=>e.stopPropagation()} style={{width:250,height:"100%",boxShadow:t.shadowHi}}>
-              <Sidebar t={t} dk={dk} nav={nav} onNav={setNav} counts={navCounts}
+              <Sidebar t={t} dk={dk} nav={nav} onNav={requestNav} counts={navCounts}
                 brands={brands} activeBrand={activeBrand} setActiveBrand={setActiveBrand}
                 demoMode={DEMO_MODE} onResetDemo={()=>{setNavOpen(false);setShowResetConfirm(true);}}
                 onTour={()=>{setNavOpen(false);setTourStep(0);setShowTour(true);}}
@@ -1439,42 +1664,48 @@ export default function App() {
         <div style={{background:t.headerBg,borderBottom:"1px solid "+t.border,position:"sticky",top:0,zIndex:100}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,padding:"11px 20px",flexWrap:"wrap",maxWidth:1440,margin:"0 auto"}}>
             <div style={{display:"flex",alignItems:"center",gap:11,minWidth:0}}>
-              <button className="gos-burger" onClick={()=>setNavOpen(true)} title="Menu"
-                style={{width:32,height:32,borderRadius:9,cursor:"pointer",background:t.surfaceAlt,border:"1px solid "+t.border,color:t.textSub,fontSize:15,alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                <span>{"☰"}</span>
+              <button className="gos-burger" onClick={()=>setNavOpen(true)} title="Menu" aria-label="Open navigation"
+                style={{width:32,height:32,borderRadius:t.r.md,cursor:"pointer",background:t.surfaceAlt,border:"1px solid "+t.border,color:t.textSub,alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                <IconMenu size={16}/>
               </button>
               {(nav==="detail"||nav==="form")?(
-                <button onClick={()=>setNav(nav==="detail"?detailOrigin:"initiatives")} style={{...gGh(t),padding:"6px 12px",fontSize:12}}>
-                  <span style={{fontSize:12}}>&#8592;</span> Back to {navName(nav==="detail"?detailOrigin:"initiatives")}
+                <button onClick={()=>requestNav(nav==="detail"?detailOrigin:"initiatives")} style={gGh(t,"sm")}>
+                  <IconArrowLeft size={13}/> Back to {navName(nav==="detail"?detailOrigin:"initiatives")}
                 </button>
               ):(
                 <div style={{minWidth:0}}>
-                  <div style={{display:"flex",alignItems:"baseline",gap:8,flexWrap:"wrap"}}>
-                    <span style={{fontFamily:t.serif,fontSize:17,fontWeight:600,color:t.text,lineHeight:1.2}}>{navName(nav)}</span>
-                    {navLab(nav)&&(
-                      <span style={{fontFamily:t.mono,fontSize:9.5,letterSpacing:"0.1em",textTransform:"uppercase",color:t.textMuted}}>
-                        {navLab(nav)}
-                      </span>
-                    )}
-                  </div>
-                  <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>{settings.companyName}</div>
+                  {/* The laboratory name used to ride here as a second uppercase
+                    * label beside the view title, where it competed for the same
+                    * glance and explained nothing — the header already says which
+                    * view you are in. It still does its one real job in the rail,
+                    * where it explains the two-letter code. */}
+                  <div style={{fontFamily:t.serif,fontSize:t.fs.large,fontWeight:600,color:t.text,lineHeight:1.2}}>{navName(nav)}</div>
+                  <div style={{fontSize:t.fs.small,color:t.textMuted,fontFamily:t.serif}}>{settings.companyName}</div>
                 </div>
               )}
             </div>
 
             <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+              {/* Search is global, so its entry point is too — it was previously
+                * reachable only inside the Library and only over closed work. */}
+              <button onClick={()=>setShowPalette(true)} style={{...gGh(t,"sm"),color:t.textMuted}}
+                title="Search initiatives and jump to a view (⌘K)" aria-label="Search (Command K)">
+                <IconSearch size={13}/>
+                <span className="gos-hide-sm">Search</span>
+                <kbd style={{fontFamily:t.mono,fontSize:9.5,border:"1px solid "+t.border,borderRadius:t.r.xs,padding:"1px 4px",marginLeft:2}}>⌘K</kbd>
+              </button>
               {nav==="initiatives"&&(<>
-                <button onClick={()=>setShowCapture(true)} style={{...gGh(t),padding:"6px 11px",fontSize:11.5}}>
-                  &#9889; Quick capture
+                <button onClick={()=>setShowCapture(true)} style={gGh(t,"sm")}>
+                  <IconBolt size={13}/> Quick capture
                 </button>
-                <button onClick={()=>{setImportRows([]);setImportErrs([]);setImportDone(false);setShowImport(true);}} style={{...gGh(t),padding:"6px 11px",fontSize:11.5}}>
-                  &#8645; Import CSV
+                <button onClick={()=>{setImportRows([]);setImportErrs([]);setImportDone(false);setShowImport(true);}} style={gGh(t,"sm")}>
+                  <IconImport size={13}/> Import CSV
                 </button>
-                <button onClick={()=>handleExportCSV(filtered,"GrowthOS_export_"+new Date().toISOString().slice(0,10)+".csv")} style={{...gGh(t),padding:"6px 11px",fontSize:11.5}} title="Export current filtered view as CSV">
-                  &#8659; Export CSV
+                <button onClick={()=>handleExportCSV(filtered, exportFilename("initiatives","csv"))} style={gGh(t,"sm")} title="Export current filtered view as CSV">
+                  <IconDownload size={13}/> Export CSV
                 </button>
-                <button onClick={goNew} style={{...gG(t),padding:"6px 12px",fontSize:12.5}}>
-                  + New
+                <button onClick={goNew} style={gG(t,"sm")}>
+                  <IconPlus size={13}/> New
                 </button>
               </>)}
             </div>
@@ -1577,14 +1808,14 @@ export default function App() {
             {filtered.length===0&&(
               items.filter(e=>activeBrand==="all"||normBrandId(e.brandId)===normBrandId(activeBrand)).length===0 ? (
                 <div style={{...gCd(t),padding:"44px 24px",textAlign:"center"}}>
-                  <div style={{fontSize:28,marginBottom:10,opacity:.5}}>&#9670;</div>
+                  <div style={{display:"flex",justifyContent:"center",marginBottom:10,color:t.textFaint}}><IconDiamond size={26}/></div>
                   <div style={{fontSize:15,fontWeight:600,color:t.text,fontFamily:t.sans,marginBottom:6}}>No initiatives yet</div>
                   <div style={{fontSize:13,color:t.textSub,fontFamily:t.sans,lineHeight:1.55,maxWidth:380,margin:"0 auto 16px"}}>Start your growth portfolio: add an initiative, capture a quick idea, or generate a slate from Signal.</div>
                   <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
                     <button onClick={goNew} style={{...gG(t),fontSize:12.5,padding:"8px 16px"}}>+ New initiative</button>
                     <button onClick={()=>setShowCapture(true)} style={{...gGh(t),fontSize:12.5,padding:"8px 14px"}}>&#9889; Quick capture</button>
                   </div>
-                  <button onClick={()=>setGuideSection(true)} style={{background:"none",border:"none",color:t.textMuted,fontSize:12,fontFamily:t.serif,cursor:"pointer",marginTop:14,textDecoration:"underline",textUnderlineOffset:3}}>New here? See everything Marketers Lab can do &#8594;</button>
+                  <button onClick={()=>setGuideSection(true)} style={{background:"none",border:"none",color:t.textMuted,fontSize:12,fontFamily:t.serif,cursor:"pointer",marginTop:14,textDecoration:"underline",textUnderlineOffset:3}}>New here? See everything Marketers Lab can do</button>
                 </div>
               ) : (
                 <div style={{...gCd(t),padding:"40px 24px",textAlign:"center"}}>
@@ -1656,7 +1887,7 @@ export default function App() {
           onRejectIce={()=>setIceReview(null)}
           onSave={handleSave}
           onOpenBuilder={()=>handleSave("builder")}
-          onCancel={()=>{setForm(null);setHypReview(null);setIceReview(null);setDataCtx("");setPendingRecAccept(null);setNav("initiatives");}}/>
+          onCancel={()=>{discardForm();setNav("initiatives");}}/>
       )}
 
       {showCapture&&(
@@ -1671,7 +1902,7 @@ export default function App() {
           {captureText.length>0&&captureText.length<30&&<div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,marginTop:4}}><span style={{fontFamily:t.mono}}>{30-captureText.length}</span> more chars to enable AI</div>}
           <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:14}}>
             <button style={gGh(t)} onClick={()=>{setShowCapture(false);setCaptureText("");}}>Cancel</button>
-            <button style={{...gG(t),opacity:captureText.length>=30?1:0.4}} disabled={captureText.length<30||captureLoad}
+            <button style={{...gG(t),...(captureText.length>=30&&!captureLoad?null:gOff)}} disabled={captureText.length<30||captureLoad}
               onClick={async()=>{
                 setCaptureLoad(true);
                 try {
@@ -1686,7 +1917,7 @@ export default function App() {
                 } catch(e){ showToast(e.message || "AI extraction failed. Try adding more detail.", "error"); }
                 setCaptureLoad(false);
               }}>
-              {captureLoad?<><span style={{display:"inline-block",animation:"spin 1s linear infinite"}}>&#8635;</span> Extracting…</>:<><span>&#9889;</span> Extract with AI</>}
+              {captureLoad?<><IconSpinner size={13}/> Extracting…</>:<><IconBolt size={13}/> Extract with AI</>}
             </button>
           </div>
         </Modal>
@@ -1701,16 +1932,17 @@ export default function App() {
           <p style={{fontSize:13,color:t.textSub,marginBottom:16,fontFamily:t.serif}}>Pick a template to pre-fill the form, or start blank.</p>
           <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:16}}>
             {TEMPLATES.map(tpl=>(
-              <div key={tpl.id} onClick={()=>startFromTemplate(tpl)} style={{...gCd(t),cursor:"pointer",display:"flex",alignItems:"flex-start",gap:12}}>
-                <div style={{fontSize:20,color:t.gold,marginTop:1}}><span style={{fontSize:18}}>&#9670;</span></div>
-                <div>
-                  <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:2}}>
+              <button key={tpl.id} type="button" onClick={()=>startFromTemplate(tpl)}
+                style={{...gCd(t),cursor:"pointer",display:"flex",alignItems:"flex-start",gap:12,width:"100%",textAlign:"left",font:"inherit",color:"inherit"}}>
+                <span style={{color:t.gold,marginTop:2,flexShrink:0}}><IconDiamond size={16}/></span>
+                <span>
+                  <span style={{display:"flex",gap:6,alignItems:"center",marginBottom:2}}>
                     <span style={{fontSize:13,fontWeight:700,color:t.text}}>{tpl.label}</span>
                     <TBdg type={tpl.initType} dk={dk} t={t}/>
-                  </div>
-                  <div style={{fontSize:12,color:t.textMuted,fontFamily:t.serif}}>{tpl.description}</div>
-                </div>
-              </div>
+                  </span>
+                  <span style={{display:"block",fontSize:12,color:t.textMuted,fontFamily:t.serif}}>{tpl.description}</span>
+                </span>
+              </button>
             ))}
           </div>
           <button onClick={()=>startFromTemplate(null)} style={{...gGh(t),width:"100%",justifyContent:"center"}}>Start blank</button>
@@ -1735,7 +1967,7 @@ export default function App() {
           <div style={{display:"flex",flexDirection:"column",gap:14}}>
             {importDone?(
               <div style={{textAlign:"center",padding:"24px 0"}}>
-                <div style={{fontSize:28,marginBottom:8}}>&#10003;</div>
+                <div style={{display:"flex",justifyContent:"center",marginBottom:8,color:t.teal}}><IconCheck size={26}/></div>
                 <div style={{fontSize:15,fontWeight:600,color:t.text,fontFamily:t.serif,marginBottom:4}}><span style={{fontFamily:t.mono}}>{importRows.length}</span> initiative{importRows.length!==1?"s":""} imported</div>
                 <div style={{fontSize:12,color:t.textMuted,fontFamily:t.serif}}>Closing…</div>
               </div>
@@ -1747,7 +1979,7 @@ export default function App() {
                 <label style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:10,padding:"28px 20px",border:"2px dashed "+t.border,borderRadius:8,cursor:"pointer",background:t.surfaceAlt}}
                   onDragOver={e=>{e.preventDefault();e.stopPropagation();}}
                   onDrop={e=>{e.preventDefault();e.stopPropagation();const f=e.dataTransfer.files[0];if(f)handleCSVFile(f);}}>
-                  <span style={{fontSize:28}}>&#128196;</span>
+                  <span style={{color:t.textMuted}}><IconFolder size={26}/></span>
                   <span style={{fontSize:13,fontWeight:600,color:t.text,fontFamily:t.serif}}>Click to choose a CSV file</span>
                   <span style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>or drag and drop here</span>
                   <input type="file" accept=".csv" style={{display:"none"}} onChange={e=>{if(e.target.files[0])handleCSVFile(e.target.files[0]);}}/>
@@ -1757,7 +1989,7 @@ export default function App() {
                     First time? Download the CSV template: correct headers, one example row.
                   </span>
                   <button style={{...gG(t),fontSize:11,padding:"4px 11px",flexShrink:0}} onClick={handleDownloadTemplate}>
-                    &#8599; Open template in Google Sheets
+                    Open template in Google Sheets
                   </button>
                 </div>
               </>
@@ -1792,7 +2024,7 @@ export default function App() {
                   })}
                 </div>
                 <div style={{display:"flex",gap:8,justifyContent:"space-between",alignItems:"center",paddingTop:4}}>
-                  <button style={gGh(t)} onClick={()=>{setImportRows([]);setImportErrs([]);}}>&#8592; Re-upload</button>
+                  <button style={gGh(t)} onClick={()=>{setImportRows([]);setImportErrs([]);}}><IconArrowLeft size={13}/> Re-upload</button>
                   <button style={gG(t)} onClick={confirmImport}>
                     Import {importRows.length} initiative{importRows.length!==1?"s":""}
                   </button>

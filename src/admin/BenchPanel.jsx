@@ -226,11 +226,19 @@ export function BenchPanel({ config }) {
               title={atCap ? `Deselect one first — ${MAX_MODELS} is the cap` : m.blurb}
               style={{ ...button(on ? "primary" : "default"), opacity: atCap ? 0.4 : 1,
                 cursor: atCap ? "not-allowed" : "pointer" }}>
-              {m.label}{isCurrent ? " · live" : ""}
+              {m.label}{isCurrent ? " · live" : ""}{m.unverified ? " ?" : ""}
             </button>
           );
         })}
       </div>
+      {/* An unconfirmed id fails as a 404 from the provider. Say so before the run
+          rather than letting the result column be the first hint. */}
+      {selected.some((id) => eligible.find((m) => m.id === id)?.unverified) && (
+        <div style={{ fontSize: 11.5, color: c.warn, lineHeight: 1.5, marginBottom: 4 }}>
+          Models marked <strong>?</strong> have an unconfirmed model id and may fail with a 404. Use
+          “Verify id” on the Routing tab to check them against the provider.
+        </div>
+      )}
 
       <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 14, flexWrap: "wrap" }}>
         <button

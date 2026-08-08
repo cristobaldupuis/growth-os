@@ -93,6 +93,58 @@ export const MODEL_CATALOGUE = [
     caps: { tools: true, json: true, adaptiveThinking: false, effort: false, cacheMinTokens: 4096, longContext: false },
   },
 
+  // -- Google Gemini text -----------------------------------------------------
+  //
+  // ## These two ids are UNCONFIRMED and that is deliberate
+  //
+  // They are transcriptions of the model names the operator asked to evaluate, not
+  // ids read off Google's model list. An id guessed from a marketing name fails as
+  // a 404 the first time someone tries to generate something real, which is the
+  // worst place to discover it — so both are flagged `unverified` and the console
+  // puts a Verify button next to them that asks the provider directly. Clear the
+  // flag once Verify says the provider lists them; correct the string here if it
+  // does not. This is one line either way.
+  //
+  // `adaptiveThinking` and `effort` are false because those are Anthropic request
+  // parameters — see the note at the top of api/_adapters.js for why the capability
+  // table is what suppresses them rather than the adapter silently dropping them.
+  // `cacheMinTokens: Infinity` keeps buildRequest from ever marking a cache
+  // breakpoint these models would not understand.
+  {
+    id: "gemini-3.1-pro",
+    provider: "gemini",
+    label: "Gemini 3.1 Pro",
+    modality: "text",
+    unverified: true,
+    blurb: "Google's reasoning tier. Long context; verify the id before relying on it.",
+    caps: { tools: true, json: true, adaptiveThinking: false, effort: false, cacheMinTokens: Infinity, longContext: true },
+  },
+  {
+    id: "gemini-3.6-flash",
+    provider: "gemini",
+    label: "Gemini 3.6 Flash",
+    modality: "text",
+    unverified: true,
+    blurb: "Fast and cheap tier. A candidate for Capture & Framing; verify the id first.",
+    caps: { tools: true, json: true, adaptiveThinking: false, effort: false, cacheMinTokens: Infinity, longContext: false },
+  },
+
+  // -- OpenAI text ------------------------------------------------------------
+  //
+  // Same caveat, more strongly: no OpenAI model id was specified, so this is a
+  // placeholder carrying the adapter rather than a confirmed model. Run Verify to
+  // see what the account actually offers and correct the id here. The adapter in
+  // api/_adapters.js is complete and does not change when the id does.
+  {
+    id: "gpt-5.1",
+    provider: "openai",
+    label: "OpenAI GPT-5.1",
+    modality: "text",
+    unverified: true,
+    blurb: "Placeholder id — run Verify to list what the account offers, then correct it here.",
+    caps: { tools: true, json: true, adaptiveThinking: false, effort: false, cacheMinTokens: Infinity, longContext: true },
+  },
+
   // -- Image ------------------------------------------------------------------
   // "Nano Banana" is the community name for Gemini 2.5 Flash Image. Both IDs are
   // confirmed — they are what api/image.js already calls.

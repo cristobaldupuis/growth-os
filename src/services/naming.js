@@ -78,7 +78,7 @@ const DIMENSIONS = [
   { key:"objective",  label:"Objective",   vocab:["Purchase","AddToCart","Lead","Traffic","Awareness","AppInstall","NA"], hint:"The conversion event optimised for." },
   { key:"bidding",    label:"Bidding",     vocab:["Auto","Value","Cost","Bid","Manual","NA"], hint:"Bid or optimisation strategy." },
   { key:"audience",   label:"Audience",    vocab:null, hint:"Targeting group. CamelCase, no spaces (StressInterest, LAL5-Buyers)." },
-  { key:"age",        label:"Age",         vocab:null, hint:"Age band as a range with a hyphen (25-34), or NA." },
+  { key:"age",        label:"Age",         vocab:["13-17","18-24","25-34","35-44","45-54","55-64","55+","65+","18-65","18+","Broad","All",NA], hint:"Targeted age band. Controlled, because the platforms' buckets are fixed — free text here splits one band across `25-34`, `25_34` and `25-34yo`. Broad/Advantage+ delivery sets no band: write Broad." },
   { key:"gender",     label:"Gender",      vocab:["F","M",NA], hint:"Targeted or presented gender. NA where it does not apply." },
   { key:"placement",  label:"Placement",   vocab:["Feed","Stories","Reels","Search","Shopping","PMax","DemandGen","Display","Audience","NA"], hint:"Where the ad serves." },
   { key:"asset",      label:"Asset",       vocab:null, hint:"Creator name, or asset type (ProductPack, ProductSingle, Catalog). CamelCase." },
@@ -581,6 +581,31 @@ export function dimensionUsage(schema, dimensionKey) {
 }
 
 /**
+ * Which channels can carry a dimension at all, and which structurally cannot.
+ *
+ * `dimensionUsage` answers "where does this sit"; this answers "where is it
+ * absent, and is that absence total". The distinction matters because a
+ * breakdown is only honest if the reader knows its denominator. `age` and
+ * `gender` sit in Meta's and TikTok's ad-set templates and in neither Google's
+ * nor YouTube's ad group, so a demographic rollup across a mixed-channel
+ * portfolio is a Meta + TikTok rollup wearing a portfolio label. Nothing is
+ * wrong with the number; the caption is what would be wrong.
+ *
+ * `partial` is the flag worth rendering: a dimension no channel carries is
+ * obviously empty and reads as a mistake in the query, while one that *most*
+ * channels carry produces a full-looking chart that quietly omits two channels.
+ * The second is the dangerous case, and it is the only one this distinguishes.
+ */
+export function dimensionCoverage(schema, dimensionKey) {
+  const covered = [], missing = [];
+  listChannels(schema).forEach(ch => {
+    const hit = (ch.levels || []).some(lv => (lv.template || []).includes(dimensionKey));
+    (hit ? covered : missing).push({ id: ch.id, label: ch.label });
+  });
+  return { covered, missing, partial: covered.length > 0 && missing.length > 0 };
+}
+
+/**
  * The registry grouped into families, each dimension carrying its usage.
  *
  * Families with no members are dropped rather than rendered empty: a schema that
@@ -967,5 +992,9 @@ export function breakdownByDimension(rows, dimensionKey, schema, ctx) {
     groups.set(key, bucket);
   });
 
-  return { groups: Array.from(groups.values()).sort((a, b) => b.rows - a.rows), unparsed, notInTemplate };
+  return {
+    groups: Array.from(groups.values()).sort((a, b) => b.rows - a.rows),
+    unparsed, notInTemplate,
+    coverage: dimensionCoverage(schema, dimensionKey),
+  };
 }

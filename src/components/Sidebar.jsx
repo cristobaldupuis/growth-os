@@ -225,7 +225,7 @@ export function Sidebar({
 
         <div style={{ display:"flex", gap:6, flexDirection: collapsed ? "column" : "row" }}>
           {[
-            { fn:onGuide,       icon:"?",        title:"What can Growth OS do?" },
+            { fn:onGuide,       icon:"?",        title:"What can Marketers Lab do?" },
             { fn:onSettings,    icon:"⚙",   title:"Settings" },
             { fn:onToggleTheme, icon: dk ? "☀" : "☾", title: dk ? "Light mode" : "Dark mode" },
           ].map((b) => (

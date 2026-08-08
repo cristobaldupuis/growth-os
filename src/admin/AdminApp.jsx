@@ -38,7 +38,7 @@ function Login({ onSignedIn }) {
   return (
     <div style={{ ...page, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
       <form onSubmit={submit} style={{ ...panel, width: "100%", maxWidth: 380 }}>
-        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>Growth OS · model console</div>
+        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>Marketers Lab · model console</div>
         <div style={{ fontSize: 11.5, color: c.textMuted, marginBottom: 18, lineHeight: 1.5 }}>
           Operator access. This is not the app — changes here affect what every session runs on.
         </div>
@@ -304,7 +304,7 @@ export default function AdminApp() {
         justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap",
         position: "sticky", top: 0, background: c.bg, zIndex: 5 }}>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 700 }}>Growth OS · model console</div>
+          <div style={{ fontSize: 14, fontWeight: 700 }}>Marketers Lab · model console</div>
           <div style={{ ...label, marginTop: 2 }}>
             {config.durable ? "routing persisted" : "routing not persisted"} · {Object.keys(config.groups).length} groups
           </div>

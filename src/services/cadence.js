@@ -12,13 +12,13 @@ import { mondayOf } from "../constants.js";
 //
 // The design prototype this is modelled on carried a hand-written code string
 // per row (`'rrrrrrRrrS....'`). That is right for a prototype and wrong here:
-// Growth OS already knows the start date, the end date, the status and the
+// Marketers Lab already knows the start date, the end date, the status and the
 // outcome, so a rail that is typed out separately is a second source of truth
 // that can disagree with the record it sits next to. Everything below is
 // computed from fields the initiative already has.
 //
 // The corollary is that this only emits states the data can actually support.
-// The prototype has a `paused` state; Growth OS does not track pauses, so no
+// The prototype has a `paused` state; Marketers Lab does not track pauses, so no
 // rail here will ever show one. Inventing it would make the strip look richer
 // and mean nothing.
 //

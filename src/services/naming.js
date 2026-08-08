@@ -49,7 +49,7 @@
 // `PinkSprinkle` and `pinksprinkle` never split a pivot into two rows, and
 // nobody has to give up a readable convention to get that.
 //
-// ## The Growth OS bridge
+// ## The Marketers Lab bridge
 //
 // The `initiative` dimension carries an initiative's `trackingTag` — the
 // attribution socket already on every initiative record. That is the join: ad
@@ -94,7 +94,7 @@ const DIMENSIONS = [
   { key:"lane",       label:"Lane",        vocab:["Question","Capability","Voices","NA"], hint:"Compliance lane the claim sits in." },
   { key:"offer",      label:"Offer",       vocab:["Sub","OneTime","Bundle","FreeProduct","Discount","NA"], hint:"Commercial offer, so subscription spend is visible separately." },
   { key:"cta",        label:"CTA",         vocab:["ShopNow","LearnMore","SignUp","GetOffer","NA"], hint:"Call to action." },
-  { key:"initiative", label:"Initiative",  vocab:null, hint:"The Growth OS bridge. Set to the initiative's trackingTag when this belongs to a tracked experiment. NA otherwise — never invent one." },
+  { key:"initiative", label:"Initiative",  vocab:null, hint:"The Marketers Lab bridge. Set to the initiative's trackingTag when this belongs to a tracked experiment. NA otherwise — never invent one." },
 ];
 
 // -- Families ------------------------------------------------------------------
@@ -751,7 +751,7 @@ export function identifyName(name, schema) {
   return { candidates, ambiguous: candidates.length > 1, resolved: candidates.length === 1 ? candidates[0] : null };
 }
 
-// -- The Growth OS bridge ------------------------------------------------------
+// -- The Marketers Lab bridge ------------------------------------------------------
 //
 // There are two bridges, and they exist for different situations.
 //

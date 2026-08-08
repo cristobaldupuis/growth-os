@@ -27,7 +27,7 @@ export const DEMO_MODE = true;
 // -----------------------------------------------------------------------------
 // COMPANY
 // -----------------------------------------------------------------------------
-export const COMPANY_NAME     = "Growth OS";
+export const COMPANY_NAME     = "Marketers Lab";
 export const BUSINESS_MODEL   = "Multi-brand ecommerce portfolio";
 
 // -----------------------------------------------------------------------------

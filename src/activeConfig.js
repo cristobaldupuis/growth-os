@@ -8,4 +8,4 @@
 // To deploy a different client: point the export at their config file
 // (see config.js's header for how to create one), then build and deploy.
 // =============================================================================
-export * from "./config.csc.js";
+export * from "./config.demo.js";

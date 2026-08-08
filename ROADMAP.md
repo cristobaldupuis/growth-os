@@ -212,21 +212,29 @@ measurements are in [docs/ui-audit-2026-08.md](./docs/ui-audit-2026-08.md).
   fixed `1fr 1fr` grids never collapsed and the tour spotlit off-screen
   rectangles.
 
-**Not done in this slice, and why:**
+**Closed in a follow-up pass (August 2026):**
 
-- [ ] **Settings as a page rather than a modal.** Nine sections in a 560px box
-  capped at 88vh, with no sub-navigation — and the campaign nomenclature
-  editor, the product's headline differentiator, lives two levels deep at
-  Performance → Taxonomy while the README says the convention "lives in
-  settings". Both fixes are the same fix: Settings becomes a nav destination
-  with a left sub-nav and Taxonomy moves into it. It is a structural change to
-  two of the largest views with no test coverage over either, so it wants its
-  own pass rather than the end of a long one.
-- [ ] **Backfill the seeded portfolio.** All 38 demo initiatives lack an
-  observation and a success metric, which is why pre-registration is enforced
-  on new work and only flagged on old. The shop window should model the
-  discipline the product sells; until the seed is rewritten, a new visitor's
-  first initiative is the only one that demonstrates it.
+- [x] **Settings is a page.** Nine sections in a 560px modal became a page with
+  a section rail, each section addressable — `#/settings/naming` is a link
+  somebody can send. The campaign nomenclature editor moved in with it, out of
+  Performance → Taxonomy, which is what the README always claimed. Performance
+  keeps a Convention tab as a signpost, because that is where you are standing
+  when you find the convention is wrong.
+- [x] **The seeded portfolio is backfilled.** All thirty-eight initiatives in
+  both configs now carry an observation and a success metric. The demo was the
+  largest counter-example to the discipline the product sells.
+- [x] **The contribution panel says what it means.** Its three segments encode a
+  certainty ramp and were drawn in `gold`, `warn` and grey — the first two being
+  1.07:1 apart in light mode, i.e. the same colour. Measured is teal (which is
+  what teal already means everywhere else in the app), forecast is gold, and
+  `check-contrast` now enforces a 1.4:1 floor between adjacent segments so the
+  ramp survives greyscale and colour blindness.
+- [x] **A fifth currency formatter, and the symbol it exposed.** ContributionView
+  still had a local `fmt`/`fmtBig`; and `resolveSymbol` used Intl's default
+  currency display, so USD under `en-CA` rendered "US$704.8k" one panel away from
+  "$273k". `narrowSymbol`, and one formatter.
+- [x] **Buttons answer the pointer.** They were the most-clicked elements in the
+  product and the only interactive surface with no hover state.
 
 ---
 

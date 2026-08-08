@@ -4,6 +4,7 @@ import { CitationModal } from "./citation.jsx";
 import { renderProse } from "./text.jsx";
 import { gG, gGh, gSL, gSc } from "./styles.js";
 import { brandName, iceScore, iceColor } from "../constants.js";
+import { IconCheck, IconClose } from "./icons.jsx";
 
 // Modal — full recommendation detail with hypothesis, ICE rationale, reasoning
 // trace, and cited learnings. Actions: Add to backlog | Dismiss.
@@ -46,7 +47,7 @@ export function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, cat
                 background: rec.status==="accepted"?(t.tealBg):(t.surfaceAlt),
                 color: rec.status==="accepted"?(t.teal):t.textMuted,
                 border:"1px solid "+(rec.status==="accepted"?(t.teal):t.border)}}>
-                {rec.status==="accepted" ? "✓ Added to backlog" : "✕ Dismissed"}
+                {rec.status==="accepted" ? <><IconCheck size={12}/> Added to backlog</> : <><IconClose size={12}/> Dismissed</>}
               </span>
             )}
           </div>
@@ -100,25 +101,25 @@ export function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, cat
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
             {rec.observation && (
               <div>
-                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>📊 Observation</div>
+                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>Observation</div>
                 <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:13}}>{rec.observation}</p>
               </div>
             )}
             {rec.hypothesis && (
               <div style={{borderLeft:"3px solid "+t.gold,paddingLeft:12}}>
-                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>💡 Hypothesis</div>
+                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>Hypothesis</div>
                 <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:14,fontWeight:600}}>{rec.hypothesis}</p>
               </div>
             )}
             {rec.successMetric && (
               <div>
-                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>🎯 Success metric</div>
+                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>Success metric</div>
                 <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:13}}>{rec.successMetric}</p>
               </div>
             )}
             {rec.killCriteria && (
               <div>
-                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>⏹ Kill criteria</div>
+                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>— Kill criteria</div>
                 <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:13}}>{rec.killCriteria}</p>
               </div>
             )}
@@ -183,10 +184,10 @@ export function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, cat
         {!isResolved && (
           <div style={{display:"flex",gap:8,justifyContent:"flex-end",borderTop:"1px solid "+t.border,paddingTop:14}}>
             <button onClick={()=>onDismiss(batchId, recId)} style={{...gGh(t),fontSize:12,padding:"7px 14px"}}>
-              ✕ Dismiss
+              <IconClose size={13}/> Dismiss
             </button>
             <button onClick={()=>onAccept(batchId, recId)} style={{...gG(t),fontSize:12,padding:"7px 14px"}}>
-              ✓ Add to backlog
+              <IconCheck size={13}/> Add to backlog
             </button>
           </div>
         )}

@@ -80,7 +80,7 @@ export const BLOCKERS  = ["None","Waiting on Engineering","Waiting on Creative",
 
 // Weekly metrics — source definitions and their fields
 export const METRIC_SOURCES = [
-  { id:"manual",      label:"Manual",       icon:"✏️",
+  { id:"manual",      label:"Manual",       icon:"pencil",
     fields:[
       {key:"revenue",     label:"Revenue ($)",          type:"number", hint:"Total revenue this period"},
       {key:"spend",       label:"Ad Spend ($)",          type:"number", hint:"Total paid media spend"},
@@ -95,7 +95,7 @@ export const METRIC_SOURCES = [
       {key:"notes",         label:"Notes",                       type:"text",   hint:"Any context for this week"},
     ]
   },
-  { id:"meta",        label:"Meta Ads",     icon:"📘",
+  { id:"meta",        label:"Meta Ads",     icon:"megaphone",
     fields:[
       {key:"spend",       label:"Spend ($)",             type:"number", hint:"Total Meta spend"},
       {key:"revenue",     label:"Revenue ($)",           type:"number", hint:"Attributed revenue"},
@@ -109,7 +109,7 @@ export const METRIC_SOURCES = [
       {key:"notes",       label:"Notes",                 type:"text",   hint:"Campaign context"},
     ]
   },
-  { id:"ga4",         label:"Google Analytics (GA4)", icon:"📊",
+  { id:"ga4",         label:"Google Analytics (GA4)", icon:"chart",
     fields:[
       {key:"sessions",    label:"Sessions",              type:"number", hint:"Total sessions"},
       {key:"traffic",     label:"Users",                 type:"number", hint:"Total users"},
@@ -121,7 +121,7 @@ export const METRIC_SOURCES = [
       {key:"notes",       label:"Notes",                 type:"text",   hint:"Any anomalies or context"},
     ]
   },
-  { id:"google_ads",  label:"Google Ads",   icon:"🔵",
+  { id:"google_ads",  label:"Google Ads",   icon:"target",
     fields:[
       {key:"spend",       label:"Spend ($)",             type:"number", hint:"Total Google Ads spend"},
       {key:"revenue",     label:"Conv. Value ($)",       type:"number", hint:"Total conversion value"},

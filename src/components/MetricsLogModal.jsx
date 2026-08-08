@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Modal } from "./Modal.jsx";
 import { FR } from "./FR.jsx";
 import { gG, gGh, gI } from "./styles.js";
+import { iconFor } from "./iconRegistry.js";
 import { METRIC_SOURCES } from "../constants.js";
 
 // Weekly metrics log modal — manual entry per brand, source-filtered fields
@@ -67,7 +68,7 @@ export function MetricsLogModal({t, dk, brands, weeklyMetrics, onSave, onClose})
                         background:row.source===s.id?t.gold:"transparent",
                         border:"1px solid "+(row.source===s.id?t.gold:t.border),
                         color:row.source===s.id?t.goldText:t.textMuted,fontWeight:row.source===s.id?700:400}}>
-                      {s.icon} {s.label}
+                      {(()=>{const A=iconFor(s.icon);return <A size={12}/>;})()} {s.label}
                     </button>
                   ))}
                 </div>

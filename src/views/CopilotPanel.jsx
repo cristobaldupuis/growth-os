@@ -1,5 +1,8 @@
 import { useState, useMemo } from "react";
 import { gG, gGh, gI, gTA, gSc } from "../components/styles.js";
+import { useDialog } from "../components/useDialog.js";
+import { iconFor } from "../components/iconRegistry.js";
+import { IconSparkle, IconClose, IconBrain, IconArchive, IconWrench, IconChart, IconCheck, IconEdit, IconChevronDown } from "../components/icons.jsx";
 import { CBdg, TBdg } from "../components/badges.jsx";
 import { getApiKey } from "../services/ai/_shared.js";
 import { callAgentTurn } from "../services/ai/callAgentTurn.js";
@@ -11,14 +14,14 @@ import { iceScore, iceColor } from "../constants.js";
 // -- Agentic Debate Panel v2 ---------------------------------------------------
 const MAX_TURNS = 8;
 const _TOOL_LABEL = {
-  get_portfolio_summary:     "📋 reading portfolio summary",
-  get_running_initiatives:   "🏃 checking running initiatives",
-  get_category_coverage:     "🗺️ analysing category coverage",
-  get_win_rate_by_category:  "📈 pulling win rates by category",
-  get_top_draft_opportunities:"💡 scanning draft pipeline",
-  get_failure_patterns:      "❌ reviewing failure patterns",
-  get_blocked_initiatives:   "⚠️ checking blocked initiatives",
-  get_revenue_gap_analysis:  "💰 running revenue gap analysis",
+  get_portfolio_summary:     "reading portfolio summary",
+  get_running_initiatives:   "checking running initiatives",
+  get_category_coverage:     "analysing category coverage",
+  get_win_rate_by_category:  "pulling win rates by category",
+  get_top_draft_opportunities:"scanning draft pipeline",
+  get_failure_patterns:      "reviewing failure patterns",
+  get_blocked_initiatives:   "checking blocked initiatives",
+  get_revenue_gap_analysis:  "running revenue gap analysis",
 };
 
 function IdeaCard({idea, idx, results, setResults, added, onAdd, t, dk, cats, agents}) {
@@ -67,13 +70,17 @@ function IdeaCard({idea, idx, results, setResults, added, onAdd, t, dk, cats, ag
           {idea.championedBy&&(
             <div style={{padding:"7px 10px",background:champAgent?champAgent.color+"18":t.goldBg,
               border:"1px solid "+(champAgent?champAgent.color+"50":t.goldBorder),borderRadius:5}}>
-              <div style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>{champAgent?.icon} Championed by</div>
+              <div style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3,display:"flex",alignItems:"center",gap:5}}>
+                {champAgent&&(()=>{const A=iconFor(champAgent.icon);return <span style={{color:champAgent.color,display:"inline-flex"}}><A size={11}/></span>;})()}
+                Championed by</div>
               <div style={{fontSize:11,color:t.textSub,fontFamily:t.serif,lineHeight:1.5}}>{idea.championedBy}</div>
             </div>
           )}
           {idea.dissentVoice&&(
             <div style={{padding:"7px 10px",background:t.redBg,border:"1px solid "+(t.red),borderRadius:5}}>
-              <div style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>{dissentAgent?.icon} Risk / Dissent</div>
+              <div style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3,display:"flex",alignItems:"center",gap:5}}>
+                {dissentAgent&&(()=>{const A=iconFor(dissentAgent.icon);return <span style={{color:dissentAgent.color,display:"inline-flex"}}><A size={11}/></span>;})()}
+                Risk / Dissent</div>
               <div style={{fontSize:11,color:t.red,fontFamily:t.serif,lineHeight:1.5}}>{idea.dissentVoice}</div>
             </div>
           )}
@@ -81,7 +88,7 @@ function IdeaCard({idea, idx, results, setResults, added, onAdd, t, dk, cats, ag
 
         {idea.csoRationale&&(
           <div style={{padding:"8px 12px",background:t.surfaceAlt,border:"1px solid "+(t.border),borderRadius:5}}>
-            <div style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>✦ CSO · Why we proceed</div>
+            <div style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>CSO · Why we proceed</div>
             <div style={{fontSize:11,color:t.textSub,fontFamily:t.serif,lineHeight:1.5,fontWeight:600}}>{idea.csoRationale}</div>
           </div>
         )}
@@ -96,7 +103,7 @@ function IdeaCard({idea, idx, results, setResults, added, onAdd, t, dk, cats, ag
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           {idea.observation&&(
             <div>
-              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>📊 Observation</div>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>Observation</div>
               {isEditing
                 ? <textarea style={{...gTA(t),fontSize:12}} rows={2} value={idea.observation}
                     onChange={e=>{const r=[...results];r[idx]={...r[idx],observation:e.target.value};setResults(r);}}/>
@@ -105,7 +112,7 @@ function IdeaCard({idea, idx, results, setResults, added, onAdd, t, dk, cats, ag
           )}
           {idea.hypothesis&&(
             <div style={{borderLeft:"3px solid "+t.gold,paddingLeft:10}}>
-              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>💡 Hypothesis</div>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>Hypothesis</div>
               {isEditing
                 ? <textarea style={{...gTA(t),fontSize:12}} rows={3} value={idea.hypothesis}
                     onChange={e=>{const r=[...results];r[idx]={...r[idx],hypothesis:e.target.value};setResults(r);}}/>
@@ -114,7 +121,7 @@ function IdeaCard({idea, idx, results, setResults, added, onAdd, t, dk, cats, ag
           )}
           {idea.successMetric&&(
             <div>
-              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>🎯 Success metric</div>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>Success metric</div>
               {isEditing
                 ? <input style={{...gI(t),fontSize:12}} value={idea.successMetric}
                     onChange={e=>{const r=[...results];r[idx]={...r[idx],successMetric:e.target.value};setResults(r);}}/>
@@ -143,14 +150,14 @@ function IdeaCard({idea, idx, results, setResults, added, onAdd, t, dk, cats, ag
         <div style={{display:"flex",gap:6}}>
           {isAdded ? (
             <div style={{flex:1,padding:"7px 12px",borderRadius:5,background:t.goldBg,border:"1px solid "+t.goldBorder,
-              fontSize:12,fontWeight:600,color:t.gold,fontFamily:t.serif,textAlign:"center"}}>✓ Added to Growth Backlog</div>
+              fontSize:12,fontWeight:600,color:t.gold,fontFamily:t.serif,textAlign:"center"}}>Added to Growth Backlog</div>
           ) : (
             <>
               <button onClick={()=>onAdd(idea,idx)} style={{...gG(t),flex:1,justifyContent:"center",fontSize:12,padding:"8px 12px",}}>
                 + Add to Growth Backlog
               </button>
               <button onClick={()=>setEditing(!isEditing)} style={{...gGh(t),fontSize:11,padding:"8px 11px"}}>
-                {isEditing?"✓ Done":"✎ Edit"}
+                {isEditing?<><IconCheck size={11}/> Done</>:<><IconEdit size={11}/> Edit</>}
               </button>
             </>
           )}
@@ -293,41 +300,53 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
     setAdded({}); setTurnCount(0); setModNote(""); setError("");
   };
 
+  // Escape closes the panel — except while a debate is in flight, where an
+  // accidental keypress would throw away a running multi-turn call. `useDialog`
+  // takes no `onClose` in that state, which makes Escape inert rather than
+  // silently destructive. Focus is trapped and returned either way.
+  const panelRef = useDialog({ onClose: running ? undefined : onClose });
+
   return (
     <div style={{position:"fixed",inset:0,zIndex:400,display:"flex"}}>
       <div style={{flex:1,background:"rgba(10,10,8,0.5)"}} onClick={!running?onClose:undefined}/>
 
-      <div style={{width:Math.min(600,window.innerWidth-16),background:t.surface,
+      {/* Width was `Math.min(600, window.innerWidth-16)` read once at render,
+          with no resize listener, so it never responded to a rotation. CSS does
+          this without needing to know the viewport. */}
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-label="Signal — C-suite debate" tabIndex={-1}
+        style={{width:"min(600px, calc(100vw - 16px))",background:t.surface,
         borderLeft:"1px solid "+t.border,display:"flex",flexDirection:"column",
-        height:"100vh",boxShadow:"-8px 0 48px rgba(0,0,0,0.22)"}}>
+        height:"100vh",boxShadow:"-8px 0 48px rgba(0,0,0,0.22)",outline:"none"}}>
 
         {/* Header */}
         <div style={{padding:"13px 20px",borderBottom:"1px solid "+t.border,background:t.goldBg,flexShrink:0}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div>
-              <div style={{fontSize:15,fontWeight:600,color:t.text,fontFamily:t.serif}}>✦ Signal AI</div>
+              <div style={{display:"flex",alignItems:"center",gap:7,fontSize:15,fontWeight:600,color:t.text,fontFamily:t.serif}}><IconSparkle size={15}/> Signal AI</div>
               <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginTop:2}}>
                 Agents query your live portfolio · Moderator routes the debate · 3 net-new initiatives
               </div>
             </div>
             <div style={{display:"flex",gap:6,alignItems:"center"}}>
               {agents.map(a=>(
-                <div key={a.id} title={a.label} style={{fontSize:13,width:26,height:26,borderRadius:"50%",
+                <div key={a.id} title={a.label} aria-label={a.label}
+                  style={{width:26,height:26,borderRadius:"50%",
                   display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.3s",
+                  color:activeAgent?.id===a.id?a.color:t.textMuted,
                   background:activeAgent?.id===a.id?a.color+"25":t.surfaceAlt,
                   border:"1px solid "+(activeAgent?.id===a.id?a.color:t.border),
                   boxShadow:activeAgent?.id===a.id?"0 0 8px "+a.color+"60":"none"}}>
-                  {a.icon}
+                  {(()=>{const A=iconFor(a.icon);return <A size={13}/>;})()}
                 </div>
               ))}
-              {!running&&<button onClick={onClose} style={{background:"transparent",border:"none",color:t.textMuted,cursor:"pointer",fontSize:18,padding:"2px 4px",lineHeight:1,marginLeft:4}}>✕</button>}
+              {!running&&<button onClick={onClose} aria-label="Close Signal" style={{background:"transparent",border:"none",color:t.textMuted,cursor:"pointer",padding:"2px 4px",lineHeight:1,marginLeft:4,display:"inline-flex"}}><IconClose size={16}/></button>}
             </div>
           </div>
 
           {/* Tabs */}
           <div style={{display:"flex",gap:4,marginTop:10}}>
-            {[["debate","🧠 Debate"],["history","🗂️ Past Debates ("+debates.length+")"]].map(([v,l])=>(
-              <button key={v} onClick={()=>setTab(v)} style={{fontSize:11,padding:"4px 11px",borderRadius:4,cursor:"pointer",
+            {[["debate",<><IconBrain size={12}/> Debate</>],["history",<><IconArchive size={12}/> Past debates ({debates.length})</>]].map(([v,l])=>(
+              <button key={v} onClick={()=>setTab(v)} aria-pressed={tab===v} style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:11,padding:"4px 11px",borderRadius:t.r.xs,cursor:"pointer",
                 fontFamily:t.serif,fontWeight:600,
                 background:tab===v?t.gold:"transparent",border:"1px solid "+(tab===v?t.gold:t.border),
                 color:tab===v?t.goldText:t.textMuted}}>{l}</button>
@@ -356,21 +375,21 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
             {/* Portfolio snapshot — collapsible */}
             <details style={{...gSc(t),background:t.surfaceAlt}}>
               <summary style={{fontSize:11,fontWeight:600,color:t.textSub,fontFamily:t.serif,cursor:"pointer",listStyle:"none",display:"flex",justifyContent:"space-between"}}>
-                <span>📋 Portfolio the agents will read</span>
-                <span style={{color:t.textMuted,fontWeight:400}}>▼</span>
+                <span style={{display:"inline-flex",alignItems:"center",gap:6}}><IconChart size={12}/> Portfolio the agents will read</span>
+                <span style={{color:t.textMuted,display:"inline-flex"}}><IconChevronDown size={12}/></span>
               </summary>
               <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,lineHeight:1.7,whiteSpace:"pre-wrap",marginTop:10,maxHeight:200,overflowY:"auto"}}>
                 {portfolioCtx}
               </div>
               <div style={{marginTop:8,fontSize:10,color:t.textMuted,fontFamily:t.serif,padding:"6px 8px",background:t.surface,borderRadius:4,border:"1px solid "+t.border}}>
-                🔧 Agents also have 8 live tools to query deeper: win rates, blocked items, coverage gaps, failure patterns, revenue gaps…
+                Agents also have 8 live tools to query deeper: win rates, blocked items, coverage gaps, failure patterns, revenue gaps…
               </div>
             </details>
 
             {/* Launch */}
             {phase==="input"&&(
-              <button onClick={runDebate} style={{...gG(t),fontSize:13,padding:"11px 16px",justifyContent:"center",}}>
-                🧠 Start C-Suite Debate
+              <button onClick={runDebate} style={{...gG(t,"lg"),width:"100%"}}>
+                <IconBrain size={15}/> Start C-Suite debate
               </button>
             )}
 
@@ -393,14 +412,14 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
                     background:t.surfaceAlt,borderRadius:"0 6px 6px 0",
                     border:"1px solid "+t.border,borderLeft:"3px solid "+msg.color}}>
                     <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:5,flexWrap:"wrap"}}>
-                      <span style={{fontSize:13}}>{msg.icon}</span>
+                      <span style={{color:msg.color,display:"inline-flex"}}>{(()=>{const A=iconFor(msg.icon);return <A size={13}/>;})()}</span>
                       <span style={{fontSize:11,fontWeight:600,color:msg.color,fontFamily:t.serif,letterSpacing:"0.04em"}}>{msg.label}</span>
                       {msg.toolsUsed&&msg.toolsUsed.length>0&&(
                         <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                           {msg.toolsUsed.map(tool=>(
                             <span key={tool} style={{fontSize:9,color:t.textMuted,fontFamily:t.serif,background:t.surface,
                               border:"1px solid "+t.border,borderRadius:3,padding:"1px 5px"}}>
-                              🔧 {tool.replace("get_","").replace(/_/g," ")}
+                              <IconWrench size={10}/> {tool.replace("get_","").replace(/_/g," ")}
                             </span>
                           ))}
                         </div>
@@ -414,7 +433,7 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
                 {modNote&&!running&&phase==="debating"&&(
                   <div style={{padding:"6px 10px",background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:5,
                     fontSize:11,color:t.warn,fontFamily:t.serif,display:"flex",gap:6,alignItems:"center"}}>
-                    <span style={{fontWeight:700}}>🎙 Moderator:</span> {modNote}
+                    <span style={{fontWeight:700}}>Moderator:</span> {modNote}
                   </div>
                 )}
 
@@ -423,7 +442,7 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
                   <div style={{borderLeft:"3px solid "+activeAgent.color,paddingLeft:12,paddingTop:8,paddingBottom:8,
                     background:t.surfaceAlt,borderRadius:"0 6px 6px 0",border:"1px solid "+t.border}}>
                     <div style={{display:"flex",alignItems:"center",gap:8}}>
-                      <span style={{fontSize:13}}>{activeAgent.icon}</span>
+                      <span style={{color:activeAgent.color,display:"inline-flex"}}>{(()=>{const A=iconFor(activeAgent.icon);return <A size={13}/>;})()}</span>
                       <span style={{fontSize:11,fontWeight:600,color:activeAgent.color,fontFamily:t.serif}}>{activeAgent.label}</span>
                       <span style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>
                         <span style={{display:"inline-block",animation:"spin 1.2s linear infinite"}}>⟳</span> querying portfolio data…
@@ -446,7 +465,7 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
               <div style={{display:"flex",flexDirection:"column",gap:14}}>
                 <div style={{padding:"11px 14px",background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:6}}>
                   <div style={{fontSize:12,fontWeight:600,color:t.gold,fontFamily:t.serif,marginBottom:2}}>
-                    ✅ {results.length} net-new initiatives · {turnCount} agent turns · {transcript.reduce((s,m)=>s+(m.toolsUsed?.length||0),0)} tool calls
+                    {results.length} net-new initiatives · {turnCount} agent turns · {transcript.reduce((s,m)=>s+(m.toolsUsed?.length||0),0)} tool calls
                   </div>
                   <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>
                     Not currently running. Review, edit, then add to your Growth Backlog.
@@ -465,13 +484,13 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
             {/* Empty state */}
             {phase==="input"&&transcript.length===0&&(
               <div style={{padding:"28px 16px",textAlign:"center",border:"1px dashed "+t.border,borderRadius:8}}>
-                <div style={{fontSize:28,marginBottom:10}}>🧠</div>
+                <div style={{display:"flex",justifyContent:"center",marginBottom:10,color:t.textMuted}}><IconBrain size={26}/></div>
                 <div style={{fontSize:13,fontWeight:600,color:t.text,fontFamily:t.serif,marginBottom:8}}>Autonomous C-Suite debate</div>
                 <div style={{display:"flex",justifyContent:"center",gap:6,flexWrap:"wrap",marginBottom:12}}>
                   {agents.map(a=>(
                     <span key={a.id} style={{fontSize:11,padding:"4px 10px",borderRadius:4,fontFamily:t.serif,fontWeight:600,
                       color:a.color,background:a.color+"15",border:"1px solid "+a.color+"30"}}>
-                      {a.icon} {a.label}
+                      {a.label}
                     </span>
                   ))}
                 </div>
@@ -498,7 +517,7 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
                     <div>
                       <div style={{fontSize:11,fontWeight:600,color:t.text,fontFamily:t.serif}}>
-                        {new Date(d.date).toLocaleDateString("en-CA",{month:"short",day:"numeric",year:"numeric",hour:"2-digit",minute:"2-digit"})}
+                        {new Date(d.date).toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric",hour:"2-digit",minute:"2-digit"})}
                       </div>
                       <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginTop:2}}>
                         {d.turnCount} turns · {d.results?.length||0} initiatives generated
@@ -521,7 +540,7 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
                     <div style={{marginTop:8,display:"flex",flexDirection:"column",gap:6,maxHeight:300,overflowY:"auto"}}>
                       {(d.transcript||[]).map((msg,j)=>(
                         <div key={j} style={{borderLeft:"3px solid "+msg.color,paddingLeft:10,paddingTop:4,paddingBottom:4}}>
-                          <div style={{fontSize:10,fontWeight:600,color:msg.color,fontFamily:t.serif,marginBottom:3}}>{msg.icon} {msg.label}</div>
+                          <div style={{fontSize:10,fontWeight:600,color:msg.color,fontFamily:t.serif,marginBottom:3}}>{msg.label}</div>
                           <p style={{margin:0,fontSize:11,color:t.textSub,fontFamily:t.serif,lineHeight:1.6}}>{msg.text}</p>
                         </div>
                       ))}

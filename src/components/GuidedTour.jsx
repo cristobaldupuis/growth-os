@@ -12,7 +12,7 @@ const CARD_W = 320;
 function useTargetRect(selector) {
   const [rect, setRect] = useState(null);
   useLayoutEffect(() => {
-    let raf, cancelled = false, tries = 0;
+    let raf, cancelled = false, tries = 0, scrolled = false;
     const measure = () => {
       if (cancelled) return;
       const el = document.querySelector(selector);
@@ -24,6 +24,18 @@ function useTargetRect(selector) {
       if (el) {
         const r = el.getBoundingClientRect();
         if (r.width > 0 && r.height > 0) {
+          // Bring the target into view before measuring it. Without this the
+          // spotlight framed whatever rectangle the element happened to have —
+          // including one entirely below the fold — and positioned its card
+          // against those coordinates, so a step anchored further down the
+          // dashboard pointed at empty space off screen.
+          const offscreen = r.top < 0 || r.bottom > window.innerHeight;
+          if (offscreen && !scrolled) {
+            scrolled = true;
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+            raf = requestAnimationFrame(measure);
+            return;
+          }
           setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
           return;
         }
@@ -77,7 +89,8 @@ function TourSpotlight({ t, dk, stepIndex, step, isLast, onBack, onNext, onSkip,
         }}/>
       )}
 
-      <div style={{...cardStyle, background:t.surface, border:"1px solid "+t.goldBorder, borderRadius:14, padding:"16px 18px", boxShadow:t.shadowHi}}>
+      <div role="dialog" aria-modal="true" aria-label={"Tour step " + (stepIndex+1) + " of " + TOUR_STEPS.length + ": " + step.title}
+        style={{...cardStyle, background:t.surface, border:"1px solid "+t.goldBorder, borderRadius:t.r.lg, padding:"16px 18px", boxShadow:t.shadowHi}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
           <span style={{fontSize:10,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color:t.gold,fontFamily:t.mono}}>
             {stepIndex+1} of {TOUR_STEPS.length}
@@ -100,6 +113,20 @@ function TourSpotlight({ t, dk, stepIndex, step, isLast, onBack, onNext, onSkip,
 export function GuidedTour({ t, dk, stepIndex, currentNav, onNavigate, onNext, onBack, onSkip, onDone }) {
   const step = TOUR_STEPS[stepIndex];
   const isLast = stepIndex === TOUR_STEPS.length - 1;
+
+  // Escape leaves the tour, and the arrow keys walk it. A first-run overlay
+  // that can only be dismissed by finding a small underlined "Skip" is a
+  // corner to be trapped in, and this one appears automatically on a cold
+  // visitor's first load.
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape")          { e.preventDefault(); onSkip(); }
+      else if (e.key === "ArrowRight") { e.preventDefault(); if (isLast) onDone(); else onNext(); }
+      else if (e.key === "ArrowLeft")  { e.preventDefault(); onBack(); }
+    };
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
+  }, [isLast, onSkip, onNext, onBack, onDone]);
 
   // Switch the app to whichever view this step is anchored in. The target DOM
   // node doesn't exist until that view renders, which is what TourSpotlight's

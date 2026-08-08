@@ -31,6 +31,7 @@ import {
   IconSpinner, IconDiamond, IconSearch, IconFolder,
 } from "./components/icons.jsx";
 import { useDialog } from "./components/useDialog.js";
+import { iconFor } from "./components/iconRegistry.js";
 import { downloadCSV, itemToCSVRow, normaliseDate, parseCSV, normalizeInitiativeRecord } from "./services/csv.js";
 import { buildLearningsIndex, buildPortfolioContext } from "./services/portfolio.js";
 import { stampUpdatedAt } from "./services/items.js";
@@ -442,13 +443,13 @@ function OnboardingModal({ t, settings, onSave, onSkip }) {
       fields: (
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           {[
-            { icon:"⚡", label:"Quick capture", desc:"Paste any idea. AI structures it into an initiative" },
-            { icon:"✦",  label:"Signal AI",     desc:"C-Suite debate that queries your live portfolio and recommends what to run next" },
-            { icon:"📚", label:"Library",        desc:"Every completed initiative becomes searchable institutional memory" },
+            { icon:"bolt", label:"Quick capture", desc:"Paste any idea. AI structures it into an initiative" },
+            { icon:"sparkle", label:"Signal AI",  desc:"C-Suite debate that queries your live portfolio and recommends what to run next" },
+            { icon:"archive", label:"Library",     desc:"Every completed initiative becomes searchable institutional memory" },
           ].map(({icon,label,desc})=>(
             <div key={label} style={{display:"flex",gap:12,alignItems:"flex-start",padding:"10px 12px",
               background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:6}}>
-              <span style={{fontSize:18,flexShrink:0,marginTop:1}}>{icon}</span>
+              <span style={{flexShrink:0,marginTop:2,color:t.gold}}>{(()=>{const A=iconFor(icon);return <A size={16}/>;})()}</span>
               <div>
                 <div style={{fontSize:13,fontWeight:600,color:t.text,fontFamily:t.serif,marginBottom:2}}>{label}</div>
                 <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,lineHeight:1.5}}>{desc}</div>
@@ -598,10 +599,16 @@ export default function App() {
   // next one gives every toast its full dwell, and clearing on unmount stops a
   // late fire from setting state on a torn-down tree.
   const toastTimer = useRef(null);
-  const showToast = (msg, type="info") => {
+  // `action` is an optional {label, fn} rendered as a button inside the toast.
+  // It exists so a destructive action can be reversible: the alternative to a
+  // confirmation dialog on every delete is an undo on the ones that matter, and
+  // an undo the user cannot reach is not one.
+  const showToast = (msg, type="info", action=null) => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
-    setToast({msg,type});
-    toastTimer.current = setTimeout(()=>{ toastTimer.current = null; setToast(null); }, 3500);
+    setToast({msg,type,action});
+    // An undoable toast dwells longer: 3.5s is enough to read a confirmation and
+    // not enough to notice a mistake and act on it.
+    toastTimer.current = setTimeout(()=>{ toastTimer.current = null; setToast(null); }, action ? 9000 : 3500);
   };
   useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
 
@@ -1309,6 +1316,37 @@ export default function App() {
     setForm(null);setHypReview(null);setIceReview(null);setDataCtx("");
   };
 
+  // -- Deleting an initiative --------------------------------------------------
+  //
+  // This was `if(confirm("Delete this initiative?")) onDelete()` — a native
+  // dialog that did not name what it was about to destroy, on the most
+  // destructive action in the product, with no undo. It took the frozen
+  // prediction snapshot and every logged learning with it, and it had strictly
+  // less ceremony than "Reset demo data", which gets a proper modal listing
+  // exactly what it overwrites.
+  //
+  // Two changes: the confirmation names the initiative, and the delete is
+  // reversible for nine seconds afterwards.
+  const [pendingDelete, setPendingDelete] = useState(null);
+  const confirmDelete = () => {
+    const victim = pendingDelete;
+    if(!victim) return;
+    const index = items.findIndex(e=>e.id===victim.id);
+    saveItems(items.filter(e=>e.id!==victim.id));
+    setPendingDelete(null);
+    setNav("initiatives");
+    showToast(`Deleted "${victim.title}".`, "info", {
+      label: "Undo",
+      // Restored to where it was, not to the top: a list that reorders itself
+      // on undo has not really undone anything.
+      fn: () => {
+        setItems(prev => { const next=[...prev]; next.splice(Math.max(0,index), 0, victim); store.set(KEY_ITEMS, JSON.stringify(next)); return next; });
+        setSelId(victim.id);
+        setNav("detail");
+      },
+    });
+  };
+
   const reqStatus = s=>{
     if(s==="Completed"||s==="Killed"){setPendS(s);setConfC(sel&&sel.ice&&sel.ice.certainty?sel.ice.certainty*10:75);setShowSM(true);}
     else saveItems(items.map(e=>e.id===selId?withRunningSnapshot({...e,status:s},s):e));
@@ -1549,6 +1587,13 @@ export default function App() {
           maxWidth:"min(90vw,520px)",lineHeight:1.45}}>
           {toast.type==="error"?<IconAlert size={15}/>:toast.type==="success"?<IconCheck size={15}/>:<IconInfo size={15}/>}
           <span style={{minWidth:0}}>{toast.msg}</span>
+          {toast.action&&(
+            <button onClick={()=>{ toast.action.fn(); setToast(null); }}
+              style={{marginLeft:4,background:"transparent",border:"1px solid currentColor",color:"inherit",
+                borderRadius:t.r.xs,padding:"3px 9px",fontSize:11.5,fontWeight:700,fontFamily:t.sans,cursor:"pointer",flexShrink:0}}>
+              {toast.action.label}
+            </button>
+          )}
         </div>
       )}
 
@@ -1566,6 +1611,28 @@ export default function App() {
             else if(a==="settings") setShowSet(true);
           }}
         />
+      )}
+
+      {/* Deleting an initiative — named, not "Delete this initiative?" */}
+      {pendingDelete&&(
+        <Modal t={t} dk={dk} title="Delete this initiative?" onClose={()=>setPendingDelete(null)}>
+          <div style={{padding:"11px 14px",borderRadius:t.r.md,background:t.redBg,border:"1px solid "+t.red,marginBottom:14}}>
+            <div style={{display:"flex",alignItems:"baseline",gap:8,flexWrap:"wrap"}}>
+              {pendingDelete.initId&&<span style={{fontSize:10,fontWeight:700,color:t.red,fontFamily:t.mono}}>{pendingDelete.initId}</span>}
+              <span style={{fontSize:14,fontWeight:600,color:t.text,fontFamily:t.sans,lineHeight:1.35}}>{pendingDelete.title}</span>
+            </div>
+          </div>
+          <div style={{fontSize:13,color:t.textSub,fontFamily:t.serif,lineHeight:1.6,marginBottom:18}}>
+            This removes the initiative and everything recorded against it — the prediction
+            frozen at launch, any logged results and learning, and its claimed ad names.
+            {pendingDelete.results?.keyLearning && " Its learning will disappear from the library."}
+            {" "}You can undo this for a few seconds afterwards.
+          </div>
+          <div style={{display:"flex",justifyContent:"flex-end",gap:8}}>
+            <button style={gGh(t)} onClick={()=>setPendingDelete(null)}>Cancel</button>
+            <button style={{...gG(t),background:t.red,borderColor:t.red,color:"#fff"}} onClick={confirmDelete}>Delete initiative</button>
+          </div>
+        </Modal>
       )}
 
       {/* Leaving the editor with unsaved edits */}
@@ -1869,7 +1936,7 @@ export default function App() {
       {nav==="detail"&&sel&&(
         <DetailView item={sel} items={items} t={t} dk={dk} cats={cats}
           onEdit={()=>goEdit(sel)}
-          onDelete={()=>{saveItems(items.filter(e=>e.id!==sel.id));setNav("initiatives");}}
+          onDelete={()=>setPendingDelete(sel)}
           onStatus={reqStatus}
           onResults={()=>{setRForm(sel.results?{...sel.results,actualRevenueImpact:sel.results.actualRevenueImpact!=null?sel.results.actualRevenueImpact:"",actualSpendCost:sel.results.actualSpendCost!=null?sel.results.actualSpendCost:"",actualResourceCost:sel.results.actualResourceCost!=null?sel.results.actualResourceCost:""}:{actualOutcome:"",keyLearning:"",outcomeClassification:"Success",decisionMade:"",outcomeCertainty:75,actualRevenueImpact:"",actualSpendCost:"",actualResourceCost:""});setShowR(true);}}
           onLink={goDetail}

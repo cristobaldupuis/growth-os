@@ -1,12 +1,12 @@
 import { PROXY_URL, AI_HEADERS, proxyError } from "./_shared.js";
-import { MODELS, EFFORT, buildRequest } from "./models.js";
+import { EFFORT, buildRequest, modelFor } from "./models.js";
 
 // Natural-language query over the learnings library. The query IS the hypothesis:
 // "have we tried creative angles for subscription retention?" returns whether the
 // team explored it, what happened, and the verdict — pulling from learnings, not titles.
 // Relevance is semantic-first; recency is weighed only WITHIN a relevance tier, so a
 // 4-year-old BFCM learning still beats a recent non-seasonal one for a BFCM question.
-export async function callAskLibrary(question, corpus, settings) {
+export async function callAskLibrary(question, corpus, settings, modelOverride) {
   const todayStr = new Date().toISOString().slice(0,10);
   const lines = corpus.map(l => {
     let s = "["+l.initId+"] ("+l.outcome+"|"+l.retailer+"|"+l.category+"|"+l.durability+(l.provenance?"|"+l.provenance:"")+"|closed "+(l.closedDate||"unknown")+")";
@@ -26,7 +26,7 @@ export async function callAskLibrary(question, corpus, settings) {
   ].join(" ");
   const resp = await fetch(PROXY_URL, {
     method:"POST", headers:AI_HEADERS(),
-    body:JSON.stringify({ ...buildRequest({model:MODELS.REASONING, maxTokens:1100, system:sys, effort:EFFORT.LOW}),
+    body:JSON.stringify({ ...buildRequest({model:modelFor("analysis", modelOverride), maxTokens:1100, system:sys, effort:EFFORT.LOW}),
       messages:[{role:"user", content:"QUESTION: "+question+"\n\nCLOSED-INITIATIVE RECORD:\n"+lines}] }),
   });
   if (!resp.ok) throw new Error(await proxyError(resp));

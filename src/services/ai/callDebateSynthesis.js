@@ -1,9 +1,9 @@
 import { PROXY_URL, AI_HEADERS, safeParseJSON, proxyError } from "./_shared.js";
-import { MODELS, EFFORT, buildRequest } from "./models.js";
+import { EFFORT, buildRequest, modelFor } from "./models.js";
 import { INIT_TYPES } from "../../constants.js";
 
 // Final synthesis — reads full debate + tool outputs, returns 3 structured initiatives
-export async function callDebateSynthesis(portfolioCtx, userContext, transcript, cats, settings, portfolioTools) {
+export async function callDebateSynthesis(portfolioCtx, userContext, transcript, cats, settings, portfolioTools, modelOverride) {
 
   // Give synthesis access to full data too
   const winRate   = portfolioTools.execute("get_win_rate_by_category");
@@ -45,7 +45,7 @@ Return ONLY a valid JSON array of exactly 3 objects. No markdown, no preamble:
   const resp = await fetch(PROXY_URL, {
     method:"POST", headers:AI_HEADERS(),
     body: JSON.stringify({
-      ...buildRequest({model:MODELS.REASONING, maxTokens:3500, system:sys, effort:EFFORT.HIGH}),
+      ...buildRequest({model:modelFor("debate", modelOverride), maxTokens:3500, system:sys, effort:EFFORT.HIGH}),
       messages:[{role:"user", content:
         `Portfolio:\n${portfolioCtx}${dataAppendix}\n\nContext:\n${userContext||"None."}\n\nDebate:\n${transcriptStr}\n\nSynthesize the 3 highest-impact net-new initiatives.`
       }],

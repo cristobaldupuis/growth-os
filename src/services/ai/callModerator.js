@@ -1,8 +1,8 @@
 import { PROXY_URL, AI_HEADERS, safeParseJSON, proxyError } from "./_shared.js";
-import { MODELS, EFFORT, buildRequest } from "./models.js";
+import { EFFORT, buildRequest, modelFor } from "./models.js";
 
 // Moderator — decides what happens next after each agent turn
-export async function callModerator(portfolioCtx, userContext, transcript, agents, turnCount, maxTurns) {
+export async function callModerator(portfolioCtx, userContext, transcript, agents, turnCount, maxTurns, modelOverride) {
 
   const agentLabels = agents.map(a=>a.label).join(", ");
   const transcriptStr = transcript.map(m=>`${m.icon} ${m.label}: ${m.text}`).join("\n\n---\n\n");
@@ -31,7 +31,7 @@ Priority: favour "followup" over "continue" whenever there is an unresolved disa
   const resp = await fetch(PROXY_URL, {
     method:"POST", headers:AI_HEADERS(),
     body: JSON.stringify({
-      ...buildRequest({model:MODELS.REASONING, maxTokens:300, system:sys, effort:EFFORT.LOW}),
+      ...buildRequest({model:modelFor("debate", modelOverride), maxTokens:300, system:sys, effort:EFFORT.LOW}),
       messages:[{role:"user", content:`Portfolio:\n${portfolioCtx}\n\nContext:\n${userContext||"none"}\n\nTranscript so far:\n${transcriptStr}\n\nDecide what happens next.`}],
     }),
   });

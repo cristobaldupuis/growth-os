@@ -1,5 +1,5 @@
 import { PROXY_URL, AI_HEADERS, safeParseJSON, proxyError } from "./_shared.js";
-import { MODELS, EFFORT, buildRequest } from "./models.js";
+import { EFFORT, buildRequest, modelFor } from "./models.js";
 
 // Step 2: expand one selected candidate into a full recommendation. Run in
 // parallel for the top 3 so a single failure doesn't sink the whole batch.
@@ -8,7 +8,7 @@ import { MODELS, EFFORT, buildRequest } from "./models.js";
 // the category win rate and the cited learnings. Where the data to support a
 // score does not exist, the rationale must say so rather than defaulting to a
 // safe mid-range number.
-export async function callExpandRecommendation(candidate, portfolioCtx, learningsIndex, settings) {
+export async function callExpandRecommendation(candidate, portfolioCtx, learningsIndex, settings, modelOverride) {
   // Filter learnings to just the ones the candidate cited, so the expander
   // grounds its reasoning trace in real history rather than re-inventing context.
   const citedLearnings = (candidate.sourceLearningIds || [])
@@ -64,7 +64,7 @@ export async function callExpandRecommendation(candidate, portfolioCtx, learning
 
   const resp = await fetch(PROXY_URL, {
     method:"POST", headers:AI_HEADERS(),
-    body:JSON.stringify({ ...buildRequest({model:MODELS.STRUCTURED, maxTokens:1200, system:sys, effort:EFFORT.LOW, cacheSystem:true}),
+    body:JSON.stringify({ ...buildRequest({model:modelFor("analysis", modelOverride), maxTokens:1200, system:sys, effort:EFFORT.LOW, cacheSystem:true}),
       messages:[{role:"user", content:user}] }),
   });
   if (!resp.ok) throw new Error(await proxyError(resp));

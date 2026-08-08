@@ -1,7 +1,12 @@
 import { AI_HEADERS, proxyError } from "./_shared.js";
+import { modelFor } from "./models.js";
 
 export const IMAGE_PROXY_URL = "/api/image";
 
+// Named aliases, kept because CreativeStudio reads IMAGE_MODELS.FAST directly and
+// the names carry the cost distinction better than the raw IDs do. They are the
+// two ends of the range rather than the routing decision — what actually ships is
+// whatever the `image` group is pointed at, which defaults to FAST.
 export const IMAGE_MODELS = {
   /** "Nano Banana" — fast, cheap, the default for concepting. */
   FAST: "gemini-2.5-flash-image",
@@ -80,11 +85,17 @@ export function buildImagePrompt(brief, variant, brand) {
  * api/image.js and DECISIONS.md. This function deliberately returns the raw
  * payload rather than writing it anywhere.
  */
-export async function callGenerateImage({ prompt, aspectRatio = "4:5", model = IMAGE_MODELS.FAST }) {
+export async function callGenerateImage({ prompt, aspectRatio = "4:5", model }) {
+  // `model` left undefined resolves through the `image` group's routing rather
+  // than defaulting to a literal here, so repointing image generation in the admin
+  // console reaches this call without an edit. An explicit `model` still wins —
+  // CreativeStudio passes IMAGE_MODELS.FAST for the concepting path, and the test
+  // bench passes whichever model it is comparing.
+  const resolved = modelFor("image", model);
   const resp = await fetch(IMAGE_PROXY_URL, {
     method: "POST",
     headers: AI_HEADERS(),
-    body: JSON.stringify({ model, prompt, aspectRatio, count: 1 }),
+    body: JSON.stringify({ model: resolved, prompt, aspectRatio, count: 1 }),
   });
   if (!resp.ok) throw new Error(await proxyError(resp));
   const data = await resp.json();

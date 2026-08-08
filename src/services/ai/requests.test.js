@@ -16,7 +16,8 @@
 // Run with: node src/services/ai/requests.test.js
 import assert from "node:assert/strict";
 import { validateBody, ALLOWED_MODELS } from "../../../api/proxy.js";
-import { capabilitiesFor } from "./models.js";
+import { capabilitiesFor, modelFor } from "./models.js";
+import { GROUP_KEYS, FEATURE_GROUPS, DEFAULT_ROUTING } from "./registry.js";
 
 import { callExpandHypothesis } from "./callExpandHypothesis.js";
 import { callQuickCapture } from "./callQuickCapture.js";
@@ -126,8 +127,13 @@ const CASES = [
   ["Quick Capture",           () => callQuickCapture("rough idea about checkout", SETTINGS, SETTINGS.categories, ["A/B Test", "Campaign"])],
   ["Hypothesis Expansion",    () => callExpandHypothesis("rough hypothesis text", "A title", SETTINGS, "")],
   ["ICE Assist",              () => callSuggestICE(ITEM, SETTINGS, "")],
-  ["Learning Synthesis",      () => callSynthesizeLearnings([ITEM], SETTINGS, SETTINGS.brands)],
-  ["Ask the Library",         () => callAskLibrary("what worked?", [ITEM], SETTINGS, SETTINGS.brands)],
+  // Neither of these takes a brands argument — both were being passed one, which
+  // was harmless while the extra positional went nowhere and became a real bug the
+  // moment the last parameter meant something (it arrived as `modelOverride` and
+  // an array is not a model id). Left as a two- and three-argument call to match
+  // the actual signatures and the real call sites in LearningLibrary.jsx.
+  ["Learning Synthesis",      () => callSynthesizeLearnings([ITEM], SETTINGS)],
+  ["Ask the Library",         () => callAskLibrary("what worked?", [ITEM], SETTINGS)],
   ["Next Plays — candidates", () => callGenerateCandidates("portfolio ctx", [{ id: "e1", title: "t" }], SETTINGS, SETTINGS.categories)],
   ["Next Plays — expansion",  () => callExpandRecommendation({ title: "t", category: "Conversion", rationale: "r" }, "portfolio ctx", [], SETTINGS)],
   ["Debate synthesis",        () => callDebateSynthesis("portfolio ctx", "user ctx", TRANSCRIPT, SETTINGS.categories, SETTINGS, PORTFOLIO_TOOLS)],
@@ -151,6 +157,91 @@ await test("no call site exceeds the proxy max_tokens ceiling", async () => {
       assert.ok(b.max_tokens <= 4000, `${label} requests ${b.max_tokens} tokens, over the proxy ceiling`);
     }
   }
+});
+
+// -- Group routing -------------------------------------------------------------
+//
+// The above proves each call site sends a *legal* request. These prove it sends the
+// request the routing asked for, which is a separate claim and the one the admin
+// console depends on. A call site that kept its old MODELS literal would pass every
+// test before this point and silently ignore the console forever.
+
+/** Which group each call site is supposed to draw its model from. */
+const GROUP_OF = {
+  "Quick Capture": "capture",
+  "Hypothesis Expansion": "capture",
+  "ICE Assist": "capture",
+  "Learning Synthesis": "analysis",
+  "Ask the Library": "analysis",
+  "Next Plays — candidates": "analysis",
+  "Next Plays — expansion": "analysis",
+  "Debate synthesis": "debate",
+  "Creative brief": "creative",
+  "Creative variants": "creative",
+};
+
+await test("every call site sends its own group's routed model", async () => {
+  for (const [label, invoke] of CASES) {
+    const group = GROUP_OF[label];
+    assert.ok(group, `${label} is not mapped to a group in this test — add it`);
+    for (const b of await capture(invoke)) {
+      assert.equal(b.model, modelFor(group),
+        `${label} should send the model routed to "${group}"`);
+    }
+  }
+});
+
+await test("every text group is covered by at least one call site here", async () => {
+  // Stops a group being added to the registry with no test exercising it.
+  const covered = new Set(Object.values(GROUP_OF));
+  for (const key of GROUP_KEYS) {
+    if (FEATURE_GROUPS[key].modality !== "text") continue;
+    assert.ok(covered.has(key), `no case in this file exercises the "${key}" group`);
+  }
+});
+
+await test("an explicit override reaches the wire", async () => {
+  // The mechanism the test bench runs on. Asserted against a model that is not any
+  // group's default, so a call site ignoring the override cannot coincidentally
+  // produce the expected value.
+  const OVERRIDE = "claude-opus-5";
+  assert.ok(!Object.values(DEFAULT_ROUTING).includes(OVERRIDE),
+    "pick an override that is not already a default, or this test proves nothing");
+
+  const OVERRIDING_CASES = [
+    ["Quick Capture",        (m) => callQuickCapture("rough idea", SETTINGS, SETTINGS.categories, ["A/B Test"], m)],
+    ["Hypothesis Expansion", (m) => callExpandHypothesis("rough", "A title", SETTINGS, "", m)],
+    ["ICE Assist",           (m) => callSuggestICE(ITEM, SETTINGS, "", m)],
+    ["Learning Synthesis",   (m) => callSynthesizeLearnings([ITEM], SETTINGS, m)],
+    ["Ask the Library",      (m) => callAskLibrary("what worked?", [ITEM], SETTINGS, m)],
+    ["Next Plays — candidates", (m) => callGenerateCandidates("ctx", [{ id:"e1", title:"t" }], SETTINGS, SETTINGS.categories, m)],
+    ["Next Plays — expansion",  (m) => callExpandRecommendation({ title:"t", category:"Conversion", rationale:"r" }, "ctx", [], SETTINGS, m)],
+    ["Debate synthesis",     (m) => callDebateSynthesis("ctx", "user ctx", TRANSCRIPT, SETTINGS.categories, SETTINGS, PORTFOLIO_TOOLS, m)],
+    ["Creative brief",       (m) => callCreativeBrief(ITEM, BRAND, [], SETTINGS, DEFAULT_NAMING_SCHEMA, m)],
+    ["Creative variants",    (m) => callCreativeVariants(BRIEF, ITEM, BRAND, DEFAULT_NAMING_SCHEMA, { perAngle: 2 }, m)],
+  ];
+
+  for (const [label, invoke] of OVERRIDING_CASES) {
+    const bodies = await capture(() => invoke(OVERRIDE));
+    assert.ok(bodies.length > 0, `${label}: made no request`);
+    for (const b of bodies) {
+      assert.equal(b.model, OVERRIDE, `${label} ignored its modelOverride`);
+      // The override must still produce a legal request — a reach model has
+      // different capabilities, and buildRequest has to honour those rather than
+      // carrying over the default tier's parameter set.
+      assertValid(b, `${label} (overridden)`);
+    }
+  }
+});
+
+await test("an override of the wrong type throws rather than reaching the wire", async () => {
+  // The stale-argument case this guard exists for: a caller passing an extra
+  // positional that lands in modelOverride. Better a loud throw than an array
+  // arriving at the proxy as a model id.
+  await assert.rejects(
+    async () => callSynthesizeLearnings([ITEM], SETTINGS, SETTINGS.brands),
+    /must be a model id string/
+  );
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

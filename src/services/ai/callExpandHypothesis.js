@@ -1,7 +1,7 @@
 import { PROXY_URL, AI_HEADERS, proxyError } from "./_shared.js";
-import { MODELS, EFFORT, buildRequest } from "./models.js";
+import { EFFORT, buildRequest, modelFor } from "./models.js";
 
-export async function callExpandHypothesis(rough, title, settings, dataCtx) {
+export async function callExpandHypothesis(rough, title, settings, dataCtx, modelOverride) {
   const sys = [
     "You help growth teams write structured initiative hypotheses for "+settings.companyName+",",
     "a "+settings.businessModel+" business.",
@@ -12,7 +12,7 @@ export async function callExpandHypothesis(rough, title, settings, dataCtx) {
   ].join(" ");
   const resp = await fetch(PROXY_URL, {
     method:"POST", headers:AI_HEADERS(),
-    body:JSON.stringify({ ...buildRequest({model:MODELS.STRUCTURED, maxTokens:300, system:sys, effort:EFFORT.LOW}),
+    body:JSON.stringify({ ...buildRequest({model:modelFor("capture", modelOverride), maxTokens:300, system:sys, effort:EFFORT.LOW}),
       messages:[{role:"user", content:"Title: "+(title||"none")+". Rough idea: "+rough}] }),
   });
   if (!resp.ok) throw new Error(await proxyError(resp));

@@ -1,7 +1,7 @@
 import { PROXY_URL, AI_HEADERS, safeParseJSON, proxyError } from "./_shared.js";
-import { MODELS, EFFORT, buildRequest } from "./models.js";
+import { EFFORT, buildRequest, modelFor } from "./models.js";
 
-export async function callQuickCapture(description, settings, cats, initTypes) {
+export async function callQuickCapture(description, settings, cats, initTypes, modelOverride) {
   const sys = [
     "You help growth teams structure initiative ideas for "+settings.companyName+", a "+settings.businessModel+" business.",
     "North star: "+settings.northStarMetric+" (current: "+settings.northStarCurrent+", target: "+settings.northStarTarget+").",
@@ -15,7 +15,7 @@ export async function callQuickCapture(description, settings, cats, initTypes) {
   ].join(" ");
   const resp = await fetch(PROXY_URL, {
     method:"POST", headers:AI_HEADERS(),
-    body:JSON.stringify({ ...buildRequest({model:MODELS.STRUCTURED, maxTokens:600, system:sys, effort:EFFORT.LOW}),
+    body:JSON.stringify({ ...buildRequest({model:modelFor("capture", modelOverride), maxTokens:600, system:sys, effort:EFFORT.LOW}),
       messages:[{role:"user", content:"Rough idea: "+description}] }),
   });
   if (!resp.ok) throw new Error(await proxyError(resp));

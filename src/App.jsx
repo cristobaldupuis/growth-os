@@ -42,6 +42,7 @@ const CreativeStudio    = lazy(() => import("./views/CreativeStudio.jsx").then(m
 const PerformanceView   = lazy(() => import("./views/PerformanceView.jsx").then(m => ({ default: m.PerformanceView })));
 const CopilotPanel      = lazy(() => import("./views/CopilotPanel.jsx").then(m => ({ default: m.CopilotPanel })));
 const ClientReadoutView = lazy(() => import("./views/ClientReadoutView.jsx").then(m => ({ default: m.ClientReadoutView })));
+import { applyRouting } from "./services/ai/models.js";
 import { callExpandHypothesis } from "./services/ai/callExpandHypothesis.js";
 import { callSuggestICE } from "./services/ai/callSuggestICE.js";
 import { callQuickCapture } from "./services/ai/callQuickCapture.js";
@@ -580,6 +581,24 @@ export default function App() {
     // reload from gone, so it gets a persistent banner rather than a toast that
     // disappears after 3.5 seconds.
     onWriteError(({ message }) => setStorageError(message));
+
+    // Which model serves which AI feature group. Deliberately fire-and-forget and
+    // deliberately not gated on `loaded`: every AI call in this app is behind a
+    // click, so this has resolved long before one fires, and applyRouting's
+    // fallback means a call that somehow beats it runs on the committed default
+    // rather than failing. Blocking first paint on a network read to learn a
+    // setting that only matters at click time would be the wrong trade.
+    fetch("/api/routing")
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data?.routing) return;
+        const dropped = applyRouting(data.routing);
+        // A stored assignment naming a model the catalogue no longer has. The app
+        // keeps working on that group's default, but it is real configuration drift
+        // and should not vanish silently.
+        if (dropped.length) console.warn("Ignored stale model routing for:", dropped.join(", "));
+      })
+      .catch(() => { /* defaults already apply — see registry.js DEFAULT_ROUTING */ });
 
     const load = async ()=>{
       try {

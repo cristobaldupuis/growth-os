@@ -1,5 +1,5 @@
 import { PROXY_URL, AI_HEADERS, safeParseJSON, proxyError } from "./_shared.js";
-import { MODELS, EFFORT, buildRequest } from "./models.js";
+import { EFFORT, buildRequest, modelFor } from "./models.js";
 
 // -- Next Plays (Recommendation Engine) ---------------------------------------
 // Two-step pattern: (1) cheap candidate generation across portfolio state and
@@ -12,7 +12,7 @@ import { MODELS, EFFORT, buildRequest } from "./models.js";
 // spend tokens expanding. The candidate's rationale must point at a real signal
 // (a named running initiative, a failed test, a proven-but-missing tactic, a
 // coverage gap, a win-rate number) — not a general ecommerce best practice.
-export async function callGenerateCandidates(portfolioCtx, learningsIndex, settings, cats) {
+export async function callGenerateCandidates(portfolioCtx, learningsIndex, settings, cats, modelOverride) {
   const learningsBlock = learningsIndex.length === 0
     ? "  (no completed initiatives yet — recommendations must rely on portfolio state and brand briefs only)"
     : learningsIndex.slice(0, 30).map(l => {
@@ -55,7 +55,7 @@ export async function callGenerateCandidates(portfolioCtx, learningsIndex, setti
 
   const resp = await fetch(PROXY_URL, {
     method:"POST", headers:AI_HEADERS(),
-    body:JSON.stringify({ ...buildRequest({model:MODELS.REASONING, maxTokens:2200, system:sys, effort:EFFORT.HIGH, cacheSystem:true}),
+    body:JSON.stringify({ ...buildRequest({model:modelFor("analysis", modelOverride), maxTokens:2200, system:sys, effort:EFFORT.HIGH, cacheSystem:true}),
       messages:[{role:"user", content:user}] }),
   });
   if (!resp.ok) throw new Error(await proxyError(resp));

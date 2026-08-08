@@ -38,15 +38,23 @@
 // change. This file is the hardened single-tenant version, not multi-tenant auth.
 
 import { guardEntry, guardRateLimit, clientIp } from "./_guard.js";
+import { TEXT_MODEL_IDS } from "../src/services/ai/registry.js";
 
 const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
 
-// Only models this app actually calls. An allowlist means a leaked request can't
-// be edited to invoke something with a different cost profile.
-export const ALLOWED_MODELS = new Set([
-  "claude-sonnet-5",
-  "claude-haiku-4-5",
-]);
+// Only models this app can route to. An allowlist means a leaked request can't be
+// edited to invoke something with a different cost profile.
+//
+// Derived from the registry rather than hand-kept, because the two lists have to
+// agree and there is no way to notice that they don't until a feature 400s in
+// production: the admin console offers exactly what the catalogue holds, so a
+// model in the catalogue but missing here would be selectable and immediately
+// broken. One list, and adding a model is one edit.
+//
+// The registry being the *source* of the allowlist does not make it a weaker
+// control. Nothing a request carries can add to it — a body naming an unlisted
+// model is still rejected here, before any upstream call.
+export const ALLOWED_MODELS = new Set(TEXT_MODEL_IDS);
 
 export const MAX_TOKENS_CEILING = 4000;   // highest max_tokens any feature legitimately needs
 const MAX_BODY_BYTES     = 512 * 1024;

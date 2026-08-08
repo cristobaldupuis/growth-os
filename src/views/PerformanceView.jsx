@@ -118,7 +118,11 @@ export function PerformanceView({ t, items, settings, perfRows, onImport, onClea
 
       {/* Header */}
       <div style={{ margin: "22px 0 18px", display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 14, flexWrap: "wrap" }}>
-        <div>
+        {/* Tour anchor. Deliberately the header rather than the corpus summary
+          * below it: the summary only renders once rows are imported, and a
+          * cold demo visitor has none, so anchoring there would leave the tour
+          * step pointing at nothing on exactly the first run it exists for. */}
+        <div data-tour="performance-intro">
           <h2 style={{ fontFamily: t.serif, fontSize: 24, fontWeight: 600, margin: 0, color: t.text }}>Performance</h2>
           <p style={{ fontSize: 13, color: t.textSub, margin: "6px 0 0", maxWidth: 700, lineHeight: 1.6 }}>
             Import a campaign-level export and every ad name is parsed back through your naming convention. That turns

@@ -38,8 +38,18 @@ import { stampUpdatedAt } from "./services/items.js";
 // DashView stays eager for the same reason in reverse: it IS first paint.
 //
 // Named exports, so each needs the default-shape adapter React.lazy expects.
+//
+// PerformanceView's loader is hoisted to its own binding because the guided
+// tour needs to be able to WARM it — see the prefetch effect in App. A tour
+// step anchored in a deferred view is a race: the tour navigates, polls for its
+// target element, and gives up after ~40 frames, so on a slow connection the
+// chunk can still be in flight when the poll expires and the step degrades to a
+// centred card with no spotlight. Kicking the import off when the tour starts
+// means the module is already resolved several steps before it is needed.
+const loadPerformanceView = () => import("./views/PerformanceView.jsx");
+
 const CreativeStudio    = lazy(() => import("./views/CreativeStudio.jsx").then(m => ({ default: m.CreativeStudio })));
-const PerformanceView   = lazy(() => import("./views/PerformanceView.jsx").then(m => ({ default: m.PerformanceView })));
+const PerformanceView   = lazy(() => loadPerformanceView().then(m => ({ default: m.PerformanceView })));
 const CopilotPanel      = lazy(() => import("./views/CopilotPanel.jsx").then(m => ({ default: m.CopilotPanel })));
 const ClientReadoutView = lazy(() => import("./views/ClientReadoutView.jsx").then(m => ({ default: m.ClientReadoutView })));
 import { callExpandHypothesis } from "./services/ai/callExpandHypothesis.js";
@@ -124,6 +134,26 @@ const GUIDE_SECTIONS = [
     why: "Institutional memory that compounds. The longer the engagement runs, the smarter every recommendation gets.",
     cta: "Open Library",
     action: "library",
+  },
+  {
+    id: "creative",
+    views: ["creative"],
+    label: "Brief and produce the creative",
+    feature: "Creative Studio",
+    what: "Pick an initiative and the studio writes a creative brief grounded in its hypothesis and your closed learnings, expands it into scripted variants per angle, and generates a key frame or a talking-head clip from any one of them. Every variant's campaign name is assembled from the convention rather than typed, so the asset is born with a name that will parse when the export comes back.",
+    why: "This is the half of the loop that produces something. A brief that came from the portfolio, and an asset already named so its spend can find its way back to the hypothesis that ordered it.",
+    cta: "Open Creative Studio",
+    action: "creative",
+  },
+  {
+    id: "readout",
+    views: ["readout"],
+    label: "Hand the client the story",
+    feature: "Client readout",
+    what: "The quarter assembled into something you can read out loud: what was tried, what landed, what it returned, and what the evidence says to do next — drawn from the same records the rest of the app runs on, with nothing retyped.",
+    why: "The meeting artifact, without the night before. It says the same thing the dashboard says, which is the point — the client sees the working, not a slide built to flatter it.",
+    cta: "Open Summary",
+    action: "readout",
   },
   {
     id: "initiatives",
@@ -560,6 +590,11 @@ export default function App() {
 
   // Guided tour (demo mode only). See components/GuidedTour.jsx
   const [showTour,   setShowTour]   = useState(false);
+  // The tour walks through Performance, which is a deferred chunk. Start
+  // fetching it the moment the tour opens — four steps before it is needed —
+  // so the step never races its own module. Idempotent: the dynamic import
+  // resolves from the module cache on every call after the first.
+  useEffect(() => { if (showTour) loadPerformanceView(); }, [showTour]);
   const [tourStep,   setTourStep]   = useState(0);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   // Mobile only. The sidebar is a permanent column above 900px and a drawer

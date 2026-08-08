@@ -32,10 +32,14 @@
 /** Views that are addressable by name. Anything else falls back to dashboard. */
 export const ROUTABLE = [
   "dashboard", "initiatives", "library", "performance",
-  "triage", "creative", "readout",
+  "triage", "creative", "readout", "settings",
 ];
 
-const PERF_TABS = ["breakdown", "attribution", "builder", "taxonomy"];
+const PERF_TABS = ["breakdown", "attribution", "builder", "convention"];
+// Settings is a page with a section rail, and each section is addressable —
+// "#/settings/naming" is how the Performance view hands you to the convention
+// editor, and how a link to it in a doc can land somewhere useful.
+const SETTINGS_SECTIONS = ["workspace","northstar","categories","brands","naming","agents","health","data"];
 
 /**
  * Parse a location hash into app state.
@@ -63,7 +67,10 @@ export function parseHash(hash) {
   }
 
   if (ROUTABLE.includes(parts[0])) {
-    const tab = parts[0] === "performance" && PERF_TABS.includes(parts[1]) ? parts[1] : null;
+    const tab =
+      (parts[0] === "performance" && PERF_TABS.includes(parts[1])) ||
+      (parts[0] === "settings" && SETTINGS_SECTIONS.includes(parts[1]))
+        ? parts[1] : null;
     return { nav: parts[0], selId: null, tab };
   }
 
@@ -80,6 +87,7 @@ export function formatHash({ nav, selId, tab }) {
   if (nav === "detail" && selId) return "#/i/" + encodeURIComponent(selId);
   if (nav === "form")            return selId ? "#/i/" + encodeURIComponent(selId) + "/edit" : "#/new";
   if (nav === "performance" && tab && PERF_TABS.includes(tab)) return "#/performance/" + tab;
+  if (nav === "settings" && tab && SETTINGS_SECTIONS.includes(tab)) return "#/settings/" + tab;
   if (ROUTABLE.includes(nav))    return "#/" + nav;
   return "";
 }
@@ -89,7 +97,7 @@ export function titleFor(nav, item) {
   const NAMES = {
     dashboard:"Dashboard", initiatives:"Initiatives", library:"Library",
     performance:"Performance", triage:"Triage", creative:"Creative",
-    readout:"Summary", detail:"Initiative", form:"Edit initiative",
+    readout:"Summary", settings:"Settings", detail:"Initiative", form:"Edit initiative",
   };
   if ((nav === "detail" || nav === "form") && item?.title) {
     const id = item.initId ? item.initId + " · " : "";

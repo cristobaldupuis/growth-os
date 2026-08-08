@@ -1489,7 +1489,11 @@ export default function App() {
   };
 
   return (
-    <div style={{background:t.bg,minHeight:"100vh",fontFamily:t.sans,color:t.text}}>
+    <div style={{background:t.bg,minHeight:"100vh",fontFamily:t.sans,color:t.text,
+      // Theme values the stylesheet needs. A media query cannot read a JS
+      // object, and the button interaction below has to work in both themes
+      // without each of 173 buttons opting in by hand.
+      "--gos-shadow":t.shadow, "--gos-shadow-hi":t.shadowHi, "--gos-gold":t.gold}}>
       {/* The Tabler icon webfont used to be @import-ed here from jsdelivr. Nothing
         * in the app ever rendered a `ti ti-*` class, so it was a render-blocking
         * third-party request buying nothing — and one more origin to justify if a
@@ -1523,7 +1527,32 @@ export default function App() {
         +"@media(max-width:640px){.gos-filters{flex-direction:column;align-items:stretch !important}.gos-filters>*{width:100%}.gos-filters select,.gos-filters input{min-width:0 !important;width:100% !important}}"
         // Labels that are noise once the screen is narrow enough that the icon
         // has to carry the button on its own.
-        +"@media(max-width:560px){.gos-hide-sm{display:none}}"}</style>
+        +"@media(max-width:560px){.gos-hide-sm{display:none}}"
+        // -- Buttons answer the pointer -------------------------------------
+        //
+        // Cards, rows and stat tiles all had a hover state; buttons had none,
+        // except three in the sidebar that recoloured their own border through
+        // hand-written onMouseEnter handlers. So the most-clicked elements in
+        // the product were the least responsive ones.
+        //
+        // Done here rather than in the style helpers because a helper returns
+        // an inline style object and `:hover` cannot be expressed in one. The
+        // selector excludes anything already in the interaction layer, so a nav
+        // item keeps its rail-and-tint and does not also lift.
+        //
+        // `saturate` rather than `brightness`: a brightness lift reads well on
+        // the gold primary but goes the wrong way on a near-white secondary in
+        // light mode, where hover should feel like the surface coming forward
+        // rather than washing out. Saturation deepens the accent and leaves the
+        // greys alone, and the lift plus shadow is what carries the state in
+        // both themes. The global prefers-reduced-motion block in index.css
+        // collapses the movement and leaves the colour.
+        +"button:not(:disabled):not(.gos-int):not(.gos-tile){transition:transform .13s cubic-bezier(.2,.7,.3,1),box-shadow .16s ease,filter .16s ease}"
+        +"button:not(:disabled):not(.gos-int):not(.gos-tile):hover{transform:translateY(-1px);box-shadow:var(--gos-shadow-hi);filter:saturate(1.14)}"
+        +"button:not(:disabled):not(.gos-int):not(.gos-tile):focus-visible{box-shadow:var(--gos-shadow-hi)}"
+        // The press. Returns to rest and dips a hair below it, so a click reads
+        // as a click rather than as the hover state blinking off.
+        +"button:not(:disabled):not(.gos-int):not(.gos-tile):active{transform:translateY(0.5px);box-shadow:none;filter:saturate(1.04)}"}</style>
 
       {/* Onboarding — first run only */}
       {onboarding&&(

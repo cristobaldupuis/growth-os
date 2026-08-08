@@ -268,6 +268,12 @@ export const TL = {
   gold:"#856310", goldFill:"#C9A227", goldSoft:"#D8B94E", goldText:"#1A1815",
   goldBg:"#FBF6E7", goldBorder:"#E3D08F",
   teal:"#0F7A5A", tealBg:"#E2F2EC", red:"#B23A20", redBg:"#FBEAE5",
+  // The contribution ramp — see ContributionView. Measured is teal because that
+  // is what teal already means in this app (an initiative card shows its actual
+  // in teal, the Initiatives group header renders "realised" in teal); forecast
+  // is gold. Named as one set rather than reused from the ink tokens so the bar
+  // can be tuned for adjacency without dragging a text colour with it.
+  rampMeasured:"#0F7A5A", rampInflight:"#C9A227", rampPipeline:"#E2C77E", rampTrack:"#F2EFE7",
   warn:"#8A5A0B", warnBg:"#FDF4E3", warnBorder:"#E0C176",
   headerBg:"#FFFFFF", inputBg:"#FFFFFF", inputBorder:"#D8D4CA",
   // Specular highlight for the hover charge sweep. Not a palette colour — it is
@@ -287,6 +293,12 @@ export const TD = {
   gold:"#E8C765", goldFill:"#E8C765", goldSoft:"#F0D68C", goldText:"#0E0F12",
   goldBg:"#221E14", goldBorder:"#5C4E28",
   teal:"#43C79A", tealBg:"#10241E", red:"#E8836B", redBg:"#2A1512",
+  // Dark cannot simply mirror light here. Teal and gold separate by hue but
+  // barely by lightness (#43C79A against #E8C765 is 1.30:1), and hue alone is
+  // not a separation a deuteranopic reader can use — the two most important
+  // segments of the bar would touch and merge. The measured tone is deepened
+  // until the ramp steps in lightness as well as hue.
+  rampMeasured:"#2E9E78", rampInflight:"#E8C765", rampPipeline:"#6B5A2E", rampTrack:"#22252C",
   warn:"#E0B155", warnBg:"#241D10", warnBorder:"#5A4820",
   headerBg:"#0E0F12", inputBg:"#16181D", inputBorder:"#2C303A",
   spark:"rgba(255,255,255,0.34)",
@@ -362,16 +374,29 @@ export const iceColor = (s, t) =>
 let NUM_FMT = { currency: "USD", locale: "en-CA" };
 let CUR_SYMBOL = "$";
 
+// `narrowSymbol` is not optional. The default `symbol` display disambiguates a
+// currency against the locale's own — so USD under `en-CA` or `en-GB` formats as
+// "US$", and the dashboard shipped reading "US$704.8k in play" next to a panel
+// still saying "$273k". Technically correct, and wrong for this product: the
+// workspace has one currency, every figure on screen is in it, and the reader
+// does not need it disambiguated from the currency they did not choose.
+// `narrowSymbol` gives "$", "£", "€" — which is what a figure in a dashboard
+// should say.
 function resolveSymbol(locale, currency) {
-  try {
-    const parts = new Intl.NumberFormat(locale, { style: "currency", currency, maximumFractionDigits: 0 })
-      .formatToParts(0);
-    return parts.find(p => p.type === "currency")?.value || "$";
-  } catch {
-    // An invalid currency code from a hand-edited settings blob should degrade
-    // to a dollar sign, not throw inside a render.
-    return "$";
+  for (const currencyDisplay of ["narrowSymbol", "symbol"]) {
+    try {
+      const parts = new Intl.NumberFormat(locale, { style: "currency", currency, currencyDisplay, maximumFractionDigits: 0 })
+        .formatToParts(0);
+      const found = parts.find(p => p.type === "currency")?.value;
+      if (found) return found;
+    } catch {
+      // `narrowSymbol` is unsupported on older engines, which throw rather than
+      // ignoring it — fall through to the wide form, then to a dollar sign. An
+      // invalid currency code from a hand-edited settings blob lands here too,
+      // and must degrade rather than throw inside a render.
+    }
   }
+  return "$";
 }
 
 /** Apply the workspace's currency and locale. Called once, when settings load. */

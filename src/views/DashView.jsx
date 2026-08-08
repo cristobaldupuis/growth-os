@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { OUTCOMES, INIT_TYPES, METRIC_SOURCES, OL, OD, DEFAULT_SETTINGS, brandName, iceScore, iceColor, fmtCur, fmtCurFine, fmtDate, fmtDateLong, fmtDateShort, mondayOf, parseNorthStarValue, resolveNorthStar } from "../constants.js";
-import { interactive, tile } from "../components/motion.js";
+import { interactive, tile, stagger } from "../components/motion.js";
 import { ChargeBar } from "../components/ChargeBar.jsx";
 import { gG, gGh, gSL, gCd } from "../components/styles.js";
 import { Spark } from "../components/Spark.jsx";
@@ -431,13 +431,29 @@ function ContributionView({t, contribution, totals, dRange, activeBrand, brands,
   }
 
   const maxRow = Math.max(...contribution.map(r=>r.realised+r.inflight+r.pipeline), 1);
-  const fmt = (n) => n===0 ? "—" : "$"+(n>=1000?Math.round(n/100)/10+"k":n.toLocaleString());
-  const fmtBig = (n) => "$"+(n>=1000?(Math.round(n/100)/10).toLocaleString()+"k":n.toLocaleString());
+  // Was a fifth currency formatter — a local `fmt` and `fmtBig`, both hardcoding
+  // a dollar sign — which is why this panel read "$273k" while the funnel map
+  // directly above it read "US$704.8k" on the same screen.
+  const fmt    = (n) => n===0 ? "—" : fmtCurFine(n);
+  const fmtBig = fmtCurFine;
 
-  // Tones: realised = gold (the defensible number), inflight = mid amber, pipeline = muted
-  const colorRealised = t.gold;
-  const colorInflight = t.warn;
-  const colorPipeline = t.textMuted;
+  // The three layers are a certainty ramp — measured, then probable, then
+  // speculative — and the old colours did not encode that. Realised was `gold`
+  // and in-flight was `warn`, which in light mode are #856310 and #8A5A0B: a
+  // 1.07:1 lightness ratio, so the two most important segments of a stacked bar
+  // were the same colour. Pipeline was `textMuted` grey, a third unrelated hue.
+  //
+  // Realised is now teal, which is not a new idea — it is what the rest of the
+  // app already does. The Initiatives group header renders "realised" in teal
+  // and "at risk" in gold, and an initiative card shows its measured `actual`
+  // in teal. This panel was the one place that said it in gold.
+  //
+  // So: teal means measured, gold means forecast, pale gold means a forecast
+  // further from evidence. Hue separates fact from estimate; lightness
+  // separates the two estimates.
+  const colorRealised = t.rampMeasured;
+  const colorInflight = t.rampInflight;
+  const colorPipeline = t.rampPipeline;
 
   const copyText = () => {
     const date = fmtDateLong();
@@ -481,26 +497,38 @@ function ContributionView({t, contribution, totals, dRange, activeBrand, brands,
             </div>
           )}
         </div>
-        <button onClick={copyText} style={{...gGh(t),fontSize:11,padding:"3px 10px"}}>&#128203; Copy</button>
+        <button onClick={copyText} style={gGh(t,"sm")}><IconCopy size={12}/> Copy</button>
       </div>
 
-      {/* Totals row — three big numbers */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:18}}>
-        <div style={{padding:"12px 14px",borderRadius:6,background:t.goldBg,border:"1px solid "+t.goldBorder}}>
-          <div style={{fontSize:10,color:t.gold,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:4}}>Realised</div>
-          <div style={{fontSize:26,fontWeight:700,fontFamily:t.mono,color:colorRealised,letterSpacing:"-0.02em",lineHeight:1}}>{fmtBig(totals.realised)}</div>
-          <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginTop:4}}>measured on completed</div>
-        </div>
-        <div style={{padding:"12px 14px",borderRadius:6,background:t.surface,border:"1px solid "+t.border}}>
-          <div style={{fontSize:10,color:colorInflight,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:4}}>In-flight</div>
-          <div style={{fontSize:26,fontWeight:700,fontFamily:t.mono,color:colorInflight,letterSpacing:"-0.02em",lineHeight:1}}>{fmtBig(totals.inflight)}</div>
-          <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginTop:4}}>running, probability-weighted</div>
-        </div>
-        <div style={{padding:"12px 14px",borderRadius:6,background:t.surface,border:"1px solid "+t.border}}>
-          <div style={{fontSize:10,color:colorPipeline,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:4}}>Pipeline</div>
-          <div style={{fontSize:26,fontWeight:700,fontFamily:t.mono,color:colorPipeline,letterSpacing:"-0.02em",lineHeight:1}}>{fmtBig(totals.pipeline)}</div>
-          <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginTop:4}}>draft, probability-weighted</div>
-        </div>
+      {/* Totals row — three big numbers.
+        *
+        * The swatch is what ties each tile to its segment in the bars below.
+        * The figure itself is drawn in an ink token, not in the ramp colour:
+        * the ramp is tuned for two blocks of colour touching in a 10px bar,
+        * where the pale end of it is a legitimate value, and the same pale gold
+        * set as `color` on a 26px numeral is unreadable on white. Bars and text
+        * are different jobs and this panel used one set of colours for both. */}
+      <div className="gos-grid-3" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:18}}>
+        {[
+          { key:"realised", label:"Realised", value:totals.realised, ink:t.teal,     swatch:colorRealised,
+            sub:"measured on completed", hero:true },
+          { key:"inflight", label:"In-flight", value:totals.inflight, ink:t.gold,    swatch:colorInflight,
+            sub:"running, probability-weighted" },
+          { key:"pipeline", label:"Pipeline",  value:totals.pipeline, ink:t.textSub, swatch:colorPipeline,
+            sub:"draft, probability-weighted" },
+        ].map(m=>(
+          <div key={m.key} style={{padding:"12px 14px",borderRadius:t.r.md,
+            background:m.hero?t.goldBg:t.surface,
+            border:"1px solid "+(m.hero?t.goldBorder:t.border)}}>
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+              <span aria-hidden="true" style={{width:8,height:8,borderRadius:2,background:m.swatch,flexShrink:0,
+                border:"1px solid "+(m.key==="pipeline"?t.border:"transparent")}}/>
+              <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>{m.label}</span>
+            </div>
+            <div style={{fontSize:t.fs.display,fontWeight:700,fontFamily:t.mono,color:m.ink,letterSpacing:"-0.02em",lineHeight:1}}>{fmtBig(m.value)}</div>
+            <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginTop:4}}>{m.sub}</div>
+          </div>
+        ))}
       </div>
 
       {totals.realisedBackfilled>0 && (
@@ -509,13 +537,24 @@ function ContributionView({t, contribution, totals, dRange, activeBrand, brands,
         </div>
       )}
 
-      {/* By category — stacked bars */}
-      <div style={{display:"flex",flexDirection:"column",gap:10}}>
-        {contribution.map(row => {
+      {/* By category — stacked bars.
+        *
+        * These rows were inert: no hover, no entry, no charge, while the funnel
+        * map directly above them lifted, railed and swept. Two panels on one
+        * screen, one alive and one not, reads as the second one being broken.
+        * They now take the same `interactive` treatment, and the segments are
+        * real `gos-fill` elements, so the shared charge sweep and the
+        * saturate/brighten on hover apply here exactly as they do everywhere
+        * else — the colour is earned by pointing at it rather than spent at
+        * rest, which is the rule the whole interaction layer is built on. */}
+      <div style={{display:"flex",flexDirection:"column",gap:2}}>
+        {contribution.map((row, ri) => {
           const rowTotal = row.realised + row.inflight + row.pipeline;
           const pct = (v) => (v/maxRow)*100;
+          const p = interactive(t, t.goldFill, {flat:true, index:ri, hoverBg:t.surfaceAlt});
           return (
-            <div key={row.category}>
+            <div key={row.category} className={p.className}
+              style={{...p.style, padding:"9px 10px 10px 12px", borderRadius:t.r.sm}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:5,gap:8,flexWrap:"wrap"}}>
                 <div style={{display:"flex",alignItems:"baseline",gap:8,flexWrap:"wrap",minWidth:0}}>
                   <span style={{fontSize:12,fontWeight:600,color:t.text,fontFamily:t.sans}}>{row.category}</span>
@@ -525,15 +564,18 @@ function ContributionView({t, contribution, totals, dRange, activeBrand, brands,
                 </div>
                 <span style={{fontSize:13,fontWeight:700,color:t.text,fontFamily:t.mono,letterSpacing:"-0.01em"}}>{fmtBig(rowTotal)}</span>
               </div>
-              <div style={{display:"flex",height:10,borderRadius:3,overflow:"hidden",background:t.border}}>
-                {row.realised>0 && <div title={"Realised: "+fmt(row.realised)} style={{width:pct(row.realised)+"%",background:colorRealised}}/>}
-                {row.inflight>0 && <div title={"In-flight: "+fmt(row.inflight)} style={{width:pct(row.inflight)+"%",background:colorInflight}}/>}
-                {row.pipeline>0 && <div title={"Pipeline: "+fmt(row.pipeline)} style={{width:pct(row.pipeline)+"%",background:colorPipeline}}/>}
+              <div className="gos-track" style={{display:"flex",height:10,background:t.rampTrack}}>
+                {row.realised>0 && <div className="gos-fill" title={"Realised: "+fmt(row.realised)}
+                  style={{width:pct(row.realised)+"%",background:colorRealised,borderRadius:0,"--gos-spark":t.spark,"--gos-delay":stagger(ri)}}/>}
+                {row.inflight>0 && <div className="gos-fill" title={"In-flight: "+fmt(row.inflight)}
+                  style={{width:pct(row.inflight)+"%",background:colorInflight,borderRadius:0,"--gos-spark":t.spark,"--gos-delay":stagger(ri)}}/>}
+                {row.pipeline>0 && <div className="gos-fill" title={"Pipeline: "+fmt(row.pipeline)}
+                  style={{width:pct(row.pipeline)+"%",background:colorPipeline,borderRadius:0,"--gos-spark":t.spark,"--gos-delay":stagger(ri)}}/>}
               </div>
               <div style={{display:"flex",gap:12,marginTop:4,fontSize:10,color:t.textMuted,fontFamily:t.mono,flexWrap:"wrap"}}>
                 {row.realised>0 && <span><span style={{display:"inline-block",width:7,height:7,background:colorRealised,marginRight:4,borderRadius:1,verticalAlign:"middle"}}/>Realised {fmt(row.realised)}</span>}
                 {row.inflight>0 && <span><span style={{display:"inline-block",width:7,height:7,background:colorInflight,marginRight:4,borderRadius:1,verticalAlign:"middle"}}/>In-flight {fmt(row.inflight)}</span>}
-                {row.pipeline>0 && <span><span style={{display:"inline-block",width:7,height:7,background:colorPipeline,marginRight:4,borderRadius:1,verticalAlign:"middle"}}/>Pipeline {fmt(row.pipeline)}</span>}
+                {row.pipeline>0 && <span><span style={{display:"inline-block",width:7,height:7,background:colorPipeline,border:"1px solid "+t.border,marginRight:4,borderRadius:1,verticalAlign:"middle"}}/>Pipeline {fmt(row.pipeline)}</span>}
               </div>
             </div>
           );

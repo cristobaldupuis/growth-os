@@ -987,7 +987,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
               "• Probability-weighted pipeline: "+fmtCur(dash.contributionTotals.pipeline),
               "• Estimate accuracy to date: "+(dash.calibration!==null?dash.calibration+"%":"not yet measurable"),
               "",
-              "Tracked in Growth OS · "+date,
+              "Tracked in Marketers Lab · "+date,
             ].join("\n");
             try { navigator.clipboard.writeText(text); showToast("Executive summary copied. Ready to paste.", "success"); } catch { showToast("Couldn't copy to clipboard.", "error"); }
           }}>

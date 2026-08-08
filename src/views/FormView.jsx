@@ -83,7 +83,7 @@ export function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hyp
           <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif}}>optional · powers data matching</span>
         </div>
         <p style={{fontSize:11.5,color:t.textSub,fontFamily:t.sans,lineHeight:1.5,margin:"0 0 12px"}}>
-          Tells Growth OS which metric, segment, and date window this initiative is judged on, so an imported CSV or feed can be matched to it. The window is the start/end dates below.
+          Tells Marketers Lab which metric, segment, and date window this initiative is judged on, so an imported CSV or feed can be matched to it. The window is the start/end dates below.
         </p>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
           <FR label="Metric measured" t={t}>

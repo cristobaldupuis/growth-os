@@ -4,7 +4,7 @@
 export const TOUR_STEPS = [
   {
     selector: '[data-tour="logo"]', nav: "dashboard",
-    title: "Welcome to Growth OS",
+    title: "Welcome to Marketers Lab",
     // No step count in the copy. It used to say "Four short stops" beside a
     // header rendering "1 of 5", which was defensible as "four more after this
     // one" and still read as a mistake. The header already carries the number,

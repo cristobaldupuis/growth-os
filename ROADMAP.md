@@ -1,6 +1,15 @@
-# Growth OS — Roadmap
+# Marketers Lab — Roadmap
 
-> This roadmap outlines the evolution of Growth OS from a modular AI-assisted dashboard into an autonomous execution loop, prediction ledger, and federated knowledge base. Each phase is a deliberate architectural step, not a feature wishlist.
+> This roadmap covers the evolution from a modular AI-assisted dashboard into an
+> experiment ledger whose campaign data, results and learnings are joined by one
+> taxonomy. Each phase is a deliberate architectural step, not a feature wishlist.
+>
+> **Read the phase numbers as dependency order, not as a plan.** Phases 3 and 4 are
+> gated on ten paying clients and should not be started before then; cross-customer
+> benchmarking has been cut outright. What is actually next is Phase 2.0 (Supabase),
+> then the campaign fact model and read connectors that depend on it. The
+> commercial thesis these are sequenced against is in
+> [docs/commercial.md](./docs/commercial.md).
 
 ---
 
@@ -158,13 +167,32 @@ and does not wait on Supabase.
 
 **Target:** Replace manual CSV data entry with live API connections to ground the Prediction Ledger in authoritative numbers.
 
-### Persistence — Supabase
+### 2.0 — Persistence: Supabase. First, and before anything else here
 
-Prerequisite for everything else in this phase, and for selling to anyone who asks where their data lives. Postgres for the relational queries the dashboard already runs (win rate by category, cross-brand gaps, contribution), RLS for tenant isolation, and Supabase Auth for the session token the proxy needs. Schema draft is in `supabase/migrations/0001_init.sql`.
+This moved to the front of the phase. The old trigger was a soft one — "the first
+client who needs a second user, a second device, or who asks where their data is
+stored" — and it was written when the thing outgrowing the browser was going to be
+someone else's objection. It isn't. It is already the product's own differentiating
+feature: **performance rows are capped at 5,000 in `localStorage` and the oldest are
+dropped on merge** (Phase 1.6, "Performance rows do not survive the browser"). The
+campaign↔experiment bridge is the part of this product no competitor has, it is the
+part that ingests the most rows, and it is silently discarding history today. A
+learning system that forgets is not a demo problem to defer; it is the claim
+failing.
+
+So the trigger is met, by the codebase rather than by a client. Build it.
+
+Postgres for the relational queries the dashboard already runs (win rate by
+category, cross-brand gaps, contribution), RLS for tenant isolation, and Supabase
+Auth for the session token the proxy needs. Schema draft is in
+`supabase/migrations/0001_init.sql`.
 
 Be honest about the cost: `store.js` stores one JSON blob per key, and that model does not survive contact with a relational schema. The read paths are real work, not an adapter swap.
 
-**Trigger:** the first client who needs a second user, a second device, or who asks where their data is stored.
+**Sequencing consequence:** the campaign fact model (Phase 5.3) and the read
+connectors (5.4) both list Supabase as a hard prerequisite. With 2.0 pulled
+forward, those stop being late-phase items gated on infrastructure that keeps
+receding and become the next real work after it.
 
 ### Normalisation contract
 
@@ -184,13 +212,32 @@ Connect the GA4 Data API to auto-populate funnel context. The recommendation eng
 
 The shared-secret model is gone (Phase 1.5); what remains is real per-user accountability. The proxy currently authorises on origin and caps cost by request shape, which is adequate for single-tenant demo and early client work but attributes nothing to a person.
 
-This step verifies a session token issued by the same auth that gates the app and rate limits per user rather than per IP. **It is the same piece of work as the Supabase migration below** — the token has to come from somewhere — and should not be attempted separately.
+This step verifies a session token issued by the same auth that gates the app and rate limits per user rather than per IP. **It is the same piece of work as the Supabase migration above (2.0)** — the token has to come from somewhere — and should not be attempted separately.
 
 - [ ] **Health Metric Anomaly Flagging:** When a designated health metric moves beyond a configurable threshold in a week where experiments are active, surface a passive contextual flag in the Business Health Panel. Requires live data connections to be meaningful at scale.
 
 ---
 
-## Phase 3 — Autonomous Orchestration
+## Phases 3 and 4 are gated on customers, not on readiness
+
+**Neither phase starts before 10 paying clients.** They are recorded here because
+the thinking is done and re-deriving it later would be waste, not because they are
+next. Both are scaling work, and scaling work done before there is something to
+scale is the most expensive kind of progress available: it takes months, it is
+genuinely interesting, and it moves nothing.
+
+The specific failure this gate exists to prevent: background execution, prompt
+versioning, Zod contracts, RLS multi-tenancy and a federated knowledge base are all
+defensible engineering. Each one can be justified on its own merits on any given
+week. Together they are two quarters spent making a product easier to operate at a
+scale it has never been asked to reach, while the question of whether anyone will
+pay for it stays unanswered.
+
+Read the gate as literal. Ten paying clients, then reopen this section.
+
+---
+
+## Phase 3 — Autonomous Orchestration *(gated: 10 paying clients)*
 
 **Target:** Automate the AI loops to support multi-client management without proportional manual overhead.
 
@@ -212,7 +259,7 @@ Background cron worker that cross-references live Shopify/Meta metrics against a
 
 ---
 
-## Phase 4 — Productised Scaling
+## Phase 4 — Productised Scaling *(gated: 10 paying clients)*
 
 **Target:** Transition from a config-swapped per-client deployment to a multi-tenant platform with a federated knowledge base.
 
@@ -224,19 +271,47 @@ Separate database indexing and client contexts so a single instance manages mult
 
 Automatically sanitise closed initiatives — stripping identifying brand data — and convert the core strategic learnings (hypothesis, result, mechanism, transferability) into vector embeddings via `pgvector`. The Ask the Library feature upgrades from in-session retrieval to a cross-portfolio semantic search, surfacing mechanisms that proved out in one brand's context when constructing hypotheses for another.
 
-### Cross-customer anonymised benchmarking
+**Separate trigger, and it is not the client count.** Retrieval earns its
+complexity when the corpus stops fitting in a context window. Ask the Library
+sends closed learnings in-session today and that is the correct design for a
+portfolio of tens. Build this when a real workspace's closed learnings exceed what
+a single call can carry, measured rather than assumed — not because the phase
+number came up.
 
-Aggregate de-identified outcome data across clients to produce category-level benchmarks (e.g. median ICE accuracy by experiment type, win rate by funnel stage, average time-to-result by category). Feed these benchmarks into the candidate generation pass of Next Plays and into the Signal debate context. This is the feature that creates compounding value with each additional client — each new data point improves recommendations for the entire network.
+### Cross-customer anonymised benchmarking — cut
 
-> Implementation note: this phase requires explicit contract language around data usage and anonymisation before any cross-client data flows are introduced.
+**Removed from the roadmap.** It was described here as "the feature that creates
+compounding value with each additional client," which is the network-effects story
+a platform tells about itself at 500 customers. At the count this product is
+planning for, the arithmetic does not work: a category benchmark drawn from a
+handful of clients is a small sample presented with the authority of a large one,
+and the first time it is wrong it is wrong in a client deck.
+
+It also inverts the sale. The pitch is *your* organisation's accumulated evidence,
+weighted by how strongly your own tests support it. Aggregating across customers
+replaces the thing being bought with an industry average, and requires asking every
+client for permission to use their results — a conversation that costs more trust
+than the feature returns.
+
+The compounding asset is one workspace's own experiment history, and that already
+exists. Revisit only if the client count reaches a scale where a category cohort is
+genuinely large, and only with the contract language written first.
 
 ---
 
-## Phase 5 — Marketers Lab
+## Phase 5 — From decision engine to execution loop
+
+*(This scope was previously titled "Marketers Lab". That is now the product's
+name rather than a phase of it — see DECISIONS.md.)*
 
 The expansion from a decision engine into an experimentation platform that also
 executes. Sequenced by dependency, not by appeal: everything below Phase 5.1
 needs a backend, and pretending otherwise is how this stalls.
+
+**5.1 and 5.2 are the next app-layer work after 2.0** — both are pure additions to
+the existing data model with no backend dependency, and together they are what
+turns a backlog into a research programme. They are also the two items a buyer can
+see in a demo without a single connector being wired.
 
 Positioning is **practice-first, product-shaped** — built for the operator's own
 consulting work, with schema decisions made multi-tenant-safe from the first
@@ -315,20 +390,33 @@ record. No auto-approval at any spend level. Full reasoning in DECISIONS.md — 
 is the one part of the scope where getting it wrong costs money rather than
 credibility.
 
-### 5.6 — Creative production
+### 5.6 — Creative production, including video from evidence
 
 Extends the Creative Studio from direction to assets: brief → variant set →
 generated or templated creative → tagged with the initiative → matched back
 through the naming convention when performance lands. Closes the loop that
 5.1–5.5 opens.
 
-### Open question — naming and identity
+**Product video generated from the learning library is the intended end state,**
+and it is deliberately last. The interesting version is not "generate a video" —
+it is a video whose angle, hook and proof are chosen because the library says
+those are the claims this brand's own tests have supported, generated against a
+hypothesis, named with the initiative's tracking tag, and joined back to its own
+performance when the rows land. Every one of those clauses depends on 5.1 through
+5.4 working on real data. Built earlier, it is an asset generator, which is a
+commodity, and it is the fastest way to be mistaken for one.
 
-`marketerslab.com` is held, and the Biosphere prototype carries a different
-visual identity (green/oklch, sidebar IA, Instrument Sans) and a strong
-vocabulary: Observatory, Quarantine, Vivarium, Laboratory, Microscope.
-DECISIONS.md defends the current sand-gold editorial palette on the grounds that
-this is a client-facing advisory artifact rather than an internal ops console.
-Both positions are coherent; they describe different products. This is a
-positioning decision to make deliberately, not a side effect of whichever view
-gets built next.
+**What ships today is not this.** `api/video.js` renders talking-head avatars
+(HeyGen, VEED Fabric via fal.ai). Useful, and worth keeping wired since it costs
+nothing to leave in place — but a spokesperson render is a different product from
+product video, and the roadmap should not let the presence of the first imply
+progress on the second.
+
+### Naming and identity — resolved
+
+Previously an open question here. The product is **Marketers Lab**; `Growth OS`
+is retired as a public name and kept as the repository name. The sand-gold
+editorial identity stays, and the Biosphere prototype's invented vocabulary
+(Observatory, Quarantine, Vivarium, Microscope) is not adopted. Full reasoning,
+including why the fallback for a trademark conflict is a new name rather than a
+reversion, is in DECISIONS.md.

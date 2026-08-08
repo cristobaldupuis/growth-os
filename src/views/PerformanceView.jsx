@@ -544,7 +544,7 @@ export function PerformanceView({ t, dk, items, settings, perfRows, onImport, on
                     {d.isBridge && (
                       <span style={{ fontFamily: t.mono, fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase",
                         color: t.gold, border: "1px solid " + t.goldBorder, borderRadius: 4, padding: "1px 6px" }}>
-                        Growth OS bridge
+                        Marketers Lab bridge
                       </span>
                     )}
                     {d.custom && (
@@ -682,7 +682,7 @@ export function PerformanceView({ t, dk, items, settings, perfRows, onImport, on
                           {d.key === schema.initiativeDimension && (
                             <span style={{ fontFamily: t.mono, fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase",
                               color: t.gold, border: "1px solid " + t.goldBorder, borderRadius: 4, padding: "1px 6px" }}>
-                              Growth OS bridge
+                              Marketers Lab bridge
                             </span>
                           )}
                           {!d.vocab && (

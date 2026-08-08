@@ -1,7 +1,7 @@
 // The console's visual language.
 //
 // Deliberately not src/components/styles.js and deliberately not the `t` theme
-// object every view takes. Growth OS is gold, Lora serif, generous spacing — it is
+// object every view takes. Marketers Lab is gold, Lora serif, generous spacing — it is
 // a product surface a client looks at. This is a control panel for one operator,
 // and the two should not be mistakable for each other at a glance: someone who has
 // this open is one click from changing what every visitor's session runs on, and

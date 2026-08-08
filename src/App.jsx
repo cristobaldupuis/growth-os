@@ -271,7 +271,7 @@ function GuideDrawer({ t, dk, openSection, onClose, onNavigate, nav }) {
         <div style={{position:"sticky",top:0,background:t.surface,borderBottom:"1px solid "+t.border,padding:"18px 22px",zIndex:2}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
             <div>
-              <div style={{fontSize:16,fontWeight:600,color:t.text,fontFamily:t.serif}}>What can Growth OS do?</div>
+              <div style={{fontSize:16,fontWeight:600,color:t.text,fontFamily:t.serif}}>What can Marketers Lab do?</div>
               <div style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,marginTop:3}}>Every capability, grouped by what you're trying to accomplish.</div>
             </div>
             <button onClick={onClose} style={{background:"transparent",border:"none",color:t.textMuted,cursor:"pointer",fontSize:18,lineHeight:1,flexShrink:0}}><span>&#10005;</span></button>
@@ -460,7 +460,7 @@ function OnboardingModal({ t, settings, onSave, onSkip }) {
         <div style={{padding:"20px 24px 0",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
           <div>
             <div style={{fontSize:10,fontFamily:t.mono,color:t.gold,letterSpacing:"0.10em",textTransform:"uppercase",marginBottom:6}}>
-              Growth OS {step < STEPS.length - 1 ? `· Step ${step+1} of ${STEPS.length - 1}` : "· Ready"}
+              Marketers Lab {step < STEPS.length - 1 ? `· Step ${step+1} of ${STEPS.length - 1}` : "· Ready"}
             </div>
             <div style={{fontSize:20,fontWeight:600,color:t.text,fontFamily:t.serif,lineHeight:1.2}}>{currentStep.title}</div>
           </div>
@@ -495,7 +495,7 @@ function OnboardingModal({ t, settings, onSave, onSkip }) {
             : <div/>
           }
           <button style={{...gG(t),fontSize:13,padding:"8px 20px"}} onClick={handleNext}>
-            {isLast ? "Start using Growth OS →" : "Next →"}
+            {isLast ? "Start using Marketers Lab →" : "Next →"}
           </button>
         </div>
       </div>
@@ -1264,7 +1264,7 @@ export default function App() {
     setTimeout(() => { setShowImport(false); setImportRows([]); setImportErrs([]); setImportDone(false); }, 1800);
   };
 
-  if(!loaded) return <div style={{background:t.bg,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{color:t.textMuted,fontFamily:t.serif}}>Loading Growth OS…</span></div>;
+  if(!loaded) return <div style={{background:t.bg,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{color:t.textMuted,fontFamily:t.serif}}>Loading Marketers Lab…</span></div>;
 
   // Counts shown against each nav item. Deliberately only where a number means
   // "there is work here" — a count on Observatory or Readout would be decoration,
@@ -1584,7 +1584,7 @@ export default function App() {
                     <button onClick={goNew} style={{...gG(t),fontSize:12.5,padding:"8px 16px"}}>+ New initiative</button>
                     <button onClick={()=>setShowCapture(true)} style={{...gGh(t),fontSize:12.5,padding:"8px 14px"}}>&#9889; Quick capture</button>
                   </div>
-                  <button onClick={()=>setGuideSection(true)} style={{background:"none",border:"none",color:t.textMuted,fontSize:12,fontFamily:t.serif,cursor:"pointer",marginTop:14,textDecoration:"underline",textUnderlineOffset:3}}>New here? See everything Growth OS can do &#8594;</button>
+                  <button onClick={()=>setGuideSection(true)} style={{background:"none",border:"none",color:t.textMuted,fontSize:12,fontFamily:t.serif,cursor:"pointer",marginTop:14,textDecoration:"underline",textUnderlineOffset:3}}>New here? See everything Marketers Lab can do &#8594;</button>
                 </div>
               ) : (
                 <div style={{...gCd(t),padding:"40px 24px",textAlign:"center"}}>
@@ -1742,7 +1742,7 @@ export default function App() {
             ) : importRows.length === 0 ? (
               <>
                 <p style={{fontSize:13,color:t.textSub,fontFamily:t.serif,lineHeight:1.6,marginBottom:4}}>
-                  Upload a CSV exported from the Growth OS Import Template. Column headers must match the template exactly.
+                  Upload a CSV exported from the Marketers Lab Import Template. Column headers must match the template exactly.
                 </p>
                 <label style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:10,padding:"28px 20px",border:"2px dashed "+t.border,borderRadius:8,cursor:"pointer",background:t.surfaceAlt}}
                   onDragOver={e=>{e.preventDefault();e.stopPropagation();}}

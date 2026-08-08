@@ -2,7 +2,7 @@
 
 A reference for the demo. Each pattern below is something the AI features in Growth OS should surface from the seed portfolio — useful to know what to click on during a client call.
 
-Every ID here is checked against the live seed in `src/config.csc.js`, which is what `activeConfig.js` points at. If you repoint `activeConfig.js` at a different config, this document does not describe what you will see.
+Every ID here is checked against the live seed in `src/config.demo.js`, which is what `activeConfig.js` points at. If you repoint `activeConfig.js` at a different config, this document does not describe what you will see.
 
 The three brands are **Northcove Home** (`NH`, home décor), **Grounds Control** (`GC`, specialty coffee) and **Peak Season** (`PS`, technical outdoor gear).
 
@@ -129,6 +129,6 @@ These are demo features, not gaps to fill.
 
 ## Keeping this document honest
 
-Every ID, figure and ratio above is derived from `src/config.csc.js`. Editing the seed can invalidate this file silently — which is exactly what happened once already, when the brands were renamed from Retailer 1 / Retailer 2 to Grounds Control / Peak Season and 17 of the 24 IDs cited here stopped existing.
+Every ID, figure and ratio above is derived from `src/config.demo.js`. Editing the seed can invalidate this file silently — which is exactly what happened once already, when the brands were renamed from Retailer 1 / Retailer 2 to Grounds Control / Peak Season and 17 of the 24 IDs cited here stopped existing.
 
 If you change the seed, re-derive rather than patch. The counts above come straight from `SEED`: closed-with-actuals for the calibration ratio, `linkedIds` for the carry-over chains, and a category tally for the thin-on-purpose section.

@@ -111,7 +111,7 @@ export const handleDownloadBackup = (items, settings, debates, weeklyMetrics, re
       format: "growth-os-backup",
       version: 1,
       exportedAt: new Date().toISOString(),
-      company: settings.companyName || "Growth OS",
+      company: settings.companyName || "Marketers Lab",
     },
     items,
     settings,
@@ -126,7 +126,7 @@ export const handleDownloadBackup = (items, settings, debates, weeklyMetrics, re
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement("a");
   const stamp = new Date().toISOString().slice(0,10);
-  const slug  = (settings.companyName || "GrowthOS").replace(/\s+/g,"_");
+  const slug  = (settings.companyName || "MarketersLab").replace(/\s+/g,"_");
   a.href = url;
   a.download = slug+"_backup_"+stamp+".json";
   a.click();
@@ -139,7 +139,7 @@ export const handleRestoreBackup = (file, showToast, setRestorePayload) => {
     try {
       const parsed = JSON.parse(ev.target.result);
       if (!parsed || parsed._meta?.format !== "growth-os-backup") {
-        showToast("This file doesn't look like a Growth OS backup. Restore cancelled.", "error");
+        showToast("This file doesn't look like a Marketers Lab backup. Restore cancelled.", "error");
         return;
       }
       const counts = {

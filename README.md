@@ -1,12 +1,60 @@
-# Growth OS
+# Marketers Lab
 
-A growth execution framework for multi-brand ecommerce portfolios. Replaces fragmented marketing spreadsheets with a structured operating engine — combining initiative lifecycle management, statistical rigour, AI-assisted prioritisation, and an autonomous C-Suite strategy debate in a single interface.
+*(Repository name `growth-os` is the internal project name. See DECISIONS.md.)*
 
-Growth OS sits between your data layer (Shopify, GA4, Triple Whale) and your execution layer (Meta, Klaviyo, native ad tools). It doesn't replace attribution or automation — it's the decision engine in the middle: enforcing scientific rigour on every experiment, synthesising learnings across brands, and surfacing what to test next before the team has to ask.
+**Every experiment should make the next one smarter.**
 
-Built to demonstrate how a Director of Growth thinks about velocity, incrementality, and portfolio-level learning at scale.
+Marketers Lab is an experiment ledger for ecommerce growth teams. It records what
+you believed before a test ran, what you predicted, what the ad account actually
+did, and what the organisation now knows — and it joins those together
+automatically, because the campaign names carry the link.
+
+```
+observation → hypothesis → prediction (frozen at launch) → campaign → ad names
+    → performance rows → prediction error → learning → next hypothesis
+```
+
+The part that is not a project-management tool is the join. An initiative's
+`trackingTag` is a segment in the ad naming convention, so a Meta export parses
+back into the experiment that produced it. Spend arrives already attached to the
+belief it was testing, and a platform export splits three ways: attributed,
+untagged business-as-usual, and a tag that resolves to nothing — a broken link,
+named rather than counted.
+
+It sits between your data layer (Shopify, GA4, Triple Whale) and your execution
+layer (Meta, Klaviyo, native ad tools). It doesn't replace attribution or
+automation, and doesn't touch your ad account's budgets: it reads what happened
+and remembers what it meant.
 
 **[→ Launch Live Application](https://growth-os-iota-seven.vercel.app/)**
+
+---
+
+## How this differs from the experiment trackers
+
+Experiment tracking, hypothesis templates, AI-suggested tests, ICE prioritisation
+and a searchable learnings library are table stakes. [GrowthLab](https://growth-experiments.com/),
+[GrowthOrange](https://growthorange.com/) and [GrowthEX](https://www.growthex.ai/)
+all ship them, and any pitch resting on "we remember what you learned" is a pitch
+against three products saying the same sentence.
+
+The difference is that those are trackers a human updates. This one reads the ad
+account. The campaign nomenclature engine (`src/services/naming.js`) turns names
+into typed dimensions, refuses to guess when a segment count doesn't match, and
+`matchNamesToInitiatives` joins the rows to experiments — so "which of our
+campaigns actually taught us anything" is a query rather than an afternoon of
+spreadsheet archaeology.
+
+Different category entirely, and not competitors: Triple Whale and Northbeam
+answer *what happened*; GrowthBook, Statsig and Eppo are product-engineering
+experimentation infrastructure. Marketers Lab sits above the first and does not
+attempt the second.
+
+The honest substitute is Airtable or Notion plus a spreadsheet — which models the
+same entities for nearly nothing, right up to the point where 4,000 ad names have
+to become dimensions.
+
+Commercial thesis, ICP and pricing: [docs/commercial.md](./docs/commercial.md).
 
 ---
 
@@ -229,7 +277,7 @@ src/
   App.jsx              # Orchestration layer
   activeConfig.js      # Re-export barrel — the one line that switches which config.*.js is live
   config.js            # Generic deployment context — brands, briefs, agents, categories, seed data
-  config.[client].js   # Per-client copy of config.js (e.g. config.csc.js)
+  config.[client].js   # Per-client copy of config.js (e.g. config.demo.js)
   constants.js         # Theme tokens, status/outcome palettes, ICE scoring, formatters
   views/               # DashView, TriageView, LearningLibrary, DetailView, ClientReadoutView, CreativeStudio, CopilotPanel
   components/          # Shared UI atoms

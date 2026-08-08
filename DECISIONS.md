@@ -629,3 +629,85 @@ is never cheaper than today.
 existing name has real equity. Neither exists now. If Marketers Lab proves
 unclearable, the fallback is a new name — not a reversion to Growth OS, which
 this entry rejects on its merits rather than on availability.
+
+---
+
+## The laboratory names live in the rail, not the header
+
+**Decision:** The Biosphere vocabulary (Observatory, Register, Archive,
+Microscope, Quarantine, Bench, Readout) stays as a one-line subtitle under each
+sidebar item and appears nowhere else. It was also rendered beside the view
+title in the page header; that instance is removed.
+
+**Why this is not a reversal of the entry above.** "The product is Marketers
+Lab; Growth OS is the repository" rejects the Biosphere vocabulary *as
+nomenclature* — as the words a buyer has to learn in order to find the
+initiative list. That rejection holds and is what produced the split in
+`navSections.js`: `label` is plain and is the thing you read and click, `lab` is
+flavour that is never the only way to find anything. The rail subtitle earns its
+place by doing one job the plain label cannot: it explains the two-letter code
+on the item, which is otherwise a monogram with no referent — and in the
+collapsed rail, the code *is* the item.
+
+**Why the header instance goes.** It explained nothing. The header already
+names the view directly above it, so a second uppercase label beside it competed
+for the same glance and told the reader something they had just read, in a word
+they would have to learn. The rail version is a gloss on a code; the header
+version was a synonym for a word already on screen.
+
+**The record was in conflict.** The entry above said the vocabulary was "not
+adopted" while the shipped UI adopted it in two places, and `navSections.js`
+carried a long defence of a position DECISIONS.md contradicted. Two written
+records disagreeing is how a codebase loses the ability to answer "why is this
+like this", which is the only thing this file is for. This entry settles it.
+
+---
+
+## Money and dates are workspace settings
+
+**Decision:** `settings.currency` and `settings.locale`, applied once at load
+through `setNumberFormat` and read by the shared formatters from module state.
+One `fmtCur`, one `fmtDate`, plus `fmtCurFine` and `fmtCurFull` for the dense
+and the prose cases.
+
+**Why:** there were four currency formatters and they disagreed on the same
+number — `$2,400,000` rendered as "$2.4M" on the dashboard, "$2400k" in Triage
+(a local copy with no millions branch), "$2400k" again in the funnel map (a
+third copy, with a decimal the others lacked), and "$2,400,000" in the AI
+context. Triage also had its own `fmtDate` that dropped the year. All four
+hardcoded a dollar sign and `en-CA`, in a product whose central artifact is a
+revenue claim a client forwards to their board: a UK brand read its own numbers
+in dollars.
+
+**Why module state rather than arguments:** the formatters are called at roughly
+a hundred and forty sites. Threading a currency through all of them to serve a
+deployment setting is the wrong trade, and the codebase already has this exact
+shape in `applyRouting` for model assignments, for the same reason.
+
+**What this costs:** the formatters are impure — a call before `setNumberFormat`
+resolves uses the default. Every one of them runs during render, long after the
+settings effect has fired on mount, and the default is a correct answer rather
+than a broken one, so the failure mode is a US-dollar figure for one frame in a
+workspace that has not finished loading.
+
+---
+
+## `textMuted` is content and is held to AA
+
+**Decision:** `TL.textMuted` darkens from `#74716A` to `#6A675F`, and
+`check-contrast.mjs` checks it at 4.5:1 like every other ink. A new `textFaint`
+token carries the AA-Large waiver.
+
+**Why:** the waiver was written on the claim that muted was "micro-label only …
+decorative context rather than content", and the code never honoured it.
+`textMuted` is the most-used ink in the app — 395 usages against 129 for
+`textSub` — and it is the label colour for every form field via `FR`, every
+table header, half the cells in Weekly Pulse, and the sublabel under every stat
+tile, at 9–11px in a hundred and ninety places. AA Large applies at ≥18.66px
+regular or ≥24px bold; none of those qualify. The pairing measured 4.05:1 on
+`bg`.
+
+A contrast gate with an exemption for the token that does most of the work is a
+gate that reports what it was told rather than what is true. The waiver now
+names a token that is actually decorative, and is checked against the surfaces
+that token is allowed on.

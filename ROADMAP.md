@@ -161,6 +161,73 @@ and does not wait on Supabase.
   read path proven against real exports, deliberately ahead of its storage —
   Phase 5.3 is where it gets a home that fits.
 
+### Phase 1.7 — Interface audit remediation (August 2026)
+
+A third audit pass, this one on UI, UX and usability rather than correctness —
+the question was not "does it work" but "does it read as finished next to the
+software this buyer already has open". Twenty-six findings; the report and its
+measurements are in [docs/ui-audit-2026-08.md](./docs/ui-audit-2026-08.md).
+
+- [x] **Finish the rename.** The shell still said `GROWTH OS` in the top-left of
+  every screen, the client readout export was headed `GROWTH OS SUMMARY`, and
+  CSV exports were `GrowthOS_export_*.csv`. Exports now carry the workspace's
+  own name, as the JSON backup already did.
+- [x] **Remove the last of the starter template.** The favicon was another
+  product's purple lightning bolt and `public/icons.svg` was an unreferenced
+  Bluesky/Discord/GitHub sprite — the same Vite residue as the 1126px
+  `index.css` removed in 1.5.
+- [x] **Add routing.** `nav` was React state, so Back left the app, nothing was
+  linkable, a refresh lost your place, and every pageview Analytics recorded was
+  `/`. Hash routing over `nav` and `selId`, with per-view document titles.
+- [x] **Add global search.** ⌘K over initiative titles, ids, hypotheses and
+  learnings, plus nav destinations and the four common actions. There were no
+  keyboard shortcuts of any kind before it.
+- [x] **Make the layers dialogs.** Eleven modals, two drawers and the tour, none
+  of which closed on Escape, trapped focus, or returned it. `useDialog` does all
+  four and `Modal` routes every modal through it.
+- [x] **Label the forms.** `FR` rendered a `<label>` with no `htmlFor` and the
+  input as a sibling, so no field in the product was associated with its label.
+- [x] **Enforce pre-registration.** The three fields marked required were not.
+  Enforced on new initiatives with inline reasons; flagged rather than blocked
+  on the 38 seeded records that predate the fields.
+- [x] **Guard unsaved work.** The editor could be abandoned in one click with no
+  warning and Settings discarded nine sections of edits on a backdrop click.
+- [x] **Name the destructive action.** Deleting an initiative was a native
+  `confirm()` that did not say what it was deleting, with no undo.
+- [x] **Replace emoji with an icon set.** ~40 `currentColor` stroke icons on a
+  16px grid. Agent avatars were a character typed into a text box; template
+  icons were dead `ti-*` class names from a webfont removed months ago.
+- [x] **Give the dashboard a hierarchy.** The range picker sat seventh down the
+  page, above the ten panels it governs and below the five it does not. Ten
+  near-equal tiles became four plus a disclosure.
+- [x] **One formatter for money and dates**, with currency and locale as
+  settings. Four disagreeing copies rendered `$2.4M` three different ways.
+- [x] **Hold `textMuted` to AA.** It was waived to AA-Large on a "decorative"
+  claim the code never honoured, and measured 4.05:1.
+- [x] **Cap the token vocabulary.** 13 border radii, 24 font sizes and ~60
+  button padding pairs; `RADIUS`/`FS`/`SP` scales and sized button variants.
+- [x] **Fix the theme flash and the link preview.** A dark-mode user got a white
+  frame on every load; a shared link unfurled as a bare URL.
+- [x] **Responsive escape hatch.** One media query governed the whole app, so 18
+  fixed `1fr 1fr` grids never collapsed and the tour spotlit off-screen
+  rectangles.
+
+**Not done in this slice, and why:**
+
+- [ ] **Settings as a page rather than a modal.** Nine sections in a 560px box
+  capped at 88vh, with no sub-navigation — and the campaign nomenclature
+  editor, the product's headline differentiator, lives two levels deep at
+  Performance → Taxonomy while the README says the convention "lives in
+  settings". Both fixes are the same fix: Settings becomes a nav destination
+  with a left sub-nav and Taxonomy moves into it. It is a structural change to
+  two of the largest views with no test coverage over either, so it wants its
+  own pass rather than the end of a long one.
+- [ ] **Backfill the seeded portfolio.** All 38 demo initiatives lack an
+  observation and a success metric, which is why pre-registration is enforced
+  on new work and only flagged on old. The shop window should model the
+  discipline the product sells; until the seed is rewritten, a new visitor's
+  first initiative is the only one that demonstrates it.
+
 ---
 
 ## Phase 2 — The Data Moat

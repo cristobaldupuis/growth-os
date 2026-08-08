@@ -8,6 +8,7 @@ import { renderCitedText, renderProse } from "../components/text.jsx";
 import { callSynthesizeLearnings } from "../services/ai/callSynthesizeLearnings.js";
 import { callAskLibrary } from "../services/ai/callAskLibrary.js";
 import { interactive } from "../components/motion.js";
+import { IconSearch, IconSpinner } from "../components/icons.jsx";
 
 // Layout toggle glyphs. Drawn inline rather than pulled from an icon font so
 // the control renders on first paint and offline.
@@ -106,7 +107,7 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
         <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"flex-start"}}>
           <input style={{...gI(t),flex:1,minWidth:200}} value={ask} onChange={e=>setAsk(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")runAsk();}} placeholder={String.fromCharCode(34)+"Have we tried creative angles for retention?"+String.fromCharCode(34)+"  ·  "+String.fromCharCode(34)+"What worked for us at BFCM?"+String.fromCharCode(34)}/>
           <button style={{...gG(t),whiteSpace:"nowrap"}} disabled={askLoad||!ask.trim()||closed.length===0} onClick={runAsk}>
-            {askLoad ? <><span style={{display:"inline-block",animation:"spin 1s linear infinite"}}>&#8635;</span> Searching…</> : <>&#128269; Ask</>}
+            {askLoad ? <><IconSpinner size={13}/> Searching…</> : <><IconSearch size={13}/> Ask</>}
           </button>
         </div>
         <div style={{fontSize:10.5,color:t.textMuted,fontFamily:t.serif,marginTop:6}}>Searches every closed initiative, wins and failures alike, weighing relevance first and recency second.</div>
@@ -124,16 +125,23 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
       </div>
 
       {/* Outcome summary tiles */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
+      <div className="gos-grid-2" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
         {["Jackpot","Success","Failed","Inconclusive"].map(o=>{
           const c=(dk?OD:OL)[o]||{};
           const active=activeOutcomes.includes(o);
+          // Filter toggles that look like stat tiles. They used a 2px border
+          // where the rest of the app uses 1px, and dropped to 45% opacity when
+          // off — which made the counts, the one thing a stat tile exists to
+          // show, hard to read in the state they are in most of the time. The
+          // off state is now carried by the border and the ink, and the number
+          // stays legible either way.
           return (
-            <button key={o} onClick={()=>toggleOutcome(o)}
-              style={{border:"2px solid "+(active?c.border:t.border),borderRadius:8,padding:"12px 10px",
+            <button key={o} onClick={()=>toggleOutcome(o)} aria-pressed={active}
+              style={{border:"1px solid "+(active?c.border:t.border),borderRadius:t.r.md,padding:"12px 10px",
                 background:active?c.bg:t.surface,cursor:"pointer",textAlign:"center",
-                transition:"all 0.15s",opacity:active?1:0.45}}>
-              <div style={{fontSize:28,fontWeight:700,color:active?c.text:t.textMuted,fontFamily:t.mono,lineHeight:1}}>{counts[o]||0}</div>
+                transition:"background .15s, border-color .15s, color .15s",
+                boxShadow:active?t.shadow:"none"}}>
+              <div style={{fontSize:t.fs.display,fontWeight:700,color:active?c.text:t.textSub,fontFamily:t.mono,lineHeight:1}}>{counts[o]||0}</div>
               <div style={{fontSize:11,fontWeight:600,color:active?c.text:t.textMuted,fontFamily:t.serif,marginTop:4,letterSpacing:"0.04em"}}>{o}</div>
             </button>
           );
@@ -141,7 +149,7 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
       </div>
 
       {/* Search + filters */}
-      <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"flex-end"}}>
+      <div className="gos-filters" style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"flex-end"}}>
         <div style={{display:"flex",flexDirection:"column",gap:2,flex:1,minWidth:180}}>
           <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Search learnings</label>
           <input style={gI2(t)} value={query} onChange={e=>setQuery(e.target.value)} placeholder="Keyword across learnings and titles..."/>

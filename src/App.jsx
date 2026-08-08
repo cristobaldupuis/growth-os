@@ -1839,7 +1839,7 @@ export default function App() {
                 );
               })}
             </div>
-            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            <div className="gos-filters" style={{display:"flex",gap:6,flexWrap:"wrap"}}>
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
                 <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Category</label>
                 <select value={fCat} onChange={e=>setFCat(e.target.value)} style={{...gSl(t),minWidth:130}}>{["All",...cats].map(c=><option key={c}>{c}</option>)}</select>

@@ -580,3 +580,52 @@ different job from claiming an existing one. The editor does the second, because
 pasting a name you already have belongs next to the other attribution fields; the
 first is a link that saves the initiative first, so the builder opens with a
 record that exists and can actually be claimed against.
+
+---
+
+## The product is Marketers Lab; Growth OS is the repository
+
+**Decision:** The public product name is **Marketers Lab**. `Growth OS` is retired
+as a customer-facing name and kept only as the repository and internal project
+name. The visual identity stays sand-gold editorial; the Biosphere prototype's
+green/oklch palette and its invented vocabulary (Observatory, Quarantine,
+Vivarium, Microscope) are not adopted. The scientific vocabulary that *is*
+adopted is the standard one already in the data model — observation, hypothesis,
+prediction, evidence, learning — because those words need no glossary.
+
+**Why now rather than later:** the switching cost is currently zero and only ever
+rises. There are no customers, no invoices, no inbound links that matter, and no
+one has the old name in their vocabulary. Every month this stays open, the same
+decision costs more to make. ROADMAP listed it as an open question on the grounds
+that both positions are coherent; they are, which is exactly why it will not
+resolve itself by being deferred.
+
+**Why not Growth OS:** "OS" has become a suffix rather than a claim — it now
+signals category ambition instead of describing anything. It is also the wrong
+promise. An operating system is what you run your work *on*; this is a thing that
+remembers what your experiments taught you. "Growth" pairs it with the job title
+of the buyer at a company large enough to have one, which is a segment above the
+ICP. `marketerslab.com` is already held.
+
+**Why "Lab" is the right noun:** it names the loop rather than the software. The
+product's actual claim is that marketing work should produce evidence, and a lab
+is where that is the normal expectation rather than an aspiration. It also
+survives the feature list changing underneath it, which "OS" does not — an OS is
+measured by how much it covers, and coverage is the trap this product has to
+avoid.
+
+**Why the Biosphere vocabulary is rejected despite being better writing:** the
+product's pitch is that it removes a translation step between what a marketer did
+and what the organisation learned. Inventing six words the buyer has to learn
+first adds a translation step back. Named concepts are worth their cost when they
+carry a meaning no existing word does; Quarantine and Vivarium are more evocative
+than Draft and Running, not more precise.
+
+**What this costs:** a rename pass across README, the app shell, the config
+defaults and the deployment. Cheap today, and the point of the entry is that it
+is never cheaper than today.
+
+**Forcing condition:** a trademark conflict, or a client relationship where the
+existing name has real equity. Neither exists now. If Marketers Lab proves
+unclearable, the fallback is a new name — not a reversion to Growth OS, which
+this entry rejects on its merits rather than on availability.

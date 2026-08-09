@@ -34,6 +34,7 @@ import {
 import {
   MODEL_CATALOGUE, FEATURE_GROUPS, DEFAULT_ROUTING, validateRouting, resolveRouting, modelById,
 } from "../src/services/ai/registry.js";
+import { geminiConfigured, geminiAuthMode } from "./_geminiAuth.js";
 
 const MAX_BODY_BYTES = 32 * 1024;
 // Low on purpose. A human clicking through a console does not need more, and this
@@ -50,6 +51,14 @@ const MODEL_LIST_ENDPOINTS = {
     keyVar: "GEMINI_API_KEY",
     // Gemini returns `models: [{name: "models/gemini-x", ...}]`.
     extract: (json) => (json?.models || []).map(m => String(m.name || "").replace(/^models\//, "")),
+    // Configured now means "AI Studio key OR Vertex service account", not just
+    // this one key var — see api/_geminiAuth.js. The list call above is AI
+    // Studio's ListModels endpoint specifically, which has no Vertex
+    // equivalent wired here, so a Vertex-only deployment is configured but
+    // not listable — notListableError below says that plainly.
+    configured: geminiConfigured,
+    listable: () => geminiAuthMode() === "aistudio",
+    notListableError: "Gemini is running in Vertex mode; listing models isn't wired up for Vertex here yet — verify the id by using it directly.",
   },
   openai: {
     url: () => "https://api.openai.com/v1/models",
@@ -80,9 +89,12 @@ const MODEL_LIST_ENDPOINTS = {
 async function fetchProviderModels(provider) {
   const spec = MODEL_LIST_ENDPOINTS[provider];
   if (!spec) return { status: 400, error: `No model list is available for provider "${provider}".` };
-  if (!process.env[spec.keyVar]) {
+
+  const configured = spec.configured ? spec.configured() : !!process.env[spec.keyVar];
+  if (!configured) {
     return { status: 400, error: `${spec.keyVar} is not set, so ${provider} models cannot be listed.` };
   }
+  if (spec.listable && !spec.listable()) return { status: 400, error: spec.notListableError };
   try {
     const upstream = await fetch(spec.url(), { headers: spec.headers ? spec.headers() : {} });
     const json = await upstream.json();

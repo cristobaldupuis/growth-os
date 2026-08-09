@@ -102,13 +102,24 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "This model has no provider adapter configured." });
   }
 
+  // Most providers are "configured" iff their one static key is set; Gemini is
+  // the exception (AI Studio key OR a full Vertex service-account setup), so it
+  // gets its own check via the optional configured()/notConfiguredError() hooks
+  // rather than every other adapter carrying machinery it doesn't need.
   const apiKey = process.env[adapter.keyVar];
-  if (!apiKey) return res.status(500).json({ error: `${adapter.keyVar} is not configured.` });
+  const configured = adapter.configured ? adapter.configured() : !!apiKey;
+  if (!configured) {
+    const message = adapter.notConfiguredError ? adapter.notConfiguredError() : `${adapter.keyVar} is not configured.`;
+    return res.status(500).json({ error: message });
+  }
 
   try {
     const upstream = await fetch(adapter.endpoint(req.body.model), {
       method: "POST",
-      headers: adapter.headers(apiKey),
+      // Awaited uniformly: every adapter but Gemini's returns a plain object here,
+      // and awaiting a non-Promise just resolves to it. Only Vertex mode needs the
+      // async path, to mint or reuse a cached OAuth2 token before the call.
+      headers: await adapter.headers(apiKey),
       body: JSON.stringify(adapter.toRequest(req.body)),
     });
 

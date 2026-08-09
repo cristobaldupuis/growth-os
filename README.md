@@ -382,9 +382,40 @@ Requires a `.env` file with:
 ANTHROPIC_API_KEY=your_key
 
 # Optional. Enables image generation in the Creative Studio (Gemini image
-# models, "Nano Banana"). Without it the app runs normally and image generation
-# returns a clear "not configured" error rather than failing obscurely.
+# models, "Nano Banana") and lets the console route text groups to Gemini.
+# Without it (and without the Vertex vars below) the app runs normally and
+# Gemini features return a clear "not configured" error rather than failing
+# obscurely.
 GEMINI_API_KEY=your_key
+
+# Optional alternative to GEMINI_API_KEY above: routes every Gemini call
+# (text and image) through Vertex AI instead of the Gemini Developer API.
+# Same models, different Google product, different billing pool — the
+# Developer API (generativelanguage.googleapis.com, the plain API key above)
+# bills against AI Studio's own balance, and as of March 2026 Google Cloud
+# Billing credits (including the free trial) are explicitly excluded from it.
+# Vertex ({location}-aiplatform.googleapis.com) bills against the GCP
+# project's Cloud Billing account, so credits sitting there apply. All three
+# vars below are required together; set all three and Vertex is used
+# automatically. Set none and GEMINI_API_KEY above is used exactly as before
+# — this is additive, not a replacement.
+GCP_PROJECT_ID=your_gcp_project_id
+GCP_LOCATION=us-central1
+# The service-account key JSON from GCP (IAM & Admin -> Service Accounts ->
+# Keys -> a key with the "Vertex AI User" role). Vercel env vars are
+# single-line and the key's `private_key` field has embedded newlines, so
+# paste it base64-encoded:
+#   base64 -i service-account-key.json | tr -d '\n'
+# A raw (unencoded) JSON string is also accepted, for platforms that tolerate
+# multi-line env values.
+GOOGLE_APPLICATION_CREDENTIALS=your_base64_or_raw_service_account_json
+
+# Optional override. Forces "vertex" or "aistudio" regardless of which of the
+# above are set — e.g. to try Vertex without deleting a working
+# GEMINI_API_KEY, or to roll back instantly without touching credentials.
+# Unset, the mode auto-detects: Vertex once all three GCP_*/GOOGLE_* vars
+# above are present, AI Studio otherwise.
+GEMINI_AUTH_MODE=vertex
 
 # Optional. Enables talking-head video generation in the Creative Studio. Each
 # tier needs only its own key — the standard tier works without the premium
@@ -423,7 +454,7 @@ ADMIN_SESSION_SECRET=a_long_random_string
 
 # Optional. Lets the console route a feature group to OpenAI. Without it, OpenAI
 # models appear in the picker but calls return a clear "not configured" error.
-# Gemini text reuses GEMINI_API_KEY above.
+# Gemini text reuses whichever Gemini auth is active above (GEMINI_API_KEY or Vertex).
 OPENAI_API_KEY=your_key
 
 # Optional. Lets the console route a feature group to an open-weights model

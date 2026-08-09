@@ -210,13 +210,25 @@ export const MODEL_CATALOGUE = [
   // moved onto our own infrastructure, if a group's output ever has to be
   // reproducible.
   //
-  // There is no first-party Thinking Machines endpoint, so it reaches us through
-  // a host. OpenRouter is the one wired here because its API is OpenAI-compatible
-  // — which makes this a routing entry plus a base URL rather than a fourth
+  // It reaches us through a host rather than from Thinking Machines directly, and
+  // the reason is narrower than "they have no API". They do: Tinker, their
+  // fine-tuning platform, and it carries an OpenAI-compatible inference endpoint.
+  // But that endpoint addresses `tinker://` sampler weight paths — checkpoints
+  // from your own training run — rather than a base model by name, and their docs
+  // scope it to low-traffic internal testing rather than user-facing deployment.
+  // It is a convenience attached to a training product. Thinking Machines points
+  // production inference at Together, Fireworks, Baseten, Modal and Databricks.
+  //
+  // OpenRouter is the host wired here because its API is OpenAI-compatible —
+  // which makes this a routing entry plus a base URL rather than a fourth
   // request/response translation — and because it publishes a model list, so the
   // console's Verify action works on it exactly as it does for the other two.
-  // Together, Fireworks, Baseten and Modal serve the same weights; switching host
-  // is the `openrouter` adapter's endpoint and key, not anything in this file.
+  // The others serve the same weights; switching host is the `openrouter`
+  // adapter's endpoint and key, not anything in this file.
+  //
+  // If a fine-tuned checkpoint ever becomes worth benching against stock models,
+  // Tinker is a sibling adapter, not a rewrite — same OpenAI shape, different
+  // base URL and key var, with the checkpoint path as the catalogue id.
   {
     id: "thinkingmachines/inkling",
     provider: "openrouter",

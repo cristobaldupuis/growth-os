@@ -337,3 +337,46 @@ test("the openrouter response reads the OpenAI tool-call shape", () => {
   assert.equal(out.content[0].type, "tool_use");
   assert.equal(out.content[0].name, "get_portfolio_summary");
 });
+
+// -- Tinker --------------------------------------------------------------------
+//
+// The pass-through adapter. Its correctness claim is unusual: not "the
+// translation is right" but "there is no translation", which is exactly the kind
+// of property that decays silently when someone later adds a helpful tweak. The
+// debate loop is the reason it matters — a tool_use block that survives untouched
+// cannot be mistranslated.
+
+test("the tinker adapter passes the request through untouched", () => {
+  const body = { ...BASE, model: "thinkingmachines/Inkling" };
+  const out = adapters.tinker.toRequest(body);
+  assert.deepEqual(out, body, "tinker speaks Anthropic Messages — nothing should be rewritten");
+  assert.equal(out, body, "and there is no reason to copy it either");
+});
+
+test("the tinker adapter passes the response through untouched", () => {
+  // Including tool_use blocks, which every other adapter has to reconstruct.
+  const json = {
+    content: [{ type: "tool_use", id: "toolu_1", name: "get_portfolio_summary", input: {} }],
+    stop_reason: "tool_use",
+    usage: { input_tokens: 10, output_tokens: 2 },
+  };
+  assert.deepEqual(adapters.tinker.fromResponse(json), json);
+  assert.equal(adapters.tinker.fromResponse(json).stop_reason, "tool_use",
+    "the value the debate loop branches on must arrive unmodified");
+});
+
+test("the tinker adapter authenticates the Anthropic way, not with a bearer token", () => {
+  // The endpoint is documented as accepting the Anthropic SDK's native header.
+  // Sending Authorization instead would 401, and the symptom (no models work on
+  // this provider) points nowhere near the cause.
+  const h = adapters.tinker.headers("sk-test");
+  assert.equal(h["x-api-key"], "sk-test");
+  assert.equal(h["anthropic-version"], "2023-06-01");
+  assert.ok(!h.Authorization, "a bearer token is the wrong scheme here");
+});
+
+test("the tinker endpoint carries the full Anthropic messages path", () => {
+  // Tinker documents a base URL and the client appends the standard path. Getting
+  // this wrong is a 404 on every call to the provider.
+  assert.match(adapters.tinker.endpoint(), /^https:\/\/tinker\.thinkingmachines\.dev\/.*\/v1\/messages$/);
+});

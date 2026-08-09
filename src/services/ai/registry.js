@@ -210,32 +210,33 @@ export const MODEL_CATALOGUE = [
   // moved onto our own infrastructure, if a group's output ever has to be
   // reproducible.
   //
-  // It reaches us through a host rather than from Thinking Machines directly, and
-  // the reason is narrower than "they have no API". They do: Tinker, their
-  // fine-tuning platform, and it carries an OpenAI-compatible inference endpoint.
-  // But that endpoint addresses `tinker://` sampler weight paths — checkpoints
-  // from your own training run — rather than a base model by name, and their docs
-  // scope it to low-traffic internal testing rather than user-facing deployment.
-  // It is a convenience attached to a training product. Thinking Machines points
-  // production inference at Together, Fireworks, Baseten, Modal and Databricks.
+  // It is served first-party, by Thinking Machines' own Tinker platform, and the
+  // deciding fact is the shape rather than the provenance: Tinker publishes an
+  // **Anthropic-compatible** Messages endpoint. This app already speaks Anthropic
+  // Messages natively, so this is the one non-Anthropic entry that crosses no
+  // translation layer at all — see the `tinker` adapter in api/_adapters.js for
+  // why that matters more than it sounds.
   //
-  // OpenRouter is the host wired here because its API is OpenAI-compatible —
-  // which makes this a routing entry plus a base URL rather than a fourth
-  // request/response translation — and because it publishes a model list, so the
-  // console's Verify action works on it exactly as it does for the other two.
-  // The others serve the same weights; switching host is the `openrouter`
-  // adapter's endpoint and key, not anything in this file.
+  // The caveat that comes with it, stated plainly by Tinker's own docs: the
+  // inference endpoint is a beta meant for low internal traffic rather than
+  // high-throughput user-facing deployment, and its latency and throughput may
+  // change without notice. That is a real limit and it is the reason the
+  // `openrouter` adapter is kept wired — but it does not bind here. Every AI call
+  // in this app is click-initiated by one operator in an internal console, which
+  // is the traffic profile that sentence is describing, not the one it is warning
+  // off. If Growth OS ever serves these calls to clients directly, revisit this
+  // before the throughput does it for you.
   //
-  // If a fine-tuned checkpoint ever becomes worth benching against stock models,
-  // Tinker is a sibling adapter, not a rewrite — same OpenAI shape, different
-  // base URL and key var, with the checkpoint path as the catalogue id.
+  // `unverified` for a different reason than the others: Tinker has no model-list
+  // endpoint wired here, so Verify will honestly answer "not verifiable" rather
+  // than confirm it. Smoke-test this one through the console's bench instead.
   {
-    id: "thinkingmachines/inkling",
-    provider: "openrouter",
-    label: "Inkling (Thinking Machines, via OpenRouter)",
+    id: "thinkingmachines/Inkling",
+    provider: "tinker",
+    label: "Inkling (Thinking Machines)",
     modality: "text",
     unverified: true,
-    blurb: "Open weights, long context, cheap. Needs OPENROUTER_API_KEY; verify the id first.",
+    blurb: "Open weights, 1M context, first-party and Anthropic-shaped. Needs TINKER_API_KEY.",
     caps: { tools: true, json: true, adaptiveThinking: false, effort: false, cacheMinTokens: Infinity, longContext: true },
   },
 

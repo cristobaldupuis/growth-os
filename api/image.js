@@ -25,8 +25,7 @@
 // by a full quota. Images are the fastest possible way to reproduce it.
 
 import { guardEntry, guardRateLimit, clientIp } from "./_guard.js";
-
-const GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/models";
+import { geminiConfigured, geminiEndpoint, geminiAuthHeaders } from "./_geminiAuth.js";
 
 // Image models this app actually calls. "Nano Banana" is the community name for
 // Gemini 2.5 Flash Image; the Pro tier is the Gemini 3 image preview.
@@ -104,13 +103,12 @@ export default async function handler(req, res) {
   const invalid = validateImageBody(req.body);
   if (invalid) return res.status(400).json({ error: invalid });
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: "Image generation is not configured on this deployment." });
+  if (!geminiConfigured()) return res.status(500).json({ error: "Image generation is not configured on this deployment." });
 
   try {
-    const upstream = await fetch(`${GEMINI_API}/${req.body.model}:generateContent`, {
+    const upstream = await fetch(geminiEndpoint(req.body.model), {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+      headers: await geminiAuthHeaders(),
       body: JSON.stringify(buildGeminiBody(req.body)),
     });
 

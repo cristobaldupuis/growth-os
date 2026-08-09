@@ -217,6 +217,42 @@ test("listModels refuses a provider with no list endpoint", async () => {
   assert.equal(res.statusCode, 400);
 });
 
+test("listModels for gemini reports GEMINI_API_KEY missing when nothing is configured", async () => {
+  const saved = process.env.GEMINI_API_KEY;
+  delete process.env.GEMINI_API_KEY;
+  try {
+    const res = await post({ action: "listModels", provider: "gemini" }, await signIn());
+    assert.equal(res.statusCode, 400);
+    assert.match(res.body.error, /GEMINI_API_KEY/);
+  } finally { if (saved) process.env.GEMINI_API_KEY = saved; }
+});
+
+test("listModels for gemini in Vertex mode says listing isn't wired up, not 'not configured'", async () => {
+  // Gemini IS configured here — just via Vertex, which this AI-Studio-only list
+  // endpoint can't serve. The console must say that, not claim the provider has
+  // no credentials at all just because the one env var it used to check is unset.
+  const saved = {
+    key: process.env.GEMINI_API_KEY,
+    project: process.env.GCP_PROJECT_ID,
+    location: process.env.GCP_LOCATION,
+    creds: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+  };
+  delete process.env.GEMINI_API_KEY;
+  process.env.GCP_PROJECT_ID = "test-project";
+  process.env.GCP_LOCATION = "us-central1";
+  process.env.GOOGLE_APPLICATION_CREDENTIALS = "{}";
+  try {
+    const res = await post({ action: "listModels", provider: "gemini" }, await signIn());
+    assert.equal(res.statusCode, 400);
+    assert.match(res.body.error, /Vertex/);
+    assert.doesNotMatch(res.body.error, /GEMINI_API_KEY is not set/);
+  } finally {
+    for (const [k, v] of Object.entries({
+      GEMINI_API_KEY: saved.key, GCP_PROJECT_ID: saved.project, GCP_LOCATION: saved.location, GOOGLE_APPLICATION_CREDENTIALS: saved.creds,
+    })) { if (v) process.env[k] = v; else delete process.env[k]; }
+  }
+});
+
 test("verifyModel refuses a model that is not in the catalogue", async () => {
   const res = await post({ action: "verifyModel", model: "gpt-imaginary" }, await signIn());
   assert.equal(res.statusCode, 400);

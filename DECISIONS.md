@@ -815,3 +815,17 @@ now the caption is derivable.
 stamped on every row. Reparse-on-version-change is what makes a vocabulary
 correction safe, because the old names are re-read under the schema that built
 them. Until that exists, this defect is cheaper than its fix.
+
+---
+
+## Gemini auth: additive Vertex path via env-var presence, not a replacement
+
+**Decision:** Gemini calls (text proxy and image generation) can authenticate two ways: the existing `GEMINI_API_KEY` against the AI Studio Developer API, or a Vertex AI service-account flow that activates once `GCP_PROJECT_ID`, `GCP_LOCATION` and `GOOGLE_APPLICATION_CREDENTIALS` are all set. Vertex is opt-in by env-var presence, or an explicit `GEMINI_AUTH_MODE=vertex|aistudio` override — nothing about a default, key-only deployment changes. `api/_geminiAuth.js` is the one place that decides which mode is active and mints the token Vertex needs; `api/_adapters.js`, `api/image.js` and `api/admin.js` all call through it rather than each growing its own copy of the same detection logic.
+
+**Why two modes instead of migrating outright:** they are not interchangeable — the Developer API and Vertex answer to different billing pools. As of March 2026, Google Cloud Billing credits (including the free trial) are explicitly excluded from Developer API / AI Studio usage; they apply only to Vertex. A deployment sitting on real Cloud credits gets nothing from them through a plain `GEMINI_API_KEY`, which is the entire reason this exists. But not every deployment has a GCP project with Vertex enabled, and a hard cutover would break every one of them for a billing concern specific to some. Env-var presence is the same shape this app already uses to gate every other optional provider (`OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `HEYGEN_API_KEY` …) — unset, and the feature degrades to a clear "not configured" error, never a broken default.
+
+**Why a service-account JWT hand-rolled with `node:crypto` rather than `google-auth-library`:** every other provider in this app — Anthropic, OpenAI, OpenRouter, HeyGen, VEED, D-ID, and AI-Studio Gemini itself — authenticates with one static key in one header, with zero OAuth2 machinery anywhere in the codebase. Vertex's token exchange is one well-documented, unchanging flow (RS256-sign a claim set, POST it to `oauth2.googleapis.com/token`), which `node:crypto` covers completely. Pulling in `google-auth-library` for exactly one call site would add a dependency, and its transitive tree, to a project that currently has three runtime dependencies total.
+
+**Why the admin console's Gemini model-listing stayed AI-Studio-only:** Verify/listModels calls Google's ListModels endpoint to confirm a catalogue id is real. Vertex has no equivalent wired here — the publisher-models list shape wasn't something this change could verify against a real Vertex account, and a guessed endpoint returning silently-wrong data is worse than the honest "listing isn't wired up for Vertex yet" the console shows instead. The gate that decides whether Gemini is configured *at all* does account for Vertex, so a Vertex-only deployment is never told it has no Gemini credentials when it does.
+
+**Forcing condition:** none expected soon — Google's May 2026 rebrand of Vertex AI to "Gemini Enterprise Agent Platform" changed the console name only; the `aiplatform.googleapis.com` endpoints and this auth flow are unaffected. Revisit if a future change touches the API surface itself, not just what the console calls it.

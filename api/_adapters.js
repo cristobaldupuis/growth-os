@@ -45,7 +45,8 @@
 // it lie. Same for prompt caching: `cacheMinTokens: Infinity` on those models means
 // the cache breakpoint never applies and `system` stays a plain string.
 
-const GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/models";
+import { geminiConfigured, geminiNotConfiguredError, geminiEndpoint, geminiAuthHeaders } from "./_geminiAuth.js";
+
 const OPENAI_API = "https://api.openai.com/v1/chat/completions";
 const OPENROUTER_API = "https://openrouter.ai/api/v1/chat/completions";
 // Tinker publishes an Anthropic-compatible base URL and the client appends the
@@ -292,9 +293,14 @@ export const adapters = {
   },
 
   gemini: {
+    // Still the fallback var name proxy.js logs/reads by default; the actual
+    // "is this provider usable" question is configured()'s, not this string's —
+    // see api/_geminiAuth.js for the AI-Studio-vs-Vertex decision.
     keyVar: "GEMINI_API_KEY",
-    endpoint: (model) => `${GEMINI_API}/${model}:generateContent`,
-    headers: (key) => ({ "Content-Type": "application/json", "x-goog-api-key": key }),
+    configured: geminiConfigured,
+    notConfiguredError: geminiNotConfiguredError,
+    endpoint: geminiEndpoint,
+    headers: geminiAuthHeaders,
     toRequest: geminiRequest,
     fromResponse: geminiResponse,
     errorOf: (json) => json?.error?.message,

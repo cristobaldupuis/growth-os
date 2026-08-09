@@ -48,6 +48,9 @@
 const GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/models";
 const OPENAI_API = "https://api.openai.com/v1/chat/completions";
 const OPENROUTER_API = "https://openrouter.ai/api/v1/chat/completions";
+// Tinker publishes an Anthropic-compatible base URL and the client appends the
+// standard Anthropic path, exactly as the Anthropic SDK does against api.anthropic.com.
+const TINKER_API = "https://tinker.thinkingmachines.dev/services/tinker-prod/anthropic/api/v1/messages";
 
 /** `system` may be a string or Anthropic cache-block form. Flatten either to text. */
 function systemText(system) {
@@ -306,10 +309,48 @@ export const adapters = {
     errorOf: (json) => json?.error?.message,
   },
 
-  // Open-weights models we do not host ourselves. Named for the host rather than
+  // Thinking Machines' own inference, which speaks the Anthropic Messages API.
+  //
+  // That is the whole reason this entry exists and it is worth being explicit
+  // about: this is the only non-Anthropic provider that needs no translation at
+  // all. `buildRequest()` already produces exactly what this endpoint accepts,
+  // and it answers in the shape `safeParseJSON` and the debate loop already read.
+  // Every other adapter here re-expresses tool_use and tool_result blocks in a
+  // foreign vocabulary and translates them back, which is where the sharp edges
+  // are — see the Gemini id/name note at the top of this file. None of that
+  // applies here, so pointing the debate group at it adds no new failure surface.
+  //
+  // The two Anthropic-only request parameters are still suppressed the same way
+  // they are for every other provider — by `adaptiveThinking:false` and
+  // `effort:false` on the catalogue entry, not by anything in this adapter.
+  // Pass-through means pass-through; the caps table is what decides which
+  // parameters get built in the first place.
+  tinker: {
+    keyVar: "TINKER_API_KEY",
+    endpoint: () => TINKER_API,
+    // Native `x-api-key`, same as Anthropic — the endpoint is documented as
+    // accepting the Anthropic SDK's own header, so there is nothing to rewrite.
+    headers: (key) => ({
+      "Content-Type": "application/json",
+      "x-api-key": key,
+      "anthropic-version": "2023-06-01",
+    }),
+    toRequest: (body) => body,
+    fromResponse: (json) => json,
+    errorOf: (json) => json?.error?.message,
+  },
+
+  // Open-weights models served by a third party. Named for the host rather than
   // the model, because the host is what the key and the endpoint belong to — a
   // second open-weights model served from here is a catalogue entry, not another
   // adapter.
+  //
+  // Nothing in the catalogue routes here today: Inkling reaches us through
+  // `tinker` above, which is first-party and needs no translation. This stays
+  // wired, and tested, because Tinker's inference is a beta that its own
+  // documentation scopes to low internal traffic. If that ceiling ever binds,
+  // moving Inkling to a production host is the `provider` field on one catalogue
+  // entry — which is only true for as long as this entry is kept.
   openrouter: {
     keyVar: "OPENROUTER_API_KEY",
     endpoint: () => OPENROUTER_API,

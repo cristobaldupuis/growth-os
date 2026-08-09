@@ -240,8 +240,8 @@ Each group declares a capability floor that both the picker and the server enfor
 so the debate group cannot be pointed at a model without tool calling, and a
 whole-portfolio prompt cannot be pointed at a short-context model. Providers wired
 today: Anthropic (Opus 5, Sonnet 5, Haiku 4.5), Google Gemini (3.1 Pro, 3.6 Flash,
-3.5 Flash Lite), OpenAI (GPT-5.6 Sol, Terra and Luna), and open weights served
-through OpenRouter (Inkling).
+3.5 Flash Lite), OpenAI (GPT-5.6 Sol, Terra and Luna), and Thinking Machines
+(Inkling, open weights, served first-party through Tinker).
 
 Only the Anthropic ids are confirmed — the app calls them. Every other id is
 flagged `unverified` in the catalogue and carries a **Verify** button that asks the
@@ -426,13 +426,21 @@ ADMIN_SESSION_SECRET=a_long_random_string
 # Gemini text reuses GEMINI_API_KEY above.
 OPENAI_API_KEY=your_key
 
-# Optional. Lets the console route a feature group to an open-weights model
-# (Inkling) served through OpenRouter, and lets Verify check its id. Same
-# behaviour without it: the model is selectable and returns a clear "not
-# configured" error rather than failing obscurely. OpenRouter is one host among
-# several serving these weights — moving to Together, Fireworks or your own
-# inference is the endpoint and key in api/_adapters.js, not a code change
-# anywhere else.
+# Optional. Lets the console route a feature group to Inkling, Thinking Machines'
+# open-weights model. From tinker.thinkingmachines.ai -> API Keys. Same behaviour
+# without it: the model is selectable and returns a clear "not configured" error
+# rather than failing obscurely.
+#
+# Tinker's inference endpoint speaks the Anthropic Messages API, so this is the
+# one non-Anthropic provider that needs no request translation. Note it is a beta
+# that Thinking Machines scope to low internal traffic — fine for an operator
+# console, not for serving clients directly.
+TINKER_API_KEY=your_key
+
+# Optional, and nothing routes here today. Inkling's weights are also served by
+# OpenRouter, Together, Fireworks and Baseten; the adapter is kept wired so that
+# moving off Tinker's beta — if its throughput ever binds — is the `provider`
+# field on one catalogue entry rather than a new integration.
 OPENROUTER_API_KEY=your_key
 
 # Optional. Comma-separated origins the proxy will accept. Defaults to the

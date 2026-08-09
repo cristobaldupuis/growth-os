@@ -210,20 +210,33 @@ export const MODEL_CATALOGUE = [
   // moved onto our own infrastructure, if a group's output ever has to be
   // reproducible.
   //
-  // There is no first-party Thinking Machines endpoint, so it reaches us through
-  // a host. OpenRouter is the one wired here because its API is OpenAI-compatible
-  // — which makes this a routing entry plus a base URL rather than a fourth
-  // request/response translation — and because it publishes a model list, so the
-  // console's Verify action works on it exactly as it does for the other two.
-  // Together, Fireworks, Baseten and Modal serve the same weights; switching host
-  // is the `openrouter` adapter's endpoint and key, not anything in this file.
+  // It is served first-party, by Thinking Machines' own Tinker platform, and the
+  // deciding fact is the shape rather than the provenance: Tinker publishes an
+  // **Anthropic-compatible** Messages endpoint. This app already speaks Anthropic
+  // Messages natively, so this is the one non-Anthropic entry that crosses no
+  // translation layer at all — see the `tinker` adapter in api/_adapters.js for
+  // why that matters more than it sounds.
+  //
+  // The caveat that comes with it, stated plainly by Tinker's own docs: the
+  // inference endpoint is a beta meant for low internal traffic rather than
+  // high-throughput user-facing deployment, and its latency and throughput may
+  // change without notice. That is a real limit and it is the reason the
+  // `openrouter` adapter is kept wired — but it does not bind here. Every AI call
+  // in this app is click-initiated by one operator in an internal console, which
+  // is the traffic profile that sentence is describing, not the one it is warning
+  // off. If Growth OS ever serves these calls to clients directly, revisit this
+  // before the throughput does it for you.
+  //
+  // `unverified` for a different reason than the others: Tinker has no model-list
+  // endpoint wired here, so Verify will honestly answer "not verifiable" rather
+  // than confirm it. Smoke-test this one through the console's bench instead.
   {
-    id: "thinkingmachines/inkling",
-    provider: "openrouter",
-    label: "Inkling (Thinking Machines, via OpenRouter)",
+    id: "thinkingmachines/Inkling",
+    provider: "tinker",
+    label: "Inkling (Thinking Machines)",
     modality: "text",
     unverified: true,
-    blurb: "Open weights, long context, cheap. Needs OPENROUTER_API_KEY; verify the id first.",
+    blurb: "Open weights, 1M context, first-party and Anthropic-shaped. Needs TINKER_API_KEY.",
     caps: { tools: true, json: true, adaptiveThinking: false, effort: false, cacheMinTokens: Infinity, longContext: true },
   },
 

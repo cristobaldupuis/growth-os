@@ -72,7 +72,7 @@ export const NAME_COLUMNS = {
 };
 
 /** Finest grain first — the row's identity is the most specific name it has. */
-const LEVEL_PRECEDENCE = ["ad", "message", "adset", "adgroup", "campaign", "flow"];
+export const LEVEL_PRECEDENCE = ["ad", "message", "adset", "adgroup", "campaign", "flow"];
 
 export const DATE_COLUMNS = new Set([
   "date", "day", "reporting_starts", "week", "week_start", "month", "period", "report_date",

@@ -829,3 +829,63 @@ them. Until that exists, this defect is cheaper than its fix.
 **Why the admin console's Gemini model-listing stayed AI-Studio-only:** Verify/listModels calls Google's ListModels endpoint to confirm a catalogue id is real. Vertex has no equivalent wired here — the publisher-models list shape wasn't something this change could verify against a real Vertex account, and a guessed endpoint returning silently-wrong data is worse than the honest "listing isn't wired up for Vertex yet" the console shows instead. The gate that decides whether Gemini is configured *at all* does account for Vertex, so a Vertex-only deployment is never told it has no Gemini credentials when it does.
 
 **Forcing condition:** none expected soon — Google's May 2026 rebrand of Vertex AI to "Gemini Enterprise Agent Platform" changed the console name only; the `aiplatform.googleapis.com` endpoints and this auth flow are unaffected. Revisit if a future change touches the API surface itself, not just what the console calls it.
+
+---
+
+## The licence is proprietary, and the repository being private was never the control
+
+**Decision:** `LICENSE` is an all-rights-reserved proprietary notice. Clients get a right to use a deployed instance under their services agreement; nobody gets a licence to the source. The repository is already private, and this is the other half of the same protection rather than a substitute for it.
+
+**Why the two are not the same thing:** the earlier entry in this file recorded a decision to move the repo private "until paying clients establish the moat", and that has happened. Private controls *who sees it*. The licence controls *what a person who has seen it may do*, and MIT's answer was: anything at all, including ship a competing product, with no obligation beyond keeping a copyright line. Everyone who gets access legitimately — a contractor, an evaluating client's engineer, a technical due-diligence reader, a future employee — leaves with a permanent, irrevocable grant to the campaign nomenclature engine that `docs/commercial.md` names as the only genuinely differentiated part of the product. That is a strange thing to attach to an asset being sold at $6,000 plus $1,500/month.
+
+**Why not a source-available licence (BUSL, PolyForm, Elastic 2.0):** those solve the problem of distributing source publicly while restricting commercial use. This source is not distributed publicly and there is no plan for it to be. A licence written for a distribution model this project does not have would be borrowed sophistication — more text, more explaining, and no more protection than "no licence is granted."
+
+**What this does not change:** the moat argument stands exactly where DECISIONS.md already put it. The prompts, the taxonomy judgement and the operating cadence are the practice, and the practice is not copyable from a repository. This closes a gap that was free to close; it does not promote the code to being the defensible layer.
+
+**Forcing condition:** a decision to open-source part of the codebase as distribution — the parser as a standalone library, say, to make the convention an industry standard. That is a real strategy and it would want PolyForm or Apache-2.0 on that package specifically, not a reversion here.
+
+---
+
+## The workspace mode is data, not the build flag
+
+**Decision:** `settings.workspaceMode` (`demo` | `live`) is workspace state, defaulted from the config's `DEMO_MODE` and overridable in Settings. Demo mode keeps every behaviour it has: seeded portfolio, tour on first visit, one-click reseed. A live workspace loses the reseed entirely — it is not rendered, not confirmed — and is held to a seven-day backup reminder instead of fourteen.
+
+**Why they are two questions:** `DEMO_MODE` is a build-time constant answering "should a cold visitor be skipped past onboarding and shown a tour". Whether the data in this browser is a client's real account is a different question, and the case that separates them is the intended first-client path: a demo build is deployed, a prospect becomes a client, and their account is imported into the workspace that is already running. At that moment the build flag says demo and the data says otherwise, and the flag is the one thing that cannot know.
+
+**Why the reseed is removed rather than guarded:** the product's own rule, from the interface audit, is that a destructive action names what it destroys and offers an undo. This one replaces an entire client portfolio with a seeded one and there is no undo — the seed *is* the overwrite. A dialog is the right guard for a destructive action whose target is on screen; the right number of clicks between a live workspace and reseeding it is none.
+
+**What this deliberately does not do:** it does not gate anything behind the mode that would make the demo less complete. The demo is the sales asset and the reason `DEMO_MODE` exists; a demo degraded to protect a live workspace would trade the thing that works today for the thing that might.
+
+---
+
+## The workspace holds aggregates about ad entities, and never people
+
+**Decision:** a stated, enforced and tested contract: no email address, phone number, person's name, postal address, customer or profile id, device or advertising id, IP address, or date of birth enters the store. Age, gender, country, city, region and placement are explicitly allowed as audience cohorts on a breakdown row. Enforced at two points — a header scan every CSV importer runs and reports from, and `stripPersonalFields` as the chokepoint for any producer of rows that is not a CSV importer. Written up for a prospect in `docs/data-handling.md`.
+
+**Why now, and why as code:** both importers already read only the columns they recognise, so an export containing an email column has never actually written one. That is an accident of how they were written rather than a property anyone stated, it is invisible from outside the source, and it is exactly the kind of accident the first connector written in a hurry does not inherit. The moment real client data arrives is the moment the difference between "never happened to" and "cannot" starts to matter.
+
+**Why this line specifically:** three separate things are true only because of it. `localStorage` on an operator's laptop is a defensible home for campaign aggregates and an indefensible one for a customer list — the persistence decision and the data decision are the same decision. Every AI prompt is built from what is in the store, so no prompt carries personal data, which keeps the model providers out of a DPA argument rather than inside one with mitigations. And a security review gets a one-sentence answer that ends the conversation instead of starting it.
+
+**The consequence worth naming:** this is also the answer for a regulated vertical. A health or finance prospect whose marketing questions are answerable from campaign aggregates is servable as-is under a contract saying regulated personal data never enters the workspace. A prospect who needs individual-level data in the tool is not a customer for this architecture, and saying so is cheaper than widening the contract and acquiring the compliance programme that comes with it.
+
+**Why the notice tells the operator their file is still on disk:** the product can drop a column; it cannot delete an export sitting in a downloads folder. A message that stops at "not imported" implies a cleanliness that does not exist, and the operator is the only one who can finish the job.
+
+**Forcing condition:** a client requirement for individual-level data — a customer-cohort analysis that genuinely needs profiles. That is not a widening of this rule, it is a different product with a different hosting and contractual posture, and it should be priced and decided as one.
+
+---
+
+## Reading a test result is an action, and it is counted
+
+**Decision:** the Test Validity panel derives a reading window from sample size and expected weekly traffic, and does not display the result until it opens. Reading early is always available, one click, never blocked — and every reading is recorded on the initiative. The significance threshold is corrected for the number of readings taken, using Pocock's flat sequential boundary, and both verdicts are shown when they disagree.
+
+**The problem, stated precisely:** an operator opens a running test on Tuesday and sees 91%, on Thursday and sees 94%, the next Monday and sees 95.2%, and calls a winner. Every individual computation was correct. The conclusion is far weaker than 95% confidence, because the decision rule was never "test once at the end" — it was "keep looking until it crosses", and that rule crosses a 5% threshold much more often than 5% of the time on pure noise. This is the most common way a marketing A/B test produces a false winner and nothing about the third reading looks different from a legitimate one. A product that sells decision quality and renders a confidence figure on demand, with no notion of how many times it has been asked, is participating in the error.
+
+**Why looking early is allowed:** blocking is stricter and worse. An operator who cannot see their own numbers exports the CSV and computes them in a spreadsheet, where there is no counter at all and no correction. The discipline has to survive being optional or it gets routed around. Making the reading an act is what turns the number of looks into something knowable, and knowing it is the only reason the threshold can be right.
+
+**Why a flat Pocock boundary rather than O'Brien-Fleming:** O'Brien-Fleming is better when the looks are planned in advance and the early ones are meant to be near-impossible to cross. Here the looks are unplanned by definition — that is the behaviour being corrected — so a boundary that does not depend on which look this is out of how many is the honest one. K=1 is 1.96 by construction, so a test read once is corrected by nothing.
+
+**Why the constants are solved rather than quoted:** the module ships a table, and a table is only as good as what produced it. `testValidity.test.js` re-derives two of the boundaries on every CI run by propagating the density of the partial sum through the non-crossing region and bisecting, and asserts the shipped values still match; the K≤5 column agrees with the published 1977 values to three decimals, which is the external check on the solver. Quoting five constants from memory into a file that decides whether a client kills a campaign was not a defensible way to write this.
+
+**Why observed sessions outrank the calendar:** the date is a forecast from an estimate of weekly traffic; the sessions are what the statistics consume. The state that matters most is the one a calendar alone gets wrong — a test past its planned end date on half the expected traffic, which reads as finished and is not. It has its own name in the panel, and reading it is called reading it short.
+
+**Forcing condition:** measured spend and conversions reaching the panel from the ad names (ROADMAP 1.6, "feed measured figures into Test Validity"). The counts are hand-entered today, which means the reading window is a discipline the operator can decline by not typing anything. When the figures arrive from the import, the window becomes a fact about the test rather than a claim about it.

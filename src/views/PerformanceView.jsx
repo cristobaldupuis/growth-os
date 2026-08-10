@@ -7,6 +7,7 @@ import {
 import { interactive, tile } from "../components/motion.js";
 import { ChargeBar } from "../components/ChargeBar.jsx";
 import { NameBuilder } from "../components/NameBuilder.jsx";
+import { AccountAuditPanel } from "../components/AccountAuditPanel.jsx";
 import { availableDimensions, defaultDimension, rollupByInitiative, deriveRatios, ADDITIVE_METRICS, PERF_ROW_LIMIT } from "../services/performance.js";
 import { IconArrowRight } from "../components/icons.jsx";
 
@@ -42,6 +43,7 @@ const TABS = [
   { key: "breakdown",  label: "Breakdown",   blurb: "pivot spend and conversions by any dimension in the name" },
   { key: "attribution", label: "Attribution", blurb: "which spend reached an initiative, and which links are broken" },
   { key: "builder",    label: "Name builder", blurb: "compose a campaign, ad set and ad name, and claim it for an initiative" },
+  { key: "audit",      label: "Account audit", blurb: "what an account's existing names contain, before any of this is installed" },
   { key: "convention", label: "Convention",  blurb: "where the naming schema is edited" },
 ];
 
@@ -445,6 +447,14 @@ export function PerformanceView({ t, items, settings, perfRows, onImport, onClea
         <NameBuilder t={t} schema={schema} items={items}
           initiativeId={builderInit} onInitiative={setBuilderInit}
           onAssign={onAssignNames} showToast={showToast} />
+      )}
+
+      {/* -------------------------------------------------------------------- Audit */}
+      {/* The one tab that does not read `rows`. It runs on names alone, which is
+          what lets it be used on a prospect's account before there is a contract
+          — and before anything has been imported into this workspace at all. */}
+      {tab === "audit" && (
+        <AccountAuditPanel t={t} settings={settings} showToast={showToast} />
       )}
 
       {/* ----------------------------------------------------------------- Taxonomy */}

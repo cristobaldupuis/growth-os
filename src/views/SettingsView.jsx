@@ -6,6 +6,8 @@ import { gG, gGh, gI, gOff } from "../components/styles.js";
 import { IconClose, IconDownload, IconImport, IconRefresh, IconPlus } from "../components/icons.jsx";
 import { iconFor, ICON_REGISTRY } from "../components/iconRegistry.js";
 import { DEFAULT_AGENTS, DEFAULT_SETTINGS, brandColor, catColor } from "../constants.js";
+import { DEMO_MODE } from "../activeConfig.js";
+import { WORKSPACE_MODES, resolveWorkspaceMode, isLiveWorkspace } from "../services/dataSafety.js";
 
 // Currencies the shipped formatter is checked against. The list is short on
 // purpose — it covers the markets the ICP sells into, and an operator outside
@@ -114,6 +116,28 @@ export function SettingsView({t,dk,settings,onSave,onClose,onDownloadBackup,onRe
             onSaveSettings={(next)=>{ setLocal(next); onSave(next); }}/>
         )}
         {sec==="workspace" && (<>
+        {/* Mode leads the section because it changes what several of the other
+            settings mean. It is also the answer to a question nobody could ask
+            before: "is this browser holding a client's data?" — which decides
+            whether Reset Demo is reachable and how hard the backup reminder
+            pushes. See services/dataSafety.js. */}
+        <FR label="Workspace mode" t={t}
+            hint={(WORKSPACE_MODES.find(m=>m.id===resolveWorkspaceMode(local, DEMO_MODE))||WORKSPACE_MODES[0]).hint}>
+          <select style={{...gI(t),cursor:"pointer"}}
+            value={resolveWorkspaceMode(local, DEMO_MODE)}
+            onChange={e=>f("workspaceMode",e.target.value)}>
+            {WORKSPACE_MODES.map(m=><option key={m.id} value={m.id}>{m.label}</option>)}
+          </select>
+        </FR>
+        {isLiveWorkspace(local, DEMO_MODE) && (
+          <div style={{fontSize:12,color:t.textSub,fontFamily:t.serif,lineHeight:1.6,padding:"10px 12px",
+                       background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:t.r.sm,marginTop:-6}}>
+            This workspace holds aggregates about ad entities — spend, conversions, revenue and the dimensions
+            parsed out of a name. It does not hold people. Importers drop any column carrying an email address,
+            a phone number, a person's name or a customer id, and report that they did. Everything lives in this
+            browser until the Postgres migration lands, so a backup is the only copy.
+          </div>
+        )}
         <FR label="Company / workspace name" t={t}><input style={gI(t)} value={local.companyName} onChange={e=>f("companyName",e.target.value)}/></FR>
         <FR label="Business model (one line)" t={t}><input style={gI(t)} value={local.businessModel} onChange={e=>f("businessModel",e.target.value)}/></FR>
         {/* Money and dates were hardcoded to a dollar sign and en-CA in four
@@ -352,8 +376,20 @@ export function SettingsView({t,dk,settings,onSave,onClose,onDownloadBackup,onRe
         {sec==="data" && (
         <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
           <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:8,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Demo data</div>
-          <p style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,lineHeight:1.6,margin:"0 0 10px"}}>Reload the built-in demo initiatives and weekly metrics. Replaces all current initiatives and weekly pulse data.</p>
-          <button onClick={onResetDemo} style={gGh(t)}><IconRefresh size={13}/> Reset to demo data</button>
+          {/* Unreachable in a live workspace rather than confirmable. A dialog is
+              the right guard for a destructive action whose target the operator
+              can see; this one replaces a client's entire portfolio with a
+              seeded one, and the correct number of clicks between a live
+              workspace and that outcome is none. */}
+          {isLiveWorkspace(local, DEMO_MODE) ? (
+            <p style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,lineHeight:1.6,margin:0}}>
+              Not available in a live workspace — reseeding would replace this client&apos;s portfolio with the
+              demonstration one. Switch the workspace mode above if this browser is genuinely a demo.
+            </p>
+          ) : (<>
+            <p style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,lineHeight:1.6,margin:"0 0 10px"}}>Reload the built-in demo initiatives and weekly metrics. Replaces all current initiatives and weekly pulse data.</p>
+            <button onClick={onResetDemo} style={gGh(t)}><IconRefresh size={13}/> Reset to demo data</button>
+          </>)}
         </div>
         )}
         {/* A "Data sources" section badged "Placeholder · coming soon", whose

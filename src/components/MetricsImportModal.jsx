@@ -5,6 +5,7 @@ import { METRIC_SOURCES, fmtCur, parseMetricsCSV } from "../constants.js";
 import { splitCSVLine } from "../services/csvLine.js";
 import { detectCsvShape, parsePerformanceCSV, mergePerformanceRows, attachInitiatives } from "../services/performance.js";
 import { resolveSchema, listChannels } from "../services/naming.js";
+import { scanHeaders, piiNotice } from "../services/dataSafety.js";
 import { IconCheck } from "./icons.jsx";
 
 // Weekly metrics CSV import modal
@@ -33,6 +34,7 @@ export function MetricsImportModal({t, dk, weeklyMetrics, perfRows, items, setti
   const [rawText, setRawText] = useState("");
   const [channel, setChannel] = useState("");
   const [conflictMode, setConflictMode] = useState("overwrite"); // overwrite | skip
+  const [pii, setPii] = useState(null);
 
   const schema = resolveSchema(settings);
   const channels = listChannels(schema);
@@ -50,6 +52,12 @@ export function MetricsImportModal({t, dk, weeklyMetrics, perfRows, items, setti
   const ingest = (text) => {
     setRawText(text);
     const headers = splitCSVLine((text.split(/\r?\n/)[0] || ""));
+    // Scanned on both shapes, before either parser runs. Both parsers read only
+    // the columns they recognise, so a personal column has never actually been
+    // written to the store — but "never happened to be read" is a property of
+    // how they were written, not a promise anybody made, and the operator has
+    // no way to tell the difference from outside. Saying it is the difference.
+    setPii(scanHeaders(headers));
     const detected = detectCsvShape(headers);
     setShape(detected.shape);
     if (detected.shape === "performance") {
@@ -146,6 +154,15 @@ export function MetricsImportModal({t, dk, weeklyMetrics, perfRows, items, setti
               Column names are case-insensitive, and platform export headers ("Amount spent (USD)", "Purchases conversion value", "Impr.") are recognised as they come.
             </div>
           </>
+        )}
+
+        {/* Shown above both shapes, because the contract is about the workspace
+            rather than about one file format. */}
+        {step==="preview" && pii && !pii.clean && (
+          <div style={{fontSize:12,fontFamily:t.serif,lineHeight:1.6,padding:"9px 11px",borderRadius:6,
+                       background:t.warnBg,border:"1px solid "+t.warnBorder,color:t.text}}>
+            {piiNotice(pii)}
+          </div>
         )}
 
         {/* ------------------------------------------------ campaign-level preview */}

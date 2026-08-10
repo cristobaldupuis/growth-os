@@ -60,6 +60,18 @@ Commercial thesis, ICP and pricing: [docs/commercial.md](./docs/commercial.md).
 
 ## What's new
 
+- **Account audit** — paste a prospect's ad names and get the delimiter, the
+  slot histogram, each slot's vocabulary, the parse rate by failure kind, and the
+  count of names that need mapping by hand. The first hour of an implementation,
+  on their data, in a first meeting
+- **A workspace knows whether its data is real** — demo stays seeded and
+  resettable; a live workspace cannot be reseeded at all and is reminded to back
+  up weekly. Every importer drops and names any column carrying personal data.
+  The contract, and where everything lives, is in
+  [docs/data-handling.md](./docs/data-handling.md)
+- **Tests are read once, not until they agree with you** — a reading window from
+  sample size and traffic, the result behind a counted click, and a significance
+  threshold corrected for the number of looks
 - **Addressable, searchable, keyboard-reachable** — every view and initiative has
   a URL, so Back works and a link to `NH-003` can be pasted into Slack. ⌘K opens
   a palette over initiative titles, ids, hypotheses and learnings. Every dialog
@@ -122,8 +134,10 @@ Impact, Certainty, Ease on a 1–10 scale. AI-assisted scoring suggests Impact a
 
 ### Test validity panel
 Built into every running or completed initiative:
-- **Sample size calculator** — enter baseline CVR, minimum detectable effect, and confidence level (90% or 95%); returns sessions needed per variant at 80% power
-- **Statistical significance** — live z-statistic, confidence level, and observed uplift as you enter control/variant conversion and session counts
+- **Reading window** — baseline CVR, minimum detectable effect, confidence level and the sessions the test gets per week give sessions needed per variant at 80% power *and the date the result becomes readable*. A test past its planned end date on half the expected traffic is named as underpowered rather than shown as finished
+- **The result is behind a click, and the click is counted** — because a confidence figure consulted every second day and reported as though it were consulted once is the most common way an ad test produces a false winner. Reading early is always allowed and always recorded
+- **A threshold corrected for how often you looked** — z ≥ 1.96 on a single reading, 2.36 on a fourth. When a result would have been called a winner on one look and is not one on four, the panel says exactly that. Pocock's sequential boundaries, re-derived numerically in CI rather than quoted
+- **Statistical significance** — z-statistic, confidence level, and observed uplift from control/variant conversion and session counts
 - **Incrementality / counterfactual** — required free-text field before a test can be marked Complete; defines what would have happened without the intervention
 - **Calibration** — at close-out, prediction error (estimated vs actual revenue) is computed from the frozen prediction snapshot taken at launch, and displayed on the initiative card and in the learning library
 
@@ -143,6 +157,22 @@ Three properties make it safe to parse positionally, and all three are enforced:
 - **A wrong segment count is refused, not guessed.** Any alignment would be a coin flip, and a mis-parsed row enters the analysis silently while an unparsed one gets counted and reported.
 
 The trailing `Initiative` segment is the bridge: it carries an initiative's `trackingTag`, so `matchNamesToInitiatives` can join performance rows back to experiments — and can separate untagged business-as-usual spend from a tag that resolves to nothing.
+
+### Account audit
+
+`Performance → Account audit` takes a names-only export — one per line, or a CSV
+with a name column — and reports what an account's existing naming actually
+contains before any of this is installed: the delimiter in use, the slot-count
+histogram, what lives in each slot and which dimension its values match, the
+parse rate against the current schema split by failure kind, and the list of
+names that will have to be mapped by hand because a live campaign cannot be
+renamed without resetting its learning phase.
+
+It runs on names alone. No metrics, no dates, no join — which is what lets it be
+used on a prospect's own account in a first meeting, before a contract and before
+any spend data changes hands. It reports evidence and refuses to propose a
+taxonomy: inferring that slot 4 is usually a theme is arithmetic, and deciding
+which dimensions a catalogue needs is the judgement being paid for.
 
 ### Creative Studio
 

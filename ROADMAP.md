@@ -238,6 +238,72 @@ measurements are in [docs/ui-audit-2026-08.md](./docs/ui-audit-2026-08.md).
 
 ---
 
+### Phase 1.8 — Ready for a real account (August 2026)
+
+A fourth pass, and the first one aimed at the sale rather than at the software.
+The question was not "does it work" or "does it read as finished" but "what
+stands between this and the first paid implementation". Four answers, all
+shipped, plus two that are decisions rather than code.
+
+- [x] **The account audit is a surface, not an afternoon.**
+  `Performance → Account audit` takes a names-only export — one per line, or a
+  CSV with a name column — and returns the delimiter the account is actually
+  using, the slot-count histogram, what lives in each slot with its likely
+  dimension, the parse rate against the current schema broken out by failure
+  kind, and the list of names that will have to be mapped by hand. commercial.md
+  budgets 20–40 hours for this and warns it is consistently underestimated; the
+  parts of it that are arithmetic are now arithmetic. It runs on names alone,
+  which is what lets it be used on a prospect's account in a first meeting,
+  before a contract and before any spend data has changed hands. The judgement —
+  which of those slots should become controlled dimensions — is deliberately not
+  automated. `src/services/accountAudit.js`.
+- [x] **Live workspaces are a mode, not a build flag.** `DEMO_MODE` answers
+  "should a cold visitor get a tour"; `settings.workspaceMode` answers "is the
+  data in this browser real". Conflating them is how a client workspace ends up
+  one click from Reset Demo, which is now unreachable rather than confirmable in
+  a live workspace. The demo stays exactly as it is, seeded and resettable.
+- [x] **The aggregates-only contract is enforced and stated.** Every importer
+  identifies, drops and reports any column carrying personal data, and the same
+  guard is the chokepoint a future connector has to pass. Both CSV importers
+  already happened to read only recognised columns — this turns an accident of
+  how they were written into a property with a test and a document a prospect
+  can be handed. `src/services/dataSafety.js`, `docs/data-handling.md`.
+- [x] **The peeking guard.** The Test Validity panel had a correct sample-size
+  calculator and a correct significance test, and no idea how many times it had
+  been asked — which is the single most common way an ad test produces a false
+  winner. A reading window derived from sample size and expected weekly traffic,
+  the result behind a click that is counted, and a threshold corrected for the
+  number of looks. Reading early is always allowed and always recorded; blocking
+  it would move the decision into a spreadsheet where nothing is counted at all.
+  The Pocock boundaries are solved numerically in the test rather than quoted.
+  `src/services/testValidity.js`.
+- [x] **The licence.** MIT on a private repository still granted anyone who saw
+  it a free fork of the parser the whole commercial thesis rests on. Now
+  proprietary, with a use right for clients rather than a source licence.
+- [x] **Backup reminders fire for the workspace that has never had one**, at
+  seven days in live and fourteen in demo. The old check read the timestamp and
+  did nothing when there wasn't one.
+
+#### Next in this slice
+
+- [ ] **Walk a real install end to end.** Every config in the repo has run on
+  seeded data. commercial.md is right that a "no" on the demo config cannot be
+  distinguished from a "not shown properly" — and the same is true of the first
+  real install, where it costs more. A live workspace loaded from an actual
+  account, start to finish, is a prerequisite for the falsification test rather
+  than part of it.
+- [ ] **A cost model per client-month.** README prices one debate in tokens.
+  Nothing prices a workspace. At $1,500/month the margin is fine until somebody
+  runs debates daily and generates video, and knowing the floor is also what
+  tells you what a discount costs. The admin bench harness is where a
+  per-workspace usage counter hangs.
+- [ ] **Commercial paper.** An MSA, an order form and a DPA do not exist.
+  `docs/data-handling.md` is the security-posture half of that answer and the
+  cheapest half; the rest is a lawyer, not a sprint, and it is needed before the
+  first invoice rather than after it.
+
+---
+
 ## Phase 2 — The Data Moat
 
 **Target:** Replace manual CSV data entry with live API connections to ground the Prediction Ledger in authoritative numbers.
@@ -274,6 +340,56 @@ receding and become the next real work after it.
 Extend `normalizeInitiativeRecord` to accept client-specific RegEx configurations and explicit platform ID mappings. This allows the system to attribute messy, legacy ad campaigns without touching live performance data — the API adapters in subsequent steps all share this contract.
 
 **Sequencing note:** connectors ship one at a time behind this contract, ordered by value over integration pain — Shopify, then GA4, then Meta/Google Ads only on explicit request. CSV import is permanent regardless: it is the only path that works for an unsupported platform or a client whose IT won't grant API access. Reasoning in DECISIONS.md.
+
+### 2.1 — Klaviyo and Shopify do not need Supabase, and that changes the order
+
+Phase 5.5 states the forcing condition for the backend plainly: *OAuth refresh
+tokens cannot live in a browser.* That is true of Meta and Google Ads, whose
+access is a user-authorised grant that expires and has to be refreshed against
+stored credentials.
+
+It is not true of these two. Klaviyo authenticates a server-side integration with
+a **private API key** scoped to one account, and Shopify with a **custom app
+admin access token** that does not expire. Both are long-lived secrets held by
+the server, which is a Vercel environment variable in the existing one-project-
+per-client deployment model — the same place the model provider keys already
+live. No token store, no refresh cycle, no Supabase.
+
+**So a real-data test can run before Phase 2.0**, which matters more than it
+sounds: the biggest single risk in the plan is that everything has only ever
+been exercised on seeded data.
+
+Both must use the aggregate endpoints, and this is a hard constraint rather than
+a preference — most of both APIs is profile-level and would breach the contract
+in `docs/data-handling.md` on the first call:
+
+- **Klaviyo** — the campaign and flow *values reports* return per-campaign and
+  per-flow aggregates (recipients, opens, clicks, conversions, revenue) with no
+  profile data in them, and `metric-aggregates` gives the time series. The
+  profiles and events endpoints are off limits. The payoff is that Klaviyo
+  campaign and flow **names** parse through the existing convention — the schema
+  already carries a `klaviyo` channel with `flow` and `message` levels — so email
+  lands in the same breakdown and the same attribution split as paid social,
+  with no new read path.
+- **Shopify** — aggregated queries rather than order-level ones. An `orders`
+  query is one field selection away from carrying an email address and a
+  shipping address, so the adapter selects explicitly and never traverses
+  `customer`. Shopify's aggregate reporting surface returns tables with no
+  personal data in them at all, which is the right shape for the weekly-metrics
+  contract this product already has.
+
+Every row from either goes through `stripPersonalFields` before it reaches the
+store — not because the endpoints above should return anything personal, but
+because "should not" is not an enforcement mechanism and a connector is written
+once and edited for years.
+
+**First live workspace: Yardsy**, which has both integrations available. Worth
+being precise about what that proves and what it does not. It closes the
+"invalid test" hole in commercial.md — a real account through the real parser —
+and it is the honest place to find out what breaks. It does not count toward the
+three paid invoices, because the relationship already exists and nobody is
+writing a $6,000 implementation cheque. Those are two different tests and
+passing the first does not advance the second.
 
 ### Shopify integration
 

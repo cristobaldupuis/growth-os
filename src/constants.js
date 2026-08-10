@@ -57,6 +57,11 @@ export const DEFAULT_SETTINGS = {
   // shipped default, so nothing needs migrating.
   currency:         "USD",
   locale:           "en-CA",
+  // Demo or live. Left undefined here rather than pinned to a value, so
+  // `resolveWorkspaceMode` falls back to the config's DEMO_MODE until an
+  // operator states it — see services/dataSafety.js for why the two are
+  // separate questions.
+  workspaceMode:    undefined,
   categories:       CATEGORIES,
   dataSources:      [],
   brands:           (CONFIG_BRANDS||[]).map(applyBrandBriefDefaults),

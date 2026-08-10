@@ -11,6 +11,7 @@ import {
 import { KEY_ITEMS, KEY_SETTINGS, KEY_DEBATES, KEY_METRICS, KEY_RECS, KEY_CREATIVE, KEY_PERF, KEY_THEME, KEY_LIB_VIEW, KEY_RAIL, KEY_TOUR_SEEN, store, onWriteError, handleDownloadBackup, handleRestoreBackup } from "./services/store.js";
 import { resolveSchema } from "./services/naming.js";
 import { attachInitiatives } from "./services/performance.js";
+import { isLiveWorkspace, backupStatus } from "./services/dataSafety.js";
 import { Sidebar } from "./components/Sidebar.jsx";
 import { CadenceRail, CadenceLegend } from "./components/CadenceRail.jsx";
 import { cadenceWindow, cadenceFor, windowLabel, groupRollup } from "./services/cadence.js";
@@ -668,10 +669,15 @@ export default function App() {
       .catch(() => { /* defaults already apply — see registry.js DEFAULT_ROUTING */ });
 
     const load = async ()=>{
+      // Hoisted out of the try so the backup nudge below can still see what was
+      // loaded even when parsing part of it threw.
+      let settingsRaw = null, itemsRaw = null;
       try {
         const [ir,sr,dr,mr,rr,tr,lv,ts,cr,pr,rc] = await Promise.all([store.get(KEY_ITEMS),store.get(KEY_SETTINGS),store.get(KEY_DEBATES),store.get(KEY_METRICS),store.get(KEY_RECS),store.get(KEY_THEME),store.get(KEY_LIB_VIEW),store.get(KEY_TOUR_SEEN),store.get(KEY_CREATIVE),store.get(KEY_PERF),store.get(KEY_RAIL)]);
         // Read theme from the resolved store before first render (gated on `loaded`),
         // so the persisted choice applies without an async flash.
+        settingsRaw = sr && sr.value ? sr.value : null;
+        itemsRaw    = ir && ir.value ? ir.value : null;
         if(tr&&tr.value) setDk(tr.value==="dark");
         if(lv&&lv.value==="grid") setLibView("grid");
         if(rc&&rc.value==="1") setRailCollapsed(true);
@@ -704,12 +710,21 @@ export default function App() {
       // `backupNudged` state it used to also check was unavoidably `false` here
       // and only served to make the dependency list wrong.
       try {
-        const lastBackup = localStorage.getItem("gos_last_backup");
-        if (lastBackup) {
-          const daysSince = (Date.now() - new Date(lastBackup).getTime()) / 86400000;
-          if (daysSince > 14) {
-            showToast("You haven't backed up in over 14 days. Consider downloading a backup.", "info");
-          }
+        // Reads the settings blob directly rather than the `settings` state,
+        // which this effect's empty dependency list means is still the default
+        // at this point. Mode has to be known here or the nudge fires on the
+        // wrong schedule for the entire first session.
+        const savedMode = (() => {
+          try { return JSON.parse(settingsRaw || "{}").workspaceMode; } catch { return undefined; }
+        })();
+        const status = backupStatus(localStorage.getItem("gos_last_backup"), {
+          live: isLiveWorkspace({ workspaceMode: savedMode }, DEMO_MODE),
+          hasData: !!itemsRaw,
+        });
+        if (status.due) {
+          showToast(status.never
+            ? "This workspace has never been backed up, and the browser is the only copy. Settings → Data → Download backup."
+            : `Last backup was ${status.days} days ago. Settings → Data → Download backup.`, "info");
         }
       } catch (err) {
         // Backup-staleness check is best effort; a browser that blocks
@@ -910,6 +925,17 @@ export default function App() {
     setShowRecModal(null);
   };
 
+
+  // -- Workspace mode -----------------------------------------------------------
+  //
+  // `DEMO_MODE` is a build constant and says what kind of deployment this is.
+  // The setting says what kind of *data* is in this browser, which is the
+  // question that decides whether a one-click reseed should exist at all. A demo
+  // build handed to a client who then imports their own account is the case the
+  // constant alone gets wrong, and it is not a hypothetical — it is the intended
+  // first-client path.
+  const liveWorkspace = isLiveWorkspace(settings, DEMO_MODE);
+  const demoControls  = DEMO_MODE && !liveWorkspace;
 
   // -- Demo data reset ----------------------------------------------------------
   const handleResetDemoData = () => {
@@ -1737,7 +1763,7 @@ export default function App() {
           <Sidebar t={t} dk={dk} nav={nav} onNav={requestNav} counts={navCounts}
             collapsed={railCollapsed} onToggleCollapse={toggleRail}
             brands={brands} activeBrand={activeBrand} setActiveBrand={setActiveBrand}
-            demoMode={DEMO_MODE} onResetDemo={()=>setShowResetConfirm(true)}
+            demoMode={demoControls} onResetDemo={()=>setShowResetConfirm(true)}
             onTour={()=>{setTourStep(0);setShowTour(true);}}
             onSignal={()=>setShowCopilot(true)} onGuide={()=>setGuideSection(true)}
             onSettings={()=>requestNav("settings")} onToggleTheme={toggleDk}/>
@@ -1750,7 +1776,7 @@ export default function App() {
             <div onClick={e=>e.stopPropagation()} style={{width:250,height:"100%",boxShadow:t.shadowHi}}>
               <Sidebar t={t} dk={dk} nav={nav} onNav={requestNav} counts={navCounts}
                 brands={brands} activeBrand={activeBrand} setActiveBrand={setActiveBrand}
-                demoMode={DEMO_MODE} onResetDemo={()=>{setNavOpen(false);setShowResetConfirm(true);}}
+                demoMode={demoControls} onResetDemo={()=>{setNavOpen(false);setShowResetConfirm(true);}}
                 onTour={()=>{setNavOpen(false);setTourStep(0);setShowTour(true);}}
                 onSignal={()=>{setNavOpen(false);setShowCopilot(true);}} onGuide={()=>{setNavOpen(false);setGuideSection(true);}}
                 onSettings={()=>{setNavOpen(false);requestNav("settings");}} onToggleTheme={toggleDk}

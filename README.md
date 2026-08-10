@@ -408,6 +408,13 @@ GCP_LOCATION=us-central1
 #   base64 -i service-account-key.json | tr -d '\n'
 # A raw (unencoded) JSON string is also accepted, for platforms that tolerate
 # multi-line env values.
+#
+# The underlying API also needs to be enabled on the project once. The
+# console product it lives under has been renamed more than once (Vertex AI,
+# now "Gemini Enterprise Agent Platform"), so searching the API Library by
+# product name is a moving target — its technical service id has not moved:
+#   gcloud services enable aiplatform.googleapis.com --project=your_gcp_project_id
+# or open console.cloud.google.com/apis/library/aiplatform.googleapis.com directly.
 GOOGLE_APPLICATION_CREDENTIALS=your_base64_or_raw_service_account_json
 
 # Optional override. Forces "vertex" or "aistudio" regardless of which of the

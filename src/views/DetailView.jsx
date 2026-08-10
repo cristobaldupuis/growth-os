@@ -1,5 +1,9 @@
 import { useState } from "react";
 import { STATUSES, SL, SD, OL, OD, iceScore, iceColor, fmtCur, fmtDate } from "../constants.js";
+import {
+  readingWindow, readingSummary, evaluate, readsOf, recordRead,
+  sequentialThreshold, toISO, MAX_TABULATED_LOOKS,
+} from "../services/testValidity.js";
 import { IconEdit, IconTrash, IconAlert, IconCopy } from "../components/icons.jsx";
 import { gG, gGh, gGd, gI, gTA, gSl, gSc, gSL } from "../components/styles.js";
 import { SBdg, OBdg, CBdg, TBdg, BlockerBadge, ICEChip } from "../components/badges.jsx";
@@ -269,89 +273,77 @@ export function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResu
 }
 
 // -- Test Validity Panel -------------------------------------------------------
-// Stats helpers (no deps)
-function calcSampleSize(baseRate, mde, alpha) {
-  // Two-sided z-test for proportions, 80% power
-  const z_alpha = alpha === 0.05 ? 1.96 : 1.645;
-  const z_beta  = 0.8416;
-  const p1 = baseRate / 100;
-  const p2 = p1 * (1 + mde / 100);
-  if (p2 <= 0 || p2 >= 1 || p1 <= 0 || p1 >= 1) return null;
-  const n = ((z_alpha + z_beta) ** 2 * (p1 * (1 - p1) + p2 * (1 - p2))) /
-            ((p2 - p1) ** 2);
-  return Math.ceil(n);
-}
-
-function calcZStat(convC, sessC, convV, sessV) {
-  // Guard only on sessions — zero conversions is valid data, not missing data
-  if (!sessC || !sessV) return null;
-  const p1 = convC / sessC;
-  const p2 = convV / sessV;
-  const p  = (convC + convV) / (sessC + sessV);
-  const se = Math.sqrt(p * (1 - p) * (1 / sessC + 1 / sessV));
-  if (se === 0) return null;
-  return (p2 - p1) / se;
-}
-
-function zToConfidence(z) {
-  if (z === null) return null;
-  const absZ = Math.abs(z);
-  // Abramowitz and Stegun approximation (max error 7.5e-8)
-  const t_ = 1 / (1 + 0.2316419 * absZ);
-  const poly = t_ * (0.319381530 + t_ * (-0.356563782 + t_ * (1.781477937 + t_ * (-1.821255978 + t_ * 1.330274429))));
-  const phi = 1 - (1 / Math.sqrt(2 * Math.PI)) * Math.exp(-0.5 * absZ * absZ) * poly;
-  // Clamp to [0, 1] to guard against floating point overshoot at extreme z-values
-  return Math.min(1, Math.max(0, phi * 2 - 1));
-}
-
+//
+// The statistics moved to src/services/testValidity.js, where they are tested.
+// What is left here is the part that is genuinely a UI decision: the result is
+// behind a click, and the click is counted.
+//
+// That is the whole peeking guard. A confidence figure rendered on every open of
+// this page is consulted a dozen times over a two-week test and reported as
+// though it had been consulted once, and no amount of correct arithmetic
+// downstream recovers from that. Making the reading an action is what turns the
+// number of looks into something knowable, and knowing it is what lets the
+// threshold be right.
 function TestValidityPanel({ item, t, onSaveTestValidity }) {
-  const [baseRate, setBaseRate] = useState(item.testValidity?.baseRate ?? 2);
-  const [mde,      setMde]      = useState(item.testValidity?.mde ?? 10);
-  const [sigAlpha, setSigAlpha] = useState(item.testValidity?.sigAlpha ?? 0.05);
+  const tv = item.testValidity || {};
+  const [baseRate, setBaseRate] = useState(tv.baseRate ?? 2);
+  const [mde,      setMde]      = useState(tv.mde ?? 10);
+  const [sigAlpha, setSigAlpha] = useState(tv.sigAlpha ?? 0.05);
+  const [weeklySessions, setWeeklySessions] = useState(tv.weeklySessions ?? "");
 
-  const [convC,    setConvC]    = useState(item.testValidity?.convC ?? "");
-  const [sessC,    setSessC]    = useState(item.testValidity?.sessC ?? "");
-  const [convV,    setConvV]    = useState(item.testValidity?.convV ?? "");
-  const [sessV,    setSessV]    = useState(item.testValidity?.sessV ?? "");
+  const [convC,    setConvC]    = useState(tv.convC ?? "");
+  const [sessC,    setSessC]    = useState(tv.sessC ?? "");
+  const [convV,    setConvV]    = useState(tv.convV ?? "");
+  const [sessV,    setSessV]    = useState(tv.sessV ?? "");
 
-  const [counterfactual, setCounterfactual] = useState(item.testValidity?.counterfactual ?? "");
+  const [counterfactual, setCounterfactual] = useState(tv.counterfactual ?? "");
 
-  // Derived
-  const n         = calcSampleSize(baseRate, mde, sigAlpha);
-  const zStat     = calcZStat(Number(convC), Number(sessC), Number(convV), Number(sessV));
-  const confidence= zToConfidence(zStat);
-  const conf90    = confidence !== null && confidence >= 0.90;
-  const conf95    = confidence !== null && confidence >= 0.95;
-  const hasData   = convC !== "" && sessC !== "" && convV !== "" && sessV !== "";
+  // Revealed for this session only. Persisting it would defeat the mechanism:
+  // the point is that seeing the result is an act, and an act that happens once
+  // and then never again is indistinguishable from the number simply being on
+  // the page.
+  const [revealed, setRevealed] = useState(false);
+
+  const startedAt = tv.startedAt || item.startDate || "";
+  const draft = { baseRate, mde, sigAlpha, weeklySessions, startedAt, convC, sessC, convV, sessV, counterfactual };
+
+  const window_ = readingWindow(draft);
+  const reads   = readsOf(tv);
+  const hasData = convC !== "" && sessC !== "" && convV !== "" && sessV !== "";
+  // The look being taken now is the one that counts. A result already on screen
+  // has been read `reads.length` times; one about to be revealed makes it one
+  // more, and correcting for the earlier number would under-correct the decision
+  // actually being made.
+  const looks   = reads.length + (revealed ? 0 : 1);
+  const result  = hasData ? evaluate({ convC, sessC, convV, sessV, looks: Math.max(1, revealed ? reads.length : looks), alpha: sigAlpha }) : null;
+  const summary = readingSummary(window_, revealed ? result : null);
 
   const uplift = (Number(sessC) > 0 && Number(sessV) > 0 && Number(convC) > 0)
     ? (((Number(convV) / Number(sessV)) - (Number(convC) / Number(sessC))) / (Number(convC) / Number(sessC)) * 100).toFixed(1)
     : null;
 
-  const dirty = JSON.stringify({baseRate,mde,sigAlpha,convC,sessC,convV,sessV,counterfactual}) !==
-    JSON.stringify({
-      baseRate: item.testValidity?.baseRate ?? 2,
-      mde:      item.testValidity?.mde ?? 10,
-      sigAlpha: item.testValidity?.sigAlpha ?? 0.05,
-      convC:    item.testValidity?.convC ?? "",
-      sessC:    item.testValidity?.sessC ?? "",
-      convV:    item.testValidity?.convV ?? "",
-      sessV:    item.testValidity?.sessV ?? "",
-      counterfactual: item.testValidity?.counterfactual ?? "",
-    });
+  const dirty = JSON.stringify(draft) !== JSON.stringify({
+    baseRate: tv.baseRate ?? 2, mde: tv.mde ?? 10, sigAlpha: tv.sigAlpha ?? 0.05,
+    weeklySessions: tv.weeklySessions ?? "", startedAt: tv.startedAt || item.startDate || "",
+    convC: tv.convC ?? "", sessC: tv.sessC ?? "", convV: tv.convV ?? "",
+    sessV: tv.sessV ?? "", counterfactual: tv.counterfactual ?? "",
+  });
 
-  const sigColor = conf95 ? (t.teal)
-                 : conf90 ? (t.warn)
-                 : (t.red);
-  const sigBg    = conf95 ? t.tealBg
-                 : conf90 ? (t.warnBg)
-                 : (t.redBg);
-  const sigBorder= conf95 ? t.teal
-                 : conf90 ? (t.warnBorder)
-                 : (t.red);
+  const reveal = () => {
+    setRevealed(true);
+    onSaveTestValidity(recordRead({ ...draft, reads }, {
+      early: window_.gated,
+      observed: hasData ? Number(sessC) + Number(sessV) : null,
+    }));
+  };
+
+  const sigColor = !result ? t.textMuted : result.significant ? t.teal : result.overturned ? t.red : t.warn;
+  const sigBg    = !result ? t.surfaceAlt : result.significant ? t.tealBg : result.overturned ? t.redBg : t.warnBg;
+  const sigBorder= !result ? t.border : result.significant ? t.teal : result.overturned ? t.red : t.warnBorder;
 
   const labelStyle = {fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:3};
   const numStyle   = {fontSize:20,fontWeight:700,fontFamily:t.mono};
+  const headStyle  = {fontSize:11,fontWeight:600,color:t.textSub,fontFamily:t.serif,marginBottom:10,letterSpacing:"0.04em"};
 
   return (
     <div style={{...gSc(t),border:"1px solid "+t.warnBorder,background:t.warnBg}}>
@@ -359,18 +351,16 @@ function TestValidityPanel({ item, t, onSaveTestValidity }) {
         <div style={{...gSL(t),marginBottom:0}}>Test Validity</div>
         {dirty&&(
           <button style={{...gG(t),fontSize:11,padding:"3px 10px"}}
-            onClick={()=>onSaveTestValidity({baseRate,mde,sigAlpha,convC,sessC,convV,sessV,counterfactual})}>
+            onClick={()=>onSaveTestValidity({ ...draft, reads })}>
             Save
           </button>
         )}
       </div>
 
-      {/* 1 — Sample size calculator */}
+      {/* 1 — The plan, and the date it produces */}
       <div style={{marginBottom:14,paddingBottom:14,borderBottom:"1px solid "+t.border}}>
-        <div style={{fontSize:11,fontWeight:600,color:t.textSub,fontFamily:t.serif,marginBottom:10,letterSpacing:"0.04em"}}>
-          &#8680; Sample size calculator
-        </div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:10}}>
+        <div style={headStyle}>&#8680; Reading window · sample size and when it arrives</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4, minmax(0,1fr))",gap:10,marginBottom:10}}>
           <div>
             <div style={labelStyle}>Baseline CVR (%)</div>
             <input style={{...gI(t),fontSize:13}} type="number" min="0.1" max="99" step="0.1"
@@ -388,20 +378,30 @@ function TestValidityPanel({ item, t, onSaveTestValidity }) {
               <option value={0.10}>90%</option>
             </select>
           </div>
+          <div>
+            <div style={labelStyle}>Sessions per week</div>
+            <input style={{...gI(t),fontSize:13}} type="number" min="0" step="100"
+              value={weeklySessions} onChange={e=>setWeeklySessions(e.target.value)} placeholder="both arms"/>
+          </div>
         </div>
-        {n !== null ? (
-          <div style={{display:"flex",gap:24,alignItems:"baseline",padding:"10px 12px",background:t.surfaceAlt,borderRadius:6,border:"1px solid "+t.border}}>
+        {window_.perArm !== null ? (
+          <div style={{display:"flex",gap:24,alignItems:"baseline",flexWrap:"wrap",padding:"10px 12px",background:t.surfaceAlt,borderRadius:6,border:"1px solid "+t.border}}>
             <div>
               <div style={labelStyle}>Sessions needed per variant</div>
-              <div style={{...numStyle,color:t.gold}}>{n.toLocaleString()}</div>
+              <div style={{...numStyle,color:t.gold}}>{window_.perArm.toLocaleString()}</div>
             </div>
             <div>
               <div style={labelStyle}>Total sessions</div>
-              <div style={{...numStyle,fontSize:16,color:t.textSub}}>{(n*2).toLocaleString()}</div>
+              <div style={{...numStyle,fontSize:16,color:t.textSub}}>{window_.requiredTotal.toLocaleString()}</div>
             </div>
-            <div style={{marginLeft:"auto",fontSize:11,color:t.textMuted,fontFamily:t.serif,maxWidth:180,lineHeight:1.5}}>
-              Assumes 80% power, two-sided test.<br/>
-              Detects a {mde}% relative change from {baseRate}% CVR.
+            {window_.readableAt && (
+              <div>
+                <div style={labelStyle}>Readable from</div>
+                <div style={{...numStyle,fontSize:16,color:window_.gated?t.warn:t.teal}}>{fmtDate(toISO(window_.readableAt))}</div>
+              </div>
+            )}
+            <div style={{marginLeft:"auto",fontSize:11,color:t.textMuted,fontFamily:t.serif,maxWidth:200,lineHeight:1.5}}>
+              80% power, two-sided.<br/>Detects a {mde}% relative change from {baseRate}% CVR.
             </div>
           </div>
         ) : (
@@ -409,12 +409,18 @@ function TestValidityPanel({ item, t, onSaveTestValidity }) {
         )}
       </div>
 
-      {/* 2 — Statistical significance */}
+      {/* 2 — The result, behind a click */}
       <div style={{marginBottom:14,paddingBottom:14,borderBottom:"1px solid "+t.border}}>
-        <div style={{fontSize:11,fontWeight:600,color:t.textSub,fontFamily:t.serif,marginBottom:10,letterSpacing:"0.04em"}}>
-          &#8680; Statistical significance · current results
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:10,flexWrap:"wrap"}}>
+          <div style={headStyle}>&#8680; Result</div>
+          {reads.length>0&&(
+            <div style={{fontSize:10,fontFamily:t.mono,color:t.textMuted,letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:10}}>
+              Read {reads.length}&times; · threshold z &ge; {sequentialThreshold(Math.max(1,reads.length), sigAlpha).threshold.toFixed(2)}
+            </div>
+          )}
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:10}}>
+
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4, minmax(0,1fr))",gap:8,marginBottom:10}}>
           {[
             {label:"Control conversions",  val:convC,  set:setConvC},
             {label:"Control sessions",     val:sessC,  set:setSessC},
@@ -424,58 +430,63 @@ function TestValidityPanel({ item, t, onSaveTestValidity }) {
             <div key={f_.label}>
               <div style={labelStyle}>{f_.label}</div>
               <input style={{...gI(t),fontSize:13}} type="number" min="0" step="1"
-                value={f_.val} onChange={e=>f_.set(e.target.value)}
-                placeholder="—"/>
+                value={f_.val} onChange={e=>f_.set(e.target.value)} placeholder="—"/>
             </div>
           ))}
         </div>
-        {hasData && zStat !== null ? (
-          <div style={{padding:"10px 12px",background:sigBg,border:"1px solid "+sigBorder,borderRadius:6}}>
-            <div style={{display:"flex",gap:24,alignItems:"baseline",flexWrap:"wrap"}}>
-              <div>
-                <div style={{...labelStyle,color:sigColor}}>Confidence</div>
-                <div style={{...numStyle,color:sigColor}}>
-                  {(confidence * 100).toFixed(1)}%
-                </div>
+
+        <div style={{padding:"10px 12px",background:revealed?sigBg:t.surfaceAlt,border:"1px solid "+(revealed?sigBorder:t.border),borderRadius:6}}>
+          {!revealed ? (
+            <div style={{display:"flex",gap:14,alignItems:"center",flexWrap:"wrap"}}>
+              <div style={{flex:"1 1 260px",fontSize:12,color:t.textSub,fontFamily:t.serif,lineHeight:1.55}}>
+                {summary}
               </div>
-              <div>
-                <div style={{...labelStyle}}>Z-statistic</div>
-                <div style={{...numStyle,fontSize:16,color:t.textSub}}>{zStat.toFixed(2)}</div>
-              </div>
-              {uplift !== null && (
+              <button
+                style={{...(window_.gated?gGd(t):gG(t)),fontSize:12}}
+                disabled={!hasData}
+                onClick={reveal}>
+                {window_.gated ? `Read early — this is look ${looks}` : reads.length ? `Read again — look ${looks}` : "Read the result"}
+              </button>
+            </div>
+          ) : !result ? (
+            <div style={{fontSize:12,color:t.textMuted,fontFamily:t.serif}}>Enter conversion and session counts to evaluate.</div>
+          ) : (
+            <>
+              <div style={{display:"flex",gap:24,alignItems:"baseline",flexWrap:"wrap"}}>
                 <div>
-                  <div style={labelStyle}>Observed uplift</div>
-                  <div style={{...numStyle,fontSize:16,color:parseFloat(uplift)>=0?(t.teal):(t.red)}}>
-                    {parseFloat(uplift)>=0?"+":""}{uplift}%
+                  <div style={{...labelStyle,color:sigColor}}>Confidence</div>
+                  <div style={{...numStyle,color:sigColor}}>{(result.confidence*100).toFixed(1)}%</div>
+                </div>
+                <div>
+                  <div style={labelStyle}>Z-statistic</div>
+                  <div style={{...numStyle,fontSize:16,color:t.textSub}}>{result.z.toFixed(2)}</div>
+                </div>
+                <div>
+                  <div style={labelStyle}>Threshold at {result.looks} look{result.looks===1?"":"s"}</div>
+                  <div style={{...numStyle,fontSize:16,color:t.textSub}}>{result.threshold.toFixed(2)}</div>
+                </div>
+                {uplift !== null && (
+                  <div>
+                    <div style={labelStyle}>Observed uplift</div>
+                    <div style={{...numStyle,fontSize:16,color:parseFloat(uplift)>=0?t.teal:t.red}}>
+                      {parseFloat(uplift)>=0?"+":""}{uplift}%
+                    </div>
                   </div>
+                )}
+              </div>
+              <div style={{marginTop:8,fontSize:11.5,color:t.textSub,fontFamily:t.serif,lineHeight:1.55}}>
+                {summary}
+              </div>
+              {result.beyondTable&&(
+                <div style={{marginTop:6,fontSize:11,color:t.textMuted,fontFamily:t.serif,lineHeight:1.5}}>
+                  Past {MAX_TABULATED_LOOKS} looks the correction is held flat and understates the real one. At this
+                  point the count is the finding: this result has been consulted enough times that it should be
+                  re-run rather than re-read.
                 </div>
               )}
-              <div style={{marginLeft:"auto",display:"flex",flexDirection:"column",gap:4}}>
-                <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                  <div style={{width:8,height:8,borderRadius:"50%",background:conf95?t.teal:t.border}}/>
-                  <span style={{fontSize:11,fontFamily:t.mono,color:conf95?sigColor:t.textMuted}}>
-                    {conf95 ? "95% confidence reached" : "95% not yet reached"}
-                  </span>
-                </div>
-                <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                  <div style={{width:8,height:8,borderRadius:"50%",background:conf90?t.warn:t.border}}/>
-                  <span style={{fontSize:11,fontFamily:t.mono,color:conf90?sigColor:t.textMuted}}>
-                    {conf90 ? "90% confidence reached" : "90% not yet reached"}
-                  </span>
-                </div>
-              </div>
-            </div>
-            {!conf90&&hasData&&(
-              <div style={{marginTop:8,fontSize:11,color:t.textMuted,fontFamily:t.serif,lineHeight:1.5}}>
-                Test has not reached statistical significance. Avoid calling a winner early; let it run to the target sample size.
-              </div>
-            )}
-          </div>
-        ) : (
-          <div style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,padding:"8px 0"}}>
-            Enter conversion and session counts to evaluate significance.
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </div>
 
       {/* 3 — Incrementality / counterfactual */}

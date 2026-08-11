@@ -877,6 +877,7 @@ const SECONDARY_TILES = (dash) => [
   { l:"Killed",         v:dash.killed,    s:" " },
   { l:"Avg to close",   v:dash.avgDays||"—", s:"days, completed" },
   { l:"Avg ICE",        v:dash.avgIce||"—",  s:"all initiatives" },
+  { l:"Loonshots active", v:dash.loonshotShare!==null?dash.loonshotShare+"%":"—", s:dash.classifiedActiveCount+"/"+dash.activeCount+" classified" },
 ];
 
 function StatTile({ t, m, index, big }) {

@@ -8,7 +8,7 @@ import {
   DEMO_MODE,
 } from "./activeConfig.js";
 
-import { KEY_ITEMS, KEY_SETTINGS, KEY_DEBATES, KEY_METRICS, KEY_RECS, KEY_CREATIVE, KEY_PERF, KEY_ASSETS, KEY_USAGE, KEY_THEME, KEY_LIB_VIEW, KEY_RAIL, KEY_TOUR_SEEN, store, onWriteError, handleDownloadBackup, handleRestoreBackup } from "./services/store.js";
+import { KEY_ITEMS, KEY_SETTINGS, KEY_DEBATES, KEY_METRICS, KEY_RECS, KEY_CREATIVE, KEY_PERF, KEY_ASSETS, KEY_USAGE, KEY_AGENDA, KEY_THEME, KEY_LIB_VIEW, KEY_RAIL, KEY_TOUR_SEEN, store, onWriteError, handleDownloadBackup, handleRestoreBackup } from "./services/store.js";
 import { resolveSchema } from "./services/naming.js";
 import { attachInitiatives } from "./services/performance.js";
 import { isLiveWorkspace, backupStatus } from "./services/dataSafety.js";
@@ -36,6 +36,7 @@ import { iconFor } from "./components/iconRegistry.js";
 import { downloadCSV, itemToCSVRow, normaliseDate, parseCSV, normalizeInitiativeRecord } from "./services/csv.js";
 import { buildLearningsIndex, buildPortfolioContext } from "./services/portfolio.js";
 import { stampUpdatedAt } from "./services/items.js";
+import { killGateBlocked } from "./services/killGate.js";
 
 // -- Deferred views ------------------------------------------------------------
 //
@@ -89,6 +90,8 @@ import { DetailView } from "./views/DetailView.jsx";
 import { FormView } from "./views/FormView.jsx";
 import { TriageView } from "./views/TriageView.jsx";
 import { LearningLibrary } from "./views/LearningLibrary.jsx";
+import { AgendaView } from "./views/AgendaView.jsx";
+import { seedInitiativeFromAgenda } from "./services/learningAgenda.js";
 
 // Shown only while a deferred view's chunk is in flight — typically a frame or
 // two on a warm connection. Deliberately not a spinner: a chunk fetch that
@@ -598,6 +601,7 @@ export default function App() {
   const [assets, setAssets] = useState([]);
   // One row per AI call, priced at the point of use. Read by the admin console.
   const [usage, setUsage] = useState([]);
+  const [agenda, setAgenda] = useState([]); // learning agenda items — see services/learningAgenda.js
   const usageRef = useRef([]);
   const [showPulse, setShowPulse] = useState(false);
   const [showMetricsImport, setShowMetricsImport] = useState(false);
@@ -700,7 +704,7 @@ export default function App() {
       // loaded even when parsing part of it threw.
       let settingsRaw = null, itemsRaw = null;
       try {
-        const [ir,sr,dr,mr,rr,tr,lv,ts,cr,pr,rc,ar,ur] = await Promise.all([store.get(KEY_ITEMS),store.get(KEY_SETTINGS),store.get(KEY_DEBATES),store.get(KEY_METRICS),store.get(KEY_RECS),store.get(KEY_THEME),store.get(KEY_LIB_VIEW),store.get(KEY_TOUR_SEEN),store.get(KEY_CREATIVE),store.get(KEY_PERF),store.get(KEY_RAIL),store.get(KEY_ASSETS),store.get(KEY_USAGE)]);
+        const [ir,sr,dr,mr,rr,tr,lv,ts,cr,pr,rc,ar,ur,gr] = await Promise.all([store.get(KEY_ITEMS),store.get(KEY_SETTINGS),store.get(KEY_DEBATES),store.get(KEY_METRICS),store.get(KEY_RECS),store.get(KEY_THEME),store.get(KEY_LIB_VIEW),store.get(KEY_TOUR_SEEN),store.get(KEY_CREATIVE),store.get(KEY_PERF),store.get(KEY_RAIL),store.get(KEY_ASSETS),store.get(KEY_USAGE),store.get(KEY_AGENDA)]);
         // Read theme from the resolved store before first render (gated on `loaded`),
         // so the persisted choice applies without an async flash.
         settingsRaw = sr && sr.value ? sr.value : null;
@@ -732,6 +736,7 @@ export default function App() {
         if(pr&&pr.value) setPerfRows(JSON.parse(pr.value));
         if(ar&&ar.value) setAssets(JSON.parse(ar.value));
         if(ur&&ur.value) { const u = JSON.parse(ur.value); setUsage(u); usageRef.current = u; }
+        if(gr&&gr.value) setAgenda(JSON.parse(gr.value));
       } catch { setItems(SEED); }
       setLoaded(true);
       // Stale-backup nudge. This effect has an empty dependency array so it runs
@@ -776,13 +781,23 @@ export default function App() {
   // the History API. Two effects, deliberately not one: the reader has to run on
   // mount and on every back/forward, the writer only when app state moves.
   //
-  // There is no re-entrancy guard between them and none is needed. Writing the
-  // hash fires `hashchange`, which calls `apply`, which calls setState with
-  // values identical to the ones already held — React bails out of the render,
-  // so no second write is ever queued. A guard flag here would have to be
-  // cleared on a render that does not happen.
+  // `#/new` is the one hash `formatHash`/`parseHash` are not inverses for, and
+  // it is not an oversight — route.js deliberately does not restore a form from
+  // a REOPENED `#/new` link, since an unsaved draft only ever lived in that
+  // tab's memory. The bug was applying that same rule to the round-trip our own
+  // write causes IN this tab: landing on the blank form set nav to "form" with
+  // no selId, the writer below turned that into `#/new`, and the `hashchange`
+  // that fires from setting `window.location.hash` ourselves was read by
+  // `apply` exactly like an external navigation — which reset nav straight back
+  // to "initiatives" before the form ever painted. "+ New" could not be reached
+  // at all. `lastWritten` is what tells `apply` the difference: a hashchange
+  // whose value is the one we just wrote ourselves carries no new information
+  // and is skipped, so an actual back/forward/typed-URL/reopened-link
+  // navigation (whose hash was never ours) still applies exactly as before.
+  const lastWrittenHash = useRef(null);
   useEffect(() => {
     const apply = () => {
+      if (lastWrittenHash.current !== null && window.location.hash === lastWrittenHash.current) return;
       const r = parseHash(window.location.hash);
       if (r.selId) setSelId(r.selId);
       if (r.tab)   { setPerfTab(r.tab); setSettingsSection(r.tab); }
@@ -796,7 +811,7 @@ export default function App() {
   useEffect(() => {
     if (!loaded) return;
     const next = formatHash({ nav, selId, tab: nav === "performance" ? perfTab : nav === "settings" ? settingsSection : null });
-    if (next && next !== window.location.hash) window.location.hash = next;
+    if (next && next !== window.location.hash) { lastWrittenHash.current = next; window.location.hash = next; }
   }, [nav, selId, perfTab, settingsSection, loaded]);
 
   const saveItems    = d => { const stamped = stampUpdatedAt(d, items); setItems(stamped); store.set(KEY_ITEMS,JSON.stringify(stamped)); };
@@ -807,6 +822,7 @@ export default function App() {
   const saveCreative = c => { setCreative(c); store.set(KEY_CREATIVE,JSON.stringify(c)); };
   const savePerf     = p => { setPerfRows(p); store.set(KEY_PERF,JSON.stringify(p)); };
   const saveAssets   = a => { setAssets(a); store.set(KEY_ASSETS,JSON.stringify(a)); };
+  const saveAgenda   = g => { setAgenda(g); store.set(KEY_AGENDA,JSON.stringify(g)); };
   const toggleDk     = ()=> { setDk(n => { const next=!n; store.set(KEY_THEME,next?"dark":"light"); return next; }); };
   const saveLibView  = v => { setLibView(v); store.set(KEY_LIB_VIEW,v); };
 
@@ -1117,6 +1133,17 @@ export default function App() {
     })();
     const durs   = completed.filter(e=>e.startDate&&e.endDate).map(e=>Math.round((parseD(e.endDate)-parseD(e.startDate))/86400000));
     const avgDays= durs.length>0?Math.round(durs.reduce((a,b)=>a+b,0)/durs.length):null;
+    // Franchise / Loonshot split, over ACTIVE (Draft+Running) initiatives only —
+    // a closed one's risk classification doesn't change whether the portfolio
+    // is currently taking swings. Unclassified items (riskType unset, which is
+    // every initiative until an operator opts in) are excluded from the share
+    // rather than counted as Franchise, so the tile can't be read as "safe" on
+    // data that was never actually classified.
+    const activeItems = items.filter(e=>brandFilter(e)&&(e.status==="Draft"||e.status==="Running"));
+    const classifiedActive = activeItems.filter(e=>e.riskType==="Franchise"||e.riskType==="Loonshot");
+    const loonshotShare = classifiedActive.length>0
+      ? Math.round((classifiedActive.filter(e=>e.riskType==="Loonshot").length/classifiedActive.length)*100)
+      : null;
     const catCounts  = {}; cats.forEach(c=>{catCounts[c]=items.filter(e=>e.category===c).length;});
     const typeCounts = {}; INIT_TYPES.forEach(tp=>{typeCounts[tp]=items.filter(e=>e.initType===tp).length;});
     const outCounts  = {}; OUTCOMES.forEach(o=>{outCounts[o]=closed.filter(e=>e.results&&e.results.outcomeClassification===o).length;});
@@ -1184,7 +1211,7 @@ export default function App() {
       pipeline: acc.pipeline + r.pipeline,
     }),{realised:0,realisedBackfilled:0,inflight:0,pipeline:0});
 
-    return {completed:completed.length,killed:killed.length,pipeline:pipeline.length,running:running.length,revImpacted,revImpactedProjected,revAtRisk,totalEstimated,totalActual,calibration,totalEstCost,totalActualCost,closedROI,winRate,wins:wins.length,closed:closed.length,avgDays,catCounts,typeCounts,outCounts,vel,avgIce,contribution,contributionTotals,_runningItems:running};
+    return {completed:completed.length,killed:killed.length,pipeline:pipeline.length,running:running.length,revImpacted,revImpactedProjected,revAtRisk,totalEstimated,totalActual,calibration,totalEstCost,totalActualCost,closedROI,winRate,wins:wins.length,closed:closed.length,avgDays,catCounts,typeCounts,outCounts,vel,avgIce,contribution,contributionTotals,loonshotShare,classifiedActiveCount:classifiedActive.length,activeCount:activeItems.length,_runningItems:running};
   },[items,cats,inRange,brandFilter]);
 
   const filtered = useMemo(()=>{
@@ -1407,6 +1434,10 @@ export default function App() {
 
   const reqStatus = s=>{
     if(s==="Completed"||s==="Killed"){setPendS(s);setConfC(sel&&sel.ice&&sel.ice.certainty?sel.ice.certainty*10:75);setShowSM(true);}
+    else if(sel && killGateBlocked(s, sel.status, sel.killCriteria)){
+      showToast("Set kill criteria before this can run — opening the editor.","info");
+      goEdit(sel);
+    }
     else saveItems(items.map(e=>e.id===selId?withRunningSnapshot({...e,status:s},s):e));
   };
 
@@ -1761,6 +1792,7 @@ export default function App() {
                 <div>Performance rows: <strong style={{color:t.text}}>{restorePayload.counts.perfRows}</strong></div>
                 <div>Generated assets: <strong style={{color:t.text}}>{restorePayload.counts.assets}</strong></div>
                 <div>AI spend rows: <strong style={{color:t.text}}>{restorePayload.counts.usage}</strong></div>
+                <div>Learning agenda items: <strong style={{color:t.text}}>{restorePayload.counts.agenda}</strong></div>
               </div>
             </div>
             <div style={{fontSize:12,color:t.textMuted,fontFamily:t.serif}}>Your current initiatives, settings, and metrics will be replaced. This cannot be undone.</div>
@@ -1780,6 +1812,7 @@ export default function App() {
                 // render as records without pictures — see store.js.
                 if (Array.isArray(parsed.assets))       saveAssets(parsed.assets);
                 if (Array.isArray(parsed.usage))        { setUsage(parsed.usage); usageRef.current = parsed.usage; store.set(KEY_USAGE, JSON.stringify(parsed.usage)); }
+                if (Array.isArray(parsed.agenda))       saveAgenda(parsed.agenda);
                 setRestorePayload(null);
                 showToast("Backup restored successfully.", "success");
               }}>Restore backup</button>
@@ -1889,7 +1922,7 @@ export default function App() {
             </span>
             <button style={{...gG(t),fontSize:12,padding:"6px 13px",flexShrink:0}}
               onClick={()=>{
-                handleDownloadBackup(items, settings, debates, weeklyMetrics, recs, creative, perfRows, assets, usage);
+                handleDownloadBackup(items, settings, debates, weeklyMetrics, recs, creative, perfRows, assets, usage, agenda);
                 try { localStorage.setItem("gos_last_backup", new Date().toISOString()); } catch { /* the very failure being reported */ }
                 setStorageError(null);
               }}>
@@ -1910,9 +1943,26 @@ export default function App() {
       {nav==="triage"&&<TriageView items={items} t={t} dk={dk} cats={cats} brands={brands} activeBrand={activeBrand} onDetail={(id)=>goDetail(id,"triage")}
         onLogResults={(id)=>{const it=items.find(e=>e.id===id); if(it){setSelId(id); setRForm(it.results?{...it.results,actualRevenueImpact:it.results.actualRevenueImpact!=null?it.results.actualRevenueImpact:"",actualSpendCost:it.results.actualSpendCost!=null?it.results.actualSpendCost:"",actualResourceCost:it.results.actualResourceCost!=null?it.results.actualResourceCost:""}:{actualOutcome:"",keyLearning:"",outcomeClassification:"Success",decisionMade:"",outcomeCertainty:75,actualRevenueImpact:"",actualSpendCost:"",actualResourceCost:""}); setShowR(true);}}}
         onExtend={(id,days)=>{saveItems(items.map(e=>{if(e.id!==id)return e; const base=e.endDate?new Date(e.endDate+"T12:00:00"):new Date(); base.setDate(base.getDate()+days); return {...e,endDate:base.toISOString().slice(0,10)};})); showToast("Extended "+days+" days.","success");}}
-        onActivate={(id)=>{saveItems(items.map(e=>e.id===id?withRunningSnapshot({...e,status:"Running",startDate:e.startDate||new Date().toISOString().slice(0,10)},"Running"):e)); showToast("Initiative activated. Now running.","success");}}
+        onActivate={(id)=>{
+          const it = items.find(e=>e.id===id);
+          if (it && killGateBlocked("Running", it.status, it.killCriteria)) {
+            showToast("Set kill criteria before activating — opening the editor.","info");
+            goEdit(it);
+            return;
+          }
+          saveItems(items.map(e=>e.id===id?withRunningSnapshot({...e,status:"Running",startDate:e.startDate||new Date().toISOString().slice(0,10)},"Running"):e)); showToast("Initiative activated. Now running.","success");
+        }}
       />}
       {nav==="library"&&<LearningLibrary items={items} t={t} dk={dk} cats={cats} brands={brands} activeBrand={activeBrand} settings={settings} view={libView} onView={saveLibView} onViewInitiative={(id)=>goDetail(id,"library")} onReplicate={(item)=>{const base=mkDefault(cats,activeBrand);setForm({...base,title:"[Replicate] "+item.title,hypothesis:"Based on learning from: "+item.title+". Original: "+item.hypothesis,category:item.category,initType:item.initType,ice:{...item.ice},revenueImpact:item.revenueImpact,notes:"Replicated from initiative "+item.id+". Original learning: "+item.results.keyLearning});setNav("form");}}/>}
+      {nav==="agenda"&&<AgendaView agenda={agenda} items={items} cats={cats} brands={brands} activeBrand={activeBrand} t={t} dk={dk}
+        onSaveAgenda={saveAgenda}
+        onViewInitiative={(id)=>goDetail(id,"agenda")}
+        onStartExperiment={(agendaItem)=>{
+          const base = mkDefault(cats, activeBrand);
+          setForm({...base, ...seedInitiativeFromAgenda(agendaItem)});
+          setSelId(null);
+          setNav("form");
+        }}/>}
       {nav==="creative"&&<CreativeStudio t={t} dk={dk} items={items} brands={brands} activeBrand={activeBrand} settings={settings}
         creative={creative} onSaveCreative={saveCreative} onSaveItems={saveItems} showToast={showToast}
         perfRows={perfRows} assets={assets} onSaveAssets={saveAssets}/>}
@@ -1928,7 +1978,7 @@ export default function App() {
           initialSection={settingsSection}
           onSave={s=>{saveSettings(s);}}
           onClose={()=>requestNav("dashboard")}
-          onDownloadBackup={() => { handleDownloadBackup(items, settings, debates, weeklyMetrics, recs, creative, perfRows, assets, usage); try { localStorage.setItem("gos_last_backup", new Date().toISOString()); } catch { /* the backup itself succeeded; only the reminder timestamp failed */ } }}
+          onDownloadBackup={() => { handleDownloadBackup(items, settings, debates, weeklyMetrics, recs, creative, perfRows, assets, usage, agenda); try { localStorage.setItem("gos_last_backup", new Date().toISOString()); } catch { /* the backup itself succeeded; only the reminder timestamp failed */ } }}
           onRestoreBackup={(file) => handleRestoreBackup(file, showToast, setRestorePayload)}
           onResetDemo={handleResetDemoData}/>
       )}
@@ -2042,17 +2092,18 @@ export default function App() {
       )}
 
       {nav==="detail"&&sel&&(
-        <DetailView item={sel} items={items} t={t} dk={dk} cats={cats}
+        <DetailView item={sel} items={items} t={t} dk={dk} cats={cats} settings={settings}
           onEdit={()=>goEdit(sel)}
           onDelete={()=>setPendingDelete(sel)}
           onStatus={reqStatus}
+          onSaveEvidence={(id,evidence)=>saveItems(items.map(e=>e.id===id?{...e,evidence}:e))}
           onResults={()=>{setRForm(sel.results?{...sel.results,actualRevenueImpact:sel.results.actualRevenueImpact!=null?sel.results.actualRevenueImpact:"",actualSpendCost:sel.results.actualSpendCost!=null?sel.results.actualSpendCost:"",actualResourceCost:sel.results.actualResourceCost!=null?sel.results.actualResourceCost:""}:{actualOutcome:"",keyLearning:"",outcomeClassification:"Success",decisionMade:"",outcomeCertainty:75,actualRevenueImpact:"",actualSpendCost:"",actualResourceCost:""});setShowR(true);}}
           onLink={goDetail}
           onSaveTestValidity={tv=>{saveItems(items.map(e=>e.id===sel.id?{...e,testValidity:tv}:e));}}/>
       )}
 
       {nav==="form"&&form&&(
-        <FormView form={form} setForm={setForm} items={items} t={t} dk={dk} cats={cats} brands={brands}
+        <FormView form={form} setForm={setForm} items={items} agenda={agenda} t={t} dk={dk} cats={cats} brands={brands}
           aiLoad={aiLoad} iceLoad={iceLoad} hypReview={hypReview} iceReview={iceReview}
           dataCtx={dataCtx} setDataCtx={setDataCtx}
           onAi={handleAiExpand} onIceAssist={handleIceAssist}

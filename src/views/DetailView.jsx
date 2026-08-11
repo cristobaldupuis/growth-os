@@ -6,12 +6,15 @@ import {
 } from "../services/testValidity.js";
 import { IconEdit, IconTrash, IconAlert, IconCopy } from "../components/icons.jsx";
 import { gG, gGh, gGd, gI, gTA, gSl, gSc, gSL } from "../components/styles.js";
-import { SBdg, OBdg, CBdg, TBdg, BlockerBadge, ICEChip } from "../components/badges.jsx";
+import { SBdg, OBdg, CBdg, TBdg, BlockerBadge, ICEChip, RiskBdg } from "../components/badges.jsx";
 import { EAlert } from "../components/EAlert.jsx";
 import { renderProse } from "../components/text.jsx";
+import { killLineProgress } from "../services/killGate.js";
+import { DiagnosticEscalationPanel } from "../components/DiagnosticEscalationPanel.jsx";
+import { resolveSchema } from "../services/naming.js";
 
 // -- Detail --------------------------------------------------------------------
-export function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResults,onLink,onSaveTestValidity}) {
+export function DetailView({item,items,t,dk,cats,settings,onEdit,onDelete,onStatus,onResults,onLink,onSaveTestValidity,onSaveEvidence}) {
   const linked = items.filter(e=>item.linkedIds&&item.linkedIds.includes(e.id));
   const score  = iceScore(item.ice&&item.ice.impact,item.ice&&item.ice.certainty,item.ice&&item.ice.ease);
   return (
@@ -24,6 +27,7 @@ export function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResu
             <SBdg s={item.status} dk={dk}/>
             {item.results&&<OBdg o={item.results.outcomeClassification} dk={dk}/>}
             <ICEChip ice={item.ice} t={t}/>
+            <RiskBdg riskType={item.riskType} t={t}/>
             <EAlert endDate={item.endDate} status={item.status} t={t} dk={dk}/>
             <BlockerBadge blocker={item.blocker} t={t}/>
           </div>
@@ -226,7 +230,31 @@ export function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResu
         </div>
       )}
 
-      {item.killCriteria&&item.status!=="Draft"&&<div style={gSc(t)}><div style={gSL(t)}>Kill criteria</div><p style={{margin:0,color:t.textSub,lineHeight:1.6,fontSize:13}}>{item.killCriteria}</p></div>}
+      {item.killCriteria&&item.status!=="Draft"&&(
+        <div style={gSc(t)}>
+          <div style={gSL(t)}>Kill criteria</div>
+          <p style={{margin:0,color:t.textSub,lineHeight:1.6,fontSize:13}}>{item.killCriteria}</p>
+          {/* Distance to the kill line — elapsed vs. the planned window, since
+              the criteria above are free text with no threshold to evaluate
+              live. See services/killGate.js for why this is the honest proxy. */}
+          {item.status==="Running" && (()=>{
+            const kl = killLineProgress(item);
+            if (!kl) return null;
+            const pct = Math.round(kl.progress*100);
+            return (
+              <div style={{marginTop:10}}>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:10.5,color:kl.overdue?t.red:t.textMuted,fontFamily:t.mono,marginBottom:4}}>
+                  <span>{pct}% of planned window elapsed</span>
+                  <span>{kl.overdue?Math.abs(kl.daysRemaining)+"d past end date":kl.daysRemaining+"d remaining"}</span>
+                </div>
+                <div style={{height:5,borderRadius:3,background:t.surfaceAlt,overflow:"hidden"}}>
+                  <div style={{height:"100%",width:pct+"%",borderRadius:3,background:kl.overdue?t.red:t.gold}}/>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
       {item.notes&&<div style={gSc(t)}><div style={gSL(t)}>Notes</div><p style={{margin:0,color:t.textSub,lineHeight:1.6,fontSize:13}}>{item.notes}</p></div>}
 
       {(item.status==="Running"||item.status==="Completed"||item.status==="Killed")&&(
@@ -253,6 +281,10 @@ export function DetailView({item,items,t,dk,cats,onEdit,onDelete,onStatus,onResu
           </div>
         );
       })()}
+
+      {(item.status==="Completed"||item.status==="Killed")&&settings&&onSaveEvidence&&(
+        <DiagnosticEscalationPanel item={item} schema={resolveSchema(settings)} t={t} dk={dk} onSaveEvidence={onSaveEvidence}/>
+      )}
 
       {linked.length>0&&(
         <div style={gSc(t)}>

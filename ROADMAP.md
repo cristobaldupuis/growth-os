@@ -546,6 +546,22 @@ anything" answerable for the first time.
 
 App-layer work on the existing data model. No backend dependency.
 
+**Shipped (August 2026):**
+
+- [x] **The agenda layer.** `services/learningAgenda.js` and `views/AgendaView.jsx`
+  — a question, `holdConstant`, `varies`, `falsifyingResult` and sample/duration
+  guidance, at `#/agenda` ("Thesis" in the rail). Initiatives ladder up via
+  `agendaId`, settable from the form or from "Start experiment" on the agenda
+  card. `agendaRollup` joins each question to its linked initiatives and
+  surfaces the latest closed learning against it.
+- [x] **Backward test design, deterministic rather than AI-derived.**
+  `seedInitiativeFromAgenda` carries the question's own fields forward into a
+  new initiative's title, hypothesis and kill criteria. Not an LLM call: an
+  agenda question is by definition the thing nothing has been run against yet,
+  so there is no evidence for a model to ground a derivation in — the same
+  discipline that keeps `callExpandRecommendation`'s ICE rationale honest about
+  thin data would have nothing to cite here. Reasoning in DECISIONS.md.
+
 ### 5.2 — Pre-registration and kill criteria as an enforced gate
 
 Harvested from the Biosphere design prototype, which got this right:
@@ -558,6 +574,26 @@ tracking. This makes it structural: a Draft cannot move to Running until kill
 criteria are set, and a Running initiative shows live distance to its kill line.
 Also from that prototype and worth adopting: a **Franchise / Loonshot** risk
 taxonomy, so a portfolio can be read for whether it is taking any real swings.
+
+**Shipped (August 2026):**
+
+- [x] **The gate.** `services/killGate.js`'s `killGateBlocked` fires on any
+  Draft/none → Running transition with empty kill criteria, enforced at all
+  three places that transition happens: the form's own save, Triage's
+  "Activate now", and Detail's status pills. A legacy Running item that
+  predates the rule is not retroactively blocked — the same asymmetry
+  pre-registration already established, for the same reason.
+- [x] **Distance to the kill line.** A proxy, not a live evaluation of the
+  criteria themselves — those stay free text on purpose (see FormView), so
+  there is no threshold to check against. What every Running initiative does
+  carry is a start/end window, and elapsed-vs-planned is what's shown next to
+  the kill criteria on Detail. Reasoning in DECISIONS.md.
+- [x] **Franchise / Loonshot.** `RISK_TYPES` in constants.js, optional and
+  unset by default rather than defaulting to the safer answer. The Dashboard's
+  secondary-tiles disclosure reads the Loonshot share of classified *active*
+  (Draft+Running) initiatives, excluding unclassified ones from the
+  denominator so the tile can't be read as "safe" on data nobody actually
+  classified.
 
 ### 5.3 — Diagnostic escalation: the system names the dimension it is missing
 
@@ -610,6 +646,29 @@ actually paying for.
 
 App-layer work on the existing data model. No backend dependency, no connector —
 which makes it unusually cheap for how hard it is to copy.
+
+**Shipped (August 2026):**
+
+- [x] **The gate and the ranking.** `services/diagnosticEscalation.js` fires on
+  relative prediction error past 40% of the frozen prediction (floored at
+  $2,000, so a miss on a trivial test can't trip it) *and* a nameable
+  candidate. Candidates are ranked by what the initiative's own claimed
+  channels' naming templates do NOT already capture — placement, device, time
+  of day and finer geo are filtered this way; age and gender are always
+  candidates regardless of naming capture, because a gender slot on an ad name
+  is a targeting label, not a performance breakdown by who converted.
+- [x] **The paste-back.** `parseBreakdownCSV` is a sibling parser scoped to
+  this one flow rather than a literal third branch of `detectCsvShape` — the
+  operator was already told which axis they pulled, so there is no shape to
+  detect, only a breakdown-value column (whichever isn't a recognised metric)
+  to read.
+- [x] **The verdict.** `verdictFromBreakdown` is arithmetic, not an AI call:
+  concentration (spend share) × underperformance (rate vs. the mix's own
+  average) names the band that explains the gap, or states the mix was even.
+- [x] **Scoped evidence.** Recorded evidence lives on `item.evidence`, an array
+  on the initiative itself — never merged into `perfRows`. Surfaced via
+  `DiagnosticEscalationPanel` on closed initiatives, which stops offering the
+  ask once an entry for that dimension exists.
 
 ### 5.4 — Campaign fact model *(requires Supabase)*
 

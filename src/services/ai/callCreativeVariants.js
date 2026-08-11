@@ -1,4 +1,4 @@
-import { PROXY_URL, AI_HEADERS, safeParseJSON, proxyError } from "./_shared.js";
+import { postProxy, firstText, safeParseJSON } from "./_shared.js";
 import { EFFORT, buildRequest, modelFor } from "./models.js";
 
 // -- Creative variants ---------------------------------------------------------
@@ -110,15 +110,15 @@ export async function callCreativeVariants(brief, initiative, brand, schema, opt
     "INITIATIVE: " + (initiative.title || "untitled") + " — " + (initiative.hypothesis || "no hypothesis recorded"),
   ].join("\n");
 
-  const resp = await fetch(PROXY_URL, {
-    method:"POST", headers:AI_HEADERS(),
-    body:JSON.stringify({ ...buildRequest({ model:modelFor("creative", modelOverride), maxTokens:3400, system:sys, effort:EFFORT.LOW }),
-      messages:[{ role:"user", content:user }] }),
+  const data = await postProxy({
+    group:"creative", fn:"callCreativeVariants",
+    // Attributed to the initiative, so the cost of producing a round of creative
+    // lands in the same place as the revenue the round is being judged on.
+    initiativeId: initiative?.id || null,
+    body:{ ...buildRequest({ model:modelFor("creative", modelOverride), maxTokens:3400, system:sys, effort:EFFORT.LOW }),
+      messages:[{ role:"user", content:user }] },
   });
-  if (!resp.ok) throw new Error(await proxyError(resp));
-  const data = await resp.json();
-  if (data.error) throw new Error(data.error.message || "The AI service returned an error.");
-  const raw = data.content && data.content[0] ? data.content[0].text.trim() : "[]";
+  const raw = firstText(data) || "[]";
   const parsed = safeParseJSON(raw, true);
   if (!Array.isArray(parsed)) throw new Error("Creative variants returned a malformed response.");
   return parsed;

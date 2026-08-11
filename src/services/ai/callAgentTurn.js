@@ -1,4 +1,4 @@
-import { PROXY_URL, AI_HEADERS, proxyError } from "./_shared.js";
+import { postProxy } from "./_shared.js";
 import { EFFORT, buildRequest, modelFor } from "./models.js";
 
 // Single agent turn with tool use — agentic: agent decides what data to fetch
@@ -38,17 +38,18 @@ Max 180 words per turn. No filler. Speak like a real boardroom executive who has
   const MAX_TOOL_ITERS = 4;
 
   while (iterations < MAX_TOOL_ITERS) {
-    const resp = await fetch(PROXY_URL, {
-      method:"POST", headers:AI_HEADERS(),
-      body: JSON.stringify({
+    // Inside the tool loop, so each iteration records its own row — a turn that
+    // fetches twice before answering cost twice, and a console that showed one
+    // row per turn would understate the debate by whatever the tool round-trips
+    // came to.
+    const data = await postProxy({
+      group:"debate", fn:"callAgentTurn",
+      body: {
         ...buildRequest({model:modelFor("debate", modelOverride), maxTokens:600, system:sys, effort:EFFORT.LOW, cacheSystem:true}),
-      tools: portfolioTools.definitions,
+        tools: portfolioTools.definitions,
         messages: currentMessages,
-      }),
+      },
     });
-    if (!resp.ok) throw new Error(await proxyError(resp));
-    const data = await resp.json();
-    if (data.error) throw new Error(data.error.message);
 
     const stopReason = data.stop_reason;
     const content = data.content || [];

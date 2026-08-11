@@ -1,4 +1,4 @@
-import { PROXY_URL, AI_HEADERS, safeParseJSON, proxyError } from "./_shared.js";
+import { postProxy, safeParseJSON } from "./_shared.js";
 import { EFFORT, buildRequest, modelFor } from "./models.js";
 
 // Moderator — decides what happens next after each agent turn
@@ -28,16 +28,13 @@ Rules:
 
 Priority: favour "followup" over "continue" whenever there is an unresolved disagreement in the transcript. Consensus too early produces generic output.`;
 
-  const resp = await fetch(PROXY_URL, {
-    method:"POST", headers:AI_HEADERS(),
-    body: JSON.stringify({
+  const data = await postProxy({
+    group:"debate", fn:"callModerator",
+    body: {
       ...buildRequest({model:modelFor("debate", modelOverride), maxTokens:300, system:sys, effort:EFFORT.LOW}),
       messages:[{role:"user", content:`Portfolio:\n${portfolioCtx}\n\nContext:\n${userContext||"none"}\n\nTranscript so far:\n${transcriptStr}\n\nDecide what happens next.`}],
-    }),
+    },
   });
-  if (!resp.ok) throw new Error(await proxyError(resp));
-  const data = await resp.json();
-  if (data.error) throw new Error(data.error.message);
   const raw = data.content?.[0]?.text?.trim()||"{}";
   const parsed = safeParseJSON(raw, false);
   // Moderator failure is non-fatal — fall back to "continue with next agent"

@@ -1,5 +1,6 @@
-import { PROXY_URL, AI_HEADERS, safeParseJSON, proxyError } from "./_shared.js";
+import { postProxy, firstText, safeParseJSON } from "./_shared.js";
 import { EFFORT, buildRequest, modelFor } from "./models.js";
+import { selectLearnings, formatEvidenceBlock } from "../creativeEvidence.js";
 
 // -- Creative brief ------------------------------------------------------------
 //
@@ -21,15 +22,33 @@ import { EFFORT, buildRequest, modelFor } from "./models.js";
 // anything, and the point of running creative through an experiment ledger is
 // that each round of assets settles a question.
 
-export async function callCreativeBrief(initiative, brand, learningsIndex, settings, schema, modelOverride) {
-  const learningsBlock = (learningsIndex || []).length === 0
+export async function callCreativeBrief(initiative, brand, learningsIndex, settings, schema, modelOverride, opts = {}) {
+  // Ranked and capped by a stated rule rather than by array position, and the
+  // remainder is counted so both the prompt and the operator can be told what
+  // was left out. See services/creativeEvidence.js for why this is a rule and
+  // not a retrieval step.
+  const selection = selectLearnings(learningsIndex, initiative);
+  const learningsBlock = selection.total === 0
     ? "  (no closed initiatives yet — the brief must rest on the brand brief and hypothesis alone, and should say so in `evidenceGaps`)"
-    : learningsIndex.slice(0, 25).map(l => {
+    : selection.shown.map(l => {
         const rev = l.actualRev != null
           ? `actual ${l.actualRev >= 0 ? "+" : "-"}$${Math.abs(l.actualRev).toLocaleString()}`
           : "actual revenue not recorded";
         return `  [${l.id}] (${l.outcome}|${l.category}|${rev}|closed ${l.closedDate || "unknown"}) "${l.title}" — ${l.learning}`;
       }).join("\n");
+
+  // Stated in the prompt, not just in the record. A model shown 25 of 51
+  // learnings and told so can qualify its claim; one shown 25 of 51 and told
+  // nothing will write as though it read the corpus.
+  const selectionNote = selection.excluded > 0
+    ? `\n  (${selection.shown.length} of ${selection.total} closed learnings shown, selected by ${selection.rule}. ` +
+      `${selection.excluded} not shown — do not claim to have reviewed the full record.)`
+    : "";
+
+  // Measured returns per creative dimension, from imported ad names. Absent
+  // until a performance CSV has been imported, which is the honest common case
+  // early in an engagement.
+  const evidenceBlock = formatEvidenceBlock(opts.evidence);
 
   const brandBlock = brand ? [
     "BRAND: " + (brand.name || "unnamed"),
@@ -56,7 +75,10 @@ export async function callCreativeBrief(initiative, brand, learningsIndex, setti
     "You are briefing ONE initiative. The team already has the hypothesis. Your job is to turn it into creative direction that a creator or designer can shoot against, and to make the round falsifiable.",
     "",
     "RULES:",
-    "  • Ground the brief in the brand brief and the closed learnings supplied. Cite specific learning ids in `evidenceCited` when a learning genuinely informs a choice. An empty array is the honest answer when nothing applies — do not manufacture citations.",
+    "  • Ground the brief in the brand brief, the closed learnings, and the MEASURED PERFORMANCE supplied. Cite specific learning ids in `evidenceCited` when a learning genuinely informs a choice. An empty array is the honest answer when nothing applies — do not manufacture citations.",
+    "  • Measured performance outranks a written learning when they disagree. A learning is what somebody concluded; the performance table is what the ad account did. If you propose an angle the table shows losing, say so and justify it.",
+    "  • A group marked [THIN] is below the reporting floor and is NOT evidence. Do not cite its ratio as a reason for anything. If a thin group is the only signal for a direction you like, the honest move is to name it in `evidenceGaps` as something worth testing properly, not to treat it as proven.",
+    "  • Do not claim coverage you do not have. If the block says learnings were excluded, or that rows did not parse, your reasoning covers what you were shown and nothing more.",
     "  • The `insight` must be a claim about the buyer, not about the product. 'Buyers of this category distrust before-and-after imagery because they have been burned' is an insight. 'Our product is high quality' is not.",
     "  • `angles` are the competing creative bets this round will settle between. They must be genuinely different theories of why someone buys, not three phrasings of one idea.",
     "  • `wouldFalsify` states what result would tell the team this creative direction is wrong. If you cannot name one, the brief is not testable and you should say so there.",
@@ -91,19 +113,34 @@ export async function callCreativeBrief(initiative, brand, learningsIndex, setti
     brandBlock,
     "",
     "CLOSED LEARNINGS (id | outcome|category|actual revenue|closed date | title — learning):",
-    learningsBlock,
+    learningsBlock + selectionNote,
+    "",
+    "MEASURED PERFORMANCE — what this account's own ad names actually returned, by creative dimension:",
+    evidenceBlock,
   ].join("\n");
 
-  const resp = await fetch(PROXY_URL, {
-    method:"POST", headers:AI_HEADERS(),
-    body:JSON.stringify({ ...buildRequest({ model:modelFor("creative", modelOverride), maxTokens:2600, system:sys, effort:EFFORT.HIGH, cacheSystem:true }),
-      messages:[{ role:"user", content:user }] }),
+  const data = await postProxy({
+    group:"creative", fn:"callCreativeBrief",
+    initiativeId: initiative?.id || null,
+    body:{ ...buildRequest({ model:modelFor("creative", modelOverride), maxTokens:2600, system:sys, effort:EFFORT.HIGH, cacheSystem:true }),
+      messages:[{ role:"user", content:user }] },
   });
-  if (!resp.ok) throw new Error(await proxyError(resp));
-  const data = await resp.json();
-  if (data.error) throw new Error(data.error.message || "The AI service returned an error.");
-  const raw = data.content && data.content[0] ? data.content[0].text.trim() : "{}";
+  const raw = firstText(data) || "{}";
   const parsed = safeParseJSON(raw, false);
   if (!parsed || typeof parsed !== "object") throw new Error("Creative brief returned a malformed response.");
-  return parsed;
+
+  // The selection is returned with the brief rather than recomputed later,
+  // because it describes what THIS brief was allowed to see. Recomputing it
+  // against a corpus that has since grown would describe a brief that never ran.
+  return {
+    ...parsed,
+    evidenceConsidered: {
+      learningsShown: selection.shown.length,
+      learningsTotal: selection.total,
+      learningsExcluded: selection.excluded,
+      rule: selection.rule,
+      performanceRows: opts.evidence?.rowCount || 0,
+      performanceSpend: opts.evidence?.totalSpend || 0,
+    },
+  };
 }

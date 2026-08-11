@@ -102,8 +102,29 @@ and does not wait on Supabase.
 
 - [x] **Key-frame generation.** Gemini image models ("Nano Banana") behind
   `api/image.js`, prompted from the approved brief rather than a free-text box.
-  Session-only by design — see DECISIONS.md for why persisting them needs blob
-  storage rather than a bigger JSON blob.
+  Up to three brand style references are attached per generation so a round of
+  creative shares one visual language.
+
+- [x] **Generated assets have provenance.** `src/services/assets.js` records an
+  id, the initiative, the brief and variant version, the prompt, the model, the
+  cost, and **the ad name the asset ships under** — which is what extends the
+  nomenclature join from `name → initiative` to `asset → initiative`. Bytes go
+  through `src/services/assetStore.js` to Supabase Storage when configured and
+  stay session-only when not; the record persists in both cases. This was
+  originally scoped inside 5.7 and was pulled forward, because every day
+  without it is provenance that cannot be reconstructed later — see DECISIONS.md.
+
+- [x] **The brief reasons from measured returns.** `src/services/creativeEvidence.js`
+  feeds per-dimension ROAS and CPA from imported ad names into every creative
+  brief, marks groups below a spend floor as not-evidence, and replaces the
+  unranked `slice(0, 25)` on closed learnings with a stated selection rule that
+  reports its own remainder. Briefs are versioned rather than overwritten.
+
+- [x] **AI spend is recorded.** `src/services/usage.js` writes one priced row per
+  call — the token counts were always in the proxy response and were being
+  discarded — and `/admin → Spend` rolls them up by feature group, model,
+  provider and call site. Per-browser and estimate-only by design; see
+  DECISIONS.md for what that scope costs and what would change it.
 
 - [x] **Performance import keyed on ad name.** The metrics importer now accepts a
   campaign-level export as well as the weekly-brand shape, routed by
@@ -669,6 +690,15 @@ commodity, and it is the fastest way to be mistaken for one.
 nothing to leave in place — but a spokesperson render is a different product from
 product video, and the roadmap should not let the presence of the first imply
 progress on the second.
+
+**What was pulled out of this item and shipped early.** Asset provenance — the
+record carrying the initiative, brief version, prompt, model, cost and ad name —
+now lands in Phase 1.6 rather than waiting here. The reasoning is in DECISIONS.md
+and is worth restating: this item's interesting version needs a corpus of
+asset→performance pairs to reason from, and a corpus only exists if collection
+started earlier. Sequenced as originally written, 5.7 would have arrived with
+nothing to learn from. What remains here is the generation itself, and it still
+depends on 5.1–5.5 working on real data.
 
 ### Naming and identity — resolved
 

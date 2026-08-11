@@ -11,6 +11,17 @@ export const KEY_CREATIVE = "gos_creative_v1";
 // entity per day with its dimensions living inside the name. Capped in
 // services/performance.js — a browser store is a provisional home for these.
 export const KEY_PERF     = "gos_perf_v1";
+// Provenance records for generated creative — id, prompt, model, cost, and the
+// ad name the asset ships under. Small structured JSON; the BYTES live in blob
+// storage via services/assetStore.js and deliberately never come near this
+// store, which is what makes persisting the record safe at all. See
+// services/assets.js for why the record is worth keeping even when the bytes
+// are gone.
+export const KEY_ASSETS   = "gos_assets_v1";
+// AI spend ledger: one row per call, priced at the point of use. Capped in
+// services/usage.js — a browser store is a provisional home for these and an
+// unbounded log is the thing that fills it.
+export const KEY_USAGE    = "gos_usage_v1";
 export const KEY_LIB_VIEW = "gos_lib_view_v1";
 // Sidebar collapsed state. A layout preference, so it persists like the theme
 // does — being asked to re-collapse the rail on every load is the kind of small
@@ -105,7 +116,7 @@ export const store = (() => {
 // payload loses only the new key, and a v2 restore reading a v1 payload finds
 // it absent and skips it. Neither direction corrupts anything, which is the bar
 // a format bump would exist to protect.
-export const handleDownloadBackup = (items, settings, debates, weeklyMetrics, recs, creative, perfRows) => {
+export const handleDownloadBackup = (items, settings, debates, weeklyMetrics, recs, creative, perfRows, assets, usage) => {
   const payload = {
     _meta: {
       format: "growth-os-backup",
@@ -120,6 +131,14 @@ export const handleDownloadBackup = (items, settings, debates, weeklyMetrics, re
     recs,
     creative: creative || [],
     perfRows: perfRows || [],
+    // Records only. The bytes they point at are not in the backup and cannot be:
+    // a portfolio's worth of generated frames would run to hundreds of megabytes
+    // of base64 inside a JSON file the operator is expected to email themselves.
+    // Restoring into a workspace with durable storage configured re-resolves the
+    // ones still in the bucket; the rest restore as records without pictures,
+    // which is the same honest state a reload produces today.
+    assets: assets || [],
+    usage: usage || [],
   };
   const json = JSON.stringify(payload, null, 2);
   const blob = new Blob([json], { type: "application/json" });
@@ -149,6 +168,8 @@ export const handleRestoreBackup = (file, showToast, setRestorePayload) => {
         recs: Array.isArray(parsed.recs) ? parsed.recs.length : 0,
         creative: Array.isArray(parsed.creative) ? parsed.creative.length : 0,
         perfRows: Array.isArray(parsed.perfRows) ? parsed.perfRows.length : 0,
+        assets: Array.isArray(parsed.assets) ? parsed.assets.length : 0,
+        usage: Array.isArray(parsed.usage) ? parsed.usage.length : 0,
       };
       const stamp = parsed._meta?.exportedAt
         ? new Date(parsed._meta.exportedAt).toLocaleString()

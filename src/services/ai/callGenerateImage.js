@@ -45,7 +45,8 @@ export const IMAGE_ASPECTS = [
  * Exported separately from the call so it can be shown to the operator before
  * they spend money on it, and asserted in tests without a network round trip.
  */
-export function buildImagePrompt(brief, variant, brand) {
+export function buildImagePrompt(brief, variant, brand, opts = {}) {
+  const refCount = opts.referenceCount || 0;
   const lines = [
     "Photorealistic advertising key frame for a direct-to-consumer brand. Single still image.",
     "",
@@ -61,9 +62,24 @@ export function buildImagePrompt(brief, variant, brand) {
   if ((brief.proof || []).length) lines.push("VISIBLE PROOF: " + brief.proof.join("; "));
   if (variant.varies)      lines.push("THIS VARIANT EMPHASISES: " + variant.varies);
 
+  // When references are attached, the prompt must say what to take from them.
+  // Left unsaid, the model treats leading images as things to reproduce and
+  // returns a near-copy of the reference rather than a new scene in its style —
+  // which is worse than no reference at all, because it looks deliberate.
+  if (refCount > 0) {
+    lines.push(
+      "",
+      `STYLE REFERENCE: ${refCount} reference image${refCount === 1 ? " is" : "s are"} attached above. ` +
+      "Match their lighting, colour grade, framing and overall visual language so this frame reads as part of the same campaign. " +
+      "Do NOT reproduce their composition or subject matter — this is a new scene in the same house style."
+    );
+  }
+
   lines.push(
     "",
-    "STYLE: naturalistic lighting, believable domestic or real-world setting, shallow depth of field, no studio sterility, no stock-photo posing.",
+    refCount > 0
+      ? "STYLE: follow the attached references. Where they are silent, default to naturalistic lighting, a believable real-world setting, shallow depth of field, no studio sterility and no stock-photo posing."
+      : "STYLE: naturalistic lighting, believable domestic or real-world setting, shallow depth of field, no studio sterility, no stock-photo posing.",
     "",
     "HARD CONSTRAINTS:",
     "  • No text, words, letters, numbers, logos, watermarks or packaging copy anywhere in the image.",
@@ -85,7 +101,7 @@ export function buildImagePrompt(brief, variant, brand) {
  * api/image.js and DECISIONS.md. This function deliberately returns the raw
  * payload rather than writing it anywhere.
  */
-export async function callGenerateImage({ prompt, aspectRatio = "4:5", model }) {
+export async function callGenerateImage({ prompt, aspectRatio = "4:5", model, referenceImages }) {
   // `model` left undefined resolves through the `image` group's routing rather
   // than defaulting to a literal here, so repointing image generation in the admin
   // console reaches this call without an edit. An explicit `model` still wins —
@@ -95,10 +111,13 @@ export async function callGenerateImage({ prompt, aspectRatio = "4:5", model }) 
   const resp = await fetch(IMAGE_PROXY_URL, {
     method: "POST",
     headers: AI_HEADERS(),
-    body: JSON.stringify({ model: resolved, prompt, aspectRatio, count: 1 }),
+    body: JSON.stringify({
+      model: resolved, prompt, aspectRatio, count: 1,
+      ...(referenceImages?.length ? { referenceImages } : {}),
+    }),
   });
   if (!resp.ok) throw new Error(await proxyError(resp));
   const data = await resp.json();
   if (!data || !data.data) throw new Error("No image was returned.");
-  return data;
+  return { ...data, model: resolved };
 }

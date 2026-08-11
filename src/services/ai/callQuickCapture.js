@@ -1,4 +1,4 @@
-import { PROXY_URL, AI_HEADERS, safeParseJSON, proxyError } from "./_shared.js";
+import { postProxy, firstText, safeParseJSON } from "./_shared.js";
 import { EFFORT, buildRequest, modelFor } from "./models.js";
 
 export async function callQuickCapture(description, settings, cats, initTypes, modelOverride) {
@@ -13,14 +13,12 @@ export async function callQuickCapture(description, settings, cats, initTypes, m
     "primaryMetric (string), killCriteria (string), notes (string, optional context).",
     "No markdown, no explanation, just the JSON object.",
   ].join(" ");
-  const resp = await fetch(PROXY_URL, {
-    method:"POST", headers:AI_HEADERS(),
-    body:JSON.stringify({ ...buildRequest({model:modelFor("capture", modelOverride), maxTokens:600, system:sys, effort:EFFORT.LOW}),
-      messages:[{role:"user", content:"Rough idea: "+description}] }),
+  const data = await postProxy({
+    group:"capture", fn:"callQuickCapture",
+    body:{ ...buildRequest({model:modelFor("capture", modelOverride), maxTokens:600, system:sys, effort:EFFORT.LOW}),
+      messages:[{role:"user", content:"Rough idea: "+description}] },
   });
-  if (!resp.ok) throw new Error(await proxyError(resp));
-  const data = await resp.json();
-  const raw = data.content && data.content[0] ? data.content[0].text.trim() : "{}";
+  const raw = firstText(data) || "{}";
   const parsed = safeParseJSON(raw, false);
   if (!parsed) throw new Error("Quick capture: couldn't parse AI response. Try again.");
   return parsed;

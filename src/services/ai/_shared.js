@@ -1,3 +1,6 @@
+import { modelById } from "./registry.js";
+import { mkUsageRow, priceTextCall } from "../usage.js";
+
 export const PROXY_URL = "/api/proxy";
 
 // There is deliberately no credential here.
@@ -39,6 +42,92 @@ export async function proxyError(res) {
   if (res.status === 503) return "AI is temporarily unavailable. Try again shortly.";
   return detail || `AI request failed (${res.status}).`;
 }
+
+// -- Spend recording -------------------------------------------------------------
+//
+// Every proxy response already carries its own token counts — Anthropic returns
+// `usage` natively and api/_adapters.js normalises Gemini's `usageMetadata` and
+// OpenAI's `usage` into the same shape. Nothing read them, so the admin console
+// could say which model each feature group was pointed at and nothing could say
+// what that choice had cost.
+//
+// The sink is module-level for the same reason `activeRouting` is in models.js:
+// every AI call site is a plain async function a long way from React state, and
+// the alternative is threading a recorder through twelve signatures that have no
+// other use for it. App.jsx installs one at boot; until it does, rows are dropped
+// rather than queued — a ledger is not worth a memory leak on a page that never
+// mounted the app.
+
+let usageSink = null;
+/** Install the recorder. Called once, at app init. */
+export function onUsage(fn) { usageSink = fn; }
+
+function record(row) {
+  if (!usageSink) return;
+  // A broken ledger must never break a working AI call. This is bookkeeping
+  // wrapped around the thing the user actually asked for, so it fails quietly
+  // and loudly in the console rather than surfacing as "your brief failed".
+  try { usageSink(row); } catch (err) { console.error("usage recording failed:", err); }
+}
+
+/**
+ * POST to the text proxy, record what it cost, and return the parsed body.
+ *
+ * Replaces the fetch/ok-check/parse/error-check preamble that was copy-pasted
+ * into all twelve call sites — which is also why recording lives here rather
+ * than at each one: a twelfth copy of the same six lines is where the drift
+ * starts, and a call site that forgets to record is invisible in the console
+ * rather than obviously broken.
+ *
+ * `group` and `fn` are both recorded because they answer different questions:
+ * the group is what the admin console routes and what an operator changes, the
+ * function is which surface actually spent the money.
+ */
+export async function postProxy({ group, fn, initiativeId = null, body }) {
+  const model = body?.model || "";
+  const entry = modelById(model);
+  const base = { group, fn, model, provider: entry?.provider || "", modality: "text", initiativeId };
+
+  let resp;
+  try {
+    resp = await fetch(PROXY_URL, { method: "POST", headers: AI_HEADERS(), body: JSON.stringify(body) });
+  } catch (err) {
+    // A network failure spent nothing, but it is still worth a row: a console
+    // showing calls-with-no-cost is how an operator notices the proxy is down.
+    record(mkUsageRow({ ...base, ok: false, errorKind: "network" }));
+    throw err;
+  }
+
+  if (!resp.ok) {
+    record(mkUsageRow({ ...base, ok: false, errorKind: "http_" + resp.status }));
+    throw new Error(await proxyError(resp));
+  }
+
+  const data = await resp.json();
+  if (data.error) {
+    record(mkUsageRow({ ...base, ok: false, errorKind: "provider" }));
+    throw new Error(data.error.message || "The AI service returned an error.");
+  }
+
+  const inputTokens  = data.usage?.input_tokens  ?? null;
+  const outputTokens = data.usage?.output_tokens ?? null;
+  record(mkUsageRow({
+    ...base,
+    inputTokens, outputTokens,
+    costUsd: priceTextCall(entry?.price, inputTokens, outputTokens),
+    // The rate is frozen onto the row alongside the figure it produced, so a
+    // later change to the catalogue does not silently restate history.
+    rate: entry?.price || null,
+  }));
+  return data;
+}
+
+/** The first text block of a proxy response, or "" — the shape every structured
+ *  call site unwraps by hand today. */
+export const firstText = (data) =>
+  data.content && data.content[0] && typeof data.content[0].text === "string"
+    ? data.content[0].text.trim()
+    : "";
 
 // Defensive JSON extraction for LLM responses. Tries direct parse, then largest
 // balanced bracket substring, then (for arrays) wraps a single object. Returns

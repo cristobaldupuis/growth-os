@@ -1,4 +1,4 @@
-import { PROXY_URL, AI_HEADERS, safeParseJSON, proxyError } from "./_shared.js";
+import { postProxy, firstText, safeParseJSON } from "./_shared.js";
 import { EFFORT, buildRequest, modelFor } from "./models.js";
 
 // Step 2: expand one selected candidate into a full recommendation. Run in
@@ -62,14 +62,12 @@ export async function callExpandRecommendation(candidate, portfolioCtx, learning
     portfolioCtx,
   ].join("\n");
 
-  const resp = await fetch(PROXY_URL, {
-    method:"POST", headers:AI_HEADERS(),
-    body:JSON.stringify({ ...buildRequest({model:modelFor("analysis", modelOverride), maxTokens:1200, system:sys, effort:EFFORT.LOW, cacheSystem:true}),
-      messages:[{role:"user", content:user}] }),
+  const data = await postProxy({
+    group:"analysis", fn:"callExpandRecommendation",
+    body:{ ...buildRequest({model:modelFor("analysis", modelOverride), maxTokens:1200, system:sys, effort:EFFORT.LOW, cacheSystem:true}),
+      messages:[{role:"user", content:user}] },
   });
-  if (!resp.ok) throw new Error(await proxyError(resp));
-  const data = await resp.json();
-  const raw = data.content && data.content[0] ? data.content[0].text.trim() : "{}";
+  const raw = firstText(data) || "{}";
   const parsed = safeParseJSON(raw, false);
   if (!parsed) throw new Error("Next Plays: expansion returned malformed response for '"+candidate.title+"'.");
   return parsed;

@@ -64,6 +64,29 @@
  * console offers a Verify action that asks the provider instead. Nothing here
  * invents an ID and presents it as confirmed.
  */
+// -- Pricing ---------------------------------------------------------------------
+//
+// `price` carries published LIST rates so services/usage.js can cost a call at the
+// point of use. Three rules, each of which exists because the alternative silently
+// misreports spend:
+//
+//   1. **A missing price is `null`, never zero.** An unpriced call is missing
+//      information, not a free one, and the rollup counts it separately rather
+//      than letting it flatter the total.
+//   2. **Unverified model ids carry no price.** Every non-Anthropic id below is
+//      flagged `unverified` because it was transcribed from a marketing name
+//      rather than read off the provider's model list. A rate attached to an id
+//      that may not exist is a guess on top of a guess, so those are null until
+//      someone confirms the id AND reads the rate off the provider's own pricing
+//      page. Fill them in here when you do — it is one line each.
+//   3. **Promotional and negotiated pricing is not modelled.** Claude Sonnet 5
+//      is on a promotional $2/$10 through 2026-08-31 against a $3/$15 list; the
+//      table carries list. Every ledger row is stamped `costBasis: "estimate"`
+//      for exactly this reason — it is a planning figure, not an invoice.
+//
+// Text rates are USD per million tokens. Image is per generated image. Video is
+// per second of output, which is why the video entries mirror VIDEO_TIERS rather
+// than restating a per-call figure that does not exist.
 export const MODEL_CATALOGUE = [
   // -- Anthropic text ---------------------------------------------------------
   {
@@ -71,6 +94,7 @@ export const MODEL_CATALOGUE = [
     provider: "anthropic",
     label: "Claude Opus 5",
     modality: "text",
+    price: { inUsdPerMTok: 5, outUsdPerMTok: 25 },
     blurb: "Strongest reasoning. The reach model for a group whose output is the product.",
     // 512, not 1024: Opus 5 halved the minimum cacheable prefix. Getting this
     // wrong is silent in both directions — too high and buildRequest declines to
@@ -83,6 +107,9 @@ export const MODEL_CATALOGUE = [
     provider: "anthropic",
     label: "Claude Sonnet 5",
     modality: "text",
+    // List rate. A promotional $2/$10 runs through 2026-08-31, so figures for
+    // calls made before then overstate actual spend — see the pricing note above.
+    price: { inUsdPerMTok: 3, outUsdPerMTok: 15 },
     blurb: "The current default for anything that weighs evidence or holds a position.",
     caps: { tools: true, json: true, adaptiveThinking: true, effort: true, cacheMinTokens: 1024, longContext: true },
   },
@@ -91,6 +118,7 @@ export const MODEL_CATALOGUE = [
     provider: "anthropic",
     label: "Claude Haiku 4.5",
     modality: "text",
+    price: { inUsdPerMTok: 1, outUsdPerMTok: 5 },
     // The two false entries are the reason models.test.js exists — they were
     // sent unconditionally once and it failed only as a runtime 400.
     blurb: "Cheap and fast. Schema-shaped rewriting where the judgement is already made.",
@@ -126,6 +154,7 @@ export const MODEL_CATALOGUE = [
     label: "Gemini 3.1 Pro",
     modality: "text",
     unverified: true,
+    price: null,
     blurb: "Google's reasoning tier. Long context; verify the id before relying on it.",
     caps: { tools: true, json: true, adaptiveThinking: false, effort: false, cacheMinTokens: Infinity, longContext: true },
   },
@@ -135,6 +164,7 @@ export const MODEL_CATALOGUE = [
     label: "Gemini 3.6 Flash",
     modality: "text",
     unverified: true,
+    price: null,
     blurb: "Fast and cheap tier. A candidate for Capture & Framing; verify the id first.",
     caps: { tools: true, json: true, adaptiveThinking: false, effort: false, cacheMinTokens: Infinity, longContext: false },
   },
@@ -144,6 +174,7 @@ export const MODEL_CATALOGUE = [
     label: "Gemini 3.5 Flash Lite",
     modality: "text",
     unverified: true,
+    price: null,
     blurb: "Google's cheapest tier. High-throughput transformation work; verify the id first.",
     caps: { tools: true, json: true, adaptiveThinking: false, effort: false, cacheMinTokens: Infinity, longContext: false },
   },
@@ -178,6 +209,7 @@ export const MODEL_CATALOGUE = [
     label: "OpenAI GPT-5.6 Sol",
     modality: "text",
     unverified: true,
+    price: null,
     blurb: "OpenAI's flagship tier — reasoning, coding, careful refinement. Verify the id first.",
     caps: { tools: true, json: true, adaptiveThinking: false, effort: false, cacheMinTokens: Infinity, longContext: true },
   },
@@ -187,6 +219,7 @@ export const MODEL_CATALOGUE = [
     label: "OpenAI GPT-5.6 Terra",
     modality: "text",
     unverified: true,
+    price: null,
     blurb: "Balanced tier at roughly half Sol's price. The sensible first thing to bench.",
     caps: { tools: true, json: true, adaptiveThinking: false, effort: false, cacheMinTokens: Infinity, longContext: true },
   },
@@ -196,6 +229,7 @@ export const MODEL_CATALOGUE = [
     label: "OpenAI GPT-5.6 Luna",
     modality: "text",
     unverified: true,
+    price: null,
     blurb: "Fastest and cheapest tier. A candidate for Capture & Framing; verify the id first.",
     caps: { tools: true, json: true, adaptiveThinking: false, effort: false, cacheMinTokens: Infinity, longContext: false },
   },
@@ -236,6 +270,7 @@ export const MODEL_CATALOGUE = [
     label: "Inkling (Thinking Machines)",
     modality: "text",
     unverified: true,
+    price: null,
     blurb: "Open weights, 1M context, first-party and Anthropic-shaped. Needs TINKER_API_KEY.",
     caps: { tools: true, json: true, adaptiveThinking: false, effort: false, cacheMinTokens: Infinity, longContext: true },
   },
@@ -248,6 +283,11 @@ export const MODEL_CATALOGUE = [
     provider: "gemini",
     label: "Nano Banana (Gemini 2.5 Flash Image)",
     modality: "image",
+    // Priced even though the provider is Gemini: unlike the text ids above these
+    // two are confirmed — they are what api/image.js already calls — so a rate
+    // here is attached to something real. Mirrors IMAGE_COST_USD in
+    // services/assets.js; that module is the one the generation path reads.
+    price: { perImageUsd: 0.04 },
     blurb: "Fast and cheap, roughly four cents a frame. The default for concepting.",
     caps: {},
   },
@@ -256,6 +296,7 @@ export const MODEL_CATALOGUE = [
     provider: "gemini",
     label: "Nano Banana Pro (Gemini 3 Pro Image)",
     modality: "image",
+    price: { perImageUsd: 0.14 },
     blurb: "Slower and dearer. For a frame that will actually be shown to someone.",
     caps: {},
   },
@@ -269,6 +310,11 @@ export const MODEL_CATALOGUE = [
     provider: "heygen",
     label: "HeyGen (Avatar III)",
     modality: "video",
+    // Mirrors VIDEO_TIERS.STANDARD.costPerSecond in callGenerateVideo.js, which
+    // stays the figure the pre-spend estimate reads. Duplicated here so the spend
+    // console can price a video row without importing the tier table; if these
+    // ever disagree, callGenerateVideo.js is the one that charges.
+    price: { perSecondUsd: 0.017 },
     blurb: "~$0.017/sec. Cheapest viable talking head; fine for reading a hook back.",
     caps: {},
   },
@@ -277,6 +323,7 @@ export const MODEL_CATALOGUE = [
     provider: "fabric",
     label: "VEED Fabric 1.0",
     modality: "video",
+    price: { perSecondUsd: 0.15 },
     blurb: "~$0.15/sec. Photoreal lip-sync, roughly nine times the price.",
     caps: {},
   },
@@ -285,6 +332,7 @@ export const MODEL_CATALOGUE = [
     provider: "did",
     label: "D-ID",
     modality: "video",
+    price: { perSecondUsd: 0.035 },
     blurb: "~$0.035/sec. Above HeyGen without being visibly better; kept reachable, not a tier.",
     caps: {},
   },

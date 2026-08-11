@@ -11,6 +11,13 @@ import {
   callGenerateVideo, pollVideoJob, buildVideoScript, VIDEO_TIERS, VIDEO_TIER_LIST,
   estimateSpokenSeconds, estimateVideoCostUsd, VIDEO_POLL_INTERVAL_MS, VIDEO_POLL_TIMEOUT_MS,
 } from "../services/ai/callGenerateVideo.js";
+import { mkAssetRecord, currentRoundAssets, imageCostUsd, costForInitiative } from "../services/assets.js";
+import { putAsset, getAssetUrl, readAssetBytes, probeDurableStorage, durableUnavailableReason } from "../services/assetStore.js";
+import { buildCreativeEvidence } from "../services/creativeEvidence.js";
+
+// Kept in step with api/image.js. Exceeding it is refused upstream rather than
+// silently truncated, so the picker never offers a fourth.
+const MAX_REFERENCE_IMAGES = 3;
 
 const usd = n => "$" + n.toFixed(2);
 const mmss = ms => {
@@ -39,6 +46,7 @@ const StatBlock = ({ t, label, children }) => (
 
 export function CreativeStudio({
   t, dk, items, brands, activeBrand, settings, creative, onSaveCreative, onSaveItems, showToast,
+  perfRows, assets, onSaveAssets,
 }) {
   const schema   = resolveSchema(settings);
   const channels = listChannels(schema);
@@ -61,51 +69,55 @@ export function CreativeStudio({
   const [channel, setChannel]   = useState(channels[0]?.id || "meta");
   const [edits, setEdits]       = useState({});     // {variantIdx: {dimKey: value}}
 
-  // Generated frames are held HERE, in component state, and are deliberately
-  // never passed to onSaveCreative. A 1024px PNG is well over a megabyte once
-  // base64-encoded and localStorage caps around 5MB, so persisting two or three
-  // would exhaust the quota — reproducing exactly the silent data-loss failure
-  // store.js was rewritten to prevent, except this time it would take the whole
-  // portfolio down with it. They survive until reload; the operator downloads
-  // what is worth keeping. Persisting these needs blob storage, not a bigger
-  // JSON blob (see DECISIONS.md).
-  const [images, setImages]     = useState({});     // {variantIdx: {mimeType, data, aspect}}
+  // The RECORD of every generated frame now persists (see services/assets.js);
+  // what is held here is only the resolved URL used to paint it, keyed by asset
+  // id. Bytes still never enter the app's JSON store — a 1024px PNG is well over
+  // a megabyte base64-encoded against a ~5MB localStorage cap — but they no
+  // longer vanish without trace either: services/assetStore.js writes them to
+  // blob storage when the deployment has it configured, and holds them for the
+  // session when it does not. Either way the provenance survives.
+  const [imgUrls, setImgUrls]   = useState({});     // {assetId: objectUrl|dataUrl}
   const [imgBusy, setImgBusy]   = useState(null);   // variantIdx currently generating
   const [imgErr, setImgErr]     = useState({});     // {variantIdx: message}
   const [aspect, setAspect]     = useState("4:5");
   const [promptPreview, setPromptPreview] = useState(null); // {idx, text}
+  const [durableBytes, setDurableBytes] = useState(false);
 
-  // Video is held the same way and for a stronger version of the same reason.
-  // What is kept here is a URL, not bytes — the record below never holds the
-  // clip itself, and nothing re-fetches it into the app. A rendered video is
-  // 5-50MB, so persisting one is not a quota risk the way an image is, it is a
-  // certainty; and re-hosting the provider's signed URL would make this app a
-  // video CDN with its own egress bill and retention policy. The operator
-  // downloads the clip before the provider's link expires. See api/video.js.
+  // Video keeps a URL, not bytes, and that has not changed: a rendered clip is
+  // 5-50MB, and re-hosting the provider's signed link would make this app a
+  // video CDN with its own egress bill and retention policy (see api/video.js).
+  // What is new is that the RECORD of the render — script, tier, provider, job
+  // id, cost, and the ad name it was made for — outlives the link.
   const [tierKey, setTierKey]   = useState("STANDARD");
-  const [videos, setVideos]     = useState({});     // {variantIdx: {status, url?, durationSeconds?, error?, tierLabel, costUsd}}
   const [vidBusy, setVidBusy]   = useState(null);   // {idx, startedAt} while one render is in flight
+  const [vidErr, setVidErr]     = useState({});     // {variantIdx: message}
   const [elapsedMs, setElapsedMs] = useState(0);
+
+  // Asked once. The studio says plainly whether a frame will survive a reload
+  // BEFORE the operator spends money generating it, rather than after.
+  useEffect(() => { probeDurableStorage().then(setDurableBytes); }, []);
 
   const tier = VIDEO_TIERS[tierKey];
 
-  // Generated assets are keyed by VARIANT INDEX, which is only meaningful
-  // against the variant list that produced them. Switching initiative or
-  // regenerating variants re-points index 0 at something else entirely, so
-  // anything left behind is now attached to the wrong hypothesis — a brief's
-  // key frame showing up under a different initiative's variant in a view whose
-  // whole discipline is that every asset is born attached to one. Clearing is
-  // cheap: none of this is persisted, and the operator downloads what is worth
-  // keeping before they move on.
+  // Assets used to be keyed by bare variant INDEX, which is only meaningful
+  // against the variant list that produced them: regenerating variants re-pointed
+  // index 0 at a different creative idea, so anything left behind was attached to
+  // the wrong hypothesis. The old answer was to delete everything on every
+  // regeneration — safe, and it threw away the ledger.
   //
-  // Bumping the video run id is what stops an in-flight render from writing its
-  // result into the cleared state a minute later; see genVideo.
+  // Assets are versioned instead (services/assets.js `variantKey`), so a frame
+  // made against brief v2's third variant carries a key brief v3 can never mint.
+  // Nothing has to be deleted to stay correct: old rounds simply stop being
+  // *current*, and the ledger keeps every one of them with its own cost and
+  // provenance. What is cleared here is view state, not evidence.
+  //
+  // Bumping the video run id still stops an in-flight render from writing its
+  // result into a view that has moved on; see genVideo.
   const videoRunId = useRef(0);
-  const clearGeneratedAssets = () => {
+  const clearViewState = () => {
     videoRunId.current += 1;
-    setImages({});
     setImgErr({});
-    setVideos({});
+    setVidErr({});
     setVidBusy(null);
     setPromptPreview(null);
   };
@@ -152,17 +164,49 @@ export function CreativeStudio({
     onSaveCreative([{ ...(record || { initiativeId: selId }), ...patch, generatedAt: new Date().toISOString() }, ...rest]);
   };
 
+  // Measured returns per creative dimension, from whatever performance has been
+  // imported. This is the half of the evidence the brief never used to see: the
+  // app could compute that one angle returned 2.1x and another 0.8x, and then
+  // brief the next round without mentioning it.
+  const evidence = useMemo(
+    () => buildCreativeEvidence(perfRows, schema),
+    [perfRows, schema]
+  );
+
   const runBrief = async () => {
     if (!sel) return;
     setBusy("brief"); setErr("");
     try {
-      const result = await callCreativeBrief(sel, brand, learningsIndex, settings, schema);
-      saveRecord({ brief: result, variants: [] });
+      const result = await callCreativeBrief(sel, brand, learningsIndex, settings, schema, undefined, { evidence });
+      // Briefs are versioned, not overwritten. The previous behaviour replaced
+      // `record.brief` in place, which destroyed its `wouldFalsify` — the one
+      // field that makes a creative round settle a question. An initiative's
+      // prediction is frozen at launch precisely so it can be checked later; the
+      // brief that justified the creative deserves the same treatment, and
+      // without it there is no way to tell whether the brief behind a winning ad
+      // said something different from the one currently on file.
+      const nextBriefVersion = (record?.briefVersion || 0) + 1;
+      const history = [
+        ...(record?.briefs || []),
+        ...(record?.brief && !(record?.briefs || []).length
+          // A record written before versioning existed carries only `brief`.
+          // Fold it in as v1 rather than losing it.
+          ? [{ version: record.briefVersion || 1, brief: record.brief, generatedAt: record.generatedAt || null }]
+          : []),
+      ];
+      saveRecord({
+        brief: result,
+        briefVersion: nextBriefVersion,
+        briefs: [...history, { version: nextBriefVersion, brief: result, generatedAt: new Date().toISOString() }],
+        // A new brief invalidates the variants it was going to produce, so the
+        // variant generation resets — but the assets already made against the
+        // old pair keep their key and stay in the ledger.
+        variants: [],
+        variantsVersion: 0,
+      });
       setEdits({});
-      // A new brief empties the variant list, so every index-keyed asset now
-      // points at a variant that no longer exists.
-      clearGeneratedAssets();
-      showToast("Creative brief generated.", "success");
+      clearViewState();
+      showToast(`Creative brief v${nextBriefVersion} generated.`, "success");
     } catch (e) { setErr(e.message || "Could not generate the brief."); }
     finally { setBusy(""); }
   };
@@ -172,11 +216,12 @@ export function CreativeStudio({
     setBusy("variants"); setErr("");
     try {
       const result = await callCreativeVariants(brief, sel, brand, schema, { perAngle, channel });
-      saveRecord({ brief, variants: result });
+      // Bumping the version is what keeps yesterday's frame from reappearing
+      // under a variant that never asked for it — the old assets keep the old
+      // key rather than being deleted to make the indices safe.
+      saveRecord({ brief, variants: result, variantsVersion: (record?.variantsVersion || 0) + 1 });
       setEdits({});
-      // Regenerating re-keys every index, so yesterday's frame would otherwise
-      // reappear under a variant that never asked for it.
-      clearGeneratedAssets();
+      clearViewState();
       showToast(result.length + " variants generated.", "success");
     } catch (e) { setErr(e.message || "Could not generate variants."); }
     finally { setBusy(""); }
@@ -201,20 +246,93 @@ export function CreativeStudio({
   const nameFor    = (variant, idx) =>
     nameSetFor(variant, idx).find(n => n.level === adLevelKey) || { name: "", errors: [] };
 
+  // The round this initiative is currently on. Every asset generated below is
+  // stamped with it, which is what lets an old round stay in the ledger without
+  // ever showing up under a variant it does not belong to.
+  const round = {
+    initiativeId: selId,
+    briefVersion: record?.briefVersion || 0,
+    variantsVersion: record?.variantsVersion || 0,
+  };
+  const roundAssets = useMemo(
+    () => currentRoundAssets(assets, round),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [assets, selId, record?.briefVersion, record?.variantsVersion]
+  );
+
+  /** Brand reference images, resolved to base64 for the image proxy. Absent when
+   *  the brand has none, which is the ordinary case before anyone uploads one. */
+  const loadReferences = async () => {
+    const refs = (brand?.referenceImages || []).slice(0, MAX_REFERENCE_IMAGES);
+    if (!refs.length) return [];
+    const resolved = await Promise.all(refs.map(readAssetBytes));
+    // A reference whose bytes are gone is skipped rather than failing the
+    // generation — a missing style reference degrades the frame, it does not
+    // invalidate the brief behind it.
+    return resolved.filter(Boolean);
+  };
+
   const genImage = async (variant, idx) => {
     setImgBusy(idx);
     setImgErr({ ...imgErr, [idx]: "" });
     try {
-      const prompt = buildImagePrompt(brief, variant, brand);
+      const references = await loadReferences();
+      const prompt = buildImagePrompt(brief, variant, brand, { referenceCount: references.length });
       // No explicit model: the `image` feature group decides, so repointing image
       // generation in the admin console reaches this button. It defaults to
       // IMAGE_MODELS.FAST, which is what this call passed before routing existed.
-      const img = await callGenerateImage({ prompt, aspectRatio: aspect });
-      setImages({ ...images, [idx]: { ...img, aspect } });
+      const img = await callGenerateImage({ prompt, aspectRatio: aspect, referenceImages: references });
+
+      const name = nameFor(variant, idx);
+      const stored = await putAsset({ mimeType: img.mimeType, data: img.data });
+      const rec = mkAssetRecord({
+        kind: "image",
+        initiativeId: selId,
+        initId: sel.initId || sel.id,
+        brandId: sel.brandId || "default",
+        briefVersion: round.briefVersion,
+        variantsVersion: round.variantsVersion,
+        variantIdx: idx,
+        variantLabel: variant.label || "",
+        angleSlug: variant.angleSlug || "",
+        // The join key, captured at the moment of generation. Without it an asset
+        // can be traced forward from the brief but never backward from the spend.
+        adName: name.name || "",
+        channel,
+        model: img.model,
+        prompt,
+        aspect,
+        mimeType: img.mimeType,
+        costUsd: imageCostUsd(img.model),
+        storageKey: stored.storageKey,
+        bytesDurable: stored.durable,
+      });
+      onSaveAssets([rec, ...(assets || [])]);
+      const url = await getAssetUrl(rec);
+      if (url) setImgUrls(u => ({ ...u, [rec.id]: url }));
     } catch (e) {
       setImgErr({ ...imgErr, [idx]: e.message || "Could not generate an image." });
     } finally { setImgBusy(null); }
   };
+
+  // Resolve URLs for assets from a previous session. A record whose bytes are
+  // gone resolves to null and renders as a record without a picture, which is
+  // the honest state rather than a broken image icon.
+  useEffect(() => {
+    let live = true;
+    const pending = Object.values(roundAssets)
+      .map(slot => slot.image)
+      .filter(a => a && !imgUrls[a.id]);
+    if (!pending.length) return;
+    Promise.all(pending.map(async a => [a.id, await getAssetUrl(a)])).then(pairs => {
+      if (!live) return;
+      const next = {};
+      pairs.forEach(([id, url]) => { if (url) next[id] = url; });
+      if (Object.keys(next).length) setImgUrls(u => ({ ...u, ...next }));
+    });
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roundAssets]);
 
   // Submit, then poll until the provider resolves. The loop lives here rather
   // than inside pollVideoJob because the UI has to keep reporting "still
@@ -229,9 +347,37 @@ export function CreativeStudio({
     const runId = ++videoRunId.current;
     const current = () => videoRunId.current === runId;
 
-    setVidBusy({ idx, startedAt });
+    setVidBusy({ idx, startedAt, status: "rendering" });
     setElapsedMs(0);
-    setVideos(v => ({ ...v, [idx]: { status: "rendering", tierLabel: tier.label, costUsd: estimateVideoCostUsd(script, tier) } }));
+    setVidErr(e => ({ ...e, [idx]: "" }));
+
+    // Written once the job is accepted, not when it finishes. A render that is
+    // submitted is billed whether or not anyone waits for it, so the ledger has
+    // to record it at submit — a record written only on success would understate
+    // spend by exactly the renders that went wrong, which is the wrong direction
+    // to be wrong in.
+    const writeRecord = (patch) => {
+      const name = nameFor(variant, idx);
+      return mkAssetRecord({
+        kind: "video",
+        initiativeId: selId,
+        initId: sel.initId || sel.id,
+        brandId: sel.brandId || "default",
+        briefVersion: round.briefVersion,
+        variantsVersion: round.variantsVersion,
+        variantIdx: idx,
+        variantLabel: variant.label || "",
+        angleSlug: variant.angleSlug || "",
+        adName: name.name || "",
+        channel,
+        model: tier.provider,
+        provider: tier.provider,
+        prompt: script,
+        aspect,
+        costUsd: estimateVideoCostUsd(script, tier),
+        ...patch,
+      });
+    };
 
     try {
       const { jobId, provider } = await callGenerateVideo({ script, cta: variant.cta, aspectRatio: aspect, tier });
@@ -249,37 +395,53 @@ export function CreativeStudio({
         // operator the job id and stops polling, rather than reporting an error
         // that implies nothing was spent.
         if (Date.now() - startedAt > VIDEO_POLL_TIMEOUT_MS) {
-          setVideos(v => ({ ...v, [idx]: { ...v[idx], status: "stalled", jobId } }));
+          // Stalled, not failed: the job is alive on the provider and will be
+          // billed, so the record is written with the job id the operator needs
+          // to collect it from the provider's own dashboard.
+          onSaveAssets([writeRecord({ jobId, providerUrl: null }), ...(assets || [])]);
+          setVidErr(e => ({ ...e,
+            [idx]: `Still rendering after ${Math.round(VIDEO_POLL_TIMEOUT_MS / 60000)} minutes, so this stopped watching. `
+                 + `The job is alive on the provider and will still be billed — job ${jobId}. It is recorded against this variant.` }));
           break;
         }
 
         const result = await pollVideoJob({ jobId, provider });
         if (!current()) return;
         if (result.status === "done") {
-          setVideos(v => ({ ...v, [idx]: { ...v[idx], status: "done", url: result.url, durationSeconds: result.durationSeconds } }));
+          onSaveAssets([writeRecord({
+            jobId,
+            providerUrl: result.url,
+            durationSeconds: result.durationSeconds,
+            // The clip itself is never re-hosted — see api/video.js. What
+            // persists is the record; the link expires within 24-72h and the
+            // operator downloads before then.
+            bytesDurable: false,
+          }), ...(assets || [])]);
           break;
         }
         if (result.status === "failed") {
           // The provider's own message, verbatim. A moderation refusal and a
           // bad avatar URL need different fixes, and paraphrasing them into
           // "render failed" throws away the only thing that distinguishes them.
-          setVideos(v => ({ ...v, [idx]: { ...v[idx], status: "failed", error: result.error || "The provider reported a failed render." } }));
+          onSaveAssets([writeRecord({ jobId }), ...(assets || [])]);
+          setVidErr(e => ({ ...e, [idx]: result.error || "The provider reported a failed render." }));
           break;
         }
       }
     } catch (e) {
       if (!current()) return;
-      setVideos(v => ({ ...v, [idx]: { ...v[idx], status: "failed", error: e.message || "Could not generate a video." } }));
+      setVidErr(er => ({ ...er, [idx]: e.message || "Could not generate a video." }));
     } finally { if (current()) setVidBusy(null); }
   };
 
   const downloadImage = (variant, idx) => {
-    const img = images[idx];
-    if (!img) return;
-    const ext = (img.mimeType || "image/png").split("/")[1] || "png";
+    const asset = roundAssets[idx]?.image;
+    const url = asset && imgUrls[asset.id];
+    if (!url) return;
+    const ext = (asset.mimeType || "image/png").split("/")[1] || "png";
     const a = document.createElement("a");
-    a.href = `data:${img.mimeType};base64,${img.data}`;
-    a.download = `${(sel.initId || sel.id)}_${(variant.label || "variant").replace(/\s+/g, "-")}_${img.aspect.replace(":", "x")}.${ext}`;
+    a.href = url;
+    a.download = `${(sel.initId || sel.id)}_${(variant.label || "variant").replace(/\s+/g, "-")}_${String(asset.aspect || "").replace(":", "x")}.${ext}`;
     a.click();
   };
 
@@ -350,7 +512,7 @@ export function CreativeStudio({
           </div>
         ) : (
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-            <select value={selId} onChange={e => { setSelId(e.target.value); setEdits({}); setErr(""); clearGeneratedAssets(); }}
+            <select value={selId} onChange={e => { setSelId(e.target.value); setEdits({}); setErr(""); clearViewState(); }}
               style={{ ...gSl(t), maxWidth: 460, flex: "1 1 300px" }}>
               <option value="">Select an initiative…</option>
               {eligible.map(e => (
@@ -467,6 +629,38 @@ export function CreativeStudio({
         </div>
       )}
 
+      {/* Production ledger. What this initiative's creative has cost to make, and
+          whether what is on screen will survive a reload. Both are stated before
+          the generate buttons rather than discovered afterwards: a frame the
+          operator believes is saved and is not is the expensive kind of surprise,
+          and production cost belongs in the denominator of a product whose whole
+          thesis is calibration. */}
+      {brief && (() => {
+        const spend = costForInitiative(assets, selId);
+        if (!spend.count && durableBytes) return null;
+        return (
+          <div style={{ ...gCd(t), marginBottom: 14, display:"flex", gap:16, flexWrap:"wrap", alignItems:"baseline" }}>
+            {spend.count > 0 && (
+              <div style={{ fontSize:12, color:t.textSub, fontFamily:t.sans }}>
+                <strong style={{ color:t.text, fontFamily:t.mono }}>{usd(spend.usd)}</strong> to produce{" "}
+                {spend.count} asset{spend.count === 1 ? "" : "s"} for this initiative
+                {spend.unpriced > 0 && (
+                  <span style={{ color:t.textMuted }}>
+                    {" "}· {spend.unpriced} unpriced, so the real figure is higher
+                  </span>
+                )}
+              </div>
+            )}
+            {!durableBytes && (
+              <div style={{ fontSize:11.5, color:t.textMuted, fontFamily:t.serif, lineHeight:1.5, flex:"1 1 320px" }}>
+                Generated frames are held for this tab only and are gone on reload — {durableUnavailableReason()}. What
+                each generation was, its prompt, model, cost and ad name, is recorded either way.
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* Variants */}
       {brief && (
         <div style={{ ...gCd(t) }}>
@@ -537,20 +731,25 @@ export function CreativeStudio({
                   {/* Key frame. The prompt is assembled from the approved brief
                       rather than typed, and is inspectable before spending —
                       an image call is a fixed few cents, unlike a text call. */}
+                  {(() => {
+                    const shot = roundAssets[i]?.image || null;
+                    const shotUrl = shot ? imgUrls[shot.id] : null;
+                    const refCount = Math.min((brand?.referenceImages || []).length, MAX_REFERENCE_IMAGES);
+                    return (
                   <div style={{ margin:"12px 0", padding:"11px 12px", background:t.surface, border:"1px solid "+t.borderSoft, borderRadius:10 }}>
                     <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:9, flexWrap:"wrap" }}>
                       <div style={{ ...gSL(t), marginBottom:0 }}>Key frame</div>
                       <div style={{ display:"flex", gap:7, alignItems:"center", flexWrap:"wrap" }}>
-                        <button onClick={() => setPromptPreview(promptPreview?.idx === i ? null : { idx:i, text:buildImagePrompt(brief, v, brand) })}
+                        <button onClick={() => setPromptPreview(promptPreview?.idx === i ? null : { idx:i, text:buildImagePrompt(brief, v, brand, { referenceCount: refCount }) })}
                           style={{ ...gGh(t), padding:"5px 9px", fontSize:11 }}>
                           {promptPreview?.idx === i ? "Hide prompt" : "See prompt"}
                         </button>
-                        {images[i] && (
+                        {shotUrl && (
                           <button onClick={() => downloadImage(v, i)} style={{ ...gGh(t), padding:"5px 9px", fontSize:11 }}>Download</button>
                         )}
                         <button onClick={() => genImage(v, i)} disabled={imgBusy !== null}
-                          style={{ ...(images[i] ? gGh(t) : gG(t)), padding:"5px 11px", fontSize:11.5, opacity: imgBusy !== null ? 0.55 : 1 }}>
-                          {imgBusy === i ? "Generating…" : images[i] ? "Regenerate" : "Generate image"}
+                          style={{ ...(shot ? gGh(t) : gG(t)), padding:"5px 11px", fontSize:11.5, opacity: imgBusy !== null ? 0.55 : 1 }}>
+                          {imgBusy === i ? "Generating…" : shot ? "Regenerate" : "Generate image"}
                         </button>
                       </div>
                     </div>
@@ -566,21 +765,42 @@ export function CreativeStudio({
                       <div style={{ marginTop:9, fontSize:11.5, color:t.red, lineHeight:1.5 }}>{imgErr[i]}</div>
                     )}
 
-                    {images[i] ? (
+                    {shot ? (
                       <div style={{ marginTop:10 }}>
-                        <img src={`data:${images[i].mimeType};base64,${images[i].data}`} alt={"Generated key frame for " + v.label}
-                          style={{ maxWidth:"100%", width:260, borderRadius:9, border:"1px solid "+t.border, display:"block" }}/>
+                        {shotUrl ? (
+                          <img src={shotUrl} alt={"Generated key frame for " + v.label}
+                            style={{ maxWidth:"100%", width:260, borderRadius:9, border:"1px solid "+t.border, display:"block" }}/>
+                        ) : (
+                          // The record outlived its bytes. Said plainly rather
+                          // than rendered as a broken image, because the record
+                          // is still worth something: it carries the prompt, the
+                          // model and the ad name this frame shipped under.
+                          <div style={{ width:260, padding:"14px 12px", borderRadius:9, border:"1px dashed "+t.border,
+                            background:t.surfaceAlt, fontSize:11.5, color:t.textMuted, fontFamily:t.serif, lineHeight:1.5 }}>
+                            Generated {fmtDate(shot.createdAt, settings)} — the image itself is no longer held, but the prompt,
+                            model and ad name are recorded. Regenerate to get the frame back.
+                          </div>
+                        )}
                         <div style={{ fontSize:10.5, color:t.textMuted, fontFamily:t.mono, marginTop:6 }}>
-                          {images[i].aspect} · held for this session only — download to keep it
+                          {shot.aspect} · {shot.costUsd != null ? usd(shot.costUsd) : "cost not recorded"} ·{" "}
+                          {shot.bytesDurable ? "stored" : "this session only — download to keep it"}
                         </div>
+                        {shot.adName && (
+                          <div style={{ fontSize:10.5, color:t.textMuted, fontFamily:t.mono, marginTop:3, wordBreak:"break-all" }}>
+                            {shot.adName}
+                          </div>
+                        )}
                       </div>
                     ) : !imgErr[i] && (
                       <div style={{ marginTop:8, fontSize:11.5, color:t.textMuted, fontFamily:t.serif, lineHeight:1.5 }}>
                         Generates the opening beat as a single frame, grounded in this brief. Text and unverified claims are
                         excluded from the image by construction — copy belongs in the ad tool, where it gets reviewed.
+                        {refCount > 0 && ` ${refCount} brand reference image${refCount === 1 ? "" : "s"} will be attached, so the frame matches the rest of the campaign.`}
                       </div>
                     )}
                   </div>
+                    );
+                  })()}
 
                   {/* Talking-head render. Unlike the key frame, the price is not
                       fixed — it is set by how long this variant's script takes
@@ -590,7 +810,7 @@ export function CreativeStudio({
                   {(() => {
                     const vidScript = buildVideoScript(v);
                     const seconds   = estimateSpokenSeconds(vidScript);
-                    const job       = videos[i];
+                    const job       = roundAssets[i]?.video || null;
                     const rendering = vidBusy?.idx === i;
                     if (!vidScript) return null;
                     return (
@@ -598,8 +818,8 @@ export function CreativeStudio({
                         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:9, flexWrap:"wrap" }}>
                           <div style={{ ...gSL(t), marginBottom:0 }}>Talking head</div>
                           <button onClick={() => genVideo(v, i)} disabled={vidBusy !== null}
-                            style={{ ...(job?.status === "done" ? gGh(t) : gG(t)), padding:"5px 11px", fontSize:11.5, opacity: vidBusy !== null ? 0.55 : 1 }}>
-                            {rendering ? "Rendering…" : job?.status === "done" ? "Regenerate" : "Generate video"}
+                            style={{ ...(job ? gGh(t) : gG(t)), padding:"5px 11px", fontSize:11.5, opacity: vidBusy !== null ? 0.55 : 1 }}>
+                            {rendering ? "Rendering…" : job ? "Regenerate" : "Generate video"}
                           </button>
                         </div>
 
@@ -616,47 +836,54 @@ export function CreativeStudio({
 
                         {rendering && (
                           <div style={{ marginTop:9, fontSize:11.5, color:t.textSub, lineHeight:1.5 }}>
-                            Rendering on {job?.tierLabel} · {mmss(elapsedMs)} elapsed. Typically 1-3 minutes.
+                            Rendering on {tier.label} · {mmss(elapsedMs)} elapsed. Typically 1-3 minutes.
                             Leaving this view cancels the wait, not the render.
                           </div>
                         )}
 
-                        {job?.status === "stalled" && (
-                          <div style={{ marginTop:9, fontSize:11.5, color:t.warn, lineHeight:1.5 }}>
-                            Still rendering after {Math.round(VIDEO_POLL_TIMEOUT_MS / 60000)} minutes, so this stopped watching — the job is
-                            alive on the provider and will still be billed. Job <code style={{ fontFamily:t.mono }}>{job.jobId}</code>; collect it
-                            from the provider's dashboard.
-                          </div>
+                        {vidErr[i] && (
+                          <div style={{ marginTop:9, fontSize:11.5, color:t.red, lineHeight:1.5 }}>{vidErr[i]}</div>
                         )}
 
-                        {job?.status === "failed" && (
-                          <div style={{ marginTop:9, fontSize:11.5, color:t.red, lineHeight:1.5 }}>{job.error}</div>
-                        )}
-
-                        {job?.status === "done" && (
+                        {job && (
                           <div style={{ marginTop:10 }}>
-                            <video src={job.url} controls playsInline
-                              style={{ maxWidth:"100%", width:260, borderRadius:9, border:"1px solid "+t.border, display:"block", background:"#000" }} />
-                            <div style={{ marginTop:8, padding:"8px 10px", borderRadius:8, background:t.warnBg, border:"1px solid "+t.warnBorder }}>
-                              <div style={{ fontSize:11.5, color:t.text, lineHeight:1.5 }}>
-                                <strong>Download this now.</strong> The link is a signed provider URL that expires in 24-72 hours, and nothing
-                                here keeps a copy. Once it lapses the clip is gone and re-rendering costs {usd(job.costUsd)} again.
+                            {job.providerUrl ? (
+                              <>
+                                <video src={job.providerUrl} controls playsInline
+                                  style={{ maxWidth:"100%", width:260, borderRadius:9, border:"1px solid "+t.border, display:"block", background:"#000" }} />
+                                <div style={{ marginTop:8, padding:"8px 10px", borderRadius:8, background:t.warnBg, border:"1px solid "+t.warnBorder }}>
+                                  <div style={{ fontSize:11.5, color:t.text, lineHeight:1.5 }}>
+                                    <strong>Download this now.</strong> The link is a signed provider URL that expires in 24-72 hours, and nothing
+                                    here keeps a copy. Once it lapses the clip is gone and re-rendering costs {usd(job.costUsd || 0)} again.
+                                  </div>
+                                  <a href={job.providerUrl} target="_blank" rel="noreferrer" download
+                                    style={{ ...gGh(t), padding:"5px 9px", fontSize:11, display:"inline-block", marginTop:7, textDecoration:"none" }}>
+                                    Download video
+                                  </a>
+                                </div>
+                              </>
+                            ) : (
+                              // The record survived the link, which is the whole
+                              // point of recording at submit: the render was paid
+                              // for and is still attributable, even though the
+                              // provider's URL has lapsed or never arrived.
+                              <div style={{ width:260, padding:"14px 12px", borderRadius:9, border:"1px dashed "+t.border,
+                                background:t.surfaceAlt, fontSize:11.5, color:t.textMuted, fontFamily:t.serif, lineHeight:1.5 }}>
+                                Rendered {fmtDate(job.createdAt, settings)}{job.jobId ? ` · job ${job.jobId}` : ""}. The provider link is no
+                                longer held here — collect it from the provider's dashboard, or regenerate.
                               </div>
-                              <a href={job.url} target="_blank" rel="noreferrer" download
-                                style={{ ...gGh(t), padding:"5px 9px", fontSize:11, display:"inline-block", marginTop:7, textDecoration:"none" }}>
-                                Download video
-                              </a>
-                            </div>
+                            )}
                             <div style={{ fontSize:10.5, color:t.textMuted, fontFamily:t.mono, marginTop:6 }}>
-                              {job.tierLabel} · {job.durationSeconds ? Math.round(job.durationSeconds) + "s" : "~" + Math.round(seconds) + "s est."} · ~{usd(job.costUsd)}
+                              {job.provider} · {job.durationSeconds ? Math.round(job.durationSeconds) + "s" : "~" + Math.round(seconds) + "s est."} · ~{usd(job.costUsd || 0)}
                             </div>
                           </div>
                         )}
 
-                        {!job && !rendering && (
+                        {!job && !rendering && !vidErr[i] && (
                           <div style={{ marginTop:8, fontSize:11.5, color:t.textMuted, fontFamily:t.serif, lineHeight:1.5 }}>
-                            Reads this variant's own approved script, unchanged — the hook and beats above, nothing rewritten. Held for this
-                            session only; the provider's link expires, so download what is worth keeping.
+                            Reads this variant's own approved script, unchanged — the hook and beats above, nothing rewritten. The clip
+                            itself is not kept here and the provider's link expires, so download what is worth keeping — but the render
+                            is recorded against this variant either way.
                           </div>
                         )}
                       </div>

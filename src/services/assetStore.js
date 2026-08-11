@@ -51,27 +51,46 @@ const sessionBytes = new Map();
 // per generation, and so the studio can tell the operator whether what they are
 // looking at will survive a reload — before they spend money generating it.
 let durableAvailable = null;
+let durableReason = null;
 
-/** Ask the server whether durable storage is configured. Cached after the first
- *  answer; a failure is treated as "not configured", which is the safe reading —
+// Why durable storage is off, in the operator's terms. Each one has a different
+// fix, and collapsing them into "not configured" is what sends someone to check
+// env vars that are already correct.
+export const DURABLE_REASONS = {
+  unset:          "no Supabase credentials are set on this deployment",
+  key_rejected:   "the Supabase key was rejected — check it is the secret (server-side) key, not the publishable one",
+  bucket_missing: "the Supabase project is reachable but has no creative-assets bucket",
+  unreachable:    "the Supabase project did not respond — it may be paused",
+};
+
+/** Ask the server whether durable storage is actually usable. Cached after the
+ *  first answer; a failure is treated as unavailable, which is the safe reading —
  *  reporting durability the deployment does not have is how an operator loses
  *  work they believed was saved. */
 export async function probeDurableStorage() {
   if (durableAvailable !== null) return durableAvailable;
   try {
     const resp = await fetch(ASSET_PROXY_URL + "?action=status");
-    if (!resp.ok) { durableAvailable = false; return false; }
+    if (!resp.ok) { durableAvailable = false; durableReason = "unreachable"; return false; }
     const data = await resp.json();
     durableAvailable = !!data.configured;
+    durableReason = data.configured ? null : (data.reason || "unset");
   } catch {
     durableAvailable = false;
+    durableReason = "unreachable";
   }
   return durableAvailable;
 }
 
-/** True once probed and configured. Synchronous, for render paths that cannot
+/** True once probed and available. Synchronous, for render paths that cannot
  *  await; call probeDurableStorage() at boot so this is meaningful. */
 export const isDurable = () => durableAvailable === true;
+
+/** A sentence explaining why bytes are not being kept, or null when they are.
+ *  Null before the probe resolves, so a caller renders nothing rather than
+ *  guessing during the round trip. */
+export const durableUnavailableReason = () =>
+  durableAvailable === false ? (DURABLE_REASONS[durableReason] || DURABLE_REASONS.unset) : null;
 
 /**
  * Store bytes and return the key the asset record should carry.
@@ -187,7 +206,7 @@ export function readSessionBytes(key) {
 
 /** Test seam — resets the probe so a suite can exercise both backends. */
 export const _internal = {
-  resetProbe: () => { durableAvailable = null; },
-  setProbe: (v) => { durableAvailable = v; },
+  resetProbe: () => { durableAvailable = null; durableReason = null; },
+  setProbe: (v, reason = null) => { durableAvailable = v; durableReason = reason; },
   sessionBytes,
 };

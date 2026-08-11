@@ -8,7 +8,7 @@ import { iconFor, ICON_REGISTRY } from "../components/iconRegistry.js";
 import { DEFAULT_AGENTS, DEFAULT_SETTINGS, brandColor, catColor } from "../constants.js";
 import { DEMO_MODE } from "../activeConfig.js";
 import { WORKSPACE_MODES, resolveWorkspaceMode, isLiveWorkspace } from "../services/dataSafety.js";
-import { putAsset, getAssetUrl, isDurable } from "../services/assetStore.js";
+import { putAsset, getAssetUrl, isDurable, durableUnavailableReason } from "../services/assetStore.js";
 import { useEffect } from "react";
 
 // Kept in step with api/image.js, which refuses a fourth rather than truncating.
@@ -119,7 +119,7 @@ function BrandReferences({ t, brand, onChange }) {
       <div style={{ marginTop: 7, fontSize: 10.5, color: t.textMuted, fontFamily: t.serif, lineHeight: 1.5 }}>
         Attached to every key frame generated for this brand so a round of creative shares one visual language. The model
         matches their lighting, grade and framing — it is told explicitly not to reproduce their composition or subject.
-        {!isDurable() && " Durable storage is not configured, so these are held for this tab only and will need re-adding after a reload."}
+        {!isDurable() && ` Held for this tab only and will need re-adding after a reload — ${durableUnavailableReason()}.`}
       </div>
     </div>
   );

@@ -12,7 +12,7 @@ import {
   estimateSpokenSeconds, estimateVideoCostUsd, VIDEO_POLL_INTERVAL_MS, VIDEO_POLL_TIMEOUT_MS,
 } from "../services/ai/callGenerateVideo.js";
 import { mkAssetRecord, currentRoundAssets, imageCostUsd, costForInitiative } from "../services/assets.js";
-import { putAsset, getAssetUrl, readAssetBytes, probeDurableStorage } from "../services/assetStore.js";
+import { putAsset, getAssetUrl, readAssetBytes, probeDurableStorage, durableUnavailableReason } from "../services/assetStore.js";
 import { buildCreativeEvidence } from "../services/creativeEvidence.js";
 
 // Kept in step with api/image.js. Exceeding it is refused upstream rather than
@@ -653,8 +653,8 @@ export function CreativeStudio({
             )}
             {!durableBytes && (
               <div style={{ fontSize:11.5, color:t.textMuted, fontFamily:t.serif, lineHeight:1.5, flex:"1 1 320px" }}>
-                Durable asset storage is not configured, so generated frames are held for this tab only and are gone on
-                reload. What each generation was — its prompt, model, cost and ad name — is recorded either way.
+                Generated frames are held for this tab only and are gone on reload — {durableUnavailableReason()}. What
+                each generation was, its prompt, model, cost and ad name, is recorded either way.
               </div>
             )}
           </div>

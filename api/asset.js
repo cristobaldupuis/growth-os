@@ -63,16 +63,69 @@ export const ALLOWED_MIME = new Set([
 // rewriting it would turn the second case into a silent success.
 const KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
+/**
+ * The server-side key, under either name Supabase has used for it.
+ *
+ * `SUPABASE_SECRET_KEY` is the current naming — Supabase renamed the
+ * `service_role` key to the "secret key" (`sb_secret_...`) — and
+ * `SUPABASE_SERVICE_KEY` is what deployments configured before that rename
+ * carry. Reading both is one line and removes an entire class of silent
+ * misconfiguration: a project that is genuinely set up, an env var that is
+ * genuinely present, and a feature that reports itself as unconfigured because
+ * the two names disagree. That failure looks identical to having no Supabase at
+ * all, which is the worst way for it to look.
+ *
+ * Neither is a publishable/anon key. This endpoint writes with it, and an
+ * anon key would either be refused by the bucket's policies or — worse — work,
+ * which would mean the bucket is writable by anyone holding a key that ships to
+ * browsers. See the note at the top of this file.
+ */
+export const secretKey = () =>
+  process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_KEY || "";
+
 export function supabaseConfigured() {
-  return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY);
+  return !!(process.env.SUPABASE_URL && secretKey());
 }
 
 const storageBase = () => process.env.SUPABASE_URL.replace(/\/+$/, "") + "/storage/v1";
 
 const authHeaders = () => ({
-  Authorization: "Bearer " + process.env.SUPABASE_SERVICE_KEY,
-  apikey: process.env.SUPABASE_SERVICE_KEY,
+  Authorization: "Bearer " + secretKey(),
+  apikey: secretKey(),
 });
+
+// Bounded, because this runs at app boot and a hung probe would hold up the
+// answer to a question whose safe default is already "no". A timeout reads as
+// unreachable, which is the conservative direction.
+const PROBE_TIMEOUT_MS = 4000;
+
+/**
+ * Can this deployment actually store a byte right now?
+ *
+ * Lists the bucket with a zero-width window — the cheapest call that
+ * distinguishes "project paused", "bucket missing" and "key rejected" from a
+ * working setup, without transferring anything. Failure reasons are returned
+ * rather than logged and swallowed, because each one has a different fix and an
+ * operator staring at "not configured" with two env vars visibly set deserves
+ * to be told which.
+ */
+export async function bucketReachable() {
+  try {
+    const resp = await fetch(`${storageBase()}/object/list/${BUCKET}`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ prefix: "", limit: 1 }),
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+    });
+    if (resp.ok) return { ok: true };
+    if (resp.status === 401 || resp.status === 403) return { ok: false, reason: "key_rejected" };
+    if (resp.status === 404) return { ok: false, reason: "bucket_missing" };
+    // A paused Supabase project answers 5xx or refuses the connection outright.
+    return { ok: false, reason: "unreachable" };
+  } catch {
+    return { ok: false, reason: "unreachable" };
+  }
+}
 
 /** Returns an error string, or null when acceptable. */
 export function validatePut(body) {
@@ -98,15 +151,31 @@ export default async function handler(req, res) {
 
   // Answered before the configuration check, because "is durable storage
   // available" is exactly the question a deployment without it needs answered.
+  //
+  // This REACHES the bucket rather than only reading env vars, and the
+  // difference matters: a project that is paused, deleted, or missing this
+  // bucket has both variables set and still cannot store anything. Answering
+  // from configuration alone would let the studio tell an operator their frames
+  // are being kept, right up until they reload and find they were not — which
+  // is precisely the failure this whole module exists to prevent. Reporting
+  // durability a deployment does not have is worse than reporting none.
   if (action === "status") {
-    res.status(200).json({ configured: supabaseConfigured(), bucket: supabaseConfigured() ? BUCKET : null });
+    if (!supabaseConfigured()) { res.status(200).json({ configured: false, bucket: null, reason: "unset" }); return; }
+    const reachable = await bucketReachable();
+    res.status(200).json({
+      configured: reachable.ok,
+      bucket: reachable.ok ? BUCKET : null,
+      // Named rather than collapsed into a boolean, because "you have not set
+      // this up" and "your project is paused" need different fixes.
+      ...(reachable.ok ? {} : { reason: reachable.reason }),
+    });
     return;
   }
 
   if (!supabaseConfigured()) {
     res.status(503).json({
       error: "Durable asset storage is not configured for this deployment. "
-           + "Set SUPABASE_URL and SUPABASE_SERVICE_KEY to enable it.",
+           + "Set SUPABASE_URL and either SUPABASE_SECRET_KEY or SUPABASE_SERVICE_KEY to enable it.",
     });
     return;
   }

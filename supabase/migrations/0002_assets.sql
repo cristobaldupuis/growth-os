@@ -6,9 +6,9 @@
 -- drift while the browser store is still the live home.
 --
 -- The one part of this file that IS live today is the storage bucket at the
--- bottom: api/asset.js writes to it as soon as SUPABASE_URL and
--- SUPABASE_SERVICE_KEY are set, with no table required. That split is
--- deliberate — durable BYTES are useful immediately and need no schema, while
+-- bottom: api/asset.js writes to it as soon as SUPABASE_URL and the server-side
+-- key are set, with no table required. That split is deliberate — durable BYTES
+-- are useful immediately and need no schema, while
 -- the records they belong to can stay in the browser store until the rest of
 -- Phase 5 moves with them.
 
@@ -124,8 +124,10 @@ create index ai_usage_group_idx        on ai_usage (feature_group, ts desc);
 create index ai_usage_initiative_idx   on ai_usage (initiative_id) where initiative_id is not null;
 
 -- ── storage bucket ───────────────────────────────────────────────────────
--- This part is live. api/asset.js writes here the moment SUPABASE_URL and
--- SUPABASE_SERVICE_KEY are set; the tables above are not required for it.
+-- This part is live. api/asset.js writes here the moment SUPABASE_URL and the
+-- server-side key are set; the tables above are not required for it. The key is
+-- read from SUPABASE_SECRET_KEY (Supabase's current name for what used to be the
+-- service_role key) or SUPABASE_SERVICE_KEY, whichever is present.
 --
 -- Private, with no RLS policy for the anon role — deliberately. Uploads and
 -- signed reads both go through api/asset.js using the service key, because a

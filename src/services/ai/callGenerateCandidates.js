@@ -1,4 +1,4 @@
-import { PROXY_URL, AI_HEADERS, safeParseJSON, proxyError } from "./_shared.js";
+import { postProxy, firstText, safeParseJSON } from "./_shared.js";
 import { EFFORT, buildRequest, modelFor } from "./models.js";
 
 // -- Next Plays (Recommendation Engine) ---------------------------------------
@@ -53,14 +53,12 @@ export async function callGenerateCandidates(portfolioCtx, learningsIndex, setti
 
   const user = "PORTFOLIO CONTEXT:\n"+portfolioCtx+"\n\nLEARNINGS (id | outcome|retailer|category|durability|provenance|actual revenue | title — one-line learning):\n"+learningsBlock;
 
-  const resp = await fetch(PROXY_URL, {
-    method:"POST", headers:AI_HEADERS(),
-    body:JSON.stringify({ ...buildRequest({model:modelFor("analysis", modelOverride), maxTokens:2200, system:sys, effort:EFFORT.HIGH, cacheSystem:true}),
-      messages:[{role:"user", content:user}] }),
+  const data = await postProxy({
+    group:"analysis", fn:"callGenerateCandidates",
+    body:{ ...buildRequest({model:modelFor("analysis", modelOverride), maxTokens:2200, system:sys, effort:EFFORT.HIGH, cacheSystem:true}),
+      messages:[{role:"user", content:user}] },
   });
-  if (!resp.ok) throw new Error(await proxyError(resp));
-  const data = await resp.json();
-  const raw = data.content && data.content[0] ? data.content[0].text.trim() : "[]";
+  const raw = firstText(data) || "[]";
   const parsed = safeParseJSON(raw, true);
   if (!Array.isArray(parsed)) throw new Error("Next Plays: candidate generation returned malformed response.");
   return parsed;

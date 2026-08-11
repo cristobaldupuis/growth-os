@@ -60,6 +60,30 @@ Commercial thesis, ICP and pricing: [docs/commercial.md](./docs/commercial.md).
 
 ## What's new
 
+- **Generated creative has an identity** — every frame and render now leaves a
+  persisted record carrying the initiative, the brief version, the prompt, the
+  model, what it cost, and the ad name it ships under. Assets used to live in
+  component state keyed by variant index and were thrown away on reload, so the
+  loop closed at name→initiative and never at asset→initiative. The bytes go to
+  Supabase Storage when it is configured and stay session-only when it is not —
+  the record persists either way, and the studio says which before you spend
+- **The brief reads the ad account, not just the library** — measured ROAS and
+  CPA per angle, theme and format are fed into every creative brief, with groups
+  below a spend floor flagged as not-evidence rather than quietly dropped. The
+  learnings that inform a brief are ranked by a stated rule and the excluded
+  remainder is counted in the prompt, so a brief shown 25 of 51 says so
+- **Briefs are versioned** — regenerating no longer destroys the previous
+  brief's `wouldFalsify`, which is the field that makes a creative round settle
+  a question
+- **Brand style references** — up to three reference images per brand, attached
+  to every generated frame so a round of creative shares one visual language.
+  The model is told to match their lighting and grade and explicitly not to
+  reproduce their composition
+- **AI spend console** — `/admin → Spend` breaks cost down by feature group,
+  model, provider and call site over a chosen window. Token counts were always
+  in the proxy response and were being discarded; they are now priced at the
+  point of use against published list rates, with unpriced calls counted
+  separately rather than silently read as free
 - **Account audit** — paste a prospect's ad names and get the delimiter, the
   slot histogram, each slot's vocabulary, the parse rate by failure kind, and the
   count of names that need mapping by hand. The first hour of an implementation,

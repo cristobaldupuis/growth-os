@@ -8,6 +8,122 @@ import { iconFor, ICON_REGISTRY } from "../components/iconRegistry.js";
 import { DEFAULT_AGENTS, DEFAULT_SETTINGS, brandColor, catColor } from "../constants.js";
 import { DEMO_MODE } from "../activeConfig.js";
 import { WORKSPACE_MODES, resolveWorkspaceMode, isLiveWorkspace } from "../services/dataSafety.js";
+import { putAsset, getAssetUrl, isDurable } from "../services/assetStore.js";
+import { useEffect } from "react";
+
+// Kept in step with api/image.js, which refuses a fourth rather than truncating.
+const MAX_REFERENCE_IMAGES = 3;
+// Well under the image proxy's body cap once three are base64-encoded together.
+const MAX_REFERENCE_BYTES = 1.5 * 1024 * 1024;
+const REFERENCE_TYPES = ["image/png", "image/jpeg", "image/webp"];
+
+/**
+ * Brand style references.
+ *
+ * The gap these close is not quality, it is consistency: every generated frame
+ * used to start from pure text, so two key frames for the same brand a week
+ * apart shared no visual language and neither was usable next to the other in a
+ * real account. These images are attached to each generation so the round reads
+ * as one campaign.
+ *
+ * Only the storage KEY lives in settings — the bytes go through assetStore, for
+ * the same reason generated frames do. Putting three megabytes of base64 into
+ * the settings blob is the fastest way to reproduce the quota bug store.js was
+ * rewritten to prevent, and settings is the one blob whose loss takes the
+ * workspace's configuration with it.
+ */
+function BrandReferences({ t, brand, onChange }) {
+  const refs = brand.referenceImages || [];
+  const [urls, setUrls] = useState({});
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    Promise.all(refs.map(async r => [r.storageKey, await getAssetUrl(r)])).then(pairs => {
+      if (!live) return;
+      const next = {};
+      pairs.forEach(([k, u]) => { if (u) next[k] = u; });
+      setUrls(next);
+    });
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(refs.map(r => r.storageKey))]);
+
+  const add = async (file) => {
+    setErr("");
+    if (!file) return;
+    if (!REFERENCE_TYPES.includes(file.type)) { setErr("Reference images must be PNG, JPEG or WebP."); return; }
+    if (file.size > MAX_REFERENCE_BYTES) {
+      setErr(`That file is ${(file.size / 1024 / 1024).toFixed(1)}MB. Reference images are capped at ${(MAX_REFERENCE_BYTES / 1024 / 1024).toFixed(1)}MB — they are sent with every generation, so a large one is billed on every frame.`);
+      return;
+    }
+    setBusy(true);
+    try {
+      const data = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(",")[1] || "");
+        reader.onerror = () => reject(new Error("Could not read that file."));
+        reader.readAsDataURL(file);
+      });
+      const stored = await putAsset({ mimeType: file.type, data });
+      onChange([...refs, {
+        storageKey: stored.storageKey,
+        bytesDurable: stored.durable,
+        mimeType: file.type,
+        name: file.name,
+        addedAt: new Date().toISOString(),
+      }].slice(0, MAX_REFERENCE_IMAGES));
+    } catch (e) {
+      setErr(e.message || "Could not add that reference image.");
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div style={{ borderTop: "1px solid " + t.borderSoft, paddingTop: 9, marginTop: 2 }}>
+      <label style={{ fontSize: 10, color: t.textMuted, fontFamily: t.mono, display: "block", marginBottom: 5, letterSpacing: "0.05em" }}>
+        STYLE REFERENCES ({refs.length}/{MAX_REFERENCE_IMAGES})
+      </label>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-start" }}>
+        {refs.map(r => (
+          <div key={r.storageKey} style={{ position: "relative" }}>
+            {urls[r.storageKey] ? (
+              <img src={urls[r.storageKey]} alt={r.name || "Brand style reference"}
+                style={{ width: 68, height: 68, objectFit: "cover", borderRadius: 7, border: "1px solid " + t.border, display: "block" }} />
+            ) : (
+              <div style={{ width: 68, height: 68, borderRadius: 7, border: "1px dashed " + t.border, background: t.surface,
+                fontSize: 9, color: t.textMuted, display: "flex", alignItems: "center", justifyContent: "center",
+                textAlign: "center", padding: 4, lineHeight: 1.3 }}>
+                bytes no longer held
+              </div>
+            )}
+            <button onClick={() => onChange(refs.filter(x => x.storageKey !== r.storageKey))}
+              aria-label={"Remove reference " + (r.name || "")}
+              style={{ position: "absolute", top: -6, right: -6, width: 18, height: 18, borderRadius: "50%",
+                border: "1px solid " + t.border, background: t.surfaceAlt, color: t.textMuted, cursor: "pointer",
+                fontSize: 10, lineHeight: 1, padding: 0 }}>&#10005;</button>
+          </div>
+        ))}
+        {refs.length < MAX_REFERENCE_IMAGES && (
+          <label style={{ width: 68, height: 68, borderRadius: 7, border: "1px dashed " + t.borderLit,
+            display: "flex", alignItems: "center", justifyContent: "center", cursor: busy ? "wait" : "pointer",
+            fontSize: 10, color: t.textMuted, textAlign: "center", opacity: busy ? 0.6 : 1 }}>
+            {busy ? "Adding…" : "+ Add"}
+            <input type="file" accept={REFERENCE_TYPES.join(",")} disabled={busy}
+              onChange={e => { add(e.target.files?.[0]); e.target.value = ""; }}
+              style={{ display: "none" }} />
+          </label>
+        )}
+      </div>
+      {err && <div style={{ marginTop: 7, fontSize: 11, color: t.red, lineHeight: 1.5 }}>{err}</div>}
+      <div style={{ marginTop: 7, fontSize: 10.5, color: t.textMuted, fontFamily: t.serif, lineHeight: 1.5 }}>
+        Attached to every key frame generated for this brand so a round of creative shares one visual language. The model
+        matches their lighting, grade and framing — it is told explicitly not to reproduce their composition or subject.
+        {!isDurable() && " Durable storage is not configured, so these are held for this tab only and will need re-adding after a reload."}
+      </div>
+    </div>
+  );
+}
 
 // Currencies the shipped formatter is checked against. The list is short on
 // purpose — it covers the markets the ICP sells into, and an operator outside
@@ -231,6 +347,7 @@ export function SettingsView({t,dk,settings,onSave,onClose,onDownloadBackup,onRe
                       placeholder="e.g. CAC rising, thin margin on hero SKU"/>
                   </div>
                 </div>
+                <BrandReferences t={t} brand={b} onChange={refs=>upd("referenceImages",refs)} />
               </div>
             );})}
           </div>

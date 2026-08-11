@@ -36,7 +36,24 @@ export const ALLOWED_IMAGE_MODELS = new Set([
 
 export const MAX_PROMPT_CHARS = 4000;
 export const ALLOWED_ASPECTS = new Set(["1:1", "4:5", "9:16", "16:9", "3:2", "2:3"]);
-const MAX_BODY_BYTES = 64 * 1024;
+
+// Reference images. These models accept inline image parts alongside the text
+// prompt and condition the output on them, which is what makes a run of frames
+// look like one campaign rather than three unrelated stock photos — the single
+// most common reason a generated frame is unusable in a real account is not
+// quality, it is that yesterday's frame and today's share no visual language.
+//
+// Capped at three because the cap is a cost control, not a quality one: every
+// reference image is billed as input on every generation, so an uncapped
+// reference set makes each frame progressively more expensive for a diminishing
+// return. Three is enough to carry a palette, a product and a setting.
+export const MAX_REFERENCE_IMAGES = 3;
+export const ALLOWED_REFERENCE_MIME = new Set(["image/png", "image/jpeg", "image/webp"]);
+
+// Raised from 64KB to carry the reference images inline. Three 1MB references
+// base64-encode to roughly 4MB; 8MB leaves headroom without accepting a body
+// that belongs in blob storage.
+const MAX_BODY_BYTES = 8 * 1024 * 1024;
 
 // Deliberately far below the text proxy's 60/hour. At roughly four cents an
 // image this is a bounded worst case of about a dollar an hour per IP.
@@ -62,13 +79,35 @@ export function validateImageBody(body) {
   // One image per request. Bounding count is the only real cost control here,
   // since there is no token ceiling to lean on.
   if (body.count != null && body.count !== 1) return "Only one image per request.";
+
+  if (body.referenceImages != null) {
+    if (!Array.isArray(body.referenceImages)) return "referenceImages must be an array.";
+    if (body.referenceImages.length > MAX_REFERENCE_IMAGES) {
+      return `At most ${MAX_REFERENCE_IMAGES} reference images per request.`;
+    }
+    for (const ref of body.referenceImages) {
+      if (!ref || typeof ref !== "object") return "Each reference image must be an object.";
+      if (!ALLOWED_REFERENCE_MIME.has(ref.mimeType)) return "Unsupported reference image type.";
+      if (typeof ref.data !== "string" || ref.data.length === 0) return "Each reference image needs base64 `data`.";
+    }
+  }
   return null;
 }
 
-/** Build the upstream Gemini body. Exported for the same reason as the validator. */
-export function buildGeminiBody({ prompt, aspectRatio }) {
+/**
+ * Build the upstream Gemini body. Exported for the same reason as the validator.
+ *
+ * Reference parts go BEFORE the text. These models read the parts in order and
+ * treat leading images as the visual context the instruction then operates on;
+ * putting the prompt first makes the references read as an afterthought and the
+ * style transfer measurably weaker.
+ */
+export function buildGeminiBody({ prompt, aspectRatio, referenceImages }) {
+  const refs = (referenceImages || []).map(r => ({
+    inlineData: { mimeType: r.mimeType, data: r.data },
+  }));
   return {
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    contents: [{ role: "user", parts: [...refs, { text: prompt }] }],
     generationConfig: {
       // Both modalities are required: these models are multimodal and always
       // return a text part alongside the image. Asking for IMAGE alone is

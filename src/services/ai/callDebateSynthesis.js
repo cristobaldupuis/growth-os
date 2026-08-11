@@ -1,4 +1,4 @@
-import { PROXY_URL, AI_HEADERS, safeParseJSON, proxyError } from "./_shared.js";
+import { postProxy, safeParseJSON } from "./_shared.js";
 import { EFFORT, buildRequest, modelFor } from "./models.js";
 import { INIT_TYPES } from "../../constants.js";
 
@@ -42,18 +42,15 @@ Return ONLY a valid JSON array of exactly 3 objects. No markdown, no preamble:
   "csoRationale": "one sentence: why you're proceeding despite the dissent — this is your call as CSO"
 }`;
 
-  const resp = await fetch(PROXY_URL, {
-    method:"POST", headers:AI_HEADERS(),
-    body: JSON.stringify({
+  const data = await postProxy({
+    group:"debate", fn:"callDebateSynthesis",
+    body: {
       ...buildRequest({model:modelFor("debate", modelOverride), maxTokens:3500, system:sys, effort:EFFORT.HIGH}),
       messages:[{role:"user", content:
         `Portfolio:\n${portfolioCtx}${dataAppendix}\n\nContext:\n${userContext||"None."}\n\nDebate:\n${transcriptStr}\n\nSynthesize the 3 highest-impact net-new initiatives.`
       }],
-    }),
+    },
   });
-  if (!resp.ok) throw new Error(await proxyError(resp));
-  const data = await resp.json();
-  if (data.error) throw new Error(data.error.message);
   const raw = data.content?.[0]?.text?.trim()||"[]";
   const parsed = safeParseJSON(raw, true);
   if (!Array.isArray(parsed) || parsed.length === 0) {

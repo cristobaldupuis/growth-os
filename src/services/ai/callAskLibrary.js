@@ -1,4 +1,4 @@
-import { PROXY_URL, AI_HEADERS, proxyError } from "./_shared.js";
+import { postProxy, firstText } from "./_shared.js";
 import { EFFORT, buildRequest, modelFor } from "./models.js";
 
 // Natural-language query over the learnings library. The query IS the hypothesis:
@@ -24,12 +24,10 @@ export async function callAskLibrary(question, corpus, settings, modelOverride) 
     "PROVENANCE: a 'backfilled' learning's outcome is a remembered estimate, not a tracked result — surface it but flag the lower confidence; a 'tracked' learning is firmer evidence.",
     "Answer in three parts: VERDICT, WHAT WE FOUND, READ. Cite ids in [BRACKETS] exactly as given. Be honest about gaps. No generic advice.",
   ].join(" ");
-  const resp = await fetch(PROXY_URL, {
-    method:"POST", headers:AI_HEADERS(),
-    body:JSON.stringify({ ...buildRequest({model:modelFor("analysis", modelOverride), maxTokens:1100, system:sys, effort:EFFORT.LOW}),
-      messages:[{role:"user", content:"QUESTION: "+question+"\n\nCLOSED-INITIATIVE RECORD:\n"+lines}] }),
+  const data = await postProxy({
+    group:"analysis", fn:"callAskLibrary",
+    body:{ ...buildRequest({model:modelFor("analysis", modelOverride), maxTokens:1100, system:sys, effort:EFFORT.LOW}),
+      messages:[{role:"user", content:"QUESTION: "+question+"\n\nCLOSED-INITIATIVE RECORD:\n"+lines}] },
   });
-  if (!resp.ok) throw new Error(await proxyError(resp));
-  const data = await resp.json();
-  return data.content && data.content[0] ? data.content[0].text.trim() : "";
+  return firstText(data);
 }

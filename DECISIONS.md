@@ -889,3 +889,67 @@ them. Until that exists, this defect is cheaper than its fix.
 **Why observed sessions outrank the calendar:** the date is a forecast from an estimate of weekly traffic; the sessions are what the statistics consume. The state that matters most is the one a calendar alone gets wrong — a test past its planned end date on half the expected traffic, which reads as finished and is not. It has its own name in the panel, and reading it is called reading it short.
 
 **Forcing condition:** measured spend and conversions reaching the panel from the ad names (ROADMAP 1.6, "feed measured figures into Test Validity"). The counts are hand-entered today, which means the reading window is a discipline the operator can decline by not typing anything. When the figures arrive from the import, the window becomes a fact about the test rather than a claim about it.
+
+---
+
+## A generated asset gets an identity; the bytes are a separate, weaker promise
+
+**Decision:** Every generated frame and render now produces a persisted **record** — id, initiative, brief version, prompt, model, aspect, cost, and the ad name it ships under (`src/services/assets.js`, `KEY_ASSETS`). The **bytes** go through a separate adapter (`src/services/assetStore.js`) that writes to Supabase Storage when the deployment has credentials configured and holds them for the tab when it does not. The record persists in every case; `bytesDurable` says which happened.
+
+**The problem this fixes.** Images lived in React state keyed by bare variant index, videos held a provider URL that expires in 24–72h, and `clearGeneratedAssets()` wiped both on any initiative switch or variant regeneration. Each of those decisions was correct on its own terms — a base64 PNG in localStorage is the fastest way to reproduce the quota bug `store.js` was rewritten to prevent — and stacked together they meant a generated asset had no id, no durable link to the brief that produced it, and ceased to exist on reload. So the loop closed at `name → initiative` and never at `asset → initiative`: when an export reported that an ad returned 2.4x, the initiative and the angle were recoverable and the creative was not. "Every asset is born attached to a hypothesis" was true for about thirty minutes.
+
+**Why the split, rather than persisting both or neither.** They have different constraints and different value. The record is a few hundred bytes of structured JSON and is the half that carries the evidence: it can still say that on 4 March, brief v2 of NH-003 produced a 4:5 key frame for the TimeSaver angle under a named prompt at four cents, and that the ad name it shipped under was the one that returned 2.4x. The picture is the regenerable half. Making the record wait for blob storage would have meant nothing worked until Phase 5.1 landed — exactly backwards, because every day without a record is provenance that cannot be reconstructed later, while a missing frame can be generated again.
+
+**Why versioned keys rather than deletion.** `variantKey` folds brief version and variants version into the key, so an asset made against brief v2's third variant carries a key brief v3 can never mint. Old rounds stop being *current* without ever becoming *wrong*, which is what `clearGeneratedAssets` was actually protecting against — it just paid for that safety by destroying the ledger. Nothing has to be deleted to stay correct now.
+
+**Why the upload goes through `api/asset.js` rather than straight to Supabase.** A browser-held anon key with insert rights is the `VITE_GOS_SECRET` mistake again (see the credential note in `services/ai/_shared.js`). Anon keys are safe behind row-level security tied to an authenticated user; this app has no per-user auth, so an insert-capable key in the bundle means anyone who opens devtools can fill the operator's bucket. The service key stays server-side and the endpoint authorises on origin and rate like every other proxy here.
+
+**Why env-var presence gating.** Same shape as the Vertex path and every optional provider: unset, and the feature degrades to a stated limitation rather than a broken default. The studio asks once at boot and says plainly whether a frame will survive a reload **before** the operator spends money generating it.
+
+**What is deliberately still not durable:** video bytes. A rendered clip is 5–50MB and re-hosting it would make this app a video CDN with its own egress bill and retention policy — the same reasoning `api/video.js` already records. The record of the render persists, including its cost and job id; the clip does not.
+
+**Forcing condition:** the first client whose generated creative has to be handed over as a deliverable. Session-only bytes are survivable for an operator who downloads as they go and not for a client expecting an asset library.
+
+---
+
+## The creative brief reasons from measured returns, and says what it was not shown
+
+**Decision:** `callCreativeBrief` now receives a per-dimension performance block built from imported ad names (`src/services/creativeEvidence.js`), and selects closed learnings by a stated ranking rule that reports its own remainder. The brief returns `evidenceConsidered` recording both.
+
+**The two problems, which were opposite.** The brief truncated learnings at `learningsIndex.slice(0, 25)` — the first 25 of an unranked array, with nothing anywhere saying the other 26 existed — while `callSynthesizeLearnings` passed *every* learning with no cap and would eventually fail on context length instead. A product that counts unparsed rows in every breakdown rather than dropping them should not drop learnings quietly in either direction. Both now rank, cap, and state the excluded count in the prompt itself, so a model shown 25 of 51 can qualify its claim rather than writing as though it read the corpus.
+
+**Why measured performance is the bigger half.** `breakdownByDimension` has been able to compute that one angle returned 2.1x and another 0.8x since the nomenclature engine shipped, and the brief never saw it. That is the piece a competitor cannot copy: a learnings library supports "we remember what you learned", which three funded products already say; measured return per creative angle requires the naming convention, the parser that refuses to guess, and the join. The prompt is told that measured performance outranks a written learning when they disagree — a learning is what somebody concluded, the table is what the account did.
+
+**Why a selection rule and not retrieval.** The obvious alternative is to embed the learnings and retrieve the *k* most similar. It fails here for a specific reason: a "gap" in this product is defined by a learning being *absent* at one retailer, and similarity search cannot see an absence. A deterministic rule — same brand, then same category, then recency — can be wrong; it cannot be *silently* wrong, because it reports what it excluded and can be diagnosed afterwards.
+
+**Why thin groups are shown and flagged rather than filtered out.** A group holding one row and $180 of spend can show a 4.8x that means nothing. Removing it looks safer and is not: the absence of an angle from the block reads as "never tested", which is a different and equally wrong conclusion. It is reported with a `[THIN]` marker and the prompt is told that a thin group's ratio is not evidence and that the honest move is to route it to `evidenceGaps` as something worth testing properly.
+
+**Forcing condition:** a portfolio where the ranked 25 still misses learnings an operator expected to see. The rule is stated precisely so that complaint is diagnosable; if it arrives, the fix is a better rule, not a switch to retrieval.
+
+---
+
+## Briefs are versioned, because a brief that can be overwritten cannot be checked
+
+**Decision:** `saveRecord` appends to a `briefs[]` history rather than replacing `record.brief`. Records written before versioning fold in as v1 rather than being lost.
+
+**Why:** the previous behaviour destroyed the prior brief's `wouldFalsify` on every regeneration — the one field that makes a creative round settle a question rather than just produce assets. An initiative's prediction is frozen at launch precisely so it can be checked against the outcome later; the brief that justified the creative deserves the same treatment. Without it there is no way to tell whether the brief behind a winning ad said something different from the one currently on file, which makes the whole falsifiability discipline decorative at the creative layer.
+
+---
+
+## AI spend is recorded per call, priced at the point of use, and scoped to one browser
+
+**Decision:** `postProxy` in `services/ai/_shared.js` wraps every text call, records a ledger row (`services/usage.js`, `KEY_USAGE`) with tokens, model, feature group, call site and computed cost, and the admin console renders rollups by group, model, provider and call site.
+
+**Why it was possible all along:** every proxy response already carried its token counts — Anthropic returns `usage` natively and `api/_adapters.js` normalises Gemini's `usageMetadata` and OpenAI's `usage` into the same shape. They were simply discarded. The console could say which model served which feature group and nothing could say what that choice cost.
+
+**Why recording lives in one helper rather than at twelve call sites.** The fetch/ok-check/parse/error-check preamble was copy-pasted into all twelve; a thirteenth copy is where drift starts, and a call site that forgets to record is invisible in the console rather than obviously broken. Folding it into one function removed the duplication and made recording unavoidable in the same edit.
+
+**Why the rate is stored with the figure.** A ledger holding only tokens has to be re-priced against whatever the catalogue says today, which silently restates history every time a provider changes a number. Freezing the rate onto the row is the same discipline as the prediction snapshot: preserve the inputs to a figure you will later be asked to defend.
+
+**Why an unknown rate is `null` and never `0`.** An unpriced call is missing information, not a free one. Counting it as zero produces a cheaper total than actually happened — wrong in the direction that flatters the operator, which is the direction this codebase consistently refuses (see the unparsed-row handling in every breakdown). Every unverified model id in the catalogue therefore ships with no price at all: a rate attached to an id that may not exist is a guess on top of a guess.
+
+**Why per-browser, and why that is stated in the UI.** The routing this console edits is server-side because every visitor shares it. Spend is not: it is a record of what this operator's browser spent, and a server-side ledger would mean an ingest endpoint, a store, and a retention policy for data whose only consumer is the person who generated it. That is the same Phase 5.3 fact-table problem, not this panel's. The cost is honesty about the scope, which the panel's footer states rather than implying a completeness it does not have.
+
+**What these figures are not:** an invoice. No promotional pricing (Sonnet 5's $2/$10 runs against a $3/$15 list through 2026-08-31), no prompt-cache discount, no batch tier, no negotiated rate, and a Vertex-billed deployment is priced here at Developer API rates. Every row is stamped `costBasis: "estimate"` so a later reconciliation against a real billing export can overwrite it without anyone having to guess which figures were measured.
+
+**Forcing condition:** a second operator, or a client asking what their own workspace cost to run. Either makes the per-browser scope wrong rather than merely partial, and both land with the same Supabase migration the performance fact table needs.

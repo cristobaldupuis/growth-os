@@ -10,6 +10,7 @@ import { test } from "node:test";
 import {
   validateImageBody, buildGeminiBody, extractImage,
   ALLOWED_IMAGE_MODELS, ALLOWED_ASPECTS, MAX_PROMPT_CHARS,
+  MAX_REFERENCE_IMAGES, ALLOWED_REFERENCE_MIME,
 } from "../../../api/image.js";
 import { buildImagePrompt, callGenerateImage, IMAGE_MODELS, IMAGE_ASPECTS } from "./callGenerateImage.js";
 
@@ -92,6 +93,59 @@ test("the upstream body asks for both modalities", () => {
   assert.equal(body.generationConfig.candidateCount, 1);
   assert.equal(body.generationConfig.imageConfig.aspectRatio, "4:5");
   assert.equal(body.contents[0].parts[0].text, "a frame");
+});
+
+// -- Reference images ----------------------------------------------------------
+
+const REF = { mimeType: "image/png", data: "aGVsbG8=" };
+
+test("reference images are optional and absent by default", () => {
+  const body = buildGeminiBody({ prompt: "a frame" });
+  assert.equal(body.contents[0].parts.length, 1);
+  assert.equal(body.contents[0].parts[0].text, "a frame");
+});
+
+test("reference parts precede the text so they read as context, not afterthought", () => {
+  const body = buildGeminiBody({ prompt: "a frame", referenceImages: [REF, REF] });
+  const parts = body.contents[0].parts;
+  assert.equal(parts.length, 3);
+  assert.equal(parts[0].inlineData.mimeType, "image/png");
+  assert.equal(parts[1].inlineData.data, "aGVsbG8=");
+  assert.equal(parts[2].text, "a frame", "the instruction comes last");
+});
+
+test("the reference count is capped, because each one is billed on every generation", () => {
+  const many = Array.from({ length: MAX_REFERENCE_IMAGES + 1 }, () => REF);
+  assert.match(validateImageBody({ model: IMAGE_MODELS.FAST, prompt: "x", referenceImages: many }),
+    /At most \d+ reference images/);
+  const ok = Array.from({ length: MAX_REFERENCE_IMAGES }, () => REF);
+  assert.equal(validateImageBody({ model: IMAGE_MODELS.FAST, prompt: "x", referenceImages: ok }), null);
+});
+
+test("a malformed reference is refused rather than skipped", () => {
+  const m = IMAGE_MODELS.FAST;
+  assert.match(validateImageBody({ model: m, prompt: "x", referenceImages: "nope" }), /must be an array/);
+  assert.match(validateImageBody({ model: m, prompt: "x", referenceImages: [null] }), /must be an object/);
+  assert.match(validateImageBody({ model: m, prompt: "x", referenceImages: [{ mimeType: "image/gif", data: "x" }] }), /Unsupported reference image type/);
+  assert.match(validateImageBody({ model: m, prompt: "x", referenceImages: [{ mimeType: "image/png" }] }), /base64/);
+  assert.ok(!ALLOWED_REFERENCE_MIME.has("image/gif"));
+});
+
+test("the prompt tells the model what to take from a reference and what not to", () => {
+  // Left unsaid, leading images read as something to reproduce and the model
+  // returns a near-copy of the reference rather than a new scene in its style.
+  const withRefs = buildImagePrompt(BRIEF, VARIANT, BRAND, { referenceCount: 2 });
+  assert.match(withRefs, /2 reference images are attached/);
+  assert.match(withRefs, /Do NOT reproduce their composition/);
+
+  const without = buildImagePrompt(BRIEF, VARIANT, BRAND);
+  assert.ok(!/reference image/i.test(without), "no reference language when none are attached");
+});
+
+test("reference images do not weaken the no-text and unverified-claim constraints", () => {
+  const p = buildImagePrompt(BRIEF, VARIANT, BRAND, { referenceCount: 1 });
+  assert.match(p, /No text, words, letters/);
+  BRIEF.claimsToVerify.forEach(claim => assert.ok(p.includes(claim), `unverified claim still excluded: ${claim}`));
 });
 
 test("the endpoint builds the upstream body itself, ignoring caller extras", () => {

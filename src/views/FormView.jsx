@@ -1,10 +1,11 @@
 import { useMemo, useRef, useState } from "react";
-import { STATUSES, INIT_TYPES, BLOCKERS, SL, SD, fmtCur } from "../constants.js";
+import { STATUSES, INIT_TYPES, RISK_TYPES, BLOCKERS, SL, SD, fmtCur } from "../constants.js";
 import { gG, gGh, gI, gTA, gSl, gSc, gSL, gOff } from "../components/styles.js";
 import { FR } from "../components/FR.jsx";
 import { ICESliders } from "../components/ICESliders.jsx";
 import { adNamesOf, adNameEntry, normKey } from "../services/naming.js";
 import { validateInitiative, PROMPTS } from "../services/preregistration.js";
+import { killGateBlocked, KILL_GATE_MESSAGE } from "../services/killGate.js";
 import {
   IconChart, IconLightbulb, IconTarget, IconAlert, IconSparkle, IconSpinner,
   IconCheck, IconClose, IconArrowRight,
@@ -35,7 +36,7 @@ import {
 // banner explaining what is missing and why, and can still be saved. New ones
 // cannot.
 // -- Form ----------------------------------------------------------------------
-export function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hypReview,iceReview,dataCtx,setDataCtx,onAi,onIceAssist,onAcceptHyp,onRejectHyp,onAcceptIce,onRejectIce,onSave,onCancel,onOpenBuilder}) {
+export function FormView({form,setForm,items,agenda,t,dk,cats,brands,aiLoad,iceLoad,hypReview,iceReview,dataCtx,setDataCtx,onAi,onIceAssist,onAcceptHyp,onRejectHyp,onAcceptIce,onRejectIce,onSave,onCancel,onOpenBuilder}) {
   const f=(k,v)=>setForm(p=>({...p,[k]:v}));
   const claimed = adNamesOf(form);
   const [pasteName,setPasteName] = useState("");
@@ -46,12 +47,17 @@ export function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hyp
   const v = useMemo(()=>validateInitiative(form),[form]);
   const errorFor = (key) => (submitted || v.legacy) && v.missing.some(m=>m.key===key)
     ? "Required. " + PROMPTS[key] : null;
+  // The status this initiative had before this edit session — undefined for a
+  // brand-new one, which killGateBlocked treats the same as "not Running".
+  const prevStatus = form._new ? null : items.find(e=>e.id===form.id)?.status;
+  const killBlocked = killGateBlocked(form.status, prevStatus, form.killCriteria);
+  const killError = submitted && killBlocked ? "Required. " + KILL_GATE_MESSAGE : null;
   const trySave = () => {
     setSubmitted(true);
-    if (v.blocking) {
+    if (v.blocking || killBlocked) {
       // Send focus to the first thing that is wrong rather than leaving the
       // reader to hunt for the red field in a twenty-field form.
-      document.getElementById("gos-missing-summary")?.scrollIntoView({behavior:"smooth",block:"center"});
+      document.getElementById(v.blocking ? "gos-missing-summary" : "gos-kill-criteria")?.scrollIntoView({behavior:"smooth",block:"center"});
       return;
     }
     onSave();
@@ -146,6 +152,15 @@ export function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hyp
         <FR label="Status" t={t}><select style={gSl(t)} value={form.status} onChange={e=>f("status",e.target.value)}>{STATUSES.map(s=><option key={s}>{s}</option>)}</select></FR>
         <FR label="Primary metric" t={t}><input style={gI(t)} value={form.primaryMetric||""} onChange={e=>f("primaryMetric",e.target.value)} placeholder="e.g. CVR, ROAS, AOV, CAC"/></FR>
       </div>
+
+      {agenda&&agenda.length>0&&(
+        <FR label="Answers agenda question" t={t} hint="Optional. Links this initiative into the learning agenda so its result rolls up against the question it was run to answer.">
+          <select style={gSl(t)} value={form.agendaId||""} onChange={e=>f("agendaId",e.target.value||null)}>
+            <option value="">— none —</option>
+            {agenda.map(a=><option key={a.id} value={a.id}>{(a.question||"(untitled)").slice(0,80)}</option>)}
+          </select>
+        </FR>
+      )}
 
       {/* Measurement & attribution — how imported data maps back to this initiative */}
       <div style={gSc(t)}>
@@ -271,7 +286,17 @@ export function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hyp
         <ICESliders ice={form.ice||{impact:5,certainty:5,ease:5}} onChange={v=>f("ice",v)} t={t}/>
       </div>
 
-      <FR label="Kill criteria" t={t}><textarea style={gTA(t)} rows={2} value={form.killCriteria||""} onChange={e=>f("killCriteria",e.target.value)} placeholder="e.g. If CVR doesn't improve by ≥0.5pp after 2 weeks on 500+ sessions, kill it. If CAC exceeds $55, pause and review spend allocation."/></FR>
+      <FR label="Kill criteria" t={t} required={form.status==="Running"&&prevStatus!=="Running"} error={killError}
+        hint={!killError&&form.status==="Running"&&prevStatus!=="Running"?"Required to start running — name the condition that would stop this.":null}>
+        <textarea id="gos-kill-criteria" style={gTA(t)} rows={2} value={form.killCriteria||""} onChange={e=>f("killCriteria",e.target.value)} placeholder="e.g. If CVR doesn't improve by ≥0.5pp after 2 weeks on 500+ sessions, kill it. If CAC exceeds $55, pause and review spend allocation."/>
+      </FR>
+
+      <FR label="Risk type" t={t} hint="Franchise extends what already works. Loonshot is a real swing on something unproven — optional, and what lets the portfolio be read for whether it's taking any.">
+        <select style={gSl(t)} value={form.riskType||""} onChange={e=>f("riskType",e.target.value)}>
+          <option value="">Unclassified</option>
+          {RISK_TYPES.map(r=><option key={r} value={r}>{r}</option>)}
+        </select>
+      </FR>
 
       <div className="gos-grid-2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
         <FR label="Start date" t={t}><input style={gI(t)} type="date" value={form.startDate||""} onChange={e=>f("startDate",e.target.value)}/></FR>
@@ -325,8 +350,13 @@ export function FormView({form,setForm,items,t,dk,cats,brands,aiLoad,iceLoad,hyp
             {v.missing.length} required field{v.missing.length!==1?"s":""} still empty.
           </span>
         )}
+        {(submitted&&!v.blocking&&killBlocked)&&(
+          <span style={{fontSize:11.5,color:t.red,fontFamily:t.sans,fontWeight:600,marginRight:"auto"}}>
+            Kill criteria required to start running.
+          </span>
+        )}
         <button style={gGh(t)} onClick={onCancel}>Cancel</button>
-        <button style={{...gG(t),...(v.blocking&&submitted?gOff:null)}} onClick={trySave}>Save</button>
+        <button style={{...gG(t),...((v.blocking||killBlocked)&&submitted?gOff:null)}} onClick={trySave}>Save</button>
       </div>
     </div>
   );

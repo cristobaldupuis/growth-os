@@ -28,6 +28,9 @@ export const KEY_LIB_VIEW = "gos_lib_view_v1";
 // friction that makes a tool feel like it is not listening.
 export const KEY_RAIL     = "gos_rail_v1";
 export const KEY_TOUR_SEEN = "gos_tour_seen_v1";
+// Learning agenda items (ROADMAP 5.1) — the layer above initiatives. Small and
+// operator-authored, so it gets no cap the way KEY_PERF does.
+export const KEY_AGENDA   = "gos_agenda_v1";
 
 // Storage helper — works in Claude artifacts (window.storage), StackBlitz
 // (localStorage), or memory.
@@ -116,7 +119,7 @@ export const store = (() => {
 // payload loses only the new key, and a v2 restore reading a v1 payload finds
 // it absent and skips it. Neither direction corrupts anything, which is the bar
 // a format bump would exist to protect.
-export const handleDownloadBackup = (items, settings, debates, weeklyMetrics, recs, creative, perfRows, assets, usage) => {
+export const handleDownloadBackup = (items, settings, debates, weeklyMetrics, recs, creative, perfRows, assets, usage, agenda) => {
   const payload = {
     _meta: {
       format: "growth-os-backup",
@@ -139,6 +142,9 @@ export const handleDownloadBackup = (items, settings, debates, weeklyMetrics, re
     // which is the same honest state a reload produces today.
     assets: assets || [],
     usage: usage || [],
+    // Optional, same reasoning as `creative`/`perfRows` above: version stays 1
+    // because an old restore reading a payload with this key just skips it.
+    agenda: agenda || [],
   };
   const json = JSON.stringify(payload, null, 2);
   const blob = new Blob([json], { type: "application/json" });
@@ -170,6 +176,7 @@ export const handleRestoreBackup = (file, showToast, setRestorePayload) => {
         perfRows: Array.isArray(parsed.perfRows) ? parsed.perfRows.length : 0,
         assets: Array.isArray(parsed.assets) ? parsed.assets.length : 0,
         usage: Array.isArray(parsed.usage) ? parsed.usage.length : 0,
+        agenda: Array.isArray(parsed.agenda) ? parsed.agenda.length : 0,
       };
       const stamp = parsed._meta?.exportedAt
         ? new Date(parsed._meta.exportedAt).toLocaleString()

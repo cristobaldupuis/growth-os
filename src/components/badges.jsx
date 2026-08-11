@@ -31,6 +31,15 @@ export function BlockerBadge({blocker,t}) {
   );
 }
 
+// Franchise / Loonshot (ROADMAP 5.2). Unset renders nothing — an unclassified
+// initiative should read as unclassified, not as a silent "Franchise" default.
+export function RiskBdg({riskType,t}) {
+  if (riskType!=="Franchise" && riskType!=="Loonshot") return null;
+  return riskType==="Loonshot"
+    ? <Bdg label="Loonshot" color={t.gold} bg={t.goldBg} border={t.goldBorder} small/>
+    : <Bdg label="Franchise" color={t.textMuted} bg={t.surfaceAlt} border={t.border} small/>;
+}
+
 export function ICEChip({ice,t}) {
   const s = iceScore(ice&&ice.impact, ice&&ice.certainty, ice&&ice.ease);
   if (s===null) return <span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>No ICE</span>;

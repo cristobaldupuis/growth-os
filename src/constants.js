@@ -81,6 +81,14 @@ export const STATUSES  = ["Draft","Running","Completed","Killed"];
 export const STATUS_GROUP_ORDER = ["Running","Draft","Completed","Killed"];
 export const OUTCOMES  = ["Jackpot","Success","Failed","Inconclusive"];
 export const INIT_TYPES = ["A/B Test","Campaign","Process","Research","Infrastructure"];
+// Franchise / Loonshot — Bahcall's split between a bet that extends what
+// already works and one that risks being wrong to find out what doesn't.
+// Optional and unset by default (see mkDefault): forcing a call on every one
+// of a real client's existing initiatives at once would be a second
+// pre-registration-style migration, and unlike observation/hypothesis/
+// successMetric this field has no downstream consumer that breaks on "unset" —
+// it only feeds a portfolio-level read of how many real swings are in flight.
+export const RISK_TYPES = ["Franchise","Loonshot"];
 export const BLOCKERS  = ["None","Waiting on Engineering","Waiting on Creative","Waiting on Merch/Inventory","Waiting on Legal","Waiting on Finance","Waiting on Leadership"];
 
 // Weekly metrics — source definitions and their fields
@@ -605,8 +613,20 @@ export const mkDefault = (cats, activeBrand) => ({
   observation:"", successMetric:"",
   category:cats[0]||"", initType:"A/B Test", owner:"",
   primaryMetric:"", killCriteria:"", status:"Draft",
+  // Unset by default rather than defaulting to "Franchise" — a default that
+  // always agrees with the safer answer is not a classification, it is a
+  // field nobody has to look at. See RISK_TYPES above.
+  riskType:"",
+  // The learning agenda item this initiative answers, if any. Set either from
+  // "start an experiment" on an agenda item (which seeds the fields below) or
+  // from the form's own agenda picker for an initiative that already existed.
+  agendaId:null,
   startDate:"", endDate:"", ice:{impact:5,certainty:5,ease:5},
   revenueImpact:0, spendCost:0, resourceCost:0, linkedIds:[], results:null,
+  // Diagnostic-escalation evidence (ROADMAP 5.3) — one entry per (dimension,
+  // paste-back), scoped to this initiative's own post-mortem. Never merged
+  // into the performance fact rows; see services/diagnosticEscalation.js.
+  evidence:[],
   createdAt:new Date().toISOString().slice(0,10), notes:"",
   brandId: activeBrand && activeBrand!=="all" ? activeBrand : "default",
   blocker:"None",

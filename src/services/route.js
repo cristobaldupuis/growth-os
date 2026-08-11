@@ -32,7 +32,7 @@
 /** Views that are addressable by name. Anything else falls back to dashboard. */
 export const ROUTABLE = [
   "dashboard", "initiatives", "library", "performance",
-  "triage", "creative", "readout", "settings",
+  "triage", "creative", "readout", "settings", "agenda",
 ];
 
 const PERF_TABS = ["breakdown", "attribution", "builder", "convention"];
@@ -97,7 +97,8 @@ export function titleFor(nav, item) {
   const NAMES = {
     dashboard:"Dashboard", initiatives:"Initiatives", library:"Library",
     performance:"Performance", triage:"Triage", creative:"Creative",
-    readout:"Summary", settings:"Settings", detail:"Initiative", form:"Edit initiative",
+    readout:"Summary", settings:"Settings", agenda:"Agenda",
+    detail:"Initiative", form:"Edit initiative",
   };
   if ((nav === "detail" || nav === "form") && item?.title) {
     const id = item.initId ? item.initId + " · " : "";

@@ -313,11 +313,14 @@ shipped, plus two that are decisions rather than code.
   real install, where it costs more. A live workspace loaded from an actual
   account, start to finish, is a prerequisite for the falsification test rather
   than part of it.
-- [ ] **A cost model per client-month.** README prices one debate in tokens.
-  Nothing prices a workspace. At $1,500/month the margin is fine until somebody
-  runs debates daily and generates video, and knowing the floor is also what
-  tells you what a discount costs. The admin bench harness is where a
-  per-workspace usage counter hangs.
+- [x] **A cost model per client-month.** `/admin → Cost model` rolls the
+  existing per-call usage ledger into a monthly projection per feature group —
+  observed calls/week × observed $/call, held against an editable monthly
+  price. A group with no priced calls in the window is reported as unknown
+  rather than assumed free. Scenario calls/week is operator-editable so a
+  heavier pace than the one logged (daily debates, routine video) can be
+  modelled before it happens rather than discovered in the invoice.
+  `src/services/costModel.js`.
 - [ ] **Commercial paper.** An MSA, an order form and a DPA do not exist.
   `docs/data-handling.md` is the security-posture half of that answer and the
   cheapest half; the rest is a lawyer, not a sprint, and it is needed before the

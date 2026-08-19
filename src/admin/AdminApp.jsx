@@ -3,6 +3,7 @@ import { c, page, panel, label, input, button, tag } from "./theme.js";
 import * as api from "./adminApi.js";
 import { BenchPanel } from "./BenchPanel.jsx";
 import { SpendPanel } from "./SpendPanel.jsx";
+import { CostModelPanel } from "./CostModelPanel.jsx";
 
 // The admin console.
 //
@@ -311,7 +312,7 @@ export default function AdminApp() {
           </div>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {[["routing", "Routing"], ["bench", "Test bench"], ["spend", "Spend"]].map(([key, name]) => (
+          {[["routing", "Routing"], ["bench", "Test bench"], ["spend", "Spend"], ["cost", "Cost model"]].map(([key, name]) => (
             <button key={key} onClick={() => setTab(key)}
               style={{ ...button(tab === key ? "primary" : "quiet") }}>
               {name}
@@ -327,7 +328,8 @@ export default function AdminApp() {
       <main style={{ maxWidth: 780, margin: "0 auto", padding: "18px 20px" }}>
         {tab === "routing" ? <RoutingPanel config={config} reload={reload} />
           : tab === "bench" ? <BenchPanel config={config} />
-          : <SpendPanel />}
+          : tab === "spend" ? <SpendPanel />
+          : <CostModelPanel />}
       </main>
     </div>
   );

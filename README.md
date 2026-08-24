@@ -55,6 +55,8 @@ same entities for nearly nothing, right up to the point where 4,000 ad names hav
 to become dimensions.
 
 Commercial thesis, ICP and pricing: [docs/commercial.md](./docs/commercial.md).
+What this is and is not, written against the finished roadmap rather than
+today's state: [docs/scope.md](./docs/scope.md).
 
 ---
 

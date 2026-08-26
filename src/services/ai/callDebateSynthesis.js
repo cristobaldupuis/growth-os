@@ -1,4 +1,5 @@
-import { postProxy, safeParseJSON } from "./_shared.js";
+import { postProxy, parseStructured } from "./_shared.js";
+import { DEBATE_SYNTHESIS_FORMAT, unwrap } from "./schemas.js";
 import { EFFORT, buildRequest, modelFor } from "./models.js";
 import { INIT_TYPES } from "../../constants.js";
 
@@ -24,7 +25,8 @@ Rules:
 - Rank by expected impact on the north star metric, highest first.
 - Be brutally specific. Dollar estimates must be grounded in actual portfolio win rates and revenue figures from the data.
 
-Return ONLY a valid JSON array of exactly 3 objects. No markdown, no preamble:
+Return ONLY a valid JSON array of exactly 3 objects. No markdown, no preamble. If a response schema is enforced, return the list under an 'items' key; otherwise return the bare array.
+
 {
   "title": "concise specific title (max 12 words)",
   "observation": "2-3 sentences grounded in the portfolio data and debate that justify this — cite specific numbers where available",
@@ -45,16 +47,18 @@ Return ONLY a valid JSON array of exactly 3 objects. No markdown, no preamble:
   const data = await postProxy({
     group:"debate", fn:"callDebateSynthesis",
     body: {
-      ...buildRequest({model:modelFor("debate", modelOverride), maxTokens:3500, system:sys, effort:EFFORT.HIGH}),
+      ...buildRequest({model:modelFor("debate", modelOverride), maxTokens:3500, system:sys, effort:EFFORT.HIGH, format:DEBATE_SYNTHESIS_FORMAT}),
       messages:[{role:"user", content:
         `Portfolio:\n${portfolioCtx}${dataAppendix}\n\nContext:\n${userContext||"None."}\n\nDebate:\n${transcriptStr}\n\nSynthesize the 3 highest-impact net-new initiatives.`
       }],
     },
   });
-  const raw = data.content?.[0]?.text?.trim()||"[]";
-  const parsed = safeParseJSON(raw, true);
-  if (!Array.isArray(parsed) || parsed.length === 0) {
-    throw new Error("The debate produced ideas but the final synthesis came back malformed. Open this debate in History to keep the transcript, then re-run.");
+  // The transcript is already saved by this point — CopilotPanel persists it turn
+  // by turn — so the advice in this message is now true. It used to be given by a
+  // throw that happened *before* the only call that saved anything.
+  const parsed = unwrap(parseStructured(data, { label: "The debate synthesis" }));
+  if (parsed.length === 0) {
+    throw new Error("The debate synthesis came back empty. The transcript is saved in History — reopen it there and synthesise again.");
   }
   return parsed;
 }

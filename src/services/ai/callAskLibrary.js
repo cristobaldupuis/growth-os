@@ -1,4 +1,4 @@
-import { postProxy, firstText } from "./_shared.js";
+import { postProxy, readProse } from "./_shared.js";
 import { EFFORT, buildRequest, modelFor } from "./models.js";
 
 // Natural-language query over the learnings library. The query IS the hypothesis:
@@ -29,5 +29,12 @@ export async function callAskLibrary(question, corpus, settings, modelOverride) 
     body:{ ...buildRequest({model:modelFor("analysis", modelOverride), maxTokens:1100, system:sys, effort:EFFORT.LOW}),
       messages:[{role:"user", content:"QUESTION: "+question+"\n\nCLOSED-INITIATIVE RECORD:\n"+lines}] },
   });
-  return firstText(data);
+  // A cut-off answer is still a useful answer, but it must not read as a
+  // complete review of the record — that is the one claim this call exists to
+  // make honestly. Said in the output rather than thrown, because the operator
+  // can act on a partial answer and cannot act on an error.
+  const { text, truncated } = readProse(data);
+  return truncated
+    ? text + "\n\n---\n(This answer was cut off at the response length limit and is incomplete.)"
+    : text;
 }

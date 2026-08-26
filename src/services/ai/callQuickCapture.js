@@ -1,4 +1,5 @@
-import { postProxy, firstText, safeParseJSON } from "./_shared.js";
+import { postProxy, parseStructured } from "./_shared.js";
+import { QUICK_CAPTURE_FORMAT } from "./schemas.js";
 import { EFFORT, buildRequest, modelFor } from "./models.js";
 
 export async function callQuickCapture(description, settings, cats, initTypes, modelOverride) {
@@ -15,11 +16,8 @@ export async function callQuickCapture(description, settings, cats, initTypes, m
   ].join(" ");
   const data = await postProxy({
     group:"capture", fn:"callQuickCapture",
-    body:{ ...buildRequest({model:modelFor("capture", modelOverride), maxTokens:600, system:sys, effort:EFFORT.LOW}),
+    body:{ ...buildRequest({model:modelFor("capture", modelOverride), maxTokens:600, system:sys, effort:EFFORT.LOW, format:QUICK_CAPTURE_FORMAT}),
       messages:[{role:"user", content:"Rough idea: "+description}] },
   });
-  const raw = firstText(data) || "{}";
-  const parsed = safeParseJSON(raw, false);
-  if (!parsed) throw new Error("Quick capture: couldn't parse AI response. Try again.");
-  return parsed;
+  return parseStructured(data, { label: "Quick capture" });
 }

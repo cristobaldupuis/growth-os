@@ -1,4 +1,5 @@
-import { postProxy, firstText, safeParseJSON } from "./_shared.js";
+import { postProxy, parseStructured } from "./_shared.js";
+import { EXPAND_RECOMMENDATION_FORMAT } from "./schemas.js";
 import { EFFORT, buildRequest, modelFor } from "./models.js";
 
 // Step 2: expand one selected candidate into a full recommendation. Run in
@@ -64,11 +65,8 @@ export async function callExpandRecommendation(candidate, portfolioCtx, learning
 
   const data = await postProxy({
     group:"analysis", fn:"callExpandRecommendation",
-    body:{ ...buildRequest({model:modelFor("analysis", modelOverride), maxTokens:1200, system:sys, effort:EFFORT.LOW, cacheSystem:true}),
+    body:{ ...buildRequest({model:modelFor("analysis", modelOverride), maxTokens:1200, system:sys, effort:EFFORT.LOW, cacheSystem:true, format:EXPAND_RECOMMENDATION_FORMAT}),
       messages:[{role:"user", content:user}] },
   });
-  const raw = firstText(data) || "{}";
-  const parsed = safeParseJSON(raw, false);
-  if (!parsed) throw new Error("Next Plays: expansion returned malformed response for '"+candidate.title+"'.");
-  return parsed;
+  return parseStructured(data, { label: "Next Plays expansion for '"+candidate.title+"'" });
 }

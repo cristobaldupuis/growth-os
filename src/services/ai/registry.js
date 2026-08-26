@@ -57,6 +57,10 @@
  *   cacheMinTokens    — minimum cacheable prefix; below this a cache breakpoint
  *                       is silently ignored, so marking one buys nothing
  *   longContext       — comfortable reading a whole-portfolio prompt
+ *   structuredOutputs — accepts `output_config.format`, so the PROVIDER enforces
+ *                       the JSON schema rather than the prompt asking nicely.
+ *                       Anthropic-only today; every other adapter keeps the
+ *                       prompt-and-parse path, which still works
  *
  * `unverified: true` marks a model ID that has not been confirmed against the
  * provider's own model list. Non-Anthropic IDs are seeded that way on purpose:
@@ -79,10 +83,12 @@
 //      that may not exist is a guess on top of a guess, so those are null until
 //      someone confirms the id AND reads the rate off the provider's own pricing
 //      page. Fill them in here when you do — it is one line each.
-//   3. **Promotional and negotiated pricing is not modelled.** Claude Sonnet 5
-//      is on a promotional $2/$10 through 2026-08-31 against a $3/$15 list; the
-//      table carries list. Every ledger row is stamped `costBasis: "estimate"`
-//      for exactly this reason — it is a planning figure, not an invoice.
+//   3. **These are OUR costs, not a client rate card.** What a call costs to
+//      make and what a client is billed for the work are different numbers with
+//      different owners; only the first belongs here. Promotional, negotiated and
+//      committed-use pricing is not modelled either, so every ledger row is
+//      stamped `costBasis: "estimate"` — it is a planning figure, not an invoice,
+//      and it will diverge from the provider's bill.
 //
 // Text rates are USD per million tokens. Image is per generated image. Video is
 // per second of output, which is why the video entries mirror VIDEO_TIERS rather
@@ -100,18 +106,28 @@ export const MODEL_CATALOGUE = [
     // wrong is silent in both directions — too high and buildRequest declines to
     // mark a breakpoint that would have worked, too low and it marks one the
     // provider ignores. Neither errors, so it is only ever caught by reading it.
-    caps: { tools: true, json: true, adaptiveThinking: true, effort: true, cacheMinTokens: 512, longContext: true },
+    caps: { tools: true, json: true, adaptiveThinking: true, effort: true, cacheMinTokens: 512, longContext: true, structuredOutputs: true },
   },
   {
     id: "claude-sonnet-5",
     provider: "anthropic",
     label: "Claude Sonnet 5",
     modality: "text",
-    // List rate. A promotional $2/$10 runs through 2026-08-31, so figures for
-    // calls made before then overstate actual spend — see the pricing note above.
-    price: { inUsdPerMTok: 3, outUsdPerMTok: 15 },
+    // $2/$10 is the published rate. This entry previously carried $3/$15 as
+    // "list", with the lower figure described as a promotion expiring
+    // 2026-08-31; that is no longer what the pricing page says, and while it
+    // stood the ledger overstated every Sonnet call by half.
+    //
+    // Worth being precise about which number belongs here, because there are two
+    // and only one of them is this table's business. `price` is what the CALL
+    // COSTS US — a platform input, used to answer "what did this feature spend".
+    // What a client is charged for the same work is a commercial decision that
+    // includes margin, and it does not belong in the model catalogue; if that is
+    // ever needed it is a separate rate card multiplied over this, so the two can
+    // move independently. Keep this one honest and the other one elsewhere.
+    price: { inUsdPerMTok: 2, outUsdPerMTok: 10 },
     blurb: "The current default for anything that weighs evidence or holds a position.",
-    caps: { tools: true, json: true, adaptiveThinking: true, effort: true, cacheMinTokens: 1024, longContext: true },
+    caps: { tools: true, json: true, adaptiveThinking: true, effort: true, cacheMinTokens: 1024, longContext: true, structuredOutputs: true },
   },
   {
     id: "claude-haiku-4-5",
@@ -122,7 +138,7 @@ export const MODEL_CATALOGUE = [
     // The two false entries are the reason models.test.js exists — they were
     // sent unconditionally once and it failed only as a runtime 400.
     blurb: "Cheap and fast. Schema-shaped rewriting where the judgement is already made.",
-    caps: { tools: true, json: true, adaptiveThinking: false, effort: false, cacheMinTokens: 4096, longContext: false },
+    caps: { tools: true, json: true, adaptiveThinking: false, effort: false, cacheMinTokens: 4096, longContext: false, structuredOutputs: true },
   },
 
   // -- Google Gemini text -----------------------------------------------------
@@ -156,7 +172,7 @@ export const MODEL_CATALOGUE = [
     unverified: true,
     price: null,
     blurb: "Google's reasoning tier. Long context; verify the id before relying on it.",
-    caps: { tools: true, json: true, adaptiveThinking: false, effort: false, cacheMinTokens: Infinity, longContext: true },
+    caps: { tools: true, json: true, adaptiveThinking: false, effort: false, cacheMinTokens: Infinity, longContext: true, structuredOutputs: false },
   },
   {
     id: "gemini-3.6-flash",
@@ -166,7 +182,7 @@ export const MODEL_CATALOGUE = [
     unverified: true,
     price: null,
     blurb: "Fast and cheap tier. A candidate for Capture & Framing; verify the id first.",
-    caps: { tools: true, json: true, adaptiveThinking: false, effort: false, cacheMinTokens: Infinity, longContext: false },
+    caps: { tools: true, json: true, adaptiveThinking: false, effort: false, cacheMinTokens: Infinity, longContext: false, structuredOutputs: false },
   },
   {
     id: "gemini-3.5-flash-lite",
@@ -176,7 +192,7 @@ export const MODEL_CATALOGUE = [
     unverified: true,
     price: null,
     blurb: "Google's cheapest tier. High-throughput transformation work; verify the id first.",
-    caps: { tools: true, json: true, adaptiveThinking: false, effort: false, cacheMinTokens: Infinity, longContext: false },
+    caps: { tools: true, json: true, adaptiveThinking: false, effort: false, cacheMinTokens: Infinity, longContext: false, structuredOutputs: false },
   },
   //
   // Gemini Spark is deliberately absent. It is an agentic assistant product —
@@ -211,7 +227,7 @@ export const MODEL_CATALOGUE = [
     unverified: true,
     price: null,
     blurb: "OpenAI's flagship tier — reasoning, coding, careful refinement. Verify the id first.",
-    caps: { tools: true, json: true, adaptiveThinking: false, effort: false, cacheMinTokens: Infinity, longContext: true },
+    caps: { tools: true, json: true, adaptiveThinking: false, effort: false, cacheMinTokens: Infinity, longContext: true, structuredOutputs: false },
   },
   {
     id: "gpt-5.6-terra",
@@ -221,7 +237,7 @@ export const MODEL_CATALOGUE = [
     unverified: true,
     price: null,
     blurb: "Balanced tier at roughly half Sol's price. The sensible first thing to bench.",
-    caps: { tools: true, json: true, adaptiveThinking: false, effort: false, cacheMinTokens: Infinity, longContext: true },
+    caps: { tools: true, json: true, adaptiveThinking: false, effort: false, cacheMinTokens: Infinity, longContext: true, structuredOutputs: false },
   },
   {
     id: "gpt-5.6-luna",
@@ -231,7 +247,7 @@ export const MODEL_CATALOGUE = [
     unverified: true,
     price: null,
     blurb: "Fastest and cheapest tier. A candidate for Capture & Framing; verify the id first.",
-    caps: { tools: true, json: true, adaptiveThinking: false, effort: false, cacheMinTokens: Infinity, longContext: false },
+    caps: { tools: true, json: true, adaptiveThinking: false, effort: false, cacheMinTokens: Infinity, longContext: false, structuredOutputs: false },
   },
 
   // -- Open weights, served through OpenRouter ---------------------------------
@@ -272,7 +288,7 @@ export const MODEL_CATALOGUE = [
     unverified: true,
     price: null,
     blurb: "Open weights, 1M context, first-party and Anthropic-shaped. Needs TINKER_API_KEY.",
-    caps: { tools: true, json: true, adaptiveThinking: false, effort: false, cacheMinTokens: Infinity, longContext: true },
+    caps: { tools: true, json: true, adaptiveThinking: false, effort: false, cacheMinTokens: Infinity, longContext: true, structuredOutputs: false },
   },
 
   // -- Image ------------------------------------------------------------------

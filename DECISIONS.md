@@ -983,3 +983,61 @@ them. Until that exists, this defect is cheaper than its fix.
 **Scope, same as `usage.js`'s own admission:** per-browser, estimate-only, list rates. A workspace deployed per client (per the config-first multi-tenancy decision above) means one browser's ledger is one client's real usage, which is what makes the projection meaningful rather than a mix of everyone's testing — but it is still this operator's browser specifically, not an account-wide read. Same Phase 5.3/Supabase forcing condition as the spend ledger it's built on.
 
 **Forcing condition:** a second operator on the same workspace, or the Supabase migration landing and making a server-side ledger cheap — either turns "per-browser" from an accepted scope into a wrong one.
+
+---
+
+## A debate is saved from its first turn, because the transcript is the asset
+
+**Decision:** `services/debateRun.js` models a Signal AI debate as a record that exists before the first call and is written after every turn. `CopilotPanel` holds the run in a local variable rather than component state and saves through on each update; `App.jsx` upserts by id. A run left unfinished is re-labelled on load and can be synthesised from History without re-debating.
+
+**What was wrong.** `runDebate` wrapped the whole loop — up to 8 agent turns, each with up to 4 tool round-trips, plus a moderator call between turns and a synthesis — in one try/catch, and called `onSaveDebate` only after synthesis returned. So a rate limit on turn seven, a dropped connection, or a malformed synthesis discarded 25 to 48 reasoning-model calls that had already been billed. The synthesis error even told the operator to "open this debate in History to keep the transcript", which was impossible: the throw happened before the only line that saved anything. `callAgentTurn` had the same shape at a smaller scale, throwing on its tool-iteration limit and taking the whole debate with it; it now withholds the tools on the final iteration, which forces a text answer instead.
+
+**Why the record is minted before any work happens.** An id is what every later update addresses. A record that only gets an identity once it succeeds cannot be updated on the way there, which was precisely the old failure — there was no row to append a turn to, so turns lived in a local array that a throw discarded.
+
+**Why the save handler had to change too.** `onSaveDebate={debate => saveDebates([debate, ...debates].slice(0,20))}` closed over the `debates` array from the render that created it. Saving once at the end hid that; saving twenty times would have prepended to the same stale list twenty times, scattering one debate through History as a dozen partial copies. `saveDebateRun` takes a functional update and `upsertRun` replaces by id.
+
+**What "survives leaving the page" does and does not mean.** Closing the panel, switching views, navigating away: fully supported, and the loop keeps running and keeps writing because it depends on nothing still mounted. Escape-to-close was re-enabled for the same reason — it was disabled only because closing used to be destructive. Closing the tab or reloading: the loop dies with the page, because a browser tab is not a job runner. What that leaves is a run marked `running` with every completed turn intact, which `reconcileOnLoad` re-labels as awaiting synthesis so it can be finished in one call instead of paid for again. Genuine unattended continuation needs the loop to run somewhere that outlives the page.
+
+**Forcing condition:** the background-execution engine in ROADMAP Phase 3. This module is the state model that work would drive — the statuses already distinguish "executing" from "has turns, needs synthesis", which is the distinction a server-side runner would write.
+
+---
+
+## Caching is placed where the repetition actually is, and the ledger reports whether it worked
+
+**Decision:** `buildRequest` gains `cacheMessages`, which marks the last content block of the last message as a cache breakpoint; the debate's portfolio snapshot moves from the first user message into the system prompt; and every ledger row records `cacheReadTokens` / `cacheWriteTokens`, priced at their own multipliers and rolled up as a cache hit rate in the spend console.
+
+**Why the existing `cacheSystem` was buying nothing.** Caching is a prefix match and a breakpoint below the model's minimum cacheable prefix is silently ignored. Measured, this app's system prompts run 250-1,000 tokens against a 1,024-token minimum on Sonnet 5 — so `cacheSystem: true`, set at six call sites, was a no-op at all of them. Nothing failed and nothing logged. Meanwhile the content that genuinely repeats — the portfolio snapshot, the tool definitions, the growing transcript — lived in `messages`, where no breakpoint was ever placed, and was re-billed in full on every one of a debate's 25 to 48 calls.
+
+**Why the portfolio snapshot moved into the system prompt.** It is identical on every turn, so it belongs with the stable content rather than inside the conversation that grows; every agent now sees it directly rather than only the opening one inheriting it through the transcript; and it carries the prefix over the cacheable minimum, which is what makes the system breakpoint real. The per-agent persona is ordered after it so the shared portion of the prefix stays shared across agents.
+
+**Why the cache counts are recorded separately rather than folded into `inputTokens`.** They bill at different rates — a read at roughly a tenth of input, a write at roughly 1.25x — so folding them in would misprice every cached call in both directions. Recorded as null rather than 0 on providers that do not report them, so "this provider cannot tell us" stays distinguishable from "nothing was cached", and the hit rate is null rather than 0% when nothing reported at all.
+
+**Why the hit rate is surfaced in the console.** It is the only way to answer "is prompt caching doing anything" from inside the product, and the absence of that answer is why six call sites could claim caching for as long as they did.
+
+**Forcing condition:** a group routed to a model whose provider reports cache usage in a different shape. The adapters normalise the Anthropic `usage` shape today and the non-Anthropic ones carry `cacheMinTokens: Infinity`, so no breakpoint is ever built for them — that stays true only while none of them ships prompt caching worth using.
+
+---
+
+## Structured outputs where the provider supports them, prompt-and-parse everywhere else
+
+**Decision:** `services/ai/schemas.js` holds a JSON schema per structured call site, emitted as `output_config.format` when the routed model declares `structuredOutputs`. `safeParseJSON` and the prompts' shape descriptions stay exactly as they were.
+
+**Why both.** The schema removes the failure class rather than recovering from it: `safeParseJSON`'s markdown-fence stripping, balanced-bracket hunting and single-object wrapping are three recoveries from one root cause, which is that the model was asked for JSON in prose and answered in prose. But structured outputs are Anthropic-only here, and the console's model picker offers Gemini, OpenAI and Inkling — so deleting the prompt text would turn every non-Anthropic routing into a trap. The capability table decides which path a request takes, the same way it already decides `thinking` and `effort`.
+
+**Why list-returning calls return `{items: [...]}`.** Structured outputs constrain a root object, not a root array. `unwrap()` reads both that and the bare array a non-schema model returns, so no call site has to know which model served it, and it returns `[]` rather than null for anything unreadable — callers iterate immediately, and null would move a clear parse failure into an unrelated `TypeError` one frame later.
+
+**Why `additionalProperties: false` and enums on the scored fields.** A key nobody reads is a key somebody eventually reads by accident. The candidate `confidence` field is constrained to the three strings `App.jsx` ranks on, because anything else silently scores 0 and sorts to the bottom with no visible cause.
+
+**Forcing condition:** a second provider shipping a compatible schema parameter. At that point `structuredOutputs` stops being a proxy for "is Anthropic" and the adapter needs to translate the format rather than the capability table suppressing it.
+
+---
+
+## The catalogue's `price` is what a call costs us, not what a client is charged
+
+**Decision:** `MODEL_CATALOGUE.price` carries the provider's published rate and nothing else. Claude Sonnet 5 corrected from $3/$15 to $2/$10.
+
+**Why the correction mattered.** The entry described $3/$15 as list with $2/$10 as a promotion expiring 2026-08-31. That is not what the pricing page says, and while it stood every Sonnet row in the ledger overstated spend by half — in the direction that would have made a cost-model projection look worse than reality, which is the opposite of the error `usage.js` is otherwise careful to avoid.
+
+**Why the distinction is worth stating.** There are two numbers and only one belongs in a model catalogue. Platform cost is an input to "what did this feature spend"; a client rate includes margin and is a commercial decision. Keeping the second out of this table means the two can move independently — a rate card is a multiplier over this, applied elsewhere, not an edit to it.
+
+**Forcing condition:** the first deployment that bills a client per unit of AI work rather than per engagement. That needs a rate card object with its own owner; it does not need this table to start lying.

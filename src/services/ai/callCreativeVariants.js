@@ -1,4 +1,5 @@
-import { postProxy, firstText, safeParseJSON } from "./_shared.js";
+import { postProxy, parseStructured } from "./_shared.js";
+import { creativeVariantsFormat, unwrap } from "./schemas.js";
 import { EFFORT, buildRequest, modelFor } from "./models.js";
 
 // -- Creative variants ---------------------------------------------------------
@@ -88,7 +89,7 @@ export async function callCreativeVariants(brief, initiative, brand, schema, opt
     "  cta (string),",
     "  rationale (string, one sentence — why this variant could win),",
     "  naming (object — the segment keys listed above, and only those).",
-    "No markdown, no preamble, just the JSON array.",
+    "No markdown, no preamble, just the JSON array. If a response schema is enforced, return the list under an 'items' key; otherwise return the bare array.",
   ].join("\n");
 
   const anglesBlock = (brief.angles || []).map(a =>
@@ -115,11 +116,8 @@ export async function callCreativeVariants(brief, initiative, brand, schema, opt
     // Attributed to the initiative, so the cost of producing a round of creative
     // lands in the same place as the revenue the round is being judged on.
     initiativeId: initiative?.id || null,
-    body:{ ...buildRequest({ model:modelFor("creative", modelOverride), maxTokens:3400, system:sys, effort:EFFORT.LOW }),
+    body:{ ...buildRequest({ model:modelFor("creative", modelOverride), maxTokens:3400, system:sys, effort:EFFORT.LOW, format:creativeVariantsFormat(fillable.map(d => d.key)) }),
       messages:[{ role:"user", content:user }] },
   });
-  const raw = firstText(data) || "[]";
-  const parsed = safeParseJSON(raw, true);
-  if (!Array.isArray(parsed)) throw new Error("Creative variants returned a malformed response.");
-  return parsed;
+  return unwrap(parseStructured(data, { label: "Creative variants" }));
 }

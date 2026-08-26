@@ -1,4 +1,4 @@
-import { postProxy, firstText } from "./_shared.js";
+import { postProxy, readProse } from "./_shared.js";
 import { EFFORT, buildRequest, modelFor } from "./models.js";
 
 // The opposite failure mode from the creative brief's, and it took the same fix.
@@ -50,5 +50,8 @@ export async function callSynthesizeLearnings(learnings, settings, modelOverride
     body:{ ...buildRequest({model:modelFor("analysis", modelOverride), maxTokens:1200, system:sys, effort:EFFORT.LOW}),
       messages:[{role:"user", content:"Learnings to synthesize:\n"+lines}] },
   });
-  return firstText(data);
+  const { text, truncated } = readProse(data);
+  return truncated
+    ? text + "\n\n---\n(This synthesis was cut off at the response length limit — the sections above it are complete, anything after is missing.)"
+    : text;
 }

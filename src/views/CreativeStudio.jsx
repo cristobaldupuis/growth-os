@@ -281,7 +281,10 @@ export function CreativeStudio({
       // No explicit model: the `image` feature group decides, so repointing image
       // generation in the admin console reaches this button. It defaults to
       // IMAGE_MODELS.FAST, which is what this call passed before routing existed.
-      const img = await callGenerateImage({ prompt, aspectRatio: aspect, referenceImages: references });
+      // `initiativeId` is what lands this generation's cost in the spend ledger
+      // against the experiment that caused it, so a round of creative can be
+      // costed alongside the revenue it is being judged on.
+      const img = await callGenerateImage({ prompt, aspectRatio: aspect, referenceImages: references, initiativeId: selId });
 
       const name = nameFor(variant, idx);
       const stored = await putAsset({ mimeType: img.mimeType, data: img.data });
@@ -380,7 +383,7 @@ export function CreativeStudio({
     };
 
     try {
-      const { jobId, provider } = await callGenerateVideo({ script, cta: variant.cta, aspectRatio: aspect, tier });
+      const { jobId, provider } = await callGenerateVideo({ script, cta: variant.cta, aspectRatio: aspect, tier, initiativeId: selId });
       if (!current()) return;
 
       for (;;) {

@@ -160,15 +160,35 @@ export const EFFORT = {
 /**
  * Build a Messages API request body.
  *
- * `cacheSystem` marks the system prompt as a cache breakpoint. Worth setting
- * wherever the same system prompt is sent repeatedly within a few minutes — the
- * debate loop sends one per agent turn, and Next Plays expands three candidates
- * in parallel off an identical prefix. Cache reads bill at roughly a tenth of
- * input rate, so on those two flows it is a real saving rather than a rounding
- * error. It is a no-op below the model's minimum cacheable prefix, so setting it
- * on a short prompt costs nothing but gains nothing either.
+ * ## `cacheSystem`, and why it was doing nothing
+ *
+ * `cacheSystem` marks the system prompt as a cache breakpoint. Caching is a
+ * PREFIX match, and a breakpoint below the model's minimum cacheable prefix is
+ * silently ignored — so this only ever bought anything when the system prompt was
+ * long enough on its own.
+ *
+ * It never was. Measured, this app's system prompts run 250-1,000 tokens against
+ * a 1,024-token minimum on Sonnet 5, so `cacheSystem: true` was a no-op at every
+ * call site that set it. Meanwhile the content that IS re-sent verbatim dozens of
+ * times inside one debate — the portfolio snapshot, the tool definitions, the
+ * growing transcript — lived in `messages`, where no breakpoint was ever placed.
+ * The app was paying full input rate on the same portfolio context 25-48 times a
+ * debate while believing it had caching switched on.
+ *
+ * Two things fix that, and both are here rather than at the call sites:
+ *
+ *   1. `cacheSystem` still marks the system prompt, and callers that can put
+ *      genuinely large stable content there (the debate now moves the portfolio
+ *      snapshot into it) clear the minimum and get a real hit.
+ *   2. `cacheMessages` marks the LAST content block of the last message as a
+ *      breakpoint, which caches everything before it — system, tools and the
+ *      conversation so far. This is what a multi-turn loop actually needs.
+ *
+ * Render order is tools -> system -> messages, so a breakpoint in `messages`
+ * covers the other two. Note the corollary: anything volatile (a timestamp, a
+ * per-request id) must come AFTER the last breakpoint or it invalidates the lot.
  */
-export function buildRequest({ model, system, messages, maxTokens, effort, tools, cacheSystem }) {
+export function buildRequest({ model, system, messages, maxTokens, effort, tools, cacheSystem, cacheMessages, format }) {
   const caps = capabilitiesFor(model);
   const body = {
     model,
@@ -179,7 +199,21 @@ export function buildRequest({ model, system, messages, maxTokens, effort, tools
   // transformations with the judgement already made, so no thinking is the
   // correct behaviour there rather than a compromise.
   if (caps.adaptiveThinking) body.thinking = { type: "adaptive" };
-  if (caps.effort) body.output_config = effort || EFFORT.LOW;
+  if (caps.effort) body.output_config = { ...(effort || EFFORT.LOW) };
+
+  // Structured outputs. `output_config.format` makes the provider itself
+  // guarantee the response parses against a schema, which removes the entire
+  // "the model returned prose where JSON was asked for" failure class — the one
+  // safeParseJSON's bracket-extraction fallback exists to paper over.
+  //
+  // Gated on the model, like every other parameter here: it is an Anthropic
+  // feature, and sending it to a provider whose adapter does not translate it
+  // would be a 400 at best and silently ignored at worst. The non-Anthropic
+  // adapters keep the prompt-and-parse path, which still works — this makes the
+  // common case reliable rather than making the rare case impossible.
+  if (caps.structuredOutputs && format) {
+    body.output_config = { ...(body.output_config || {}), format };
+  }
 
   if (system) {
     // Below the model's minimum cacheable prefix a breakpoint is silently
@@ -195,7 +229,43 @@ export function buildRequest({ model, system, messages, maxTokens, effort, tools
   // `messages` and `tools` are optional here so a call site can spread the result
   // and supply them itself, which keeps the per-call message construction
   // readable next to the prompt it belongs to.
-  if (messages) body.messages = messages;
+  if (messages) body.messages = cacheMessages ? withMessageBreakpoint(messages, caps) : messages;
   if (tools) body.tools = tools;
   return body;
+}
+
+/**
+ * Mark the last content block of the last message as a cache breakpoint.
+ *
+ * Everything before it — tools, system, and every earlier turn — becomes the
+ * cached prefix. This is the breakpoint that matters in a loop: each turn appends
+ * to the conversation, so each request's prefix is the previous request's whole
+ * body, and without a breakpoint here every one of them is billed in full.
+ *
+ * Returns the messages unchanged when the conversation is too short to clear the
+ * model's minimum cacheable prefix, so a breakpoint is only ever marked where it
+ * can actually take effect. The estimate is deliberately crude (~4 chars/token) —
+ * it only has to be right about the order of magnitude, same as the system-prompt
+ * estimate above.
+ */
+function withMessageBreakpoint(messages, caps) {
+  if (!Array.isArray(messages) || messages.length === 0) return messages;
+  if (!Number.isFinite(caps.cacheMinTokens)) return messages;
+
+  const roughTokens = JSON.stringify(messages).length / 4;
+  if (roughTokens < caps.cacheMinTokens) return messages;
+
+  const last = messages[messages.length - 1];
+  // A string `content` has no block to attach `cache_control` to, so it is
+  // promoted to the block form. Semantically identical to the API.
+  const blocks = typeof last.content === "string"
+    ? [{ type: "text", text: last.content }]
+    : [...(last.content || [])];
+  if (blocks.length === 0) return messages;
+
+  const tail = blocks[blocks.length - 1];
+  // A tool_result block takes cache_control the same way a text block does, so
+  // this is safe for the debate's tool loop as well as ordinary turns.
+  blocks[blocks.length - 1] = { ...tail, cache_control: { type: "ephemeral" } };
+  return [...messages.slice(0, -1), { ...last, content: blocks }];
 }

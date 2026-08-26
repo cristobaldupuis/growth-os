@@ -35,9 +35,16 @@ export const HOUR_MS = 60 * 60 * 1000;
 function originAllowed(req) {
   const origin = req.headers.origin;
   if (origin) return ALLOWED_ORIGINS.includes(origin);
-  // Some browsers omit Origin on same-origin POSTs; fall back to Referer prefix.
+  // Some browsers omit Origin on same-origin POSTs; fall back to Referer.
+  //
+  // Matched at a path boundary, not as a bare string prefix. A plain
+  // `referer.startsWith(o)` also accepts `https://our-app.example.com.evil.test/`
+  // — the allowed origin really is a prefix of that string — which hands the
+  // check to anyone who can register a hostname with ours on the front. Requiring
+  // the next character to be `/` (or the string to end there) means the authority
+  // component has to match exactly.
   const referer = req.headers.referer;
-  if (referer) return ALLOWED_ORIGINS.some((o) => referer.startsWith(o));
+  if (referer) return ALLOWED_ORIGINS.some((o) => referer === o || referer.startsWith(o + "/"));
   return false;
 }
 
@@ -117,10 +124,35 @@ export function guardEntry(req, res, { maxBodyBytes, methods = ["POST"] }) {
   if (!methods.includes(req.method)) { res.status(405).json({ error: "Method not allowed" }); return true; }
   if (!originAllowed(req)) { res.status(403).json({ error: "Forbidden" }); return true; }
 
+  // Content-Length is the cheap check and it is the one an honest client trips.
+  // It is not a guarantee: a chunked request omits the header entirely, so a
+  // caller who wants to evade it can. The real ceiling is the platform's own body
+  // limit plus each endpoint's validator (script length, prompt length, reference
+  // count) — this exists to reject an oversized body before it is parsed, not to
+  // be the only thing standing between the function and a large upload.
+  //
+  // Measured rather than trusted where it matters: once the body has been parsed,
+  // a missing or lying header is checked against what actually arrived.
   const contentLength = Number(req.headers["content-length"] || 0);
   if (contentLength > maxBodyBytes) { res.status(413).json({ error: "Request body too large." }); return true; }
 
+  if (!contentLength && req.body !== undefined && actualBodyBytes(req.body) > maxBodyBytes) {
+    res.status(413).json({ error: "Request body too large." });
+    return true;
+  }
+
   return false;
+}
+
+/** Byte length of a parsed body, for the case where no Content-Length arrived. */
+function actualBodyBytes(body) {
+  if (typeof body === "string") return Buffer.byteLength(body, "utf8");
+  if (Buffer.isBuffer(body)) return body.length;
+  try { return Buffer.byteLength(JSON.stringify(body) || "", "utf8"); }
+  // An unserialisable body (a cycle) cannot be measured. Treated as zero so this
+  // check abstains rather than rejecting a request the validators would judge on
+  // their own terms — this is a size guard, not a well-formedness one.
+  catch { return 0; }
 }
 
 /**

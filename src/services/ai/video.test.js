@@ -69,6 +69,63 @@ test("a tier name never reaches the wire in place of a provider id", () => {
   assert.equal(validateSubmitBody({ provider: "premium", script: "x" }), "Unsupported video provider.");
 });
 
+// -- Tier resolution when the caller does not pick one -------------------------
+//
+// The bug: `tier ? tier.provider : modelFor("video")` submitted against whatever
+// provider the `video` group was routed to, with no tier behind it. Route the
+// group to D-ID — which is reachable but deliberately not a tier — and every
+// caller without an operator at the picker submitted to a provider that cannot be
+// priced and that rejects any submit with no avatar image URL. It read as "the
+// video feature is broken".
+
+/** Capture the submit body for a call that passes no tier. */
+async function submitWithRouting(routedModel, args = {}) {
+  const { applyRouting } = await import("./models.js");
+  applyRouting({ video: routedModel });
+  let sent = null;
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (_url, opts) => {
+    sent = JSON.parse(opts.body);
+    return { ok: true, status: 200, json: async () => ({ jobId: "job_1", provider: sent.provider }) };
+  };
+  try {
+    const out = await callGenerateVideo({ script: buildVideoScript(VARIANT), ...args });
+    return { sent, out };
+  } finally {
+    globalThis.fetch = realFetch;
+    applyRouting(null);
+  }
+}
+
+test("no tier and a routed provider that HAS a tier resolves to that tier", async () => {
+  const { sent, out } = await submitWithRouting("fabric");
+  assert.equal(sent.provider, "fabric");
+  assert.equal(out.tier.id, VIDEO_TIERS.PREMIUM.id);
+});
+
+test("no tier and a routed provider with NO tier falls back to standard", async () => {
+  // D-ID is the case. Falling back to STANDARD is not arbitrary: HeyGen is the one
+  // provider here with a stock avatar library, so it is the only one that can
+  // succeed when no avatar image was supplied.
+  const { sent, out } = await submitWithRouting("did");
+  assert.equal(sent.provider, VIDEO_TIERS.STANDARD.provider);
+  assert.equal(out.tier.id, VIDEO_TIERS.STANDARD.id);
+});
+
+test("an explicit tier always beats the routing", async () => {
+  // Video is the group where the product deliberately puts the choice in front of
+  // the operator at the moment of spend, so the picker must win.
+  const { sent } = await submitWithRouting("did", { tier: VIDEO_TIERS.PREMIUM });
+  assert.equal(sent.provider, VIDEO_TIERS.PREMIUM.provider);
+});
+
+test("the resolved request always passes the real endpoint validator", async () => {
+  for (const routed of ["heygen", "fabric", "did"]) {
+    const { sent } = await submitWithRouting(routed);
+    assert.equal(validateSubmitBody(sent), null, `routing video to ${routed} produced a request the endpoint rejects`);
+  }
+});
+
 // -- Bounds --------------------------------------------------------------------
 
 test("an unknown provider is rejected", () => {

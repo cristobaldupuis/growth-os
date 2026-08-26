@@ -1,4 +1,4 @@
-import { AI_HEADERS, proxyError } from "./_shared.js";
+import { AI_HEADERS, proxyError, recordVideoUsage } from "./_shared.js";
 import { modelFor } from "./models.js";
 
 // -- Video generation (talking-head avatar) ------------------------------------
@@ -222,19 +222,59 @@ export function estimateVideoCostUsd(script, tier = VIDEO_TIERS.STANDARD) {
  * module's estimator — one formula, so the number the operator was shown before
  * clicking cannot drift from the number recorded against the submitted job.
  */
-export async function callGenerateVideo({ script, cta, avatarId, voiceId, aspectRatio = "9:16", tier }) {
-  // No tier from the caller: fall back to whatever the `video` group is routed to,
-  // then to STANDARD if that provider has no named tier (D-ID).
-  const provider = tier ? tier.provider : modelFor("video");
-  const resp = await fetch(VIDEO_PROXY_URL, {
-    method: "POST",
-    headers: AI_HEADERS(),
-    body: JSON.stringify({ action: "submit", provider, script, cta, avatarId, voiceId, aspectRatio }),
-  });
-  if (!resp.ok) throw new Error(await proxyError(resp));
+export async function callGenerateVideo({ script, cta, avatarId, voiceId, aspectRatio = "9:16", tier, initiativeId = null }) {
+  // Resolving the tier, not just the provider — this is what the docstring above
+  // has always promised and what the code did not do.
+  //
+  // It used to be `tier ? tier.provider : modelFor("video")`, which took the
+  // routed provider id and submitted against it directly. Route the `video` group
+  // to D-ID in the admin console and every caller that does not pass a tier (the
+  // test bench, and anything else with no operator at the picker) submitted to a
+  // provider that is reachable but is not a tier — so no cost estimate could be
+  // computed for it, and D-ID additionally rejects any submit with no avatar image
+  // URL. The failure read as "the video feature is broken" rather than "this
+  // provider needs a still to animate".
+  //
+  // Now: an explicit tier always wins, a routed provider resolves through its own
+  // tier when it has one, and anything else falls back to STANDARD — which is
+  // HeyGen, the one provider here with a stock avatar library and therefore the
+  // only one that can succeed with no avatar supplied.
+  const resolvedTier = tier || tierForProvider(modelFor("video")) || VIDEO_TIERS.STANDARD;
+  const provider = resolvedTier.provider;
+  const estimatedCostUsd = estimateVideoCostUsd(script, resolvedTier);
+
+  let resp;
+  try {
+    resp = await fetch(VIDEO_PROXY_URL, {
+      method: "POST",
+      headers: AI_HEADERS(),
+      body: JSON.stringify({ action: "submit", provider, script, cta, avatarId, voiceId, aspectRatio }),
+    });
+  } catch (err) {
+    recordVideoUsage({ provider, costUsd: null, initiativeId, ok: false, errorKind: "network" });
+    throw err;
+  }
+
+  if (!resp.ok) {
+    recordVideoUsage({ provider, costUsd: null, initiativeId, ok: false, errorKind: "http_" + resp.status });
+    throw new Error(await proxyError(resp));
+  }
   const data = await resp.json();
-  if (!data || !data.jobId) throw new Error("No job was returned.");
-  return data;
+  if (!data || !data.jobId) {
+    recordVideoUsage({ provider, costUsd: null, initiativeId, ok: false, errorKind: "provider" });
+    throw new Error("No job was returned.");
+  }
+
+  // Recorded at SUBMIT, because a submitted render is billed whether or not
+  // anyone waits for it. Preferring the proxy's own figure keeps one formula
+  // between what the operator was quoted and what the ledger carries; the local
+  // estimate is the fallback for a provider the endpoint could not price.
+  recordVideoUsage({
+    provider,
+    costUsd: typeof data.estimatedCostUsd === "number" ? data.estimatedCostUsd : estimatedCostUsd,
+    initiativeId,
+  });
+  return { ...data, tier: resolvedTier };
 }
 
 /**

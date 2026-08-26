@@ -59,7 +59,37 @@ export const MAX_TOKENS_CEILING = 4000;   // highest max_tokens any feature legi
 const MAX_BODY_BYTES     = 512 * 1024;
 const MAX_SYSTEM_CHARS   = 60000;
 
-const RATE_LIMIT_MAX = 60;
+// ## Why this is 250 and not 60
+//
+// 60/hour was set when the heaviest thing a visitor could do was generate a set
+// of Next Plays — five or six calls. It predates the Signal AI debate, which is
+// an order of magnitude heavier and is the only feature whose cost profile this
+// number actually has to accommodate.
+//
+// Counted honestly, one debate is: up to 8 agent turns, each of which may make up
+// to 4 tool round-trips before answering (so up to 5 proxy calls per turn), plus
+// a moderator call after every turn from the second, plus one synthesis. Worst
+// case that is 8x5 + 7 + 1 = 48 calls; a typical debate lands nearer 25.
+//
+// At 60/hour a single operator could not reliably run two debates in an hour, and
+// — worse — a debate that tripped the limit did so MID-RUN, at turn six or seven,
+// which under the old code discarded the whole thing. The ceiling was quietly
+// setting a cap on the product's flagship feature and failing destructively when
+// it bound.
+//
+// 250 leaves room for four or five debates alongside ordinary Next Plays and
+// Creative Studio use. The worst case it permits is bounded by the same controls
+// that always bounded it: MAX_TOKENS_CEILING caps output per call, so 250 calls
+// at 4,000 output tokens on the dearest model in the catalogue (Opus 5, $25/MTok
+// out) is roughly $25/hour/IP of output plus input — survivable for a
+// single-operator deployment, and the figure to revisit before this serves
+// clients directly.
+//
+// Note this is per IP, so a team behind one office NAT shares one budget. That is
+// the honest limit of IP-based limiting and the reason the "Proxy authentication"
+// forcing condition in DECISIONS.md exists — per-user limiting arrives with real
+// auth, not before it.
+const RATE_LIMIT_MAX = 250;
 
 // Returns an error string, or null when the body is acceptable.
 // Exported so the request-shape test can assert against the real rules rather

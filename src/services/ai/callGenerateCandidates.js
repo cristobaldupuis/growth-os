@@ -1,4 +1,5 @@
-import { postProxy, firstText, safeParseJSON } from "./_shared.js";
+import { postProxy, parseStructured } from "./_shared.js";
+import { CANDIDATES_FORMAT, unwrap } from "./schemas.js";
 import { EFFORT, buildRequest, modelFor } from "./models.js";
 
 // -- Next Plays (Recommendation Engine) ---------------------------------------
@@ -48,18 +49,15 @@ export async function callGenerateCandidates(portfolioCtx, learningsIndex, setti
     "  confidence (string — exactly one of: low, medium, high — your honest read of how strongly the evidence supports this candidate),",
     "  confidenceRationale (string, one sentence — what evidence sets the confidence at that level; if it rests on thin or backfilled data, say so),",
     "  sourceLearningIds (array of strings — item ids from the LEARNINGS block that informed this candidate; empty array if none).",
-    "No markdown, no preamble, just the JSON array.",
+    "No markdown, no preamble, just the JSON array. If a response schema is enforced, return the list under an 'items' key; otherwise return the bare array.",
   ].join("\n");
 
   const user = "PORTFOLIO CONTEXT:\n"+portfolioCtx+"\n\nLEARNINGS (id | outcome|retailer|category|durability|provenance|actual revenue | title — one-line learning):\n"+learningsBlock;
 
   const data = await postProxy({
     group:"analysis", fn:"callGenerateCandidates",
-    body:{ ...buildRequest({model:modelFor("analysis", modelOverride), maxTokens:2200, system:sys, effort:EFFORT.HIGH, cacheSystem:true}),
+    body:{ ...buildRequest({model:modelFor("analysis", modelOverride), maxTokens:2200, system:sys, effort:EFFORT.HIGH, cacheSystem:true, format:CANDIDATES_FORMAT}),
       messages:[{role:"user", content:user}] },
   });
-  const raw = firstText(data) || "[]";
-  const parsed = safeParseJSON(raw, true);
-  if (!Array.isArray(parsed)) throw new Error("Next Plays: candidate generation returned malformed response.");
-  return parsed;
+  return unwrap(parseStructured(data, { label: "Next Plays candidate generation" }));
 }

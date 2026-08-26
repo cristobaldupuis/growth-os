@@ -153,6 +153,9 @@ const adapters = {
     },
     async poll(jobId) {
       const apiKey = process.env.HEYGEN_API_KEY;
+      // See the note on the D-ID poll below: a poll outlives its submit, so the
+      // key is re-checked rather than assumed from the submit that started the job.
+      if (!apiKey) throw Object.assign(new Error("HeyGen is not configured on this deployment."), { status: 500 });
       const resp = await fetch(`https://api.heygen.com/v1/video_status.get?video_id=${encodeURIComponent(jobId)}`, {
         headers: { "X-Api-Key": apiKey },
       });
@@ -208,6 +211,11 @@ const adapters = {
     },
     async poll(jobId) {
       const apiKey = process.env.DID_API_KEY;
+      // Checked here as well as in submit. A poll can outlive the submit that
+      // created it — the browser drives the loop for minutes — so a key removed
+      // or a function cold-starting into a different env would otherwise send
+      // `Basic undefined` and surface D-ID's 401 as if the render had failed.
+      if (!apiKey) throw Object.assign(new Error("D-ID is not configured on this deployment."), { status: 500 });
       const resp = await fetch(`https://api.d-id.com/talks/${encodeURIComponent(jobId)}`, {
         headers: { Authorization: `Basic ${apiKey}` },
       });
@@ -282,6 +290,7 @@ const adapters = {
     },
     async poll(jobId) {
       const apiKey = process.env.VEED_API_KEY;
+      if (!apiKey) throw Object.assign(new Error("VEED Fabric is not configured on this deployment."), { status: 500 });
       const auth = { Authorization: `Key ${apiKey}` };
       const id = encodeURIComponent(jobId);
 

@@ -73,6 +73,7 @@ import { callSuggestICE } from "./services/ai/callSuggestICE.js";
 import { callQuickCapture } from "./services/ai/callQuickCapture.js";
 import { callGenerateCandidates } from "./services/ai/callGenerateCandidates.js";
 import { callExpandRecommendation } from "./services/ai/callExpandRecommendation.js";
+import { upsertRun, reconcileOnLoad } from "./services/debateRun.js";
 import { gG, gGh, gI, gTA, gSl, gCd, gOff } from "./components/styles.js";
 import { Bdg, SBdg, OBdg, CBdg, TBdg, BlockerBadge, ICEChip } from "./components/badges.jsx";
 import { Modal } from "./components/Modal.jsx";
@@ -728,7 +729,11 @@ export default function App() {
         // client deployment (DEMO_MODE false) still gets onboarding as before.
         else if (!DEMO_MODE) { setOnboarding(true); }
         if (DEMO_MODE && isFirstVisit && !(ts&&ts.value)) { setShowTour(true); }
-        if(dr&&dr.value) setDebates(JSON.parse(dr.value));
+        // reconcileOnLoad re-labels any run left mid-flight by a closed tab. A
+        // record that says "running" when nothing is running it would otherwise
+        // show a permanent spinner in History; what it actually is, is a saved
+        // transcript waiting to be synthesised. See services/debateRun.js.
+        if(dr&&dr.value) setDebates(reconcileOnLoad(JSON.parse(dr.value)));
         if(mr&&mr.value) setWeeklyMetrics(JSON.parse(mr.value));
         else { setWeeklyMetrics(SEED_WEEKLY_METRICS); store.set(KEY_METRICS,JSON.stringify(SEED_WEEKLY_METRICS)); }
         if(rr&&rr.value) setRecs(JSON.parse(rr.value));
@@ -817,6 +822,20 @@ export default function App() {
   const saveItems    = d => { const stamped = stampUpdatedAt(d, items); setItems(stamped); store.set(KEY_ITEMS,JSON.stringify(stamped)); };
   const saveSettings = s => { setSettings(s); store.set(KEY_SETTINGS,JSON.stringify(s)); };
   const saveDebates  = d => { setDebates(d); store.set(KEY_DEBATES,JSON.stringify(d)); };
+  // A debate now saves after every turn rather than once at the end, which makes
+  // the old `[debate, ...debates]` handler wrong in two ways: it closed over the
+  // `debates` array from the render that created it, so a run saving twenty times
+  // would each time prepend to the same stale list; and prepending a record that
+  // already exists leaves one debate scattered through History as a dozen partial
+  // copies. The functional update reads the live list, and upsertRun replaces by
+  // id. See services/debateRun.js.
+  const saveDebateRun = run => {
+    setDebates(prev => {
+      const next = upsertRun(prev, run);
+      store.set(KEY_DEBATES, JSON.stringify(next));
+      return next;
+    });
+  };
   const saveMetrics  = m => { setWeeklyMetrics(m); store.set(KEY_METRICS,JSON.stringify(m)); };
   const saveRecs     = r => { setRecs(r); store.set(KEY_RECS,JSON.stringify(r)); };
   const saveCreative = c => { setCreative(c); store.set(KEY_CREATIVE,JSON.stringify(c)); };
@@ -2348,7 +2367,7 @@ export default function App() {
           agents={agents}
           debates={debates}
           weeklyMetrics={weeklyMetrics}
-          onSaveDebate={debate => saveDebates([debate, ...debates].slice(0,20))}
+          onSaveDebate={saveDebateRun}
           onAddToBacklog={(initiative) => {
             const base = mkDefault(cats, activeBrand);
             const newItem = {

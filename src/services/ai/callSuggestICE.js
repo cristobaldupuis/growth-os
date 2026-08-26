@@ -1,4 +1,5 @@
-import { postProxy, firstText, safeParseJSON } from "./_shared.js";
+import { postProxy, parseStructured } from "./_shared.js";
+import { SUGGEST_ICE_FORMAT } from "./schemas.js";
 import { EFFORT, buildRequest, modelFor } from "./models.js";
 
 export async function callSuggestICE(form, settings, dataCtx, modelOverride) {
@@ -24,9 +25,12 @@ export async function callSuggestICE(form, settings, dataCtx, modelOverride) {
   ].join(". ");
   const data = await postProxy({
     group:"capture", fn:"callSuggestICE",
-    body:{ ...buildRequest({model:modelFor("capture", modelOverride), maxTokens:400, system:sys, effort:EFFORT.LOW}),
+    body:{ ...buildRequest({model:modelFor("capture", modelOverride), maxTokens:400, system:sys, effort:EFFORT.LOW, format:SUGGEST_ICE_FORMAT}),
       messages:[{role:"user", content:user}] },
   });
-  const raw   = firstText(data) || "{}";
-  return safeParseJSON(raw, false) || null;
+  // Returns null rather than throwing: ICE Assist is an optional aid beside a
+  // form the operator can fill in themselves, so a failure here should leave the
+  // form alone rather than interrupt it.
+  try { return parseStructured(data, { label: "ICE Assist" }); }
+  catch (err) { console.warn("ICE Assist:", err.message); return null; }
 }

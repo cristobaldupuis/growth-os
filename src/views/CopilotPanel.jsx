@@ -4,12 +4,15 @@ import { useDialog } from "../components/useDialog.js";
 import { iconFor } from "../components/iconRegistry.js";
 import { IconSparkle, IconClose, IconBrain, IconArchive, IconWrench, IconChart, IconCheck, IconEdit, IconChevronDown } from "../components/icons.jsx";
 import { CBdg, TBdg } from "../components/badges.jsx";
-import { getApiKey } from "../services/ai/_shared.js";
 import { callAgentTurn } from "../services/ai/callAgentTurn.js";
 import { callModerator } from "../services/ai/callModerator.js";
 import { callDebateSynthesis } from "../services/ai/callDebateSynthesis.js";
 import { buildPortfolioTools, buildPortfolioContext } from "../services/portfolio.js";
 import { iceScore, iceColor } from "../constants.js";
+import {
+  mkDebateRun, withTurn, withResults, withFailure, awaitingSynthesis,
+  isResumable, statusLabel, DONE,
+} from "../services/debateRun.js";
 
 // -- Agentic Debate Panel v2 ---------------------------------------------------
 const MAX_TURNS = 8;
@@ -183,6 +186,9 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
   const portfolioCtx = buildPortfolioContext(items, settings, brands, activeBrand, weeklyMetrics);
   const portfolioTools = buildPortfolioTools(items, settings, brands, activeBrand, weeklyMetrics);
 
+  /** Saved runs with a transcript but no synthesis — finishable in one call. */
+  const unfinished = useMemo(() => (debates || []).filter(isResumable), [debates]);
+
   // Build a smart default context from live portfolio data when panel opens
   const smartDefaultContext = useMemo(() => {
     const tools = buildPortfolioTools(items, settings, brands, activeBrand);
@@ -202,92 +208,146 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
     return "Portfolio snapshot: "+parts.join(" · ")+". What should we prioritise next?";
   }, [items, settings, brands, activeBrand]);
 
-  const runDebate = async () => {
-    const apiKey = getApiKey();
-    if (!apiKey) { setError("AI features are not configured. Contact the app administrator."); return; }
+  // -- Running a debate --------------------------------------------------------
+  //
+  // The loop below saves after every turn, which is the single most important
+  // property of this function and the reason it is shaped the way it is.
+  //
+  // Every `onSaveDebate(run)` here writes through to storage immediately, and the
+  // loop holds its own `run` rather than reading component state — so it keeps
+  // working after this panel unmounts. Close the panel mid-debate and the turns
+  // carry on arriving in History; navigate away and come back and the debate is
+  // where you left it, still going. Nothing about the run depends on anything
+  // still being on screen.
+  //
+  // The one thing it cannot survive is the tab closing, because the loop is the
+  // page. What that leaves behind is a run marked `running` with every completed
+  // turn intact, which `reconcileOnLoad` re-labels as awaiting synthesis so it can
+  // be finished from History instead of paid for again. See services/debateRun.js.
 
+  /** Run the turn loop, saving as it goes. Returns the run once turns are done. */
+  const runTurns = async (startRun) => {
+    let run = startRun;
+    const messageHistory = [];
+    let currentTurn = 0;
+    let nextAgent = agents[0];
+
+    while (currentTurn < MAX_TURNS) {
+      setTurnCount(currentTurn + 1);
+      setActiveAgent({ ...nextAgent, toolsUsed: [] });
+
+      const { text, toolsUsed } = await callAgentTurn(
+        nextAgent, portfolioCtx, context, messageHistory, portfolioTools, currentTurn === 0
+      );
+
+      setActiveAgent(null);
+      run = withTurn(run, {
+        agent: nextAgent.id, icon: nextAgent.icon, label: nextAgent.label,
+        color: nextAgent.color, text, toolsUsed,
+      });
+      // Written before anything else can fail. A turn that has been spoken and
+      // paid for is now on disk regardless of what the next call does.
+      onSaveDebate(run);
+      setTranscript(run.transcript);
+
+      // Shared history so agents read each other's words. The portfolio snapshot
+      // is deliberately NOT repeated here — it moved into the system prompt in
+      // callAgentTurn, where it is identical every turn and can be cached. Sending
+      // it again in the first user message would pay for it twice and break the
+      // cacheable prefix on every subsequent turn.
+      messageHistory.push({ role: "user", content: currentTurn === 0
+        ? "Open the debate. Use your tools then give your take."
+        : `${nextAgent.label}, your turn.` });
+      messageHistory.push({ role: "assistant", content: `${nextAgent.icon} ${nextAgent.label}: ${text}` });
+
+      currentTurn++;
+
+      if (currentTurn >= 2) {
+        const modDecision = await callModerator(
+          portfolioCtx, context, run.transcript, agents, currentTurn, MAX_TURNS
+        );
+        setModNote(modDecision.reason || "");
+
+        if (modDecision.decision === "synthesise" || currentTurn >= MAX_TURNS - 1) break;
+
+        const nextLabel = modDecision.next_agent;
+        const found = agents.find(a => a.label === nextLabel);
+        if (modDecision.decision === "followup" && found && modDecision.followup_prompt) {
+          messageHistory.push({ role: "user", content: `Moderator to ${nextLabel}: ${modDecision.followup_prompt}` });
+          messageHistory.push({ role: "assistant", content: "Understood." });
+        }
+        nextAgent = found || agents[currentTurn % agents.length];
+      } else {
+        nextAgent = agents[currentTurn % agents.length];
+      }
+    }
+    return run;
+  };
+
+  /**
+   * Synthesise a run's transcript into initiatives.
+   *
+   * Separate from the turn loop because it is separately retryable: it reads the
+   * transcript and nothing else, so a synthesis that fails — or never ran, because
+   * the tab closed — can be redone without re-debating. That is what the Finish
+   * button in History calls.
+   */
+  const synthesise = async (run) => {
+    setPhase("synthesising");
+    setActiveAgent(null);
+    const ideas = await callDebateSynthesis(portfolioCtx, run.context || context, run.transcript, cats, settings, portfolioTools);
+    const done = withResults(run, ideas);
+    onSaveDebate(done);
+    setResults(ideas);
+    setPhase("done");
+    return done;
+  };
+
+  const runDebate = async () => {
     setRunning(true); setError(""); setTranscript([]); setResults(null);
     setAdded({}); setPhase("debating"); setTurnCount(0); setModNote("");
 
-    const fullTranscript = [];
-    // Build shared message history so agents read each other's words
-    const messageHistory = [];
-    let currentTurn = 0;
-
-    // Pick opening agent
-    let nextAgent = agents[0];
+    // The record exists before the first call, so there is never a window in which
+    // work has happened and nothing addresses it.
+    let run = mkDebateRun({ context, agents, maxTurns: MAX_TURNS });
+    onSaveDebate(run);
 
     try {
-      while (currentTurn < MAX_TURNS) {
-        setTurnCount(currentTurn + 1);
-        setActiveAgent({ ...nextAgent, toolsUsed:[] });
-
-        // Agent speaks (with tool use)
-        const { text, toolsUsed } = await callAgentTurn(
-          nextAgent, portfolioCtx, context, messageHistory, portfolioTools, currentTurn === 0
-        );
-
-        setActiveAgent(null);
-        const turn = { agent:nextAgent.id, icon:nextAgent.icon, label:nextAgent.label,
-          color:nextAgent.color, text, toolsUsed };
-        fullTranscript.push(turn);
-        setTranscript([...fullTranscript]);
-
-        // Add to shared history as alternating user/assistant
-        messageHistory.push({ role:"user", content: currentTurn===0
-          ? `Portfolio:\n${portfolioCtx}\n\nContext:\n${context||"None."}\n\nOpen the debate. Use your tools then give your take.`
-          : `${nextAgent.label}, your turn.` });
-        messageHistory.push({ role:"assistant", content: `${nextAgent.icon} ${nextAgent.label}: ${text}` });
-
-        currentTurn++;
-
-        // Moderator decides what's next
-        if (currentTurn >= 2) {
-          const modDecision = await callModerator(
-            portfolioCtx, context, fullTranscript, agents, currentTurn, MAX_TURNS
-          );
-          setModNote(modDecision.reason || "");
-
-          if (modDecision.decision === "synthesise" || currentTurn >= MAX_TURNS - 1) {
-            break;
-          }
-
-          const nextLabel = modDecision.next_agent;
-          const found = agents.find(a => a.label === nextLabel);
-          if (modDecision.decision === "followup" && found && modDecision.followup_prompt) {
-            // Inject the moderator's specific question as the next prompt
-            messageHistory.push({ role:"user", content: `Moderator to ${nextLabel}: ${modDecision.followup_prompt}` });
-            messageHistory.push({ role:"assistant", content: `Understood.` });
-          }
-          nextAgent = found || agents[currentTurn % agents.length];
-        } else {
-          nextAgent = agents[currentTurn % agents.length];
-        }
-      }
-
-      // Synthesis
-      setPhase("synthesising"); setActiveAgent(null);
-      const _transcriptStr = fullTranscript.map(m=>`${m.icon} ${m.label}:\n${m.text}`).join("\n\n---\n\n");
-      const ideas = await callDebateSynthesis(portfolioCtx, context, fullTranscript, cats, settings, portfolioTools);
-
-      // Save debate to history
-      const saved = {
-        id: "dbt-"+Date.now(),
-        date: new Date().toISOString(),
-        context,
-        transcript: fullTranscript,
-        results: ideas,
-        turnCount: currentTurn,
-      };
-      onSaveDebate(saved);
-
-      setResults(ideas);
-      setPhase("done");
-    } catch(e) {
-      setError("Debate failed: " + (e.message||"check your API key in Settings."));
+      run = await runTurns(run);
+      run = awaitingSynthesis(run);
+      onSaveDebate(run);
+      await synthesise(run);
+    } catch (e) {
+      onSaveDebate(withFailure(run, e));
+      // The advice is now true, which it was not before: the transcript really is
+      // in History, and a run with turns in it can be finished from there.
+      const kept = (run.transcript || []).length;
+      setError(
+        "Debate stopped: " + (e.message || "the AI request failed.") +
+        (kept >= 2
+          ? ` The ${kept} turns already completed are saved in History — you can finish this debate from there without re-running it.`
+          : "")
+      );
       setPhase("input");
     }
-    setRunning(false); setActiveAgent(null);
+    setRunning(false);
+    setActiveAgent(null);
+  };
+
+  /** Finish a debate that stopped before synthesis. Called from the History tab. */
+  const resumeDebate = async (run) => {
+    setTab("debate");
+    setRunning(true); setError(""); setAdded({}); setResults(null);
+    setTranscript(run.transcript || []);
+    setTurnCount(run.turnCount || (run.transcript || []).length);
+    try {
+      await synthesise(run);
+    } catch (e) {
+      onSaveDebate(withFailure(run, e));
+      setError("Synthesis failed: " + (e.message || "the AI request failed.") + " The transcript is still saved.");
+      setPhase("input");
+    }
+    setRunning(false);
   };
 
   const handleAdd = (idea, idx) => {
@@ -300,11 +360,14 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
     setAdded({}); setTurnCount(0); setModNote(""); setError("");
   };
 
-  // Escape closes the panel — except while a debate is in flight, where an
-  // accidental keypress would throw away a running multi-turn call. `useDialog`
-  // takes no `onClose` in that state, which makes Escape inert rather than
-  // silently destructive. Focus is trapped and returned either way.
-  const panelRef = useDialog({ onClose: running ? undefined : onClose });
+  // Escape closes the panel, including mid-debate.
+  //
+  // It used to be deliberately inert while a debate was running, because closing
+  // threw away a multi-turn call nothing had saved. That is no longer true: the
+  // run loop holds its own record and writes after every turn, so closing the
+  // panel costs nothing — the debate carries on and the turns keep landing in
+  // History. Making Escape work again is the visible half of that fix.
+  const panelRef = useDialog({ onClose });
 
   return (
     <div style={{position:"fixed",inset:0,zIndex:400,display:"flex"}}>
@@ -385,6 +448,30 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
                 Agents also have 8 live tools to query deeper: win rates, blocked items, coverage gaps, failure patterns, revenue gaps…
               </div>
             </details>
+
+            {/* An unfinished debate is worth surfacing here rather than only in
+                History, because this is the screen where someone is about to
+                spend twenty-five calls on a new one. Finishing the old one costs
+                a single synthesis call against a transcript already paid for. */}
+            {phase==="input"&&unfinished.length>0&&(
+              <div style={{padding:"10px 14px",background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:6,
+                display:"flex",flexDirection:"column",gap:8}}>
+                <div style={{fontSize:12,fontWeight:600,color:t.gold,fontFamily:t.serif}}>
+                  {unfinished.length===1?"A debate was never finished":`${unfinished.length} debates were never finished`}
+                </div>
+                <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,lineHeight:1.6}}>
+                  The transcript{unfinished.length===1?" is":"s are"} saved. Synthesising costs one call — running a fresh debate costs the lot.
+                </div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  {unfinished.slice(0,3).map(d=>(
+                    <button key={d.id} onClick={()=>resumeDebate(d)} disabled={running}
+                      style={{...gGh(t),fontSize:11,padding:"5px 10px"}}>
+                      Finish {new Date(d.date).toLocaleDateString(undefined,{month:"short",day:"numeric"})} · {d.transcript?.length||0} turns
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Launch */}
             {phase==="input"&&(
@@ -520,11 +607,30 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
                         {new Date(d.date).toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric",hour:"2-digit",minute:"2-digit"})}
                       </div>
                       <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginTop:2}}>
-                        {d.turnCount} turns · {d.results?.length||0} initiatives generated
+                        {d.turnCount||d.transcript?.length||0} turns · {statusLabel(d)}
                         {d.context&&<span> · "{d.context.slice(0,50)}{d.context.length>50?"…":""}"</span>}
                       </div>
+                      {/* Why it stopped, kept on the record rather than only in a
+                          toast that is long gone by the time anyone looks here. */}
+                      {d.error&&d.status!==DONE&&(
+                        <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginTop:3,fontStyle:"italic"}}>
+                          {d.error}
+                        </div>
+                      )}
                     </div>
-                    <div style={{display:"flex",gap:4}}>
+                    <div style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap",justifyContent:"flex-end"}}>
+                      {/* An unfinished debate is the case this whole record type
+                          exists for: the turns are bought and saved, and only the
+                          synthesis is missing. Finishing it costs one call instead
+                          of the twenty-five that produced the transcript. */}
+                      {isResumable(d)&&!running&&(
+                        <button onClick={()=>resumeDebate(d)}
+                          title="Synthesise this transcript into initiatives"
+                          style={{fontSize:10,padding:"3px 9px",borderRadius:3,fontFamily:t.serif,fontWeight:600,cursor:"pointer",
+                            background:t.goldBg,border:"1px solid "+t.goldBorder,color:t.gold}}>
+                          Finish this debate
+                        </button>
+                      )}
                       {(d.results||[]).map((idea,idx)=>(
                         <button key={idx} onClick={()=>{onAddToBacklog(idea);}}
                           title={"Add: "+idea.title}

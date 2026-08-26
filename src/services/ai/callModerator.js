@@ -1,4 +1,5 @@
-import { postProxy, safeParseJSON } from "./_shared.js";
+import { postProxy, parseStructured } from "./_shared.js";
+import { MODERATOR_FORMAT } from "./schemas.js";
 import { EFFORT, buildRequest, modelFor } from "./models.js";
 
 // Moderator — decides what happens next after each agent turn
@@ -31,12 +32,18 @@ Priority: favour "followup" over "continue" whenever there is an unresolved disa
   const data = await postProxy({
     group:"debate", fn:"callModerator",
     body: {
-      ...buildRequest({model:modelFor("debate", modelOverride), maxTokens:300, system:sys, effort:EFFORT.LOW}),
+      ...buildRequest({model:modelFor("debate", modelOverride), maxTokens:300, system:sys, effort:EFFORT.LOW, format:MODERATOR_FORMAT}),
       messages:[{role:"user", content:`Portfolio:\n${portfolioCtx}\n\nContext:\n${userContext||"none"}\n\nTranscript so far:\n${transcriptStr}\n\nDecide what happens next.`}],
     },
   });
-  const raw = data.content?.[0]?.text?.trim()||"{}";
-  const parsed = safeParseJSON(raw, false);
-  // Moderator failure is non-fatal — fall back to "continue with next agent"
-  return parsed || { decision: "continue", next_agent: null, followup_prompt: null, reason: "Moderator response unparseable; continuing." };
+  // Moderator failure is non-fatal — fall back to "continue with next agent".
+  // Worth keeping that way: the moderator only decides who speaks next, so a
+  // debate that loses it degrades to plain rotation rather than stopping. It is
+  // the one JSON call site where throwing would be worse than guessing.
+  try {
+    return parseStructured(data, { label: "The moderator" });
+  } catch (err) {
+    console.warn("Moderator:", err.message);
+    return { decision: "continue", next_agent: null, followup_prompt: null, reason: "Moderator response unparseable; continuing." };
+  }
 }

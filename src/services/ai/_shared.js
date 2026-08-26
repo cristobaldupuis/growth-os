@@ -1,5 +1,6 @@
 import { modelById } from "./registry.js";
 import { mkUsageRow, priceTextCall } from "../usage.js";
+import { imageCostUsd } from "../assets.js";
 
 export const PROXY_URL = "/api/proxy";
 
@@ -21,11 +22,18 @@ export const AI_HEADERS = () => ({
   "Content-Type": "application/json",
 });
 
-// Kept so call sites that gate UI on "is AI configured" keep compiling. Whether
-// the key is present is now purely a server-side fact, so from the browser's
-// point of view AI is always available to attempt; failures surface as errors
-// from the proxy instead.
-export const getApiKey = () => "proxied";
+// `getApiKey()` used to live here, returning the literal string "proxied" so that
+// call sites gating UI on "is AI configured" kept compiling after the credential
+// moved server-side. Its last caller was CopilotPanel, which opened every debate
+// with `if (!apiKey) { setError("AI features are not configured...") }` — a branch
+// that could not be taken, guarding against a condition the browser cannot
+// observe, and whose message named a cause ("check your API key in Settings")
+// that has not been true since the secret was removed from the bundle.
+//
+// Whether a provider key is present is purely a server-side fact. From the
+// browser's side AI is always available to *attempt*, and a missing key surfaces
+// as a real error from the proxy with the actual variable named. Removed rather
+// than left as a no-op, because a dead configuration check reads like a live one.
 
 /**
  * Read a proxy error response into a message worth showing a user.
@@ -70,6 +78,54 @@ function record(row) {
   try { usageSink(row); } catch (err) { console.error("usage recording failed:", err); }
 }
 
+// -- Image and video spend ---------------------------------------------------
+//
+// Text calls record themselves inside postProxy below, because every one of them
+// goes through it. Image and video do not: they are their own endpoints with
+// their own request shapes (see api/image.js and api/video.js), so they record
+// here explicitly.
+//
+// This was the ledger's largest blind spot and it was blind in the worst
+// direction. A video render is priced per second and runs one to nine dollars a
+// clip — two orders of magnitude above a text call — so a console that showed
+// every text call and no renders was not slightly incomplete, it was reporting
+// the cheap half of the bill as the whole of it. The asset record already
+// carried the cost; nothing joined it to the spend rollup.
+//
+// Priced from the same tables the asset record uses (IMAGE_COST_USD here,
+// estimateVideoCostUsd at the video call site) so a row and its asset cannot
+// disagree about what one generation cost.
+
+/** Record one image generation. `costUsd` null for an unpriced model, never 0. */
+export function recordImageUsage({ model, initiativeId = null, ok = true, errorKind = null }) {
+  const entry = modelById(model);
+  record(mkUsageRow({
+    group: "image", fn: "callGenerateImage", model,
+    provider: entry?.provider || "gemini", modality: "image",
+    initiativeId, ok, errorKind,
+    costUsd: ok ? imageCostUsd(model) : null,
+    rate: entry?.price || null,
+  }));
+}
+
+/**
+ * Record one video render at SUBMIT, not at completion.
+ *
+ * A submitted render is billed whether or not anyone waits for it, so recording
+ * on success would understate spend by exactly the renders that went wrong —
+ * the same reasoning the asset record already follows in CreativeStudio.
+ */
+export function recordVideoUsage({ provider, costUsd, initiativeId = null, ok = true, errorKind = null }) {
+  const entry = modelById(provider);
+  record(mkUsageRow({
+    group: "video", fn: "callGenerateVideo", model: provider,
+    provider, modality: "video",
+    initiativeId, ok, errorKind,
+    costUsd: ok ? (typeof costUsd === "number" ? costUsd : null) : null,
+    rate: entry?.price || null,
+  }));
+}
+
 /**
  * POST to the text proxy, record what it cost, and return the parsed body.
  *
@@ -111,10 +167,17 @@ export async function postProxy({ group, fn, initiativeId = null, body }) {
 
   const inputTokens  = data.usage?.input_tokens  ?? null;
   const outputTokens = data.usage?.output_tokens ?? null;
+  // Cache tokens are billed at different rates from ordinary input — a read at
+  // roughly a tenth, a write at roughly 1.25x — so a ledger that folded them
+  // into `inputTokens` would misprice every cached call in both directions.
+  // Recorded separately and priced separately; absent on providers that do not
+  // report them, which is every non-Anthropic adapter today.
+  const cacheReadTokens  = data.usage?.cache_read_input_tokens     ?? null;
+  const cacheWriteTokens = data.usage?.cache_creation_input_tokens ?? null;
   record(mkUsageRow({
     ...base,
-    inputTokens, outputTokens,
-    costUsd: priceTextCall(entry?.price, inputTokens, outputTokens),
+    inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens,
+    costUsd: priceTextCall(entry?.price, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens),
     // The rate is frozen onto the row alongside the figure it produced, so a
     // later change to the catalogue does not silently restate history.
     rate: entry?.price || null,
@@ -122,12 +185,71 @@ export async function postProxy({ group, fn, initiativeId = null, body }) {
   return data;
 }
 
-/** The first text block of a proxy response, or "" — the shape every structured
- *  call site unwraps by hand today. */
-export const firstText = (data) =>
-  data.content && data.content[0] && typeof data.content[0].text === "string"
-    ? data.content[0].text.trim()
-    : "";
+/**
+ * The first TEXT block of a proxy response, or "".
+ *
+ * Deliberately searches for the block rather than reading `content[0]`, which is
+ * what every call site used to do. That worked right up until adaptive thinking
+ * was switched on: a response with thinking enabled can lead with a `thinking`
+ * block, and `content[0].text` is then `undefined`. The failure was silent in the
+ * worst way — the `|| "{}"` fallbacks downstream turned an empty string into an
+ * empty object, so Quick Capture returned a blank initiative and Ask Library
+ * returned a blank answer, both reported as success.
+ *
+ * callAgentTurn always filtered by type and was the one call site never affected.
+ * Now they all do.
+ */
+export const firstText = (data) => {
+  const block = (data?.content || []).find(b => b?.type === "text" && typeof b.text === "string");
+  return block ? block.text.trim() : "";
+};
+
+/**
+ * Read a prose response, flagging truncation rather than hiding it.
+ *
+ * Returns `{text, truncated}`. Unlike the JSON path below this does not throw on
+ * a cut-off response — half a library answer is still worth reading, it just must
+ * not be presented as a whole one. The caller decides how to say so.
+ */
+export function readProse(data) {
+  return { text: firstText(data), truncated: data?.stop_reason === "max_tokens" };
+}
+
+/**
+ * Read a structured (JSON) response into a value, or throw something the operator
+ * can act on.
+ *
+ * Consolidates the `firstText(data) || "{}"` + `safeParseJSON` + `if (!parsed)
+ * throw` preamble that was copy-pasted into eight call sites, and adds the check
+ * none of them made: `stop_reason`.
+ *
+ * Truncation is the failure worth naming separately. A response cut off at
+ * `max_tokens` is not malformed — it is a complete, correct, *incomplete* answer
+ * that money was already spent on, and it is fixed by raising the ceiling rather
+ * than by clicking the button again. Reporting it as "malformed, try again" sends
+ * the operator into a retry loop that costs the same again and fails the same way.
+ *
+ * A refusal is the other one: `stop_reason: "refusal"` means the model declined
+ * on safety grounds, which no amount of retrying changes.
+ */
+export function parseStructured(data, { expectArray = false, label = "The AI response" } = {}) {
+  if (data?.stop_reason === "max_tokens") {
+    throw new Error(
+      `${label} was cut off before it finished — it hit the response length limit. ` +
+      `Shorten the input, or raise this call's max_tokens.`
+    );
+  }
+  if (data?.stop_reason === "refusal") {
+    throw new Error(`${label} was declined by the model on safety grounds. Try rewording the input.`);
+  }
+  const raw = firstText(data);
+  if (!raw) throw new Error(`${label} came back empty.`);
+
+  const parsed = safeParseJSON(raw, expectArray);
+  if (parsed === null) throw new Error(`${label} was not valid JSON.`);
+  if (expectArray && !Array.isArray(parsed)) throw new Error(`${label} was expected to be a list.`);
+  return parsed;
+}
 
 // Defensive JSON extraction for LLM responses. Tries direct parse, then largest
 // balanced bracket substring, then (for arrays) wraps a single object. Returns

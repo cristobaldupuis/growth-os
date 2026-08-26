@@ -1,4 +1,4 @@
-import { AI_HEADERS, proxyError } from "./_shared.js";
+import { AI_HEADERS, proxyError, recordImageUsage } from "./_shared.js";
 import { modelFor } from "./models.js";
 
 export const IMAGE_PROXY_URL = "/api/image";
@@ -101,23 +101,43 @@ export function buildImagePrompt(brief, variant, brand, opts = {}) {
  * api/image.js and DECISIONS.md. This function deliberately returns the raw
  * payload rather than writing it anywhere.
  */
-export async function callGenerateImage({ prompt, aspectRatio = "4:5", model, referenceImages }) {
+export async function callGenerateImage({ prompt, aspectRatio = "4:5", model, referenceImages, initiativeId = null }) {
   // `model` left undefined resolves through the `image` group's routing rather
   // than defaulting to a literal here, so repointing image generation in the admin
   // console reaches this call without an edit. An explicit `model` still wins —
   // CreativeStudio passes IMAGE_MODELS.FAST for the concepting path, and the test
   // bench passes whichever model it is comparing.
   const resolved = modelFor("image", model);
-  const resp = await fetch(IMAGE_PROXY_URL, {
-    method: "POST",
-    headers: AI_HEADERS(),
-    body: JSON.stringify({
-      model: resolved, prompt, aspectRatio, count: 1,
-      ...(referenceImages?.length ? { referenceImages } : {}),
-    }),
-  });
-  if (!resp.ok) throw new Error(await proxyError(resp));
+
+  // Every exit below records a ledger row, including the failures. A failed
+  // generation costs nothing, but a console showing attempts-with-no-cost is how
+  // an operator notices the image proxy is misconfigured — the same reasoning
+  // postProxy already applies to text calls.
+  let resp;
+  try {
+    resp = await fetch(IMAGE_PROXY_URL, {
+      method: "POST",
+      headers: AI_HEADERS(),
+      body: JSON.stringify({
+        model: resolved, prompt, aspectRatio, count: 1,
+        ...(referenceImages?.length ? { referenceImages } : {}),
+      }),
+    });
+  } catch (err) {
+    recordImageUsage({ model: resolved, initiativeId, ok: false, errorKind: "network" });
+    throw err;
+  }
+
+  if (!resp.ok) {
+    recordImageUsage({ model: resolved, initiativeId, ok: false, errorKind: "http_" + resp.status });
+    throw new Error(await proxyError(resp));
+  }
   const data = await resp.json();
-  if (!data || !data.data) throw new Error("No image was returned.");
+  if (!data || !data.data) {
+    recordImageUsage({ model: resolved, initiativeId, ok: false, errorKind: "provider" });
+    throw new Error("No image was returned.");
+  }
+
+  recordImageUsage({ model: resolved, initiativeId });
   return { ...data, model: resolved };
 }

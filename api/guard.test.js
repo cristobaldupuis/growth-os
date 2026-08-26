@@ -67,6 +67,49 @@ test("a referer prefix stands in when the browser omits Origin", () => {
   assert.equal(guardEntry(mkReq({ referer: "https://second.example/app" }), res, ENTRY), false);
 });
 
+test("a referer on a hostname that merely STARTS WITH an allowed origin does not pass", () => {
+  // The bug: `referer.startsWith(allowedOrigin)` is true for
+  // `https://allowed.example.evil.test/`, because the allowed origin genuinely is
+  // a prefix of that string. Anyone able to register a hostname with ours on the
+  // front would have satisfied the check. Matching at a path boundary means the
+  // authority component has to match exactly.
+  const res = mkRes();
+  assert.equal(guardEntry(mkReq({ referer: "https://allowed.example.evil.test/app" }), res, ENTRY), true);
+  assert.equal(res.statusCode, 403);
+});
+
+test("a referer that is exactly the allowed origin, with no path, passes", () => {
+  assert.equal(guardEntry(mkReq({ referer: "https://allowed.example" }), mkRes(), ENTRY), false);
+});
+
+test("a body with no Content-Length is measured rather than trusted", () => {
+  // A chunked request omits the header entirely, so the cheap check abstains and
+  // the parsed body is what gets weighed.
+  const req = mkReq({ origin: "https://allowed.example", length: 0 });
+  req.headers["content-length"] = "";
+  req.body = { blob: "x".repeat(2000) };
+  const res = mkRes();
+  assert.equal(guardEntry(req, res, ENTRY), true);
+  assert.equal(res.statusCode, 413);
+});
+
+test("a small body with no Content-Length still passes", () => {
+  const req = mkReq({ origin: "https://allowed.example", length: 0 });
+  req.headers["content-length"] = "";
+  req.body = { ok: true };
+  assert.equal(guardEntry(req, mkRes(), ENTRY), false);
+});
+
+test("an unserialisable body abstains rather than being refused on size", () => {
+  // This is a size guard, not a well-formedness one — the endpoint validators
+  // judge the body on their own terms.
+  const req = mkReq({ origin: "https://allowed.example", length: 0 });
+  req.headers["content-length"] = "";
+  const cyclic = { a: 1 }; cyclic.self = cyclic;
+  req.body = cyclic;
+  assert.equal(guardEntry(req, mkRes(), ENTRY), false);
+});
+
 test("a referer that merely contains an allowed origin does not pass", () => {
   const res = mkRes();
   assert.equal(guardEntry(mkReq({ referer: "https://evil.example/?q=https://allowed.example" }), res, ENTRY), true);

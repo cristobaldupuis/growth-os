@@ -14,7 +14,34 @@ export async function callAgentTurn(agent, portfolioCtx, userContext, messageHis
   };
   const agentMandate = mandates[agent.label] || "Your mandate: represent your strategic lens forcefully and push back on anything that conflicts with it.";
 
-  const sys = `You are the ${agent.label} (${agent.icon}) in a C-Suite strategy debate about what this company should be doing that it currently isn't.
+  // The portfolio snapshot lives in the SYSTEM prompt, not in the first user
+  // message where it used to sit. Three things follow from that, and the third is
+  // the reason:
+  //
+  //   1. It is identical on every turn of a debate, so it belongs with the other
+  //      stable content rather than inside the conversation that grows.
+  //   2. Every agent sees the same snapshot regardless of which turn they take,
+  //      which is what the debate assumes — previously only the opening agent got
+  //      it directly and the rest inherited it through the transcript.
+  //   3. It is large. Caching is a prefix match with a 1,024-token minimum on
+  //      Sonnet 5, and the persona text alone is ~250 tokens — under the floor, so
+  //      `cacheSystem: true` here was silently buying nothing. The snapshot
+  //      carries the prefix over the line, and a debate re-sends this system
+  //      prompt 25-48 times. That is the difference between paying full input rate
+  //      on the portfolio once per debate and once per call.
+  //
+  // Ordering matters: the per-agent persona goes AFTER the shared snapshot, so the
+  // portion of the prefix that is identical across agents comes first and stays
+  // cacheable across all of them.
+  const sys = `PORTFOLIO SNAPSHOT — the live state of the business under discussion:
+${portfolioCtx}
+
+SITUATION CONTEXT:
+${userContext||"None provided."}
+
+---
+
+You are the ${agent.label} (${agent.icon}) in a C-Suite strategy debate about what this company should be doing that it currently isn't.
 
 Your strategic lens: ${agent.lens}.
 Your known blindspot (acknowledge it if relevant): ${agent.blindspot}.
@@ -26,7 +53,7 @@ When you disagree with another executive, state exactly what they got wrong and 
 Your goal: surface HIGH-IMPACT net-new opportunities the team is NOT currently running, and defend your position under challenge.
 Max 180 words per turn. No filler. Speak like a real boardroom executive who has a point of view and will fight for it.`;
 
-  const firstUserMsg = `Portfolio snapshot:\n${portfolioCtx}\n\nSituation context:\n${userContext||"None provided."}\n\nOpen the debate. Use your tools to look deeper at anything in the portfolio that concerns you, then make your case for what's being overlooked.`;
+  const firstUserMsg = `Open the debate. Use your tools to look deeper at anything in the portfolio that concerns you, then make your case for what's being overlooked.`;
 
   const messages = isFirstTurn
     ? [{ role:"user", content: firstUserMsg }]
@@ -37,7 +64,18 @@ Max 180 words per turn. No filler. Speak like a real boardroom executive who has
   let iterations = 0;
   const MAX_TOOL_ITERS = 4;
 
-  while (iterations < MAX_TOOL_ITERS) {
+  while (iterations <= MAX_TOOL_ITERS) {
+    // The last permitted iteration withholds the tools entirely, which forces a
+    // text answer because there is nothing left to call.
+    //
+    // This replaces a `throw new Error("Agent exceeded tool iteration limit")`,
+    // and the throw was worse than it looks: it did not fail one turn, it failed
+    // the whole debate from CopilotPanel's single try/catch, discarding every
+    // turn before it. An agent that wants a fifth lookup has enough to speak
+    // with — it has already made four — so the right answer is to ask it to
+    // speak, not to abandon the session.
+    const lastChance = iterations === MAX_TOOL_ITERS;
+
     // Inside the tool loop, so each iteration records its own row — a turn that
     // fetches twice before answering cost twice, and a console that showed one
     // row per turn would understate the debate by whatever the tool round-trips
@@ -45,8 +83,18 @@ Max 180 words per turn. No filler. Speak like a real boardroom executive who has
     const data = await postProxy({
       group:"debate", fn:"callAgentTurn",
       body: {
-        ...buildRequest({model:modelFor("debate", modelOverride), maxTokens:600, system:sys, effort:EFFORT.LOW, cacheSystem:true}),
-        tools: portfolioTools.definitions,
+        ...buildRequest({
+          model:modelFor("debate", modelOverride), maxTokens:600,
+          system:sys, effort:EFFORT.LOW,
+          // Both breakpoints earn their place here and they cache different
+          // things. The system one covers the portfolio snapshot, identical
+          // across every turn of the debate. The message one covers the
+          // conversation so far, which grows by one turn each time and is
+          // otherwise re-billed in full on every call — including the tool
+          // round-trips inside this very loop.
+          cacheSystem:true, cacheMessages:true,
+        }),
+        ...(lastChance ? {} : { tools: portfolioTools.definitions }),
         messages: currentMessages,
       },
     });
@@ -72,7 +120,9 @@ Max 180 words per turn. No filler. Speak like a real boardroom executive who has
       ];
       iterations++;
     } else {
-      // Final text response
+      // Final text response. Already filters by block type, which is why this
+      // call site was the only one adaptive thinking never broke — see the note
+      // on firstText in _shared.js.
       const text = content.filter(b=>b.type==="text").map(b=>b.text).join("").trim();
       // Return text + the tool calls made (for transparency in UI)
       const _toolsUsed = content.filter(b=>b.type==="tool_use").map(b=>b.name);
@@ -84,5 +134,9 @@ Max 180 words per turn. No filler. Speak like a real boardroom executive who has
       return { text, toolsUsed:[...new Set(allToolsUsed)] };
     }
   }
-  throw new Error("Agent exceeded tool iteration limit");
+  // Unreachable: the final iteration sends no tools, so it cannot come back with
+  // stop_reason "tool_use" and must fall into the branch above. Kept as a guard
+  // rather than removed, because "unreachable" is a claim about the provider's
+  // behaviour and this is what it costs to be wrong about one.
+  return { text: "", toolsUsed: [] };
 }

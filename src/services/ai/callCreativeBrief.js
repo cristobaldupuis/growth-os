@@ -1,4 +1,5 @@
-import { postProxy, firstText, safeParseJSON } from "./_shared.js";
+import { postProxy, parseStructured } from "./_shared.js";
+import { CREATIVE_BRIEF_FORMAT } from "./schemas.js";
 import { EFFORT, buildRequest, modelFor } from "./models.js";
 import { selectLearnings, formatEvidenceBlock } from "../creativeEvidence.js";
 
@@ -122,12 +123,10 @@ export async function callCreativeBrief(initiative, brand, learningsIndex, setti
   const data = await postProxy({
     group:"creative", fn:"callCreativeBrief",
     initiativeId: initiative?.id || null,
-    body:{ ...buildRequest({ model:modelFor("creative", modelOverride), maxTokens:2600, system:sys, effort:EFFORT.HIGH, cacheSystem:true }),
+    body:{ ...buildRequest({ model:modelFor("creative", modelOverride), maxTokens:2600, system:sys, effort:EFFORT.HIGH, cacheSystem:true, format:CREATIVE_BRIEF_FORMAT }),
       messages:[{ role:"user", content:user }] },
   });
-  const raw = firstText(data) || "{}";
-  const parsed = safeParseJSON(raw, false);
-  if (!parsed || typeof parsed !== "object") throw new Error("Creative brief returned a malformed response.");
+  const parsed = parseStructured(data, { label: "The creative brief" });
 
   // The selection is returned with the brief rather than recomputed later,
   // because it describes what THIS brief was allowed to see. Recomputing it

@@ -146,6 +146,20 @@ export function SpendPanel() {
               <div style={{ fontSize: 22, fontWeight: 700, color: c.bad, fontVariantNumeric: "tabular-nums" }}>{num(roll.failed)}</div>
             </div>
           )}
+          {/* The share of billable prompt input served from cache.
+              Worth a tile of its own because it is the only way to tell from
+              inside the product whether prompt caching is doing anything — the
+              question that went unanswered long enough for six call sites to set
+              `cacheSystem: true` and buy nothing. Null (no reporting provider)
+              renders nothing rather than a misleading 0%. */}
+          {roll.cacheHitRate !== null && (
+            <div>
+              <div style={label}>Prompt cache</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: roll.cacheHitRate > 0 ? c.ok : c.textMuted, fontVariantNumeric: "tabular-nums" }}>
+                {Math.round(roll.cacheHitRate * 100)}%
+              </div>
+            </div>
+          )}
         </div>
 
         {roll.unpriced > 0 && (

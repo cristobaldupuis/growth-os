@@ -12,10 +12,23 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 process.env.ALLOWED_ORIGINS = "https://allowed.example,https://second.example";
-delete process.env.UPSTASH_REDIS_REST_URL;
-delete process.env.UPSTASH_REDIS_REST_TOKEN;
+// No Supabase — these tests exercise the memory-fallback path by default, and
+// switch the durable path on per test via `configureStore()` below.
+delete process.env.SUPABASE_URL;
+delete process.env.SUPABASE_SECRET_KEY;
+delete process.env.SUPABASE_SERVICE_KEY;
 
 const { guardEntry, guardRateLimit, clientIp, HOUR_MS } = await import("./_guard.js");
+
+/** Point the limiter at a (stubbed) durable store for one test. */
+function configureStore() {
+  process.env.SUPABASE_URL = "https://project.supabase.invalid";
+  process.env.SUPABASE_SECRET_KEY = "sb_secret_test";
+}
+function unconfigureStore() {
+  delete process.env.SUPABASE_URL;
+  delete process.env.SUPABASE_SECRET_KEY;
+}
 
 /** Minimal req/res doubles recording what the handler did. */
 function mkReq({ method = "POST", origin, referer, length = 10, ip = "1.2.3.4" } = {}) {
@@ -182,8 +195,7 @@ test("separate keys are separate budgets — image spend cannot exhaust text", a
 // -- guardRateLimit (durable path, and the failure mode that matters) ---------
 
 test("an unavailable rate-limit backend fails CLOSED with a 503", async () => {
-  process.env.UPSTASH_REDIS_REST_URL = "https://redis.invalid";
-  process.env.UPSTASH_REDIS_REST_TOKEN = "t";
+  configureStore();
   const realFetch = globalThis.fetch;
   globalThis.fetch = async () => { throw new Error("network down"); };
   try {
@@ -192,49 +204,43 @@ test("an unavailable rate-limit backend fails CLOSED with a 503", async () => {
     assert.equal(res.statusCode, 503, "must not fall through to the upstream provider");
   } finally {
     globalThis.fetch = realFetch;
-    delete process.env.UPSTASH_REDIS_REST_URL;
-    delete process.env.UPSTASH_REDIS_REST_TOKEN;
+    unconfigureStore();
   }
 });
 
 test("a non-OK response from the backend also fails closed", async () => {
-  process.env.UPSTASH_REDIS_REST_URL = "https://redis.invalid";
-  process.env.UPSTASH_REDIS_REST_TOKEN = "t";
+  configureStore();
   const realFetch = globalThis.fetch;
-  globalThis.fetch = async () => ({ ok: false, status: 500, json: async () => ({}) });
+  globalThis.fetch = async () => ({ ok: false, status: 500, text: async () => "boom", json: async () => ({}) });
   try {
     const res = mkRes();
     assert.equal(await guardRateLimit(mkReq(), res, RL("test:closed2", 100)), true);
     assert.equal(res.statusCode, 503);
   } finally {
     globalThis.fetch = realFetch;
-    delete process.env.UPSTASH_REDIS_REST_URL;
-    delete process.env.UPSTASH_REDIS_REST_TOKEN;
+    unconfigureStore();
   }
 });
 
 test("an unreadable count fails closed rather than being coerced to zero", async () => {
-  process.env.UPSTASH_REDIS_REST_URL = "https://redis.invalid";
-  process.env.UPSTASH_REDIS_REST_TOKEN = "t";
+  configureStore();
   const realFetch = globalThis.fetch;
-  globalThis.fetch = async () => ({ ok: true, json: async () => [{ result: "not-a-number" }] });
+  globalThis.fetch = async () => ({ ok: true, json: async () => "not-a-number" });
   try {
     const res = mkRes();
     assert.equal(await guardRateLimit(mkReq(), res, RL("test:closed3", 100)), true);
     assert.equal(res.statusCode, 503);
   } finally {
     globalThis.fetch = realFetch;
-    delete process.env.UPSTASH_REDIS_REST_URL;
-    delete process.env.UPSTASH_REDIS_REST_TOKEN;
+    unconfigureStore();
   }
 });
 
 test("the durable count decides the limit when the backend is healthy", async () => {
-  process.env.UPSTASH_REDIS_REST_URL = "https://redis.invalid";
-  process.env.UPSTASH_REDIS_REST_TOKEN = "t";
+  configureStore();
   const realFetch = globalThis.fetch;
   let count = 0;
-  globalThis.fetch = async () => ({ ok: true, json: async () => [{ result: ++count }] });
+  globalThis.fetch = async () => ({ ok: true, json: async () => ++count });
   try {
     assert.equal(await guardRateLimit(mkReq(), mkRes(), RL("test:durable", 2)), false, "1st");
     assert.equal(await guardRateLimit(mkReq(), mkRes(), RL("test:durable", 2)), false, "2nd");
@@ -243,8 +249,7 @@ test("the durable count decides the limit when the backend is healthy", async ()
     assert.equal(res.statusCode, 429);
   } finally {
     globalThis.fetch = realFetch;
-    delete process.env.UPSTASH_REDIS_REST_URL;
-    delete process.env.UPSTASH_REDIS_REST_TOKEN;
+    unconfigureStore();
   }
 });
 

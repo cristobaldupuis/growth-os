@@ -541,16 +541,40 @@ OPENROUTER_API_KEY=your_key
 # canonical deployment, so a missing value fails closed rather than opening up.
 ALLOWED_ORIGINS=https://your-deployment.vercel.app
 
-# Optional but strongly recommended in production. Without these the proxy
-# falls back to an in-memory rate limiter, which on serverless is per-instance
-# and resets on cold start — i.e. effectively no limit at all.
+# Supabase — the deployment's one server-side datastore. Strongly recommended
+# in production, because three separate things degrade without it:
 #
-# These also store the admin console's model routing. Without them the console
-# still runs and the bench still works, but a routing change cannot be saved —
-# the console says so rather than appearing to save.
-UPSTASH_REDIS_REST_URL=...
-UPSTASH_REDIS_REST_TOKEN=...
+#   1. RATE LIMITING. The proxy falls back to an in-memory limiter, which on
+#      serverless is per warm Lambda instance and resets on cold start — i.e.
+#      effectively no limit at all in front of a metered API.
+#   2. MODEL ROUTING. The admin console still runs and the bench still works,
+#      but a routing change cannot be saved. The console says so rather than
+#      appearing to save.
+#   3. GENERATED ASSET BYTES. Frames are held for the session only and are gone
+#      on reload; the provenance record survives either way.
+#
+# Must be the SECRET (server-side) key, not the publishable/anon one — the
+# runtime tables have RLS enabled with no policies, so the anon key can read
+# and write neither, which is the point.
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SECRET_KEY=sb_secret_...
+# Optional. Defaults to "creative-assets".
+SUPABASE_ASSET_BUCKET=creative-assets
 ```
+
+**Apply `supabase/migrations/0003_runtime.sql` after setting those.** It creates
+the two tables the routing store and the rate limiter need, plus the atomic
+counter function the limiter calls. Paste it into the Supabase SQL editor and
+run it; it is idempotent. The other two migrations in that directory
+(`0001_init.sql`, `0002_assets.sql`) are proposals for a later phase and should
+**not** be run yet — see their headers.
+
+Earlier revisions of this project used Upstash Redis for the first two of those
+jobs. It is no longer read: neither is Redis-shaped (routing is one row read per
+page load, and Postgres increments a counter atomically in one statement), and a
+second managed datastore is one more account, one more bill, and one more thing
+to be silently unconfigured. `UPSTASH_*` variables, if any are still set, are
+ignored and can be deleted.
 
 Note there is deliberately no client-side secret. Anything prefixed `VITE_` is
 compiled into the browser bundle and is not a secret.

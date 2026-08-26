@@ -1041,3 +1041,23 @@ them. Until that exists, this defect is cheaper than its fix.
 **Why the distinction is worth stating.** There are two numbers and only one belongs in a model catalogue. Platform cost is an input to "what did this feature spend"; a client rate includes margin and is a commercial decision. Keeping the second out of this table means the two can move independently — a rate card is a multiplier over this, applied elsewhere, not an edit to it.
 
 **Forcing condition:** the first deployment that bills a client per unit of AI work rather than per engagement. That needs a rate card object with its own owner; it does not need this table to start lying.
+
+---
+
+## One datastore, and it is Supabase
+
+**Decision:** durable rate limiting and model routing move from Upstash Redis to Supabase Postgres, alongside the asset bytes already stored there. `api/_supabase.js` is the single accessor; `supabase/migrations/0003_runtime.sql` creates the two tables and the atomic counter function, and unlike 0001/0002 it is meant to be run. `UPSTASH_*` is no longer read.
+
+**What was actually wrong.** Upstash was chosen when it was the only durable store the deployment had, and it was then never configured — while Supabase was, for blob storage, in Phase 5. So two controls described themselves as durable while running degraded in production: the rate limiter fell back to a module-level `Map`, which on Vercel is per warm Lambda instance and resets on cold start (so "250 per hour" was really "250 per instance per warm period" — not a limit at all in front of a metered API), and every routing save failed. The console did say so, to its credit; the limiter said nothing but a `console.warn` nobody reads.
+
+**Why one store rather than two.** Neither job is Redis-shaped. Routing is a single row read once per page load. Rate limiting is a counter, and Postgres increments one atomically in a single `INSERT … ON CONFLICT DO UPDATE … RETURNING` statement. A second managed datastore for a single-operator app is one more account, one more bill, and — as this episode demonstrates — one more thing that can be quietly unset while the code claims otherwise.
+
+**Why the increment must be one statement.** The obvious two-step, SELECT then UPDATE, loses increments under exactly the concurrency a rate limiter exists to bound: two instances reading 249 simultaneously both write 250. The window is encoded into the key (`gos:rl:<ip>:<window index>`), carried over from the Redis implementation, so a new window is a new row and there is no reset logic to race on.
+
+**Why RLS with no policies.** Both runtime tables deny every request carrying the anon/publishable key; only the server-side secret key, which never leaves `api/`, can touch them. A rate-limit counter a browser can reset is not a rate limit, and a routing row a visitor can write lets them repoint every AI feature in the app at the dearest model in the catalogue.
+
+**Why raw REST rather than `@supabase/supabase-js`.** This project's runtime dependencies are react and react-dom. Every other provider is reached with `fetch` and a header — `api/_geminiAuth.js` mints RS256 JWTs with `node:crypto` rather than pull in google-auth-library. PostgREST is an HTTP API; a client library would add a dependency to serverless functions to save a fetch call.
+
+**Not BigQuery.** BigQuery is an analytics warehouse — columnar, batch-oriented, priced per byte scanned. Every read this app makes is a point lookup on a handful of rows on a request path someone is waiting on, which is the workload BigQuery is worst at. It becomes the right tool if cross-client performance-fact analysis ever arrives at a volume Postgres struggles with; that is a different question from where application state lives, and Postgres would still hold the state.
+
+**Forcing condition:** the ledger and portfolio state moving server-side (Phase 5.3 / the 0001 and 0002 migrations). At that point this is no longer "two tables for runtime controls" and the schema deserves a proper review rather than being extended a table at a time.

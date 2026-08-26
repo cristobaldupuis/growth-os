@@ -1,17 +1,15 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { gG, gGh, gI, gTA, gSc } from "../components/styles.js";
 import { useDialog } from "../components/useDialog.js";
 import { iconFor } from "../components/iconRegistry.js";
 import { IconSparkle, IconClose, IconBrain, IconArchive, IconWrench, IconChart, IconCheck, IconEdit, IconChevronDown } from "../components/icons.jsx";
 import { CBdg, TBdg } from "../components/badges.jsx";
-import { callAgentTurn } from "../services/ai/callAgentTurn.js";
-import { callModerator } from "../services/ai/callModerator.js";
-import { callDebateSynthesis } from "../services/ai/callDebateSynthesis.js";
 import { buildPortfolioTools, buildPortfolioContext } from "../services/portfolio.js";
+import { startDebate, watchDebate, sweepDebates, buildSnapshot } from "../services/ai/debateClient.js";
+import { unwrap } from "../services/ai/schemas.js";
 import { iceScore, iceColor } from "../constants.js";
 import {
-  mkDebateRun, withTurn, withResults, withFailure, awaitingSynthesis,
-  isResumable, statusLabel, DONE,
+  mkDebateRun, fromServerRun, isResumable, statusLabel, DONE, RUNNING,
 } from "../services/debateRun.js";
 
 // -- Agentic Debate Panel v2 ---------------------------------------------------
@@ -173,18 +171,36 @@ function IdeaCard({idea, idx, results, setResults, added, onAdd, t, dk, cats, ag
 export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand, agents, debates, weeklyMetrics, onSaveDebate, onAddToBacklog, onClose}) {
   const [tab,        setTab]       = useState("debate"); // debate | history
   const [context,    setContext]   = useState("");
-  const [running,    setRunning]   = useState(false);
+
+  // A debate this browser started that is still running on the server. Resolved
+  // once, at mount, from the local History mirror — which is why reopening the app
+  // mid-debate lands straight back in it rather than on an empty input form.
+  // Lazy-initialised so it is computed exactly once and the state below can be
+  // derived from it, rather than corrected by an effect after first paint.
+  const [initialLive] = useState(
+    () => (debates || []).find(d => d.serverRunId && d.status === RUNNING) || null,
+  );
+  const [running,    setRunning]   = useState(!!initialLive);
   const [transcript, setTranscript]= useState([]);
   const [activeAgent,setActiveAgent]=useState(null); // {label, icon, color, toolsUsed}
   const [modNote,    setModNote]   = useState("");   // moderator's reasoning shown briefly
   const [results,    setResults]   = useState(null);
   const [error,      setError]     = useState("");
   const [added,      setAdded]     = useState({});
-  const [phase,      setPhase]     = useState("input");
+  const [phase,      setPhase]     = useState(initialLive ? "debating" : "input");
   const [turnCount,  setTurnCount] = useState(0);
 
-  const portfolioCtx = buildPortfolioContext(items, settings, brands, activeBrand, weeklyMetrics);
-  const portfolioTools = buildPortfolioTools(items, settings, brands, activeBrand, weeklyMetrics);
+  // Detach handle for the poller. A ref rather than state because changing it
+  // must never re-render, and because the cleanup path has to see the latest one.
+  const detach = useRef(null);
+
+  // Display only. The server derives its own copy from the snapshot it is sent —
+  // this is here so the operator can read what the agents will read BEFORE
+  // spending anything, which is the whole purpose of the disclosure below.
+  const portfolioCtx = useMemo(
+    () => buildPortfolioContext(items, settings, brands, activeBrand, weeklyMetrics),
+    [items, settings, brands, activeBrand, weeklyMetrics],
+  );
 
   /** Saved runs with a transcript but no synthesis — finishable in one call. */
   const unfinished = useMemo(() => (debates || []).filter(isResumable), [debates]);
@@ -210,144 +226,112 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
 
   // -- Running a debate --------------------------------------------------------
   //
-  // The loop below saves after every turn, which is the single most important
-  // property of this function and the reason it is shaped the way it is.
+  // This panel does not run the debate. It starts one and watches it.
   //
-  // Every `onSaveDebate(run)` here writes through to storage immediately, and the
-  // loop holds its own `run` rather than reading component state — so it keeps
-  // working after this panel unmounts. Close the panel mid-debate and the turns
-  // carry on arriving in History; navigate away and come back and the debate is
-  // where you left it, still going. Nothing about the run depends on anything
-  // still being on screen.
+  // The loop used to live here, and that made the page load-bearing: closing the
+  // tab killed the run mid-argument. Saving every turn made that non-destructive,
+  // but "you can pick it up afterwards" is a weaker promise than "it kept going",
+  // and the work is the same either way — so the loop moved to api/debate.js,
+  // where it advances one model call per serverless invocation and chains itself
+  // along. See supabase/migrations/0004_debate_runs.sql for the state model.
   //
-  // The one thing it cannot survive is the tab closing, because the loop is the
-  // page. What that leaves behind is a run marked `running` with every completed
-  // turn intact, which `reconcileOnLoad` re-labels as awaiting synthesis so it can
-  // be finished from History instead of paid for again. See services/debateRun.js.
+  // What is left here is a `start` call carrying a portfolio snapshot, and a
+  // poller. Neither is load-bearing: `watchDebate` returns a detach function, and
+  // detaching is explicitly not cancelling. Close the panel, close the tab, close
+  // the laptop — the run is on the server and keeps going, and reopening the app
+  // reattaches to it.
 
-  /** Run the turn loop, saving as it goes. Returns the run once turns are done. */
-  const runTurns = async (startRun) => {
-    let run = startRun;
-    const messageHistory = [];
-    let currentTurn = 0;
-    let nextAgent = agents[0];
+  /** Mirror a server run into the panel's own state and the local History store. */
+  const applyRun = (run) => {
+    if (!run) return;
+    setTranscript(run.transcript || []);
+    setTurnCount(run.turn_index || (run.transcript || []).length);
+    setModNote(run.note || "");
+    // The agent mid-turn, so the "querying portfolio data" indicator still has
+    // something to name while a step is in flight.
+    setActiveAgent(run.status === "running" && run.phase === "agent_turn" ? run.current_agent : null);
 
-    while (currentTurn < MAX_TURNS) {
-      setTurnCount(currentTurn + 1);
-      setActiveAgent({ ...nextAgent, toolsUsed: [] });
+    // History is still the browser's, so a finished run is mirrored into it and
+    // stays readable offline. `fromServerRun` keeps the shape debateRun.js already
+    // defines, so nothing downstream needs to know where a run executed.
+    onSaveDebate(fromServerRun(run));
 
-      const { text, toolsUsed } = await callAgentTurn(
-        nextAgent, portfolioCtx, context, messageHistory, portfolioTools, currentTurn === 0
+    if (run.status === "done") {
+      setResults(unwrap(run.results));
+      setPhase("done");
+      setRunning(false);
+    } else if (run.status === "failed") {
+      const kept = (run.transcript || []).length;
+      setError(
+        "Debate stopped: " + (run.error || "the AI request failed.") +
+        (kept >= 2 ? ` The ${kept} turns already completed are saved in History.` : "")
       );
-
-      setActiveAgent(null);
-      run = withTurn(run, {
-        agent: nextAgent.id, icon: nextAgent.icon, label: nextAgent.label,
-        color: nextAgent.color, text, toolsUsed,
-      });
-      // Written before anything else can fail. A turn that has been spoken and
-      // paid for is now on disk regardless of what the next call does.
-      onSaveDebate(run);
-      setTranscript(run.transcript);
-
-      // Shared history so agents read each other's words. The portfolio snapshot
-      // is deliberately NOT repeated here — it moved into the system prompt in
-      // callAgentTurn, where it is identical every turn and can be cached. Sending
-      // it again in the first user message would pay for it twice and break the
-      // cacheable prefix on every subsequent turn.
-      messageHistory.push({ role: "user", content: currentTurn === 0
-        ? "Open the debate. Use your tools then give your take."
-        : `${nextAgent.label}, your turn.` });
-      messageHistory.push({ role: "assistant", content: `${nextAgent.icon} ${nextAgent.label}: ${text}` });
-
-      currentTurn++;
-
-      if (currentTurn >= 2) {
-        const modDecision = await callModerator(
-          portfolioCtx, context, run.transcript, agents, currentTurn, MAX_TURNS
-        );
-        setModNote(modDecision.reason || "");
-
-        if (modDecision.decision === "synthesise" || currentTurn >= MAX_TURNS - 1) break;
-
-        const nextLabel = modDecision.next_agent;
-        const found = agents.find(a => a.label === nextLabel);
-        if (modDecision.decision === "followup" && found && modDecision.followup_prompt) {
-          messageHistory.push({ role: "user", content: `Moderator to ${nextLabel}: ${modDecision.followup_prompt}` });
-          messageHistory.push({ role: "assistant", content: "Understood." });
-        }
-        nextAgent = found || agents[currentTurn % agents.length];
-      } else {
-        nextAgent = agents[currentTurn % agents.length];
-      }
+      setPhase("input");
+      setRunning(false);
+    } else {
+      setPhase(run.phase === "synthesis" ? "synthesising" : "debating");
     }
-    return run;
   };
 
-  /**
-   * Synthesise a run's transcript into initiatives.
-   *
-   * Separate from the turn loop because it is separately retryable: it reads the
-   * transcript and nothing else, so a synthesis that fails — or never ran, because
-   * the tab closed — can be redone without re-debating. That is what the Finish
-   * button in History calls.
-   */
-  const synthesise = async (run) => {
-    setPhase("synthesising");
-    setActiveAgent(null);
-    const ideas = await callDebateSynthesis(portfolioCtx, run.context || context, run.transcript, cats, settings, portfolioTools);
-    const done = withResults(run, ideas);
-    onSaveDebate(done);
-    setResults(ideas);
-    setPhase("done");
-    return done;
+  /** Attach to a run and mirror it until it finishes. Detaching never cancels. */
+  const watch = (runId) => {
+    if (detach.current) detach.current();
+    detach.current = watchDebate(runId, applyRun);
   };
+
+  // Reattach to a run that is still going, on mount. This is what makes reopening
+  // the app after closing it look like nothing happened — the debate has been
+  // running the whole time and the panel simply finds it again.
+  useEffect(() => {
+    if (initialLive) watch(initialLive.serverRunId);
+    // Detach on unmount. The run continues; only the watcher stops.
+    return () => { if (detach.current) detach.current(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const runDebate = async () => {
     setRunning(true); setError(""); setTranscript([]); setResults(null);
     setAdded({}); setPhase("debating"); setTurnCount(0); setModNote("");
-
-    // The record exists before the first call, so there is never a window in which
-    // work has happened and nothing addresses it.
-    let run = mkDebateRun({ context, agents, maxTurns: MAX_TURNS });
-    onSaveDebate(run);
-
     try {
-      run = await runTurns(run);
-      run = awaitingSynthesis(run);
-      onSaveDebate(run);
-      await synthesise(run);
+      const runId = await startDebate({
+        snapshot: buildSnapshot({ items, settings, brands, activeBrand, weeklyMetrics, cats }),
+        context, agents, maxTurns: MAX_TURNS,
+      });
+      // Recorded locally the moment the server accepts it, so a run is findable
+      // from this browser even if the very next thing that happens is a reload.
+      onSaveDebate(mkDebateRun({ context, agents, maxTurns: MAX_TURNS, serverRunId: runId }));
+      watch(runId);
     } catch (e) {
-      onSaveDebate(withFailure(run, e));
-      // The advice is now true, which it was not before: the transcript really is
-      // in History, and a run with turns in it can be finished from there.
-      const kept = (run.transcript || []).length;
-      setError(
-        "Debate stopped: " + (e.message || "the AI request failed.") +
-        (kept >= 2
-          ? ` The ${kept} turns already completed are saved in History — you can finish this debate from there without re-running it.`
-          : "")
-      );
+      setError("Could not start the debate: " + (e.message || "the service is unavailable."));
       setPhase("input");
+      setRunning(false);
     }
-    setRunning(false);
-    setActiveAgent(null);
   };
 
-  /** Finish a debate that stopped before synthesis. Called from the History tab. */
+  /**
+   * Reattach to a run recorded in History.
+   *
+   * For a run still going this is just "show me that again". For one that failed
+   * before synthesis there is nothing to reattach to, so it starts a fresh run
+   * seeded with the same context — the transcript is kept either way, and the
+   * server is where a retry belongs now.
+   */
   const resumeDebate = async (run) => {
     setTab("debate");
-    setRunning(true); setError(""); setAdded({}); setResults(null);
+    setError(""); setAdded({}); setResults(null);
     setTranscript(run.transcript || []);
     setTurnCount(run.turnCount || (run.transcript || []).length);
-    try {
-      await synthesise(run);
-    } catch (e) {
-      onSaveDebate(withFailure(run, e));
-      setError("Synthesis failed: " + (e.message || "the AI request failed.") + " The transcript is still saved.");
+    if (run.serverRunId) {
+      setRunning(true);
+      setPhase("debating");
+      watch(run.serverRunId);
+      // A stalled chain is repaired by asking; the lease means a run somebody
+      // already holds is skipped rather than double-stepped.
+      sweepDebates();
+    } else {
+      setError("This debate ran in an older version that executed in the browser, so there is nothing on the server to resume. Its transcript is kept below.");
       setPhase("input");
     }
-    setRunning(false);
   };
 
   const handleAdd = (idea, idx) => {

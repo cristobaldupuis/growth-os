@@ -1061,3 +1061,25 @@ them. Until that exists, this defect is cheaper than its fix.
 **Not BigQuery.** BigQuery is an analytics warehouse — columnar, batch-oriented, priced per byte scanned. Every read this app makes is a point lookup on a handful of rows on a request path someone is waiting on, which is the workload BigQuery is worst at. It becomes the right tool if cross-client performance-fact analysis ever arrives at a volume Postgres struggles with; that is a different question from where application state lives, and Postgres would still hold the state.
 
 **Forcing condition:** the ledger and portfolio state moving server-side (Phase 5.3 / the 0001 and 0002 migrations). At that point this is no longer "two tables for runtime controls" and the schema deserves a proper review rather than being extended a table at a time.
+
+---
+
+## Debates run on the server, one model call per invocation
+
+**Decision:** the Signal AI debate loop moves out of the browser into `api/debate.js`, a state machine over a `debate_runs` row. Each serverless invocation advances a run by exactly one model call and dispatches the next; the browser starts a run with a portfolio snapshot and then only polls. `supabase/migrations/0004_debate_runs.sql` is live and must be applied.
+
+**Why "resume it later" was not good enough.** The previous change made a lost debate non-destructive: every turn was saved, and an unfinished one could be synthesised in a single call rather than re-run for twenty-five. That was a real fix and it is still the fallback. But the honest limit stood — the loop *was* the page, so closing the tab stopped the work — and "you can pick it up afterwards" is a materially weaker promise than "it kept going" for the feature that takes several minutes and is the product's centrepiece.
+
+**Why one model call per step, not one agent turn.** A turn can make up to five calls (four tool round-trips then the answer). Five sequential reasoning-model calls is exactly the shape of thing that passes a local test and times out in production; a single call is bounded by the model's own latency, which is the only bound actually available. It also means the unit of work is the same size regardless of how tool-happy an agent is.
+
+**Why the snapshot is frozen at start.** The server cannot reach the operator's browser storage, so the portfolio has to travel with the request. Freezing it is not a workaround: a debate whose later turns read newer state than its earlier ones produces a transcript that cannot be interpreted against any single portfolio. Same discipline as the frozen launch prediction.
+
+**Why there is a lease.** Two things can legitimately try to advance one run — the chain, and the sweeper that restarts broken chains. Without a lease both do, and the debate forks: two invocations appending to one history, each unaware of the other, both billed. `claim_debate_step` takes it in one statement for the same reason `increment_rate_limit` is one statement.
+
+**Why the sweeper is client-driven rather than a cron.** Chains break, and a run whose chain broke sits at `running` with nothing driving it — the exact failure this endpoint exists to remove, reintroduced by its own mechanism. The client asks for a sweep while it polls, so an operator who reopens the app repairs their own stalled runs by looking at them. That also avoids a scheduled-function dependency, which the Hobby plan does not offer at a useful interval.
+
+**Why `step` is authorised on an HMAC rather than an origin.** A server-to-server call has no Origin header to check. The token is an HMAC of the run id keyed by the Supabase secret — a value that already must be present for any of this to work and that never leaves the server. Without it, `step` would be an unauthenticated way to make this deployment spend a reasoning model's budget in a loop.
+
+**Why the worker does not call `/api/proxy`.** It was the obvious first idea and it is wrong three times over: the proxy authorises on Origin, so it would need a bypass — a second way past the control that bounds spend; it rate-limits per IP, and every step would arrive from the same egress address, so one debate would throttle itself against a ceiling meant for a person; and it doubles the hops for nothing. `api/_textCall.js` shares the provider *translation* and skips only the transport guard, which exists because the browser is untrusted. The model allowlist and token ceiling still apply — it calls the proxy's own `validateBody` on every body.
+
+**Forcing condition:** a second feature needing background execution (Next Plays across a large portfolio is the likely one). At that point the run table, the lease and the chain are a general job runner wearing a debate's name, and should be extracted before a third caller copies them.

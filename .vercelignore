@@ -1,0 +1,32 @@
+# Files Vercel should not upload — and, for anything under api/, must not upload.
+#
+# ## The build failure this fixes
+#
+# Vercel turns every non-underscore-prefixed file under `api/` into its own
+# Serverless Function. That included the unit tests: `api/guard.test.js`,
+# `api/admin.test.js` and five others were each being deployed as a live
+# endpoint. They did nothing useful there — a test file exports no handler — but
+# they counted, and the Hobby plan allows twelve functions per deployment.
+#
+# With six real endpoints and six test files the count sat at exactly twelve, so
+# the limit was invisible right up until a seventh test file was added and the
+# deployment failed with "No more than 12 Serverless Functions can be added to a
+# Deployment on the Hobby plan". The functions themselves were fine; the build
+# never got far enough to say so.
+#
+# Excluding them takes the real count to seven and leaves headroom. Nothing is
+# lost: tests run in CI via `npm run verify`, which executes them with the Node
+# test runner on GitHub Actions and never involves Vercel.
+#
+# Note that `api/_*.js` files are already excluded by Vercel's own underscore
+# convention — that is why `_guard.js`, `_adapters.js` and the rest never counted
+# against the limit and why they carry the prefix.
+api/*.test.js
+
+# Local test/build output, never needed by a deployment.
+node_modules
+dist
+coverage
+.env
+.env.*
+!.env.example

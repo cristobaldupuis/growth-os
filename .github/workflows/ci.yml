@@ -32,5 +32,13 @@ jobs:
         # gold text at 2.4:1 on white in light mode.
         run: npm run check:contrast
 
+      - name: Serverless Function budget
+        # Guards the specific failure that shipped once: seven api/*.test.js files
+        # were being deployed as functions, which put the count at exactly the
+        # Hobby plan's twelve. The next file added broke the deployment — after
+        # lint, tests, contrast and build had all passed. Failing here means it is
+        # caught in the pull request instead.
+        run: npm run check:functions
+
       - name: Build
         run: npm run build

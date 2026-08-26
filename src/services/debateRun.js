@@ -16,25 +16,25 @@
 // it. The transcript is the asset; the synthesis is a step that can be retried
 // against it. That reordering is the whole of this module.
 //
-// ## What "survives leaving the page" does and does not mean
+// ## Where a debate actually runs now
 //
-// Two different things, and only one of them is achievable in a browser-only app:
+// On the server. api/debate.js advances a run one model call per invocation and
+// chains itself along, so closing the tab does not touch it — the page was never
+// driving the work. This module is the BROWSER's view of that: History stays
+// local, because a finished transcript is the operator's own reading record and
+// should not need the network to be legible.
 //
-//   NAVIGATING AWAY, CLOSING THE PANEL, SWITCHING VIEWS — fully supported. The run
-//   loop is a plain async function holding a reference to the save callback, so it
-//   keeps going and keeps writing after the panel unmounts. Reopen History and the
-//   turns are there, still arriving.
+// `serverRunId` is what distinguishes the two kinds of record this file has to
+// handle. A run that has one is mirrored from the server and its `running` status
+// is literally true. A run without one predates server-side execution and was
+// driven by a browser that has since gone away — `reconcileOnLoad` re-labels
+// those, because presenting them as live would leave a permanent spinner against
+// something nothing is executing.
 //
-//   CLOSING THE TAB OR RELOADING — the loop dies with the page. Everything already
-//   written is kept and the run is left marked `running` with its turns intact, so
-//   it can be finished from History rather than started again. It cannot silently
-//   continue: there is no server-side execution engine, and a browser tab is not a
-//   job runner. Making a debate genuinely continue unattended means running the loop
-//   somewhere that outlives the page — the background-execution work in ROADMAP
-//   Phase 3 — and this module is the state model that work would drive.
-//
-// `status` is what tells those two apart in the UI, and it is the reason a run
-// carries one at all.
+// The resumability machinery below is kept for exactly those older records, and
+// for the case a synthesis fails with a transcript worth keeping. It is no longer
+// the primary answer to a closed tab; it is the fallback for runs that predate the
+// fix and for a retry that costs one call instead of twenty-five.
 
 /** A run that is still executing turns. Reopened from storage, it means the page
  *  went away mid-debate — the transcript is good, the loop is not coming back. */
@@ -73,10 +73,14 @@ let seq = 0;
  * is what every later update addresses. A record that only gets an identity once it
  * succeeds cannot be updated on the way there, which was precisely the old problem.
  */
-export function mkDebateRun({ context = "", agents = [], maxTurns = 0 } = {}) {
+export function mkDebateRun({ context = "", agents = [], maxTurns = 0, serverRunId = null } = {}) {
   seq += 1;
   return {
-    id: "dbt-" + Date.now() + "-" + seq,
+    id: serverRunId || "dbt-" + Date.now() + "-" + seq,
+    // The server-side run this mirrors, when there is one. Its presence is what
+    // distinguishes a debate that is still executing somewhere from one that only
+    // ever existed in a browser that has since been closed.
+    serverRunId,
     date: new Date().toISOString(),
     context,
     // Which personas were in the room. Settings are editable, so a transcript read
@@ -134,15 +138,22 @@ export function upsertRun(runs, run, limit = 20) {
 /**
  * Bring a run loaded from storage into a truthful state.
  *
- * A run written as `running` whose page then went away is not running any more —
- * nothing is executing it — so presenting it as live would leave a permanent
- * spinner in History. Called once at load, it re-labels those by what they
- * actually have: turns but no results is awaiting synthesis, nothing at all is a
- * failure with a reason that names the cause.
+ * The distinction this draws is the whole reason server-side execution was worth
+ * building. A run with a `serverRunId` that says `running` genuinely IS running —
+ * on the server, where closing the tab did not touch it — so it is left alone and
+ * the panel reattaches to it at mount.
+ *
+ * A run WITHOUT one was executed by a browser that has since gone away, and
+ * nothing is driving it. Presenting that as live would leave a permanent spinner
+ * in History, so it is re-labelled by what it actually has: turns but no results
+ * is a saved transcript awaiting synthesis, nothing at all is a failure with a
+ * reason that names the cause. Those are records from before this moved
+ * server-side; new runs never reach that branch.
  */
 export function reconcileOnLoad(runs) {
   return (runs || []).map(run => {
     if (run.status !== RUNNING) return run;
+    if (run.serverRunId) return run;
     if ((run.transcript || []).length >= 2) return { ...run, status: AWAITING_SYNTHESIS };
     return {
       ...run,
@@ -152,12 +163,44 @@ export function reconcileOnLoad(runs) {
   });
 }
 
+/**
+ * Mirror a server-side run into the local History shape.
+ *
+ * History stays in the browser store — it is the operator's own reading record,
+ * and there is no reason a finished transcript should need the network to be
+ * legible. This keeps the two representations in one shape so nothing downstream
+ * has to know where a run executed.
+ *
+ * The server's `results` may arrive schema-wrapped (`{items: [...]}`) or bare,
+ * depending on which model served the synthesis; the caller unwraps before
+ * rendering, and both forms are stored as they came so nothing is lost.
+ */
+export function fromServerRun(run) {
+  const status = run.status === "done" ? DONE
+    : run.status === "failed" ? FAILED
+    : RUNNING;
+  return {
+    id: run.id,
+    serverRunId: run.id,
+    date: run.created_at || new Date().toISOString(),
+    context: run.context || "",
+    agents: run.agents || [],
+    maxTurns: run.max_turns || 0,
+    transcript: run.transcript || [],
+    turnCount: run.turn_index || (run.transcript || []).length,
+    results: run.results || null,
+    status,
+    error: run.error || null,
+    updatedAt: run.updated_at || new Date().toISOString(),
+  };
+}
+
 /** One-line status for the History list. */
 export function statusLabel(run) {
   switch (run?.status) {
     case DONE:               return `${run.results?.length || 0} initiatives`;
     case AWAITING_SYNTHESIS: return "Transcript saved · not yet synthesised";
-    case RUNNING:            return "Running…";
+    case RUNNING:            return run.serverRunId ? "Running on the server…" : "Running…";
     case FAILED:             return "Stopped early · transcript saved";
     // A record written before runs carried a status. Treated as complete when it
     // has results, because that is what it meant at the time.

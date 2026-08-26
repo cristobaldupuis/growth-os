@@ -23,9 +23,10 @@ import assert from "node:assert/strict";
 process.env.ADMIN_PASSWORD = "test-admin-password";
 process.env.ADMIN_SESSION_SECRET = "test-signing-secret";
 process.env.ALLOWED_ORIGINS = "https://example.test";
-// Deliberately no UPSTASH_* — this exercises the no-routing-store path.
-delete process.env.UPSTASH_REDIS_REST_URL;
-delete process.env.UPSTASH_REDIS_REST_TOKEN;
+// Deliberately no Supabase — this exercises the no-routing-store path.
+delete process.env.SUPABASE_URL;
+delete process.env.SUPABASE_SECRET_KEY;
+delete process.env.SUPABASE_SERVICE_KEY;
 
 const adminHandler = (await import("./admin.js")).default;
 const routingHandler = (await import("./routing.js")).default;
@@ -159,7 +160,7 @@ test("getConfig returns the catalogue, groups, defaults and resolved routing", a
   // With no store configured, everything resolves to the committed defaults.
   assert.deepEqual(b.routing, DEFAULT_ROUTING);
   assert.deepEqual(b.assigned, []);
-  assert.equal(b.durable, false, "no UPSTASH_* means routing is not durable, and this must say so");
+  assert.equal(b.durable, false, "no Supabase means routing is not durable, and this must say so");
 });
 
 test("getConfig reports every group's capability requirements", async () => {
@@ -320,39 +321,55 @@ test("routing refuses an unlisted origin", async () => {
 // the other groups, and that what was stored actually reaches the app through
 // /api/routing. Without this the happy path is untested.
 
-/** Stand up a fake Upstash and run `fn` against it. Returns the stored key/values. */
+/** Stand up a fake PostgREST and run `fn` against it. Returns the stored config. */
 async function withStore(fn) {
   const realFetch = globalThis.fetch;
   const kv = {};
-  process.env.UPSTASH_REDIS_REST_URL = "https://fake-upstash.test";
-  process.env.UPSTASH_REDIS_REST_TOKEN = "fake-token";
+  process.env.SUPABASE_URL = "https://project.supabase.invalid";
+  process.env.SUPABASE_SECRET_KEY = "sb_secret_test";
 
-  // A mini-Redis over the pipeline API. It has to cover more than GET/SET: once
-  // UPSTASH_* is set, _guard.js's rate limiter starts using the same backend and
-  // pipelines INCR + EXPIRE on every request. Answering only GET/SET made the
-  // limiter throw, and the limiter fails closed — so every call 503'd before it
-  // reached the action under test.
-  globalThis.fetch = async (url, opts) => {
-    if (!String(url).startsWith("https://fake-upstash.test")) {
-      throw new Error(`unexpected outbound call to ${url} — the test should not reach a real provider`);
+  // This has to cover more than the config table. Once Supabase is set, _guard.js's
+  // rate limiter starts using the same backend and calls the increment_rate_limit
+  // RPC on every request — and the limiter fails closed, so a stub that answered
+  // only the config routes would 503 every call before it reached the action under
+  // test. That is not hypothetical; it is what happened when this stub spoke only
+  // GET/SET.
+  const counters = {};
+  globalThis.fetch = async (url, opts = {}) => {
+    const u = String(url);
+    if (!u.startsWith("https://project.supabase.invalid")) {
+      throw new Error(`unexpected outbound call to ${u} — the test should not reach a real provider`);
     }
-    const results = JSON.parse(opts.body).map(([cmd, key, value]) => {
-      switch (cmd) {
-        case "SET":    kv[key] = value; return { result: "OK" };
-        case "GET":    return { result: kv[key] ?? null };
-        case "INCR":   kv[key] = String(Number(kv[key] || 0) + 1); return { result: Number(kv[key]) };
-        case "EXPIRE": return { result: 1 };
-        default: throw new Error(`unexpected command ${cmd}`);
-      }
-    });
-    return { ok: true, json: async () => results };
+
+    // Atomic counter, via the RPC the real limiter calls.
+    if (u.includes("/rpc/increment_rate_limit")) {
+      const { p_key } = JSON.parse(opts.body);
+      counters[p_key] = (counters[p_key] || 0) + 1;
+      return { ok: true, json: async () => counters[p_key] };
+    }
+
+    // app_config upsert.
+    if (u.includes("/app_config") && opts.method === "POST") {
+      const row = JSON.parse(opts.body);
+      kv[row.key] = row.value;
+      return { ok: true, status: 201, json: async () => [], text: async () => "" };
+    }
+
+    // app_config read — `?key=eq.<key>&select=value`.
+    if (u.includes("/app_config")) {
+      const key = decodeURIComponent((u.match(/key=eq\.([^&]+)/) || [])[1] || "");
+      const rows = key in kv ? [{ value: kv[key] }] : [];
+      return { ok: true, json: async () => rows };
+    }
+
+    throw new Error(`unexpected Supabase route ${u}`);
   };
 
   try { await fn(kv); }
   finally {
     globalThis.fetch = realFetch;
-    delete process.env.UPSTASH_REDIS_REST_URL;
-    delete process.env.UPSTASH_REDIS_REST_TOKEN;
+    delete process.env.SUPABASE_URL;
+    delete process.env.SUPABASE_SECRET_KEY;
   }
 }
 
@@ -422,7 +439,10 @@ test("a routing stored for a model no longer in the catalogue degrades to the de
   // in the app failing, and the console is told which groups were dropped.
   await withStore(async (kv) => {
     const cookie = await signIn();
-    kv["gos:admin:routing"] = JSON.stringify({ capture: "claude-retired-9", analysis: "claude-opus-5" });
+    // Seeded as a jsonb value under the config key, which is what the store
+    // actually holds — Postgres gives the object back as an object, where Redis
+    // handed back the string it was given.
+    kv["routing"] = { capture: "claude-retired-9", analysis: "claude-opus-5" };
 
     const cfg = await post({ action: "getConfig" }, cookie);
     assert.equal(cfg.body.routing.capture, DEFAULT_ROUTING.capture);

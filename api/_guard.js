@@ -27,6 +27,8 @@
 // in front of a metered API is worse than a brief outage. Every endpoint made
 // that call independently and identically; it is now made once, here.
 
+import { supabaseConfigured, rpc } from "./_supabase.js";
+
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "https://growth-os-iota-seven.vercel.app")
   .split(",").map((s) => s.trim()).filter(Boolean);
 
@@ -54,7 +56,7 @@ export function clientIp(req) {
 }
 
 // Local-dev fallback only. On serverless this is per-instance and resets on cold
-// start, which is exactly why the Redis path below exists for production.
+// start, which is exactly why the durable path below exists for production.
 const memoryLog = new Map();
 
 function memoryRateLimit(key, max, window) {
@@ -66,28 +68,31 @@ function memoryRateLimit(key, max, window) {
   return entry.count > max;
 }
 
-// Durable, shared across instances. Uses the Upstash REST API so there's no
-// connection pooling to manage in a Lambda. Configure UPSTASH_REDIS_REST_URL and
-// UPSTASH_REDIS_REST_TOKEN; without them the caller falls back to the in-memory
-// limiter and logs that the deployment is not durably limited.
+// Durable, shared across instances, backed by Postgres through PostgREST.
 //
-// Returns null when Redis is not configured, so the caller can tell "not
+// This used to talk to Upstash Redis, which was never configured on this
+// deployment — so the limiter in front of a metered API had been silently
+// running on the per-instance memory fallback below. See api/_supabase.js for
+// why there is now one datastore rather than two.
+//
+// The window is encoded INTO the key rather than tracked as state, which is what
+// the Redis implementation did and is worth keeping: a new window is a new row,
+// so there is no reset logic to get wrong and no read-modify-write race to lose
+// increments to. The increment itself is atomic inside one SQL statement — see
+// `increment_rate_limit` in supabase/migrations/0003_runtime.sql, and the note
+// there about why a SELECT-then-UPDATE would quietly overshoot the ceiling under
+// exactly the concurrency this exists to bound.
+//
+// Returns null when Supabase is not configured, so the caller can tell "not
 // configured" apart from "configured and under the limit".
-async function redisRateLimit(key, max, window) {
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) return null;
+async function durableRateLimit(key, max, window) {
+  if (!supabaseConfigured()) return null;
 
   const bucketKey = `${key}:${Math.floor(Date.now() / window)}`;
-  const ttl = Math.ceil(window / 1000);
-  const res = await fetch(`${url}/pipeline`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify([["INCR", bucketKey], ["EXPIRE", bucketKey, ttl]]),
-  });
-  if (!res.ok) throw new Error(`rate-limit backend returned ${res.status}`);
-  const out = await res.json();
-  const count = Number(out?.[0]?.result);
+  const count = Number(await rpc("increment_rate_limit", {
+    p_key: bucketKey,
+    p_window_seconds: Math.ceil(window / 1000),
+  }));
   if (!Number.isFinite(count)) throw new Error("rate-limit backend returned an unreadable count");
   return count > max;
 }
@@ -168,11 +173,12 @@ function actualBodyBytes(body) {
  */
 export async function guardRateLimit(req, res, { key, max, window = HOUR_MS, limitMessage, label }) {
   try {
-    const limited = await redisRateLimit(key, max, window);
+    const limited = await durableRateLimit(key, max, window);
     if (limited === null) {
-      // No Redis configured. Still limit, but say so — a production deployment
-      // running on the in-memory limiter is effectively unlimited.
-      console.warn(`${label} rate limiting is in-memory only; set UPSTASH_REDIS_REST_URL/TOKEN for a durable limit.`);
+      // No durable store configured. Still limit, but say so — a production
+      // deployment running on the in-memory limiter is effectively unlimited,
+      // because that Map is per warm Lambda instance.
+      console.warn(`${label} rate limiting is in-memory only; set SUPABASE_URL/SUPABASE_SECRET_KEY and apply 0003_runtime.sql for a durable limit.`);
       if (memoryRateLimit(key, max, window)) { res.status(429).json({ error: limitMessage }); return true; }
     } else if (limited) {
       res.status(429).json({ error: limitMessage });

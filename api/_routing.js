@@ -3,19 +3,25 @@
 // Underscore-prefixed so Vercel does not route it as a function; it is a module
 // api/admin.js and api/routing.js import.
 //
-// ## Why Upstash and not a database
+// ## Why the server stores this at all
 //
-// This app has no database — persistence is localStorage in the browser (see
-// DECISIONS.md, "localStorage over backend persistence"). That is fine for
-// portfolio state, which belongs to whoever is looking at it, and completely
-// wrong for routing: a model assignment made in the operator's browser has to
-// apply to every visitor's session, not just the tab it was typed in.
+// The rest of this app persists to localStorage in the browser (see DECISIONS.md,
+// "localStorage over backend persistence"). That is fine for portfolio state,
+// which belongs to whoever is looking at it, and completely wrong for routing: a
+// model assignment made in the operator's browser has to apply to every visitor's
+// session, not just the tab it was typed in.
 //
-// So it needs server-side storage, and the cheapest honest option is the one
-// already wired up. api/_guard.js talks to Upstash over its REST API for durable
-// rate limiting, using UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN. Reusing
-// that adds no dependency, no new credential and no new failure mode to reason
-// about — it is one more key in a store the deployment already trusts.
+// ## Why Supabase and not the Upstash this used to assume
+//
+// This was written against Upstash Redis because at the time that was the only
+// durable store the deployment had. It was never configured, while Supabase was —
+// api/asset.js has been writing generated frames to a bucket since Phase 5. So
+// this module described itself as durable while every save silently failed.
+//
+// Routing is a single row read once per page load. That is not a workload with a
+// Redis-shaped answer, and running a second managed datastore for it is one more
+// account, one more bill, and one more thing to be quietly unset. See
+// api/_supabase.js.
 //
 // ## Why this fails soft where the rate limiter fails closed
 //
@@ -33,44 +39,25 @@
 // successful save that evaporates on the next request is exactly the class of bug
 // store.js was rewritten to stop doing in the browser; it would be no better here.
 
-const ROUTING_KEY = "gos:admin:routing";
+import { supabaseConfigured, readConfig, writeConfig } from "./_supabase.js";
 
-function redisConfig() {
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) return null;
-  return { url, token };
-}
+const ROUTING_KEY = "routing";
 
 /** True when this deployment has somewhere durable to put a routing decision. */
-export const routingIsDurable = () => redisConfig() !== null;
-
-async function redisCommand(command) {
-  const cfg = redisConfig();
-  if (!cfg) return null;
-  const res = await fetch(`${cfg.url}/pipeline`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${cfg.token}`, "Content-Type": "application/json" },
-    body: JSON.stringify([command]),
-  });
-  if (!res.ok) throw new Error(`routing store returned ${res.status}`);
-  const out = await res.json();
-  return out?.[0]?.result ?? null;
-}
+export const routingIsDurable = () => supabaseConfigured();
 
 /**
- * The stored routing, or null when nothing is stored / Redis is not configured /
- * the read failed.
+ * The stored routing, or null when nothing is stored / Supabase is not
+ * configured / the read failed.
  *
  * Never throws. Callers merge whatever comes back over DEFAULT_ROUTING via
  * resolveRouting, so null and a partial object are both handled by the same path
  * and neither can take the app down.
  */
 export async function readRouting() {
+  if (!supabaseConfigured()) return null;
   try {
-    const raw = await redisCommand(["GET", ROUTING_KEY]);
-    if (!raw) return null;
-    return typeof raw === "string" ? JSON.parse(raw) : raw;
+    return await readConfig(ROUTING_KEY);
   } catch (err) {
     // Deliberately soft — see the header. The defaults are a shipped
     // configuration, so serving them is a degradation rather than a failure.
@@ -86,18 +73,22 @@ export async function readRouting() {
  * than reporting a save.
  */
 export async function writeRouting(routing) {
-  if (!redisConfig()) {
+  if (!supabaseConfigured()) {
     return {
       ok: false,
       durable: false,
-      message: "No routing store is configured, so this change was not saved. Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN to persist model routing across requests.",
+      message: "No routing store is configured, so this change was not saved. Set SUPABASE_URL and SUPABASE_SECRET_KEY, and run supabase/migrations/0003_runtime.sql, to persist model routing across requests.",
     };
   }
   try {
-    await redisCommand(["SET", ROUTING_KEY, JSON.stringify(routing)]);
+    await writeConfig(ROUTING_KEY, routing);
     return { ok: true, durable: true };
   } catch (err) {
     console.error("Could not write model routing:", err);
-    return { ok: false, durable: false, message: "The routing store rejected the write. Nothing was saved." };
+    return {
+      ok: false,
+      durable: false,
+      message: "The routing store rejected the write. Nothing was saved — check that supabase/migrations/0003_runtime.sql has been applied.",
+    };
   }
 }

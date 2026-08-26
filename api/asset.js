@@ -63,36 +63,13 @@ export const ALLOWED_MIME = new Set([
 // rewriting it would turn the second case into a silent success.
 const KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
-/**
- * The server-side key, under either name Supabase has used for it.
- *
- * `SUPABASE_SECRET_KEY` is the current naming — Supabase renamed the
- * `service_role` key to the "secret key" (`sb_secret_...`) — and
- * `SUPABASE_SERVICE_KEY` is what deployments configured before that rename
- * carry. Reading both is one line and removes an entire class of silent
- * misconfiguration: a project that is genuinely set up, an env var that is
- * genuinely present, and a feature that reports itself as unconfigured because
- * the two names disagree. That failure looks identical to having no Supabase at
- * all, which is the worst way for it to look.
- *
- * Neither is a publishable/anon key. This endpoint writes with it, and an
- * anon key would either be refused by the bucket's policies or — worse — work,
- * which would mean the bucket is writable by anyone holding a key that ships to
- * browsers. See the note at the top of this file.
- */
-export const secretKey = () =>
-  process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_KEY || "";
-
-export function supabaseConfigured() {
-  return !!(process.env.SUPABASE_URL && secretKey());
-}
+// Credentials and the REST helpers live in api/_supabase.js, which is also what
+// the routing store and the rate limiter now use. Re-exported here because
+// asset.test.js and the storage paths below address them by these names.
+export { secretKey, supabaseConfigured } from "./_supabase.js";
+import { supabaseConfigured, authHeaders } from "./_supabase.js";
 
 const storageBase = () => process.env.SUPABASE_URL.replace(/\/+$/, "") + "/storage/v1";
-
-const authHeaders = () => ({
-  Authorization: "Bearer " + secretKey(),
-  apikey: secretKey(),
-});
 
 // Bounded, because this runs at app boot and a hung probe would hold up the
 // answer to a question whose safe default is already "no". A timeout reads as

@@ -214,9 +214,10 @@ function RoutingPanel({ config, reload }) {
         <div style={{ ...panel, borderColor: c.warn, marginBottom: 14 }}>
           <div style={{ color: c.warn, fontWeight: 700, fontSize: 12.5, marginBottom: 5 }}>No routing store configured</div>
           <div style={{ fontSize: 12, color: c.textSub, lineHeight: 1.6 }}>
-            Set <code>UPSTASH_REDIS_REST_URL</code> and <code>UPSTASH_REDIS_REST_TOKEN</code> to persist model
-            routing. Until then every group runs on the defaults committed in <code>registry.js</code> and saving
-            here will fail rather than appear to work.
+            Set <code>SUPABASE_URL</code> and <code>SUPABASE_SECRET_KEY</code>, and apply
+            <code>supabase/migrations/0003_runtime.sql</code>, to persist model routing. Until then every group runs
+            on the defaults committed in <code>registry.js</code> and saving here will fail rather than appear to
+            work.
           </div>
         </div>
       )}

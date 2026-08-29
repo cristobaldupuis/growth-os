@@ -63,8 +63,11 @@ export function AgendaView({ agenda, items, cats, brands, activeBrand, t, dk, on
       )}
 
       <div style={{display:"flex",flexDirection:"column",gap:10}}>
-        {scoped.map(a => (
-          <div key={a.id} style={{...gSc(t)}}>
+        {scoped.map((a, idx) => (
+          // The tour anchors on the first question rather than the list: a
+          // spotlight around six stacked cards is a spotlight around the whole
+          // viewport, which leaves its own card nowhere to go.
+          <div key={a.id} style={{...gSc(t)}} data-tour={idx === 0 ? "agenda-question" : undefined}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,marginBottom:8}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginBottom:5}}>

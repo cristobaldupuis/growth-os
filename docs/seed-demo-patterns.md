@@ -6,6 +6,15 @@ Every ID here is checked against the live seed in `src/config.demo.js`, which is
 
 The three brands are **Northcove Home** (`NH`, home décor), **Grounds Control** (`GC`, specialty coffee) and **Peak Season** (`PS`, technical outdoor gear).
 
+**The guided tour is the short version of this document.** Eight steps in
+`src/components/tourSteps.js`, ordered as an argument rather than as a site map:
+the premise (everything here is invented, the machinery is not), the north star,
+the agenda (§8), the library, and then three consecutive steps on the part
+nothing else attempts — the parse, the four-way split (§7), and the account audit
+(§9). It opens itself on a cold visit and replays from the **Tour** button beside
+the demo chip. If you are narrating in person, the tour's own ordering is the
+running order to follow.
+
 ---
 
 ## 1. SMS as a portfolio gap

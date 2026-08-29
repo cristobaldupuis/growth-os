@@ -35,7 +35,7 @@ export const ROUTABLE = [
   "triage", "creative", "readout", "settings", "agenda",
 ];
 
-const PERF_TABS = ["breakdown", "attribution", "builder", "convention"];
+const PERF_TABS = ["breakdown", "attribution", "builder", "audit", "convention"];
 // Settings is a page with a section rail, and each section is addressable —
 // "#/settings/naming" is how the Performance view hands you to the convention
 // editor, and how a link to it in a doc can land somewhere useful.

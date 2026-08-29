@@ -843,7 +843,15 @@ export default function App() {
   const lastWrittenHash = useRef(null);
   useEffect(() => {
     const apply = () => {
-      if (lastWrittenHash.current !== null && window.location.hash === lastWrittenHash.current) return;
+      // Consumed on use, not left standing. Each write below causes exactly one
+      // hashchange, so one skip settles it — and holding the value afterwards
+      // made Back *to* a hash we had written at some point look like our own
+      // echo and get dropped, which is how "#/performance/attribution → audit →
+      // Back" changed the URL and left the tab where it was.
+      if (lastWrittenHash.current !== null && window.location.hash === lastWrittenHash.current) {
+        lastWrittenHash.current = null;
+        return;
+      }
       const r = parseHash(window.location.hash);
       if (r.selId) setSelId(r.selId);
       if (r.tab)   { setPerfTab(r.tab); setSettingsSection(r.tab); }
@@ -1746,7 +1754,7 @@ export default function App() {
           t={t} dk={dk}
           stepIndex={tourStep}
           currentNav={nav}
-          onNavigate={setNav}
+          onNavigate={(to, tab) => { if (tab) setPerfTab(tab); setNav(to); }}
           onNext={()=>setTourStep(s=>Math.min(s+1,TOUR_STEPS.length-1))}
           onBack={()=>setTourStep(s=>Math.max(s-1,0))}
           onSkip={dismissTour}
@@ -2041,7 +2049,7 @@ export default function App() {
         creative={creative} onSaveCreative={saveCreative} onSaveItems={saveItems} showToast={showToast}
         perfRows={perfRows} assets={assets} onSaveAssets={saveAssets}/>}
       {nav==="performance"&&<PerformanceView t={t} items={items} settings={settings} perfRows={perfRows}
-        initialTab={perfTab} initialInitiativeId={builderInit} showToast={showToast}
+        tab={perfTab} onTab={setPerfTab} initialInitiativeId={builderInit} showToast={showToast}
         onAssignNames={(id,adNames)=>saveItems(items.map(e=>e.id===id?{...e,adNames}:e))}
         onImport={()=>setShowMetricsImport(true)}
         onOpenConvention={()=>{ setSettingsSection("naming"); requestNav("settings"); }}

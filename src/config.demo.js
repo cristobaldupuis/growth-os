@@ -20,7 +20,7 @@
 // to change between clients.
 // =============================================================================
 
-import { buildSeed } from "./services/seedRebase.js";
+import { buildSeed, makeRebaser } from "./services/seedRebase.js";
 
 // -----------------------------------------------------------------------------
 // DEPLOYMENT MODE
@@ -1195,6 +1195,210 @@ const SEED_WEEKLY_METRICS_AUTHORED = [
 ];
 
 // -----------------------------------------------------------------------------
+// SEED LEARNING AGENDA
+//
+// The layer above the ledger: the questions the business is actually trying to
+// answer, with experiments laddering up to them via `agendaId`. Without it the
+// portfolio is a backlog with good hygiene, and the honest objection — "this is
+// a nicely structured list of things you were going to do anyway" — has no
+// answer. With it, "did any of this teach us anything" is a query.
+//
+// These are authored, not generated, and that is a deliberate distinction rather
+// than a shortcut. `seedInitiativeFromAgenda` is deterministic for the reason
+// stated in services/learningAgenda.js: a question with no evidence behind it is
+// exactly where a model produces confident filler. Naming the question is the
+// judgement being sold, so the seed authors it the way an operator would.
+//
+// Six questions across three brands: two answered, three open (two of which have
+// a closed result and so raise the "worth marking Answered" nudge — the system
+// notices, the human decides), and one parked, because a research programme that
+// never shelves a question is not a research programme.
+// -----------------------------------------------------------------------------
+const SEED_AGENDA_AUTHORED = [
+  {
+    id: "la-paid-decay", brandId: "default", category: "Paid Media", status: "Answered",
+    question: "At our AOV, is paid-social decay a creative-fatigue problem or an audience-saturation problem?",
+    holdConstant: "Budget, audience definition and placement",
+    varies: "Creative refresh cadence — new concepts weekly vs. scaling spend behind winners",
+    falsifyingResult: "ROAS holds within 10% across three weeks at flat spend and no refresh. That would point at saturation, and the answer would be audience expansion rather than a creative pipeline.",
+    sampleGuidance: "3 weeks per arm, minimum $25k spend per arm to clear weekly variance",
+    createdAt: "2026-03-01",
+    notes: "Answered the expensive way, twice, before it was written down as a question. NH-013 and GC-004 burned $20k of spend on the same root cause at two different brands; PS-003 ran the inverse and held. Cost to answer, in media alone: roughly $80k.",
+  },
+  {
+    id: "la-gc-trial", brandId: "r1", category: "Paid Media", status: "Answered",
+    question: "For a considered-purchase coffee buyer, does trial-led acquisition beat discount-led acquisition on 60-day LTV?",
+    holdConstant: "Traffic source, landing page and audience",
+    varies: "The offer: $5 sample pack vs. percentage discount on a first full-price order",
+    falsifyingResult: "Sample buyers convert to a second full-price order at or below the discount cohort's rate. That would mean the $5 commitment is filtering for price sensitivity rather than for intent.",
+    sampleGuidance: "6 weeks, 400 first orders per arm, measured at 60 days not at first purchase",
+    createdAt: "2026-01-20",
+    notes: "The 60-day window is the whole question. Read at first purchase, discount wins and the wrong programme gets built.",
+  },
+  {
+    id: "la-nh-lapsed", brandId: "default", category: "Retention", status: "Open",
+    question: "Which owned channel recovers a lapsed Northcove customer at the lowest cost, and at what delay?",
+    holdConstant: "Segment definition (90-day lapsed), incentive value, creative",
+    varies: "Channel (SMS vs. email) and send delay",
+    falsifyingResult: "SMS recovery revenue per recipient lands within 15% of email while carrying a higher per-message cost. Then the channel is not the lever and the delay window is where the remaining answer is.",
+    sampleGuidance: "4 weeks, 5,000 recipients per arm",
+    createdAt: "2026-02-10",
+    notes: "Two arms have closed and the subscribe-and-save arm is blocked on an inventory upgrade that is not tracked anywhere in this portfolio. Holding the question Open until that resolves is a decision, not an oversight.",
+  },
+  {
+    id: "la-ps-window", brandId: "r2", category: "Paid Media", status: "Open",
+    question: "Can any owned or paid channel hold demand through the eight-week pre-season window, or does the window only reward inventory timing?",
+    holdConstant: "Budget envelope and the SKU set in market",
+    varies: "Channel and cadence — weekly synced creative refresh vs. founder-led organic vs. flat evergreen",
+    falsifyingResult: "No channel beats flat evergreen spend by more than 15% inside the window. That would say the window is an inventory and merchandising problem wearing a marketing costume.",
+    sampleGuidance: "One full pre-season window per arm — this question takes a season to answer, not a sprint",
+    createdAt: "2026-01-08",
+    notes: "The most expensive question on this list to answer, because the unit of observation is a season and there are two per year.",
+  },
+  {
+    id: "la-nh-pdp", brandId: "default", category: "Conversion", status: "Open",
+    question: "What does a Northcove buyer need to see above the fold before they will add to cart?",
+    holdConstant: "Traffic mix, price and product photography",
+    varies: "What occupies the space above the fold — hero imagery, delivery clarity, social proof",
+    falsifyingResult: "No above-fold arrangement moves add-to-cart rate by more than 3%. That would say the constraint sits upstream of the PDP, in traffic quality rather than in the page.",
+    sampleGuidance: "2 weeks per arm at current traffic, ~8,000 sessions per variant",
+    createdAt: "2026-04-20",
+    notes: "Nothing has closed under this question yet. NH-016 (reviews above the fold) tested the same surface and is deliberately not laddered to it — it ran before the question was framed, which is what most of a back-filled portfolio looks like.",
+  },
+  {
+    id: "la-gc-subscription", brandId: "r1", category: "Retention", status: "Parked",
+    question: "Is replenishment subscription worth building before the fulfilment side can support a variable cadence?",
+    holdConstant: "Hero SKU set and price",
+    varies: "Cadence model — fixed calendar vs. inferred from real reorder behaviour",
+    falsifyingResult: "Fixed-calendar subscribers churn at the same rate as inferred-cadence subscribers over 90 days. Then the fulfilment work buys nothing and the simpler build is correct.",
+    sampleGuidance: "90 days minimum — churn is the metric and it does not resolve sooner",
+    createdAt: "2026-05-01",
+    notes: "Parked, not killed. The question is good and the dependency is real: answering it needs a fulfilment change nobody has scheduled. Parked with the reason attached beats a draft that quietly ages in the backlog.",
+  },
+];
+
+// Which experiments ladder up to which question. Kept as one map rather than an
+// `agendaId` scattered across fifteen initiative records, so the shape of the
+// research programme is readable in one place — and so a question with no
+// experiments under it, or an experiment under no question, is obvious.
+//
+// Fifteen of thirty-eight initiatives are laddered. The rest predate the agenda
+// layer and are left unlinked on purpose: a back-filled portfolio where every
+// historical experiment traces neatly to a pre-existing question is a portfolio
+// somebody tidied after the fact.
+const AGENDA_LADDER = {
+  "la-paid-decay":      ["e15", "e09", "e05"],
+  "la-gc-trial":        ["e22", "e25", "e23"],
+  "la-nh-lapsed":       ["e13", "e14", "e19"],
+  "la-ps-window":       ["e31", "e36"],
+  "la-nh-pdp":          ["e02", "e20", "e07"],
+  "la-gc-subscription": ["e28"],
+};
+
+const AGENDA_BY_ITEM = Object.fromEntries(
+  Object.entries(AGENDA_LADDER).flatMap(([agendaId, ids]) => ids.map(id => [id, agendaId])));
+
+// -----------------------------------------------------------------------------
+// SAMPLE ACCOUNT — for the audit tab
+//
+// A prospect's account as found, which is a different artefact from the seeded
+// ad account above. That one follows the convention because this tool built it.
+// This one is what is actually in an Ads Manager before anybody arrives, and the
+// audit exists to price the gap between them.
+//
+// Authored irregular on purpose, because the irregularity is the finding:
+//
+//   - the delimiter is "|", not the schema's "_", so `inferDelimiter` has
+//     something to detect rather than confirm;
+//   - slot counts run 1 to 7, so the histogram has a real spread and the
+//     "how many will need mapping by hand" figure is not zero;
+//   - some slots do carry a vocabulary — US/CA/UK reads as Geo, Video/Static/
+//     Carousel reads as Format — because a real account usually has *some*
+//     discipline, and finding it is what makes the meeting productive;
+//   - the funnel slot says "Prospecting" where the registry says "Prospect".
+//     A near-miss, and the most useful kind of finding: a convention that is
+//     90% there and parses at 0% until somebody decides which way it goes;
+//   - and there is genuine junk — a duplicated campaign, a test that was never
+//     cleaned up, a date in the name, trailing "FINAL v2".
+//
+// Nothing here parses against the shipped schema, which is the honest result and
+// the one worth showing. The audit reports evidence and refuses to propose a
+// taxonomy; deciding what these slots should become is the judgement being sold.
+// -----------------------------------------------------------------------------
+export const SAMPLE_ACCOUNT_NAMES = [
+  "Prospecting|US|Broad|Candles|Video|Jan24",
+  "Prospecting|US|Broad|Candles|Static|Jan24",
+  "Prospecting|US|Broad|Candles|Carousel|Jan24",
+  "Prospecting|US|LAL3|Candles|Video|Jan24",
+  "Prospecting|US|LAL3|Candles|Static|Jan24",
+  "Prospecting|US|LAL1|Textiles|Video|Jan24",
+  "Prospecting|CA|Broad|Candles|Video|Jan24",
+  "Prospecting|CA|Broad|Textiles|Static|Jan24",
+  "Retargeting|US|Cart|Static|Feb24",
+  "Retargeting|US|Cart|Video|Feb24",
+  "Retargeting|US|ViewContent|Static|Feb24",
+  "Retargeting|US|ViewContent|Carousel|Feb24",
+  "Retargeting|CA|Cart|Static|Feb24",
+  "Retargeting|UK|Cart|Static|Feb24",
+  "PROSPECTING|US|LAL3|Candles|UGC|Video|Mar24",
+  "PROSPECTING|US|LAL3|Candles|UGC|Static|Mar24",
+  "PROSPECTING|US|LAL5|Gifting|UGC|Video|Mar24",
+  "PROSPECTING|US|LAL5|Gifting|Studio|Video|Mar24",
+  "PROSPECTING|CA|LAL3|Candles|UGC|Video|Mar24",
+  "prospecting | us | broad | textiles | carousel | apr24",
+  "prospecting | us | broad | textiles | video | apr24",
+  "prospecting | us | lal3 | candles | video | apr24",
+  "retargeting | us | cart | static | apr24",
+  "Prospecting|US|Broad|Decor|Video|Apr24",
+  "Prospecting|US|Broad|Decor|Static|Apr24",
+  "Prospecting|US|Broad|Decor|Carousel|Apr24",
+  "Prospecting|UK|Broad|Decor|Video|Apr24",
+  "Prospecting|UK|Broad|Candles|Video|Apr24",
+  "Prospecting|EU|Broad|Candles|Video|Apr24",
+  "Mothers Day Push|US|Broad|Gifting|Video",
+  "Mothers Day Push|US|Broad|Gifting|Static",
+  "Mothers Day Push|US|Retarget|Gifting|Static",
+  "Mothers Day Push|CA|Broad|Gifting|Video",
+  "Spring Refresh|US|Broad|Textiles|Video",
+  "Spring Refresh|US|Broad|Textiles|Carousel",
+  "Spring Refresh|US|LAL3|Textiles|Video",
+  "Summer Sale|US|Broad|All|Static|Jun24",
+  "Summer Sale|US|Retarget|All|Static|Jun24",
+  "Summer Sale|CA|Broad|All|Static|Jun24",
+  "Summer Sale|UK|Broad|All|Static|Jun24",
+  "Brand|US|Broad|Awareness|Video|Jul24",
+  "Brand|US|Broad|Awareness|Video|Aug24",
+  "Catalog Sales|US|All Products|Dynamic",
+  "Catalog Sales|CA|All Products|Dynamic",
+  "Catalog Sales|UK|All Products|Dynamic",
+  "Advantage+ Shopping|US",
+  "Advantage+ Shopping|CA",
+  "Advantage+ Shopping|UK",
+  "ASC|US|Candles",
+  "ASC|US|Textiles",
+  "Copy of Prospecting|US|Broad|Candles|Video|Jan24",
+  "Copy of Copy of Prospecting|US|Broad|Candles|Video",
+  "Prospecting|US|Broad|Candles|Video|Jan24 - FINAL",
+  "Prospecting|US|Broad|Candles|Video|Jan24 - FINAL v2",
+  "TEST - do not use",
+  "TEST 2 - do not use",
+  "new campaign",
+  "Untitled campaign",
+  "Q1 Push FINAL",
+  "Q1 Push FINAL v2",
+  "Q1 Push FINAL v2 (use this one)",
+  "agency handover - prospecting",
+  "agency handover - retargeting",
+  "JB test - new creative",
+  "JB test - new creative 2",
+  "holiday_2023_prospecting_us",
+  "holiday_2023_retargeting_us",
+  "holiday_2023_prospecting_ca",
+  "BF/CM 2023 | US | Broad",
+  "BF/CM 2023 | US | Retarget",
+].join("\n");
+
+// -----------------------------------------------------------------------------
 // SEED NAMING OVERLAY
 //
 // The shipped dimension registry in services/naming.js carries a snack-brand
@@ -1392,12 +1596,20 @@ const AUTHORED_LAST_WEEK = "2026-05-18";  // most recent date in SEED_WEEKLY_MET
 // needs a tag unlike its id sets `trackingTag` on its own record and wins here.
 const withTrackingTags = (list) => list.map(it => ({ ...it, trackingTag: it.trackingTag || it.initId }));
 
+// Applied from AGENDA_LADDER above rather than authored per record.
+const withAgendaIds = (list) => list.map(it => (
+  AGENDA_BY_ITEM[it.id] ? { ...it, agendaId: AGENDA_BY_ITEM[it.id] } : it));
+
 export const { SEED, SEED_WEEKLY_METRICS, SEED_AD_ACCOUNT } = buildSeed({
   authoredLastWeek: AUTHORED_LAST_WEEK,
-  seed: withTrackingTags(SEED_AUTHORED),
+  seed: withAgendaIds(withTrackingTags(SEED_AUTHORED)),
   weeklyMetrics: SEED_WEEKLY_METRICS_AUTHORED,
   adAccount: SEED_AD_ACCOUNT_AUTHORED,
 });
+
+// Agenda items carry a `createdAt` and nothing else date-shaped, so they ride
+// the same rebaser as everything else and stay in the narrative's relative order.
+export const SEED_AGENDA = SEED_AGENDA_AUTHORED.map(makeRebaser(AUTHORED_LAST_WEEK).rebaseRecord);
 
 // -----------------------------------------------------------------------------
 // SEED DEBATES

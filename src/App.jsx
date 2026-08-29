@@ -8,6 +8,7 @@ import {
   SEED_AD_ACCOUNT,
   SEED_NAMING_CUSTOM,
   SEED_DEBATES,
+  SEED_AGENDA,
   DEMO_MODE,
 } from "./activeConfig.js";
 
@@ -781,6 +782,7 @@ export default function App() {
         if(ar&&ar.value) setAssets(JSON.parse(ar.value));
         if(ur&&ur.value) { const u = JSON.parse(ur.value); setUsage(u); usageRef.current = u; }
         if(gr&&gr.value) setAgenda(JSON.parse(gr.value));
+        else if (SEED_AGENDA.length) { setAgenda(SEED_AGENDA); store.set(KEY_AGENDA,JSON.stringify(SEED_AGENDA)); }
       } catch { setItems(SEED); }
       setLoaded(true);
       // Stale-backup nudge. This effect has an empty dependency array so it runs
@@ -1049,7 +1051,11 @@ export default function App() {
     // visitor imported, and an initiative list restored beside an empty
     // Performance view is the "app left broken" case a reset promises to avoid.
     if (SEED_AD_ACCOUNT.length) savePerf(seedPerfRows(settings));
-    showToast(`Demo data restored: ${SEED.length} initiatives, ${SEED_WEEKLY_METRICS.length} weeks of metrics and ${SEED_AD_ACCOUNT.length} ad-account rows loaded.`, "success");
+    // The agenda is part of the same authored narrative: the initiatives carry
+    // `agendaId`, so restoring them without the questions leaves fifteen records
+    // laddering up to nothing.
+    if (SEED_AGENDA.length) saveAgenda(SEED_AGENDA);
+    showToast(`Demo data restored: ${SEED.length} initiatives, ${SEED_AGENDA.length} agenda questions, ${SEED_WEEKLY_METRICS.length} weeks of metrics and ${SEED_AD_ACCOUNT.length} ad-account rows loaded.`, "success");
   };
 
   // Demo-mode header control. A stronger reset than the Settings-modal one
@@ -1066,6 +1072,7 @@ export default function App() {
     const reset = DEMO_MODE ? demoSettings() : DEFAULT_SETTINGS;
     saveSettings(reset);
     saveDebates(SEED_DEBATES);
+    saveAgenda(SEED_AGENDA);
     saveRecs([]);
     // Creative records key off initiative ids, so leaving them behind after the
     // items are reseeded would strand briefs against initiatives that no longer

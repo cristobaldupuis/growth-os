@@ -1185,3 +1185,11 @@ export const { SEED, SEED_WEEKLY_METRICS, SEED_AD_ACCOUNT } = buildSeed({
 // demo config authors both — see config.demo.js for the contract they follow.
 export const SEED_NAMING_CUSTOM = { dimensions: [], vocabAdditions: {} };
 export const SEED_DEBATES = [];
+
+// The learning agenda is a client's own list of questions, written with them in
+// the first week. Seeding one here would be putting words in their mouth.
+export const SEED_AGENDA = [];
+
+// The audit's sample account is a demo affordance. A client runs it on their own
+// names, and offering them a fabricated account to audit would be noise.
+export const SAMPLE_ACCOUNT_NAMES = "";

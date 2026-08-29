@@ -5,12 +5,15 @@ import {
   TEMPLATES,
   SEED,
   SEED_WEEKLY_METRICS,
+  SEED_AD_ACCOUNT,
+  SEED_NAMING_CUSTOM,
+  SEED_DEBATES,
   DEMO_MODE,
 } from "./activeConfig.js";
 
 import { KEY_ITEMS, KEY_SETTINGS, KEY_DEBATES, KEY_METRICS, KEY_RECS, KEY_CREATIVE, KEY_PERF, KEY_ASSETS, KEY_USAGE, KEY_AGENDA, KEY_THEME, KEY_LIB_VIEW, KEY_RAIL, KEY_TOUR_SEEN, store, onWriteError, handleDownloadBackup, handleRestoreBackup } from "./services/store.js";
 import { resolveSchema } from "./services/naming.js";
-import { attachInitiatives } from "./services/performance.js";
+import { attachInitiatives, annotateRow } from "./services/performance.js";
 import { isLiveWorkspace, backupStatus } from "./services/dataSafety.js";
 import { Sidebar } from "./components/Sidebar.jsx";
 import { CadenceRail, CadenceLegend } from "./components/CadenceRail.jsx";
@@ -533,6 +536,24 @@ function OnboardingModal({ t, settings, onSave, onSkip }) {
   );
 }
 
+// -- Seeding the ad account ----------------------------------------------------
+//
+// The seed ships raw rows and no parse results. They are annotated here, against
+// the schema resolved from the live settings, so a seeded row takes the same
+// path an imported row takes and the demo's parse rate, unparsed count and
+// unparsed spend are all computed rather than authored. A row the parser refuses
+// is refused on screen for the same reason it would refuse a client's export.
+//
+// The naming overlay has to be in settings before this runs: the seeded names
+// use vocabulary this deployment added (Candles, WholeBean, Outerwear), so
+// parsing them against the bare shipped registry would report failures that are
+// an artefact of load order rather than of the names.
+const demoSettings = () => ({ ...DEFAULT_SETTINGS, namingCustom: SEED_NAMING_CUSTOM });
+const seedPerfRows = (settings) => {
+  const schema = resolveSchema(settings);
+  return SEED_AD_ACCOUNT.map(r => annotateRow(r, schema));
+};
+
 export default function App() {
   const [items,     setItems]     = useState([]);
   const [settings,  setSettings]  = useState(DEFAULT_SETTINGS);
@@ -716,29 +737,47 @@ export default function App() {
         setItems(ir&&ir.value?JSON.parse(ir.value):SEED);
         if(!ir||!ir.value) store.set(KEY_ITEMS,JSON.stringify(SEED));
         const isFirstVisit = !sr || !sr.value;
+        // Tracked locally as well as in state, because the seeded ad account is
+        // parsed below in this same pass and `settings` is still the default
+        // until React re-renders.
+        let liveSettings = DEFAULT_SETTINGS;
         if(sr&&sr.value) {
           const saved = JSON.parse(sr.value);
           // Backfill brand brief defaults for any brand that's missing them
           if (Array.isArray(saved.brands)) {
             saved.brands = saved.brands.map(applyBrandBriefDefaults);
           }
+          liveSettings = saved;
           setSettings(saved);
         }
         // Demo mode: skip the config-collection wizard for a cold visitor.
         // They get the pre-loaded portfolio and the guided tour instead. A real
         // client deployment (DEMO_MODE false) still gets onboarding as before.
         else if (!DEMO_MODE) { setOnboarding(true); }
+        // A cold demo visitor gets this deployment's naming overlay written into
+        // settings on arrival, so the Taxonomy page shows the vocabulary the
+        // seeded ad account was actually built against.
+        else {
+          liveSettings = demoSettings();
+          setSettings(liveSettings);
+          store.set(KEY_SETTINGS, JSON.stringify(liveSettings));
+        }
         if (DEMO_MODE && isFirstVisit && !(ts&&ts.value)) { setShowTour(true); }
         // reconcileOnLoad re-labels any run left mid-flight by a closed tab. A
         // record that says "running" when nothing is running it would otherwise
         // show a permanent spinner in History; what it actually is, is a saved
         // transcript waiting to be synthesised. See services/debateRun.js.
         if(dr&&dr.value) setDebates(reconcileOnLoad(JSON.parse(dr.value)));
+        else if (SEED_DEBATES.length) { setDebates(SEED_DEBATES); store.set(KEY_DEBATES,JSON.stringify(SEED_DEBATES)); }
         if(mr&&mr.value) setWeeklyMetrics(JSON.parse(mr.value));
         else { setWeeklyMetrics(SEED_WEEKLY_METRICS); store.set(KEY_METRICS,JSON.stringify(SEED_WEEKLY_METRICS)); }
         if(rr&&rr.value) setRecs(JSON.parse(rr.value));
         if(cr&&cr.value) setCreative(JSON.parse(cr.value));
         if(pr&&pr.value) setPerfRows(JSON.parse(pr.value));
+        else if (SEED_AD_ACCOUNT.length) {
+          const seeded = seedPerfRows(liveSettings);
+          setPerfRows(seeded); store.set(KEY_PERF,JSON.stringify(seeded));
+        }
         if(ar&&ar.value) setAssets(JSON.parse(ar.value));
         if(ur&&ur.value) { const u = JSON.parse(ur.value); setUsage(u); usageRef.current = u; }
         if(gr&&gr.value) setAgenda(JSON.parse(gr.value));
@@ -1006,7 +1045,11 @@ export default function App() {
   const handleResetDemoData = () => {
     saveItems(SEED);
     saveMetrics(SEED_WEEKLY_METRICS);
-    showToast(`Demo data restored: ${SEED.length} initiatives and ${SEED_WEEKLY_METRICS.length} weeks of metrics loaded.`, "success");
+    // The ad account comes back with them. It is seed data, not something the
+    // visitor imported, and an initiative list restored beside an empty
+    // Performance view is the "app left broken" case a reset promises to avoid.
+    if (SEED_AD_ACCOUNT.length) savePerf(seedPerfRows(settings));
+    showToast(`Demo data restored: ${SEED.length} initiatives, ${SEED_WEEKLY_METRICS.length} weeks of metrics and ${SEED_AD_ACCOUNT.length} ad-account rows loaded.`, "success");
   };
 
   // Demo-mode header control. A stronger reset than the Settings-modal one
@@ -1017,18 +1060,23 @@ export default function App() {
   const handleResetDemo = () => {
     saveItems(SEED);
     saveMetrics(SEED_WEEKLY_METRICS);
-    saveSettings(DEFAULT_SETTINGS);
-    saveDebates([]);
+    // Back to the demo's own settings rather than the bare defaults: the naming
+    // overlay is part of the seed state, and resetting to a schema the seeded ad
+    // account was not written against would make two-thirds of it stop parsing.
+    const reset = DEMO_MODE ? demoSettings() : DEFAULT_SETTINGS;
+    saveSettings(reset);
+    saveDebates(SEED_DEBATES);
     saveRecs([]);
     // Creative records key off initiative ids, so leaving them behind after the
     // items are reseeded would strand briefs against initiatives that no longer
     // exist — which is exactly the "app left broken" case this reset promises
     // not to produce.
     saveCreative([]);
-    // Same reasoning: performance rows join to initiatives by tracking tag, so
-    // keeping them across a reseed would attribute imported spend to items that
-    // no longer exist.
-    savePerf([]);
+    // Performance rows join to initiatives by tracking tag, so a visitor's own
+    // imported rows cannot survive a reseed either. They are replaced by the
+    // seeded ad account rather than cleared, re-parsed against the settings this
+    // reset just restored.
+    savePerf(seedPerfRows(reset));
     setShowResetConfirm(false);
     showToast("Demo reset. Everything is back to the original seed state.", "success");
   };

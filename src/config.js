@@ -1172,8 +1172,16 @@ const SEED_WEEKLY_METRICS_AUTHORED = [
 
 const AUTHORED_LAST_WEEK = "2026-05-18";  // most recent date in SEED_WEEKLY_METRICS_AUTHORED
 
-export const { SEED, SEED_WEEKLY_METRICS } = buildSeed({
+export const { SEED, SEED_WEEKLY_METRICS, SEED_AD_ACCOUNT } = buildSeed({
   authoredLastWeek: AUTHORED_LAST_WEEK,
   seed: SEED_AUTHORED,
   weeklyMetrics: SEED_WEEKLY_METRICS_AUTHORED,
+  adAccount: [],
 });
+
+// A client deployment starts with no seeded ad account and no captured debate:
+// its performance rows come from that client's own export on day one, and a
+// transcript is only worth shipping when it was produced against real data. The
+// demo config authors both — see config.demo.js for the contract they follow.
+export const SEED_NAMING_CUSTOM = { dimensions: [], vocabAdditions: {} };
+export const SEED_DEBATES = [];

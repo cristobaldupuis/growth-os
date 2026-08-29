@@ -420,6 +420,19 @@ const SEED_AUTHORED = [
     ice: { impact: 8, certainty: 9, ease: 9 }, revenueImpact: 80000,
     linkedIds: ["e01","e06"], results: null, createdAt: "2026-05-10",
     brandId: "default",
+    // Claimed by hand, because these campaigns predate the convention and a live
+    // Meta campaign cannot be renamed without resetting its learning phase. The
+    // claim is on the campaign, so every ad inside it inherits the attribution —
+    // the ad names themselves are still unparseable and still attributed.
+    //
+    // The Q4 retargeting campaign is claimed and does not appear in the imported
+    // window. That is reported as a claimed-but-absent name rather than passed
+    // over: a claim that matches nothing is a broken expectation, and a total
+    // that quietly excludes it is worse than one that admits it.
+    adNames: [
+      { name: "2026_Q1_prospecting_v2",  level: "campaign", channel: "meta", addedAt: "2026-05-11" },
+      { name: "2025_Q4_retargeting_v1",  level: "campaign", channel: "meta", addedAt: "2026-05-11" },
+    ],
     notes: "Incremental ROAS last 4W = 0.24x.",
   },
   {
@@ -496,6 +509,14 @@ const SEED_AUTHORED = [
       decisionMade: "Hold spend. Confirm attribution methodology first.",
       outcomeCertainty: 92, actualRevenueImpact: -60000,
     },
+    // A genuine conflict, left in on purpose: the rejected scale proposal and
+    // the spend hold that replaced it both point at the same live campaign. The
+    // same spend cannot belong to two experiments, so the resolution is stable
+    // rather than clever — first registration wins — and the collision is
+    // surfaced for a human to settle instead of being arbitrated silently.
+    adNames: [
+      { name: "2026_Q1_prospecting_v2", level: "campaign", channel: "meta", addedAt: "2026-05-13" },
+    ],
     createdAt: "2026-05-10", brandId: "default",
   },
   {
@@ -780,6 +801,10 @@ const SEED_AUTHORED = [
       decisionMade: "Evergreen. Build a sample-pack landing page with paid traffic feed. Test $7 price ceiling in Q3.",
       outcomeCertainty: 90, actualRevenueImpact: 68000,
     },
+    // Pre-convention launch campaign, claimed by hand at the campaign level.
+    adNames: [
+      { name: "GC_samplepack_launch_apr", level: "campaign", channel: "meta", addedAt: "2026-03-16" },
+    ],
   },
 
   {
@@ -1169,6 +1194,187 @@ const SEED_WEEKLY_METRICS_AUTHORED = [
   { date: "2026-05-18", brand: "r2", source: "manual", metrics: { revenue: 151000, sessions: 23900, conversions: 439, aov: 344, cac: 32, notes: "" } },
 ];
 
+// -----------------------------------------------------------------------------
+// SEED NAMING OVERLAY
+//
+// The shipped dimension registry in services/naming.js carries a snack-brand
+// vocabulary (Pastry, Donuts, PinkSprinkle) because that is the account the
+// convention was first designed against. None of it describes candles, coffee
+// or technical outerwear, so this deployment extends the registry the way any
+// workspace does — through `settings.namingCustom`, resolved on top of the
+// shipped schema rather than forked from it.
+//
+// This is a vocabulary addition, not a dimension addition. A longer controlled
+// list accepts more names and changes nothing about names already built; a new
+// *dimension* would append a slot and break every existing name. See the
+// "two kinds of addition" note in services/naming.js.
+// -----------------------------------------------------------------------------
+export const SEED_NAMING_CUSTOM = {
+  dimensions: [],
+  vocabAdditions: {
+    category: ["Candles", "Textiles", "Decor", "Gifting", "WholeBean", "BrewGear", "Outerwear", "Layers"],
+    flavor:   ["MediumRoast", "DarkRoast", "SingleOrigin"],
+    theme:    ["Seasonal", "Technical"],
+  },
+};
+
+// -----------------------------------------------------------------------------
+// SEED AD ACCOUNT
+//
+// A fabricated campaign export, and the most important fixture in this file.
+// Everything above it — the portfolio, the learnings, the calibration spread —
+// is the half of the product that three funded competitors also ship. This is
+// the half that nothing else attempts: an ad account whose names are the join
+// key back to the experiments that ordered them.
+//
+// ## The rows are authored raw, and parsed at load
+//
+// No row here carries `parsed`, `values` or `parseErrors`. Those are computed by
+// `annotateRow` against the schema resolved at load time, so a seeded row goes
+// through the identical path a CSV-imported row does. A seed that shipped its
+// own parse results could assert that a name parsed when the live parser
+// refuses it — a demo that lies about the one thing being demonstrated.
+//
+// ## The defects are the demo
+//
+// A clean fabricated account proves nothing; anyone can invent rows that add up.
+// Eight failure modes are planted deliberately, each of which the product is
+// built to name rather than absorb. Every one is documented, with the figure it
+// should produce, in docs/seed-demo-patterns.md §7.
+//
+//   1. clean parse, joined by tag slot        NH-013, GC-004, GC-006, PS-003
+//   2. legacy names, joined by hand claim     NH-005, GC-003 (pre-convention)
+//   3. claim inherited from a parent campaign NH-005 claims the campaign name
+//   4. wrong segment count — refused          one 10-slot Meta ad name
+//   5. delimiter inside a value               "Emma_Brune" → 12 slots
+//   6. value outside a controlled vocabulary  theme "Cozy"
+//   7. a tag that resolves to nothing         _NH-099, a broken link
+//   8. untagged business-as-usual spend       _NA, correctly joins to nothing
+//
+// Two more live on the initiative records rather than here: one name claimed by
+// two initiatives (NH-005 and NH-009 both claim the Q1 prospecting campaign),
+// and a claimed name absent from the export (NH-005 claims a Q4 retargeting
+// campaign that predates this window).
+//
+// Dates are authored on the same weekly grid as SEED_WEEKLY_METRICS and rebased
+// with it, so the paid-social burn in the ad account lands on the same weeks the
+// Weekly Pulse notes describe it.
+// -----------------------------------------------------------------------------
+
+// Parent entity names, referenced by the ad rows below. A real export carries
+// them on every row, and they are what lets a claim on a campaign inherit down
+// to every ad inside it.
+const NH_PROSPECT_CANDLES = "Meta_Prospect_Candles_US_Purchase";
+const NH_LEGACY_CAMPAIGN  = "2026_Q1_prospecting_v2";
+const GC_PROSPECT_BEAN    = "Meta_Prospect_WholeBean_US_Purchase";
+const PS_PROSPECT_OUTER   = "Meta_Prospect_Outerwear_US_Purchase";
+
+const meta = (name, date, campaignName, adsetName, spend, conversions, revenue) => ({
+  name, level: "ad", channel: "meta", date, campaignName, adsetName,
+  metrics: {
+    spend, conversions, revenue,
+    impressions: Math.round(spend * 88),
+    clicks:      Math.round(spend * 1.16),
+  },
+});
+
+const klaviyo = (name, date, flowName, spend, conversions, revenue) => ({
+  name, level: "message", channel: "klaviyo", date, campaignName: flowName, adsetName: "",
+  metrics: { spend, conversions, revenue, impressions: Math.round(revenue * 0.4), clicks: Math.round(conversions * 9.4) },
+});
+
+const google = (name, date, campaignName, adgroupName, spend, conversions, revenue) => ({
+  name, level: "ad", channel: "google", date, campaignName, adsetName: adgroupName,
+  metrics: { spend, conversions, revenue, impressions: Math.round(spend * 61), clicks: Math.round(spend * 2.1) },
+});
+
+const SEED_AD_ACCOUNT_AUTHORED = [
+  // -- NH-013: the UGC creative scale that was killed -------------------------
+  // Three creatives over three weeks. Spend climbs, conversions do not follow,
+  // and blended ROAS falls 3.2 → 1.5. This is the burn the Weekly Pulse notes
+  // describe on 2026-03-30 and the kill on 2026-04-06, now visible at ad level.
+  meta("Meta_Col_MayaOrtiz_R3_F_Lifestyle_CozyReset_Candles_NA_30s_NH-013",        "2026-03-23", NH_PROSPECT_CANDLES, "US_25-34_F_LAL5-Buyers_Auto", 4200, 42, 13500),
+  meta("Meta_Col_DevPatel_R3_NA_DayInLife_MorningRitual_Textiles_NA_30s_NH-013",   "2026-03-23", NH_PROSPECT_CANDLES, "US_25-34_F_LAL5-Buyers_Auto", 3100, 29,  9300),
+  meta("Meta_LF_ProductPack_R3_F_Product_TextureCloseUp_Decor_NA_Carousel_NH-013", "2026-03-23", NH_PROSPECT_CANDLES, "US_35-44_F_StackedInterest_Auto", 2600, 22, 7100),
+  meta("Meta_Col_MayaOrtiz_R3_F_Lifestyle_CozyReset_Candles_NA_30s_NH-013",        "2026-03-30", NH_PROSPECT_CANDLES, "US_25-34_F_LAL5-Buyers_Auto", 6800, 52, 16700),
+  meta("Meta_Col_DevPatel_R3_NA_DayInLife_MorningRitual_Textiles_NA_30s_NH-013",   "2026-03-30", NH_PROSPECT_CANDLES, "US_25-34_F_LAL5-Buyers_Auto", 5200, 36, 11500),
+  meta("Meta_LF_ProductPack_R3_F_Product_TextureCloseUp_Decor_NA_Carousel_NH-013", "2026-03-30", NH_PROSPECT_CANDLES, "US_35-44_F_StackedInterest_Auto", 4100, 24, 7700),
+  meta("Meta_Col_MayaOrtiz_R3_F_Lifestyle_CozyReset_Candles_NA_30s_NH-013",        "2026-04-06", NH_PROSPECT_CANDLES, "US_25-34_F_LAL5-Buyers_Auto", 7400, 44, 14200),
+  meta("Meta_Col_DevPatel_R3_NA_DayInLife_MorningRitual_Textiles_NA_30s_NH-013",   "2026-04-06", NH_PROSPECT_CANDLES, "US_25-34_F_LAL5-Buyers_Auto", 5600, 27,  8600),
+  meta("Meta_LF_ProductPack_R3_F_Product_TextureCloseUp_Decor_NA_Carousel_NH-013", "2026-04-06", NH_PROSPECT_CANDLES, "US_35-44_F_StackedInterest_Auto", 4300, 17, 5400),
+
+  // -- Untagged business-as-usual, and one broken link ------------------------
+  // Evergreen product ads carry the placeholder in the initiative slot and join
+  // to nothing, which is correct: most spend is not an experiment. The Gifting
+  // ad carries NH-099, an initiative that does not exist — a tag that resolves
+  // to nothing is reported as a broken link rather than counted as attributed.
+  meta("Meta_LF_ProductSingle_Evergreen_NA_Product_HeroSKU_Decor_NA_Static_NA",    "2026-04-13", NH_PROSPECT_CANDLES, "US_25-34_F_Broad_Auto", 5100, 39, 12900),
+  meta("Meta_LF_ProductSingle_Evergreen_NA_Product_HeroSKU_Decor_NA_Static_NA",    "2026-04-20", NH_PROSPECT_CANDLES, "US_25-34_F_Broad_Auto", 5400, 44, 14600),
+  meta("Meta_LF_ProductPack_Promo_F_Lifestyle_GiftEdit_Gifting_NA_Carousel_NH-099","2026-04-20", NH_PROSPECT_CANDLES, "US_25-34_F_Broad_Auto", 2900, 21,  6800),
+
+  // -- Three names this account cannot parse, for three different reasons -----
+  // All three were meant for NH-018 and none of them reach it. The product's
+  // rule is that a wrong-but-plausible parse is worse than an unparsed row, so
+  // each is counted, reported by failure kind, and its spend named.
+  //   ten slots — the flavor segment was dropped rather than written NA
+  meta("Meta_LF_ProductPack_R4_F_Lifestyle_WarmNeutrals_Candles_Static_NH-018",    "2026-04-27", NH_PROSPECT_CANDLES, "US_25-34_F_QuizAudience_Auto", 1900, 14, 4400),
+  //   twelve slots — a creator's name typed with the delimiter inside it
+  meta("Meta_Col_Emma_Brune_R4_F_Product_LinenHand_Textiles_NA_Static_NH-018",     "2026-04-27", NH_PROSPECT_CANDLES, "US_25-34_F_QuizAudience_Auto", 1600, 11, 3500),
+  //   right shape, wrong vocabulary — "Cozy" is not a theme anybody declared
+  meta("Meta_LF_ProductPack_R4_F_Cozy_WarmNeutrals_Candles_NA_Static_NH-018",      "2026-05-04", NH_PROSPECT_CANDLES, "US_25-34_F_QuizAudience_Auto", 2200, 16, 5100),
+
+  // -- Legacy names from before the convention was installed ------------------
+  // These cannot be renamed — a live Meta campaign loses its learning phase — so
+  // they are claimed by hand instead. Unparseable and attributed anyway, which
+  // is the whole point of having two independent bridges.
+  meta("2026_Q1_prospecting_v2 — Ad 3 (linen, static)",   "2026-04-13", NH_LEGACY_CAMPAIGN, "prospecting_broad", 3800, 31, 10200),
+  meta("2026_Q1_prospecting_v2 — Ad 7 (candle carousel)", "2026-04-20", NH_LEGACY_CAMPAIGN, "prospecting_broad", 3400, 26,  8700),
+
+  // -- GC-004: the same burn, at a second brand -------------------------------
+  meta("Meta_Col_JonasLee_R2_NA_Lifestyle_HomeBarista_WholeBean_MediumRoast_35s_GC-004",  "2026-04-13", GC_PROSPECT_BEAN, "US_25-34_NA_HomeBrewInterest_Auto", 5600, 41, 14100),
+  meta("Meta_Col_JonasLee_R2_NA_DayInLife_PourOverRitual_BrewGear_NA_35s_GC-004",         "2026-04-13", GC_PROSPECT_BEAN, "US_25-34_NA_HomeBrewInterest_Auto", 4100, 27,  9300),
+  meta("Meta_Col_JonasLee_R2_NA_Lifestyle_HomeBarista_WholeBean_MediumRoast_35s_GC-004",  "2026-04-20", GC_PROSPECT_BEAN, "US_25-34_NA_HomeBrewInterest_Auto", 7200, 42, 14400),
+  meta("Meta_Col_JonasLee_R2_NA_DayInLife_PourOverRitual_BrewGear_NA_35s_GC-004",         "2026-04-20", GC_PROSPECT_BEAN, "US_25-34_NA_HomeBrewInterest_Auto", 5300, 26,  8900),
+  meta("Meta_LF_ProductSingle_R2_NA_Taste_RoastDate_WholeBean_SingleOrigin_Static_GC-004","2026-04-20", GC_PROSPECT_BEAN, "US_35-44_NA_Broad_Auto",           3900, 18,  6100),
+  meta("Meta_Col_JonasLee_R2_NA_Lifestyle_HomeBarista_WholeBean_MediumRoast_35s_GC-004",  "2026-04-27", GC_PROSPECT_BEAN, "US_25-34_NA_HomeBrewInterest_Auto", 6900, 31, 10600),
+  meta("Meta_LF_ProductSingle_R2_NA_Taste_RoastDate_WholeBean_SingleOrigin_Static_GC-004","2026-04-27", GC_PROSPECT_BEAN, "US_35-44_NA_Broad_Auto",           4200, 15,  5000),
+
+  // -- GC-006: the micro-creator pilot that worked ----------------------------
+  // Same brand, same channel, same period as the burn above — and a different
+  // result. Pivoting the account by `handle` is what separates them.
+  meta("Meta_Col_PriyaN_R1_NA_DayInLife_FirstGrind_BrewGear_NA_25s_GC-006",   "2026-03-16", GC_PROSPECT_BEAN, "US_25-34_NA_HomeBrewInterest_Auto", 2100, 27, 9600),
+  meta("Meta_Col_TomasR_R1_NA_Taste_RoastComparison_WholeBean_DarkRoast_25s_GC-006", "2026-03-16", GC_PROSPECT_BEAN, "US_25-34_NA_HomeBrewInterest_Auto", 1800, 22, 7800),
+  meta("Meta_Col_PriyaN_R1_NA_DayInLife_FirstGrind_BrewGear_NA_25s_GC-006",   "2026-03-23", GC_PROSPECT_BEAN, "US_25-34_NA_HomeBrewInterest_Auto", 2400, 31, 10900),
+  meta("Meta_Col_TomasR_R1_NA_Taste_RoastComparison_WholeBean_DarkRoast_25s_GC-006", "2026-03-23", GC_PROSPECT_BEAN, "US_25-34_NA_HomeBrewInterest_Auto", 2000, 24, 8500),
+
+  // -- GC-003: the sample-pack launch, also pre-convention ---------------------
+  meta("GC_samplepack_launch_apr — static A", "2026-03-09", "GC_samplepack_launch_apr", "broad_us", 2600, 44, 9100),
+  meta("GC_samplepack_launch_apr — video B",  "2026-03-16", "GC_samplepack_launch_apr", "broad_us", 2900, 51, 10600),
+
+  // -- PS-003: the refresh cadence that avoided both burns --------------------
+  // Stable ROAS across five weeks against two brands whose scale pushes decayed
+  // in three. The contrast is the portfolio's most-cited learning, and here it
+  // is in spend rather than in a post-mortem field.
+  meta("Meta_LF_TrailKit_Evergreen_NA_Seasonal_ShoulderSeason_Outerwear_NA_30s_PS-003",   "2026-03-23", PS_PROSPECT_OUTER, "US_25-34_NA_HikingInterest_Auto", 3200, 29, 10100),
+  meta("Meta_LF_GearTest_Evergreen_NA_Technical_WaterproofProof_Outerwear_NA_30s_PS-003", "2026-03-23", PS_PROSPECT_OUTER, "US_25-34_NA_HikingInterest_Auto", 2800, 26,  9200),
+  meta("Meta_LF_TrailKit_Evergreen_NA_Seasonal_ShoulderSeason_Outerwear_NA_30s_PS-003",   "2026-04-06", PS_PROSPECT_OUTER, "US_25-34_NA_HikingInterest_Auto", 3600, 33, 11600),
+  meta("Meta_Col_AlexKim_R4_NA_DayInLife_TrailMorning_Layers_NA_35s_PS-003",              "2026-04-06", PS_PROSPECT_OUTER, "US_25-34_NA_HikingInterest_Auto", 2500, 24,  8400),
+  meta("Meta_LF_GearTest_Evergreen_NA_Technical_WaterproofProof_Outerwear_NA_30s_PS-003", "2026-04-20", PS_PROSPECT_OUTER, "US_25-34_NA_HikingInterest_Auto", 3900, 37, 13000),
+  meta("Meta_Col_AlexKim_R4_NA_DayInLife_TrailMorning_Layers_NA_35s_PS-003",              "2026-04-20", PS_PROSPECT_OUTER, "US_25-34_NA_HikingInterest_Auto", 2700, 25,  8800),
+  meta("Meta_LF_TrailKit_Evergreen_NA_Seasonal_ShoulderSeason_Outerwear_NA_30s_PS-003",   "2026-05-04", PS_PROSPECT_OUTER, "US_35-44_NA_Broad_Auto",          3400, 31, 10900),
+  meta("Meta_LF_GearTest_Evergreen_NA_Technical_WaterproofProof_Outerwear_NA_30s_PS-003", "2026-05-04", PS_PROSPECT_OUTER, "US_35-44_NA_Broad_Auto",          3100, 30, 10500),
+
+  // -- A second channel, so the pivot is not a Meta-only trick -----------------
+  google("Google_LF_ShoppingFeed_Evergreen_Static_BrandTerms_Outerwear_NA_NA_NA", "2026-04-20", "Google_Prospect_Outerwear_US_Purchase", "brand_terms_exact", 2200, 34, 12600),
+  google("Google_LF_ShoppingFeed_Evergreen_Static_GenericTerms_Layers_NA_NA_NA",  "2026-04-20", "Google_Prospect_Outerwear_US_Purchase", "generic_nonbrand",  1900, 12,  4100),
+
+  // -- Owned channel, same convention, same bridge ----------------------------
+  klaviyo("Klaviyo_Convenience_ThirtyMinuteNudge_NA_NH-011", "2026-04-27", "Klaviyo_Retain_CartAbandon_Purchase", 0, 61, 19800),
+  klaviyo("Klaviyo_Convenience_ThirtyMinuteNudge_NA_NH-011", "2026-05-04", "Klaviyo_Retain_CartAbandon_Purchase", 0, 58, 18900),
+  klaviyo("Klaviyo_Convenience_BrowseNudge2h_NA_GC-002",     "2026-04-27", "Klaviyo_Retain_BrowseAbandon_Purchase", 0, 37, 12400),
+  klaviyo("Klaviyo_Taste_RoastDateProof_NA_GC-005",          "2026-05-04", "Klaviyo_Retain_Nurture_Purchase",       0, 29,  9700),
+];
+
 // -- Demo timeline rebasing ----------------------------------------------------
 //
 // The two arrays above are an authored narrative, kept at their authored dates
@@ -1179,8 +1385,37 @@ const SEED_WEEKLY_METRICS_AUTHORED = [
 
 const AUTHORED_LAST_WEEK = "2026-05-18";  // most recent date in SEED_WEEKLY_METRICS_AUTHORED
 
-export const { SEED, SEED_WEEKLY_METRICS } = buildSeed({
+// Every initiative carries an attribution socket. In a live workspace the tag is
+// stamped when the record is created — `suggestTrackingTag` derives it from the
+// initiative id — and the seed derives it the same way rather than authoring 38
+// literals that could drift from the ids sitting beside them. Anything that
+// needs a tag unlike its id sets `trackingTag` on its own record and wins here.
+const withTrackingTags = (list) => list.map(it => ({ ...it, trackingTag: it.trackingTag || it.initId }));
+
+export const { SEED, SEED_WEEKLY_METRICS, SEED_AD_ACCOUNT } = buildSeed({
   authoredLastWeek: AUTHORED_LAST_WEEK,
-  seed: SEED_AUTHORED,
+  seed: withTrackingTags(SEED_AUTHORED),
   weeklyMetrics: SEED_WEEKLY_METRICS_AUTHORED,
+  adAccount: SEED_AD_ACCOUNT_AUTHORED,
 });
+
+// -----------------------------------------------------------------------------
+// SEED DEBATES
+//
+// A captured Signal AI run, shown in History so the debate is readable without
+// waiting ninety seconds for eight agent turns — and without a live model call
+// failing in front of an audience.
+//
+// It stays empty until a real run is pasted in. A hand-written transcript would
+// be a different kind of fiction from the rest of this file: fabricated brands
+// and figures are announced as fabricated on arrival, but a transcript implied
+// to be model output that was actually authored misrepresents what the system
+// does. So this array holds real runs or nothing.
+//
+// To capture one: run a debate in the deployed app, Settings → Download backup,
+// and copy one element of the `debates` array out of the JSON into this list.
+// Stamp `capturedAt` and `capturedModel` on it so the demo can say which model
+// produced it and when — a transcript with no provenance ages into a claim
+// nobody can check.
+// -----------------------------------------------------------------------------
+export const SEED_DEBATES = [];

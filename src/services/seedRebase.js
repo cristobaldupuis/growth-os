@@ -119,13 +119,22 @@ export function withDerivedMetrics(entry) {
 }
 
 /**
- * The whole pipeline, which is what a config actually wants: rebase both
+ * The whole pipeline, which is what a config actually wants: rebase all three
  * arrays onto today's timeline and derive the missing weekly figures.
+ *
+ * `adAccount` is deliberately returned *unparsed*. A performance row's `parsed`,
+ * `values` and `parseErrors` fields are the output of the naming schema resolved
+ * at load, not something a config is allowed to author — a seed that shipped its
+ * own parse results could claim a name parsed when the live parser refuses it,
+ * which is the one lie this demo cannot afford to tell. The caller runs
+ * `annotateRow` over these, so every seeded row takes the identical path a
+ * CSV-imported row takes. See App.jsx's load path and DECISIONS.md.
  */
-export function buildSeed({ authoredLastWeek, seed, weeklyMetrics }) {
+export function buildSeed({ authoredLastWeek, seed, weeklyMetrics, adAccount = [] }) {
   const { rebaseRecord } = makeRebaser(authoredLastWeek);
   return {
     SEED: seed.map(rebaseRecord),
     SEED_WEEKLY_METRICS: weeklyMetrics.map(rebaseRecord).map(withDerivedMetrics),
+    SEED_AD_ACCOUNT: adAccount.map(rebaseRecord),
   };
 }

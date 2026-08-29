@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { gG, gGh, gSL, gCd, gSl } from "../components/styles.js";
 import { fmtCur, fmtDate } from "../constants.js";
 import {
-  resolveSchema, breakdownByDimension, adNamesOf, normKey, NA,
+  resolveSchema, breakdownByDimension, adNamesOf, normKey, NA, assignedNameConflicts,
 } from "../services/naming.js";
 import { interactive, tile } from "../components/motion.js";
 import { ChargeBar } from "../components/ChargeBar.jsx";
@@ -124,9 +124,19 @@ export function PerformanceView({ t, items, settings, perfRows, onImport, onClea
         <div data-tour="performance-intro">
           <h2 style={{ fontFamily: t.serif, fontSize: 24, fontWeight: 600, margin: 0, color: t.text }}>Performance</h2>
           <p style={{ fontSize: 13, color: t.textSub, margin: "6px 0 0", maxWidth: 700, lineHeight: 1.6 }}>
-            Import a campaign-level export and every ad name is parsed back through your naming convention. That turns
-            a flat spend report into a dimensional one, and joins the rows that carry a tracking tag to the initiative
-            they belong to — no API integration involved.
+            {rows.length > 0 ? (
+              <>
+                Every ad name below has been parsed back through your naming convention, which turns a flat spend report
+                into a dimensional one and joins the rows carrying a tracking tag to the initiative they belong to — no
+                API integration involved. Names the parser refuses are counted and named rather than guessed at.
+              </>
+            ) : (
+              <>
+                Import a campaign-level export and every ad name is parsed back through your naming convention. That turns
+                a flat spend report into a dimensional one, and joins the rows that carry a tracking tag to the initiative
+                they belong to — no API integration involved.
+              </>
+            )}
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -400,7 +410,15 @@ export function PerformanceView({ t, items, settings, perfRows, onImport, onClea
             {(() => {
               const broken = [...new Map(roll.rows.filter(r => r.attribution === "unmatched").map(r => [r.name, r])).values()];
               const bad    = [...new Map(roll.rows.filter(r => r.attribution === "unparsed").map(r => [r.name, r])).values()];
-              if (broken.length === 0 && bad.length === 0) return null;
+              // Two initiatives claiming one name is a genuine conflict: the same
+              // spend cannot belong to two experiments. `assignedNameIndex`
+              // resolves it deterministically — first registration wins — so the
+              // attribution is stable across imports, but stability is not
+              // correctness and only a human knows which claim was meant. It was
+              // being computed and never shown, which made a first-wins guess
+              // look like a settled fact.
+              const clashes = assignedNameConflicts(items);
+              if (broken.length === 0 && bad.length === 0 && clashes.length === 0) return null;
               return (
                 <div style={gCd(t)}>
                   <div style={gSL(t)}>Needs a look</div>
@@ -433,6 +451,24 @@ export function PerformanceView({ t, items, settings, perfRows, onImport, onClea
                         </div>
                       ))}
                       {bad.length > 8 && <div style={{ fontSize: 11, color: t.textMuted, fontFamily: t.sans, marginTop: 4 }}>…and {bad.length - 8} more.</div>}
+                    </div>
+                  )}
+                  {clashes.length > 0 && (
+                    <div style={{ marginTop: (broken.length || bad.length) ? 14 : 0 }}>
+                      <div style={{ fontSize: 12.5, color: t.text, fontFamily: t.serif, marginBottom: 7, lineHeight: 1.55 }}>
+                        <strong>{clashes.length} name{clashes.length !== 1 ? "s are" : " is"} claimed by more than one initiative.</strong>{" "}
+                        The spend is currently attributed to whichever claimed it first, which is stable but not necessarily
+                        right — the same spend cannot belong to two experiments. Drop the claim from the one that should not have it.
+                      </div>
+                      {clashes.slice(0, 8).map(c => (
+                        <div key={c.name} style={{ padding: "4px 0" }}>
+                          <div style={{ fontFamily: t.mono, fontSize: 10.5, color: t.textSub, wordBreak: "break-all" }}>{c.name}</div>
+                          <div style={{ fontFamily: t.mono, fontSize: 10.5, color: t.warn }}>
+                            {c.initiatives.map(i => i.initId || i.title).join("  ·  ")}
+                          </div>
+                        </div>
+                      ))}
+                      {clashes.length > 8 && <div style={{ fontSize: 11, color: t.textMuted, fontFamily: t.sans, marginTop: 4 }}>…and {clashes.length - 8} more.</div>}
                     </div>
                   )}
                 </div>

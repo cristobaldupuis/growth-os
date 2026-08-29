@@ -30,7 +30,7 @@ export const TOUR_STEPS = [
   {
     selector: '[data-tour="performance-intro"]', nav: "performance",
     title: "The ad names are the attribution layer",
-    body: "Import a campaign export and every ad name is parsed back through your naming convention — a flat spend report becomes one you can pivot by audience, angle or format, and any ad whose name carries a tracking tag is joined to the initiative that ordered it. No pixel, no API integration.",
+    body: "A campaign export is already loaded here. Every ad name has been parsed back through the naming convention — a flat spend report becomes one you can pivot by audience, angle or format, and any ad whose name carries a tracking tag is joined to the initiative that ordered it. No pixel, no API integration. Open Attribution to see the four-way split, including the names this account cannot parse and why.",
   },
   {
     selector: '[data-tour="signal-button"]', nav: "dashboard",

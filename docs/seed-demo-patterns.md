@@ -115,6 +115,90 @@ Three Drafts in the seed are explicitly grounded in another brand's closed work,
 
 ---
 
+## 7. The ad account, and the eight ways it is broken on purpose
+
+Everything above this section is the experiment ledger — the half of the product
+that GrowthLab, GrowthOrange and GrowthEX also ship. This section is the other
+half, and it is the one to demo first.
+
+`Performance` is populated on arrival. Nothing has to be imported to reach it,
+and a visitor who opens the link unaccompanied lands on a parsed account rather
+than on an empty state and an Import button.
+
+**Where it lives:** `SEED_AD_ACCOUNT_AUTHORED` in `src/config.demo.js`, rebased
+onto today's timeline by `buildSeed` and parsed at load by `annotateRow`.
+
+### The rows are authored raw and parsed live
+
+No seeded row carries `parsed`, `values` or `parseErrors`. Those come from the
+schema resolved at load, so every figure below is computed by the same code path
+a client's CSV takes. This matters more than it sounds: a seed that shipped its
+own parse results could claim a name parsed when the live parser refuses it,
+which is the one thing this demo cannot afford to get wrong. Change a vocabulary
+in Settings → Taxonomy and the parse rate on this page moves.
+
+### The headline figures
+
+| | |
+|---|---|
+| Rows | 44 |
+| Spend / revenue / ROAS | $150k · $445k · 2.97x |
+| **Attributed** | 36 rows, $127k — joined to an initiative |
+| **Untagged** | 4 rows, $15k — no tag in the name, normal BAU |
+| **Broken links** | 1 row, $3k — carries a tag resolving to nothing |
+| **Unparsed** | 3 rows, $6k — name fits no template |
+
+Two counts of "unparsed" appear on this page and they are not the same number.
+Seven names fail to parse; only three are unattributed. The other four are
+pre-convention names attributed by hand claim — unparseable and attributed,
+which is the entire reason two independent bridges exist.
+
+### The eight planted cases
+
+| # | Case | Where to look |
+|---|---|---|
+| 1 | Clean parse, joined by the tag slot | NH-013, GC-004, GC-006, PS-003 in *Measured performance by initiative* |
+| 2 | Legacy names joined by hand claim | NH-005 and GC-003, labelled `claimed name` rather than `tracking tag` |
+| 3 | A claim on a campaign inherits to its ads | NH-005 claims `2026_Q1_prospecting_v2`; the two ad rows under it attribute |
+| 4 | Wrong segment count — refused, not guessed | *Needs a look*: "Expected 11 slots for meta/ad, found 10" |
+| 5 | The delimiter inside a value | `Meta_Col_Emma_Brune_…` → 12 slots, and a cascade of wrong vocabulary errors behind it |
+| 6 | A value outside a controlled vocabulary | Theme `Cozy`, right shape and still refused |
+| 7 | A tag that resolves to nothing | `NH-099`, named as a broken link rather than counted as attributed |
+| 8 | Untagged business-as-usual spend | Trailing `NA`, correctly joined to nothing |
+
+Two more live on the initiative records rather than in the export: NH-005 and
+NH-009 both claim the Q1 prospecting campaign (a conflict, resolved
+first-wins and reported rather than arbitrated silently), and NH-005 claims a Q4
+retargeting campaign absent from this window (reported as claimed-but-absent —
+`3/4 found in this data`).
+
+### What the account says that the ledger cannot
+
+NH-013 and GC-004 are the two paid-social burns the library already describes in
+post-mortem prose. Here they are in spend: NH-013 at 2.17x and GC-004 at 1.84x,
+against PS-003 — the refresh-cadence discipline designed in response to both —
+holding 3.27x over a longer window. GC-006, the micro-creator pilot, returns
+4.43x on $8k in the same account and the same weeks as GC-004's burn. Break the
+account down by `handle` and the difference between `Col` and `LF` is visible
+before anybody reads a learning.
+
+**Demo line:** "Every experiment tracker can tell you that test failed. This one
+can tell you it failed at 1.84x while the pilot beside it ran at 4.43x, because
+the ad names carried the link and nobody typed any of it in."
+
+**Second demo line, for the defects:** "The fabricated data isn't here to flatter
+the tool. It's designed to break it in eight ways, and what you're looking at is
+the tool refusing to guess."
+
+### Scope of the export
+
+This is the paid-social and owned-channel slice, not the whole account: roughly
+$150k against a portfolio spending far more per week in Weekly Pulse. That is
+what a real export looks like when someone pulls the campaigns relevant to a
+question, and it is why the two figures are not meant to reconcile.
+
+---
+
 ## What's missing on purpose
 
 Some categories are deliberately thin, so the library doesn't read as "we have a play for everything."

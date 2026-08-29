@@ -62,6 +62,19 @@ today's state: [docs/scope.md](./docs/scope.md).
 
 ## What's new
 
+- **The demo ships an ad account, authored to break the parser** — Performance
+  is populated on arrival rather than behind a file picker, so the bridge (the
+  parse, the four-way split, the dimension pivot) is what a visitor sees first
+  instead of the experiment tracker every competitor also ships. The rows are
+  fabricated and say so, and they are fabricated *badly on purpose*: a dropped
+  slot, a delimiter inside a creator's name, a theme nobody declared, a tag
+  pointing at a deleted initiative, two initiatives claiming one campaign. Each
+  is refused and named rather than absorbed. Rows carry no authored parse
+  results — they go through the same `annotateRow` path a client's CSV takes, so
+  changing a vocabulary in Settings moves the numbers on the page. Every planted
+  case is documented with its expected figure in
+  [docs/seed-demo-patterns.md](./docs/seed-demo-patterns.md) §7 and held there by
+  `src/services/seedAdAccount.test.js`
 - **Generated creative has an identity** — every frame and render now leaves a
   persisted record carrying the initiative, the brief version, the prompt, the
   model, what it cost, and the ad name it ships under. Assets used to live in

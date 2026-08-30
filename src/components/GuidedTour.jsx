@@ -60,16 +60,24 @@ function TourSpotlight({ t, dk, stepIndex, step, isLast, onBack, onNext, onSkip,
   const cardW = Math.min(CARD_W, vw - MARGIN*2);
   const scrim = dk ? "rgba(0,0,0,0.55)" : "rgba(20,18,10,0.35)";
 
-  // Prefer below the target, then above, then a centered fallback when the
-  // element couldn't be found at all (e.g. selector missing at this size).
+  // Below the target, then above, then centred — either when the element could
+  // not be found at all, or when neither side has room to read a card in. That
+  // last case is the one a tall anchor produces: an element spanning most of the
+  // viewport leaves a sliver above and a sliver below, and squeezing the card
+  // into either clips its own Next button off the screen.
+  const MIN_CARD_H = 200;
   let cardStyle;
-  if (rect) {
-    const roomBelow = vh - (rect.top + rect.height);
-    const placeBelow = roomBelow > 190 || roomBelow >= rect.top;
-    const top = placeBelow ? Math.min(rect.top + rect.height + 14, vh - 20) : undefined;
+  const roomBelow = rect ? vh - (rect.top + rect.height) - MARGIN * 2 : 0;
+  const roomAbove = rect ? rect.top - MARGIN * 2 : 0;
+  if (rect && Math.max(roomBelow, roomAbove) >= MIN_CARD_H) {
+    const placeBelow = roomBelow >= MIN_CARD_H && (roomBelow >= roomAbove || roomBelow > 190);
+    const top = placeBelow ? rect.top + rect.height + 14 : undefined;
     const bottom = !placeBelow ? Math.max(vh - rect.top + 14, 20) : undefined;
     const left = Math.max(MARGIN, Math.min(rect.left, vw - cardW - MARGIN));
-    cardStyle = { position:"fixed", top, bottom, left, width:cardW, zIndex:402 };
+    // The card's own height is not known here, so it is capped against the space
+    // it was placed in and scrolls, rather than running off the edge.
+    cardStyle = { position:"fixed", top, bottom, left, width:cardW, zIndex:402,
+      maxHeight: (placeBelow ? roomBelow : roomAbove), overflowY:"auto" };
   } else {
     cardStyle = { position:"fixed", top:"50%", left:"50%", transform:"translate(-50%,-50%)", width:cardW, zIndex:402 };
   }
@@ -131,8 +139,12 @@ export function GuidedTour({ t, dk, stepIndex, currentNav, onNavigate, onNext, o
   // Switch the app to whichever view this step is anchored in. The target DOM
   // node doesn't exist until that view renders, which is what TourSpotlight's
   // retry loop (keyed fresh on stepIndex below) is waiting out.
+  //
+  // `step.tab` addresses a tab within that view. Three of the strongest steps
+  // live behind one — the split, the audit — and a tour that says "open
+  // Attribution to see it" is a tour that stopped short of its own argument.
   useEffect(() => {
-    if (step.nav && step.nav !== currentNav) onNavigate(step.nav);
+    if (step.nav && (step.nav !== currentNav || step.tab)) onNavigate(step.nav, step.tab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stepIndex]);
 

@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { gG, gGh, gGd, gCd, gTA } from "./styles.js";
 import { auditAccount, extractNames, auditToCSV } from "../services/accountAudit.js";
 import { piiNotice } from "../services/dataSafety.js";
+import { SAMPLE_ACCOUNT_NAMES } from "../activeConfig.js";
 
 // -- Account audit -------------------------------------------------------------
 //
@@ -80,6 +81,14 @@ export function AccountAuditPanel({ t, settings, showToast }) {
             Load a file
             <input type="file" accept=".csv,.txt,.tsv" onChange={onFile} style={{ display: "none" }} />
           </label>
+          {/* A prospect's account as found, for when there is no file to hand.
+              Absent from a client deployment, where the only account worth
+              auditing is their own. */}
+          {SAMPLE_ACCOUNT_NAMES && (
+            <button style={{ ...gGh(t), fontSize: 12.5 }} onClick={() => { setText(SAMPLE_ACCOUNT_NAMES); setRan(null); }}>
+              Load a sample account
+            </button>
+          )}
           {text.trim() && (
             <span style={{ fontSize: 11.5, color: t.textMuted, fontFamily: t.mono }}>
               {parsed.names.length.toLocaleString()} name{parsed.names.length === 1 ? "" : "s"}

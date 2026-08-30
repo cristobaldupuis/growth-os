@@ -69,9 +69,15 @@ function Empty({ t, title, body, action }) {
   );
 }
 
-export function PerformanceView({ t, items, settings, perfRows, onImport, onClear, onAssignNames, showToast, initialTab, initialInitiativeId, onOpenConvention }) {
+// `tab` is owned by the caller rather than held here, because it is addressable:
+// it is in the URL, the guided tour drives it, and the builder hand-off sets it.
+// It used to seed a local `useState` from `initialTab`, which read only at mount
+// — so pasting "#/performance/attribution" into an already-open app changed the
+// hash and nothing else, and clicking a tab never wrote the hash back. One
+// source of truth removes both directions of that.
+export function PerformanceView({ t, items, settings, perfRows, onImport, onClear, onAssignNames, showToast, tab = "breakdown", onTab, initialInitiativeId, onOpenConvention }) {
   const schema = resolveSchema(settings);
-  const [tab, setTab] = useState(initialTab || "breakdown");
+  const setTab = (next) => onTab && onTab(next);
   const [dimKey, setDimKey] = useState("");
   const [sortBy, setSortBy] = useState("spend");
   const [builderInit, setBuilderInit] = useState(initialInitiativeId || "");
@@ -295,7 +301,7 @@ export function PerformanceView({ t, items, settings, perfRows, onImport, onClea
           <>
             {/* The three-way split, kept three-way on purpose: untagged spend is
                 normal business as usual, an unresolvable tag is a broken link. */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 12, marginBottom: 16 }}>
+            <div data-tour="attribution-split" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 12, marginBottom: 16 }}>
               {[
                 { key: "matched",  label: "Attributed",  note: "joined to an initiative" },
                 { key: "untagged", label: "Untagged",    note: "no tag in the name — normal for BAU spend" },
@@ -490,7 +496,9 @@ export function PerformanceView({ t, items, settings, perfRows, onImport, onClea
           what lets it be used on a prospect's account before there is a contract
           — and before anything has been imported into this workspace at all. */}
       {tab === "audit" && (
-        <AccountAuditPanel t={t} settings={settings} showToast={showToast} />
+        <div data-tour="account-audit">
+          <AccountAuditPanel t={t} settings={settings} showToast={showToast} />
+        </div>
       )}
 
       {/* ----------------------------------------------------------------- Taxonomy */}

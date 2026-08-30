@@ -6,6 +6,15 @@ Every ID here is checked against the live seed in `src/config.demo.js`, which is
 
 The three brands are **Northcove Home** (`NH`, home décor), **Grounds Control** (`GC`, specialty coffee) and **Peak Season** (`PS`, technical outdoor gear).
 
+**The guided tour is the short version of this document.** Eight steps in
+`src/components/tourSteps.js`, ordered as an argument rather than as a site map:
+the premise (everything here is invented, the machinery is not), the north star,
+the agenda (§8), the library, and then three consecutive steps on the part
+nothing else attempts — the parse, the four-way split (§7), and the account audit
+(§9). It opens itself on a cold visit and replays from the **Tour** button beside
+the demo chip. If you are narrating in person, the tour's own ordering is the
+running order to follow.
+
 ---
 
 ## 1. SMS as a portfolio gap
@@ -196,6 +205,79 @@ This is the paid-social and owned-channel slice, not the whole account: roughly
 $150k against a portfolio spending far more per week in Weekly Pulse. That is
 what a real export looks like when someone pulls the campaigns relevant to a
 question, and it is why the two figures are not meant to reconcile.
+
+---
+
+## 8. The learning agenda — the layer above the ledger
+
+`Agenda` opens on six questions rather than an empty state. This is the answer
+to the sharpest fair objection a demo attracts — *"this is a nicely structured
+list of things you were going to do anyway"* — so it is worth reaching before
+the initiative register, not after.
+
+**Where it lives:** `SEED_AGENDA_AUTHORED` in `src/config.demo.js`, with
+`AGENDA_LADDER` in the same file mapping which experiments ladder up to which
+question.
+
+These are **authored, not generated**, and the distinction is load-bearing.
+`seedInitiativeFromAgenda` is deterministic by design (see the reasoning in
+`services/learningAgenda.js`): a question with no evidence behind it is precisely
+where a model produces confident filler. Naming the question is the judgement
+being sold, so the seed writes it the way an operator would.
+
+| Status | Count | What it demonstrates |
+|---|---|---|
+| Answered | 2 | A question the portfolio actually closed out |
+| Open | 3 | Two of which carry a closed result, raising the "worth marking Answered" nudge — the system notices, the human decides |
+| Parked | 1 | A good question shelved on a real dependency, with the reason attached |
+
+**15 of 38 initiatives ladder up. The rest deliberately do not.** A back-filled
+portfolio where every historical experiment traces neatly to a pre-existing
+question is one somebody tidied afterwards. NH-016 is the pointed example: it
+tested the same PDP surface as the open Conversion question and is left
+unlinked, because it ran before the question was framed.
+
+**Demo line:** "Every one of these is a question with a stated falsifying result
+and a sample guidance. The experiments underneath aren't a backlog — they're how
+the question gets answered, and two of them cost about $80k of media to answer.
+That's what makes 'did any of this teach us anything' a query rather than an
+argument."
+
+---
+
+## 9. The sample account — the first meeting, on a prospect's data
+
+`Performance → Account audit → Load a sample account` fills the box with 70 ad
+names from a fictional prospect's account **as found**. This is a different
+artefact from §7's seeded account: that one follows the convention because this
+tool built it; this one is what is actually sitting in an Ads Manager before
+anybody arrives. The audit exists to price the gap between them.
+
+**Where it lives:** `SAMPLE_ACCOUNT_NAMES` in `src/config.demo.js`.
+
+What it produces, and why each number is worth pausing on:
+
+| Finding | Value | The point |
+|---|---|---|
+| Delimiter | `\|`, schema uses `_` | Not a setting to change — changing it invalidates every name already built |
+| Dominant shape | 6 slots, 37% | And four other shapes at similar weight: several conventions layered over time |
+| Parse rate | **0%** across all six templates | All 70 failing on slot count, none on vocabulary — the expensive end of the estimate |
+| Retrofit | **70 names, 100%** | These cannot be renamed without resetting the learning phase, so each is a mapping decision |
+
+The slot table is the part to slow down on. Two slots resolve cleanly (Geo 100%,
+Format 100%), two resolve to nothing — and **slot 3 reads as "Age · 80.8%" and
+that is wrong.** It matches because `Broad` happens to sit in the age
+vocabulary; the slot is plainly an audience slot. That is not a bug to tune out
+of the sample. It is the clearest possible demonstration of what "reports
+evidence and refuses to propose a taxonomy" means in practice: the tool offers
+coverage figures, and a person decides what the slot is. A tool confident enough
+to auto-assign that slot would have been confidently wrong, silently, in a
+client's first week.
+
+**Demo line:** "Seventy names, none of them parse, all seventy need mapping by
+hand. Two slots the tool is sure about, two it has nothing to say about, and one
+it's 81% confident about and wrong. That last one is why the implementation is
+priced the way it is."
 
 ---
 

@@ -8,6 +8,7 @@ import {
   SEED_AD_ACCOUNT,
   SEED_NAMING_CUSTOM,
   SEED_DEBATES,
+  SEED_AGENDA,
   DEMO_MODE,
 } from "./activeConfig.js";
 
@@ -781,6 +782,7 @@ export default function App() {
         if(ar&&ar.value) setAssets(JSON.parse(ar.value));
         if(ur&&ur.value) { const u = JSON.parse(ur.value); setUsage(u); usageRef.current = u; }
         if(gr&&gr.value) setAgenda(JSON.parse(gr.value));
+        else if (SEED_AGENDA.length) { setAgenda(SEED_AGENDA); store.set(KEY_AGENDA,JSON.stringify(SEED_AGENDA)); }
       } catch { setItems(SEED); }
       setLoaded(true);
       // Stale-backup nudge. This effect has an empty dependency array so it runs
@@ -841,7 +843,15 @@ export default function App() {
   const lastWrittenHash = useRef(null);
   useEffect(() => {
     const apply = () => {
-      if (lastWrittenHash.current !== null && window.location.hash === lastWrittenHash.current) return;
+      // Consumed on use, not left standing. Each write below causes exactly one
+      // hashchange, so one skip settles it — and holding the value afterwards
+      // made Back *to* a hash we had written at some point look like our own
+      // echo and get dropped, which is how "#/performance/attribution → audit →
+      // Back" changed the URL and left the tab where it was.
+      if (lastWrittenHash.current !== null && window.location.hash === lastWrittenHash.current) {
+        lastWrittenHash.current = null;
+        return;
+      }
       const r = parseHash(window.location.hash);
       if (r.selId) setSelId(r.selId);
       if (r.tab)   { setPerfTab(r.tab); setSettingsSection(r.tab); }
@@ -1049,7 +1059,11 @@ export default function App() {
     // visitor imported, and an initiative list restored beside an empty
     // Performance view is the "app left broken" case a reset promises to avoid.
     if (SEED_AD_ACCOUNT.length) savePerf(seedPerfRows(settings));
-    showToast(`Demo data restored: ${SEED.length} initiatives, ${SEED_WEEKLY_METRICS.length} weeks of metrics and ${SEED_AD_ACCOUNT.length} ad-account rows loaded.`, "success");
+    // The agenda is part of the same authored narrative: the initiatives carry
+    // `agendaId`, so restoring them without the questions leaves fifteen records
+    // laddering up to nothing.
+    if (SEED_AGENDA.length) saveAgenda(SEED_AGENDA);
+    showToast(`Demo data restored: ${SEED.length} initiatives, ${SEED_AGENDA.length} agenda questions, ${SEED_WEEKLY_METRICS.length} weeks of metrics and ${SEED_AD_ACCOUNT.length} ad-account rows loaded.`, "success");
   };
 
   // Demo-mode header control. A stronger reset than the Settings-modal one
@@ -1066,6 +1080,7 @@ export default function App() {
     const reset = DEMO_MODE ? demoSettings() : DEFAULT_SETTINGS;
     saveSettings(reset);
     saveDebates(SEED_DEBATES);
+    saveAgenda(SEED_AGENDA);
     saveRecs([]);
     // Creative records key off initiative ids, so leaving them behind after the
     // items are reseeded would strand briefs against initiatives that no longer
@@ -1739,7 +1754,7 @@ export default function App() {
           t={t} dk={dk}
           stepIndex={tourStep}
           currentNav={nav}
-          onNavigate={setNav}
+          onNavigate={(to, tab) => { if (tab) setPerfTab(tab); setNav(to); }}
           onNext={()=>setTourStep(s=>Math.min(s+1,TOUR_STEPS.length-1))}
           onBack={()=>setTourStep(s=>Math.max(s-1,0))}
           onSkip={dismissTour}
@@ -2034,7 +2049,7 @@ export default function App() {
         creative={creative} onSaveCreative={saveCreative} onSaveItems={saveItems} showToast={showToast}
         perfRows={perfRows} assets={assets} onSaveAssets={saveAssets}/>}
       {nav==="performance"&&<PerformanceView t={t} items={items} settings={settings} perfRows={perfRows}
-        initialTab={perfTab} initialInitiativeId={builderInit} showToast={showToast}
+        tab={perfTab} onTab={setPerfTab} initialInitiativeId={builderInit} showToast={showToast}
         onAssignNames={(id,adNames)=>saveItems(items.map(e=>e.id===id?{...e,adNames}:e))}
         onImport={()=>setShowMetricsImport(true)}
         onOpenConvention={()=>{ setSettingsSection("naming"); requestNav("settings"); }}

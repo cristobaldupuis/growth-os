@@ -392,7 +392,8 @@ api/
   admin.js             # Model console backend — session, routing read/write, provider model lists
   routing.js           # Public read of group → model, fetched by the app at boot
   _session.js          # HMAC-signed admin session cookie
-  _routing.js          # Routing persistence (Upstash), soft on read, explicit on write
+  _routing.js          # Routing persistence (Supabase Postgres), soft on read, explicit on write
+  _supabase.js         # The one server-side datastore: routing, rate-limit counters, asset bytes
 scripts/
   check-contrast.mjs   # Fails the build if any themed pairing drops below WCAG AA
 ```
@@ -401,9 +402,9 @@ scripts/
 
 **Config-first per-client deployment.** Client context lives in a `config.[client].js` file, isolated from app logic. App logic never imports a config file directly — every app-logic file imports from `src/activeConfig.js`, a one-line re-export barrel (`export * from "./config.[client].js"`). Switching clients, or standing up a new one, is a single-line edit to that barrel — no auth layer, no shared database, no cross-client data risk. Multi-tenant architecture is a planned future phase, triggered when managing per-client deployments becomes the operational constraint.
 
-**localStorage with a backend-agnostic store abstraction.** All state persists via `store.get` / `store.set`. The abstraction is backend-agnostic by design — migrating to Postgres is a layer swap when a real client constraint demands it, not a rewrite. The operational overhead of a backend is not justified before that trigger exists.
+**localStorage with a backend-agnostic store abstraction — and the trigger to move has now fired.** All state persists via `store.get` / `store.set`, which keeps the backend swappable. Two things this paragraph used to claim are no longer true. The first is the trigger: it was written as "when a real client constraint demands it", and the constraint turned out to be the codebase rather than a client — performance rows are capped at 5,000 in `localStorage` and the oldest are dropped on merge, so the one feature no competitor has is the one silently discarding history. The second is the cost: this is **not** a layer swap. `store.js` holds one JSON blob per key, every read path in `services/` is a synchronous pure function over in-memory arrays, and those are the parts that have to change. There is also already a backend — `api/_supabase.js` holds model routing, the rate-limit counters and generated-asset bytes — so the operational overhead has been paid. See ROADMAP Phase 2.0.
 
-**Serverless proxy, no browser-side credential of any kind.** All Anthropic calls route through `api/proxy.js`. It authorises on Origin/Referer against an allowlist, and bounds cost per request with a model allowlist, a `max_tokens` ceiling, a body-size limit and a system-prompt cap. Rate limiting is durable across instances via Upstash Redis and fails closed if the limiter is unreachable. An earlier version shipped a `VITE_`-prefixed shared secret, which Vite inlines into the browser bundle — see DECISIONS.md.
+**Serverless proxy, no browser-side credential of any kind.** All Anthropic calls route through `api/proxy.js`. It authorises on Origin/Referer against an allowlist, and bounds cost per request with a model allowlist, a `max_tokens` ceiling, a body-size limit and a system-prompt cap. Rate limiting is durable across instances via Supabase Postgres — one atomic `INSERT … ON CONFLICT DO UPDATE` per call — and fails closed if the limiter is unreachable. An earlier version shipped a `VITE_`-prefixed shared secret, which Vite inlines into the browser bundle — see DECISIONS.md.
 
 **No router, no state management library.** Keeps the app portable and the full state shape visible in one place — a deliberate tradeoff that favours legibility and AI-assisted development over framework convention. Both are addable later without structural changes.
 

@@ -523,9 +523,10 @@ The expansion from a decision engine into an experimentation platform that also
 executes. Sequenced by dependency, not by appeal: everything below Phase 5.1
 needs a backend, and pretending otherwise is how this stalls.
 
-**5.1, 5.2 and 5.3 are the next app-layer work after 2.0** — all three are pure additions to
+**5.1, 5.2, 5.3 and 5.8 are the next app-layer work after 2.0** — all four are pure additions to
 the existing data model with no backend dependency, and together they are what
-turns a backlog into a research programme. They are also the three items a buyer can
+turns a backlog into a research programme. 5.8 is the one that lets that programme
+change its mind. They are also the three items a buyer can
 see in a demo without a single connector being wired.
 
 Positioning is **practice-first, product-shaped** — built for the operator's own
@@ -761,6 +762,64 @@ asset→performance pairs to reason from, and a corpus only exists if collection
 started earlier. Sequenced as originally written, 5.7 would have arrived with
 nothing to learn from. What remains here is the generation itself, and it still
 depends on 5.1–5.5 working on real data.
+
+### 5.8 — Supersession: a learning that can be retracted
+
+App-layer work on the existing data model. No backend dependency, so it belongs
+with 5.1–5.3 rather than behind Supabase.
+
+**The gap.** A closed initiative's learning is `results.keyLearning`, a string.
+The record around it is better than a note — `provenance` separates a tracked
+result from a backfilled one and is derived from the prediction snapshot rather
+than typed, `durability` separates structural from tactical, and prediction error
+is computed against the frozen snapshot. What the model has no way to express is
+**one experiment contradicting another**. There is no supersession edge, no
+counter-evidence, and no way for a result to retract a belief rather than sit
+beside it.
+
+**Why that is not cosmetic.** `buildLearningsIndex` feeds the creative brief
+generator, Signal AI's portfolio tools and learning synthesis. All three rank and
+cite what they are shown. So a belief that stopped being true in March keeps being
+cited in June — with an experiment id attached, which makes it *more* persuasive
+than an unsourced claim, not less. The confidence a reader takes from "three
+experiments support this" is computed only from the experiments that supported it;
+the one that broke it, if it ran, is a separate row saying something else. A
+knowledge base that can only accumulate is not neutral about being wrong. It is
+confidently wrong, at increasing volume, in a brief that a person then spends
+money against.
+
+This is also the honest answer to the pitch. "Stop relearning the same lessons"
+is a claim about a system that knows when a lesson expired, and the current model
+cannot represent that.
+
+**What to build:**
+
+- [ ] **A supersession edge between closed initiatives** — `supersedes` /
+  `supersededBy`, plus `contradicts` for the weaker relation where two results
+  disagree and neither is decisive yet. Set from the close flow, where the person
+  writing the learning is the one who knows it conflicts with an earlier one.
+- [ ] **Confidence derived, never typed.** Computed from the supporting and
+  contradicting closed initiatives and their provenance, the way `provenance`
+  itself is derived. A hand-set confidence field is a number that was true once,
+  which is the failure this item exists to fix.
+- [ ] **Superseded learnings leave the index rather than the record.**
+  `buildLearningsIndex` stops offering them for citation; the initiative and its
+  result stay exactly where they are. A retracted belief is evidence about the
+  business — deleting it loses the calibration signal that the team believed it.
+- [ ] **A contradiction is surfaced, not silently absorbed.** Two live learnings
+  that disagree is a finding, and it is the highest-value thing a learning agenda
+  question can be pointed at.
+
+**What not to build, and this is the part worth writing down.** The obvious
+version of this item is a structured learning record with hand-entered fields for
+conditions, mechanism, freshness and applicability. Do not. The conditions under
+which a result held — channel, audience, format, placement — are **already on the
+parsed name**, which is the entire point of the taxonomy engine; deriving them
+from the join is free and stays true, while asking a marketer to re-type them
+produces a second set of conditions that disagrees with the first and goes stale
+the same way the free text did. Freshness is a date arithmetic problem, not a
+field. The only things that genuinely need a person are the edges above, because
+only a person knows that two results are about the same belief.
 
 ### Naming and identity — resolved
 

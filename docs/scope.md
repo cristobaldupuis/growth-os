@@ -361,8 +361,12 @@ Read this as the inventory of the finished thing.
 
 ### Facts and persistence
 - Supabase Postgres with RLS and Auth; the `store` abstraction re-backed;
-  per-user proxy authorisation on a session token from the same auth **[planned,
-  2.0 — the read paths are real work, not an adapter swap]**
+  per-user proxy authorisation on a session token from the same auth **[shipped,
+  2.0]**. Operator-authored state is a document per store key, performance facts
+  are a table with no cap, and device preferences stay in the browser. Documents
+  carry a revision and a stale write is refused rather than clobbering. The read
+  paths were deliberately left synchronous: normalising them is 5.4's work, on a
+  table that will hold real history by then
 - Campaign fact model at campaign/adset/ad × day with parsed dimensions, so every
   "break performance down by X" is a `GROUP BY` **[planned, 5.4]**
 - **`raw_name` and the schema version stamped on every fact row**, with a reparse

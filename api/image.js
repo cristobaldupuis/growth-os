@@ -24,7 +24,7 @@
 // around 5MB, and this app has already shipped one silent data-loss bug caused
 // by a full quota. Images are the fastest possible way to reproduce it.
 
-import { guardEntry, guardRateLimit, clientIp } from "./_guard.js";
+import { guardEntry, guardRateLimit, rateLimitIdentity } from "./_guard.js";
 import { geminiConfigured, geminiEndpoint, geminiAuthHeaders } from "./_geminiAuth.js";
 
 // Image models this app actually calls. "Nano Banana" is the community name for
@@ -132,8 +132,10 @@ export default async function handler(req, res) {
   if (guardEntry(req, res, { maxBodyBytes: MAX_BODY_BYTES })) return;
   // Separate key namespace from the text proxy: image spend has its own, much
   // lower ceiling and must not be able to exhaust or be exhausted by text calls.
+  const who = await rateLimitIdentity(req);
+  if (who.error) { res.status(401).json({ error: who.error }); return; }
   if (await guardRateLimit(req, res, {
-    key: `gos:img:${clientIp(req)}`,
+    key: `gos:img:${who.id}`,
     max: RATE_LIMIT_MAX,
     limitMessage: "Image generation limit reached. Try again later.",
     label: "Image",

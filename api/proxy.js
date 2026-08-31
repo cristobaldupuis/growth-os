@@ -37,7 +37,7 @@
 // DECISIONS.md ("Proxy authentication") for the trigger and the shape of that
 // change. This file is the hardened single-tenant version, not multi-tenant auth.
 
-import { guardEntry, guardRateLimit, clientIp } from "./_guard.js";
+import { guardEntry, guardRateLimit, rateLimitIdentity } from "./_guard.js";
 import { TEXT_MODEL_IDS, modelById } from "../src/services/ai/registry.js";
 import { adapters } from "./_adapters.js";
 
@@ -112,8 +112,10 @@ export function validateBody(body) {
 
 export default async function handler(req, res) {
   if (guardEntry(req, res, { maxBodyBytes: MAX_BODY_BYTES })) return;
+  const who = await rateLimitIdentity(req);
+  if (who.error) { res.status(401).json({ error: who.error }); return; }
   if (await guardRateLimit(req, res, {
-    key: `gos:rl:${clientIp(req)}`,
+    key: `gos:rl:${who.id}`,
     max: RATE_LIMIT_MAX,
     limitMessage: "Rate limit exceeded. Try again later.",
     label: "Text",

@@ -39,10 +39,12 @@ Three things are true only because of it:
 1. **A security review has a one-sentence answer.** "It never receives personal
    data" ends a conversation that "it receives personal data and protects it
    carefully" begins.
-2. **`localStorage` is a defensible home.** Browser storage on an operator's
-   laptop is an entirely reasonable place for campaign spend aggregates and an
-   indefensible one for a customer list. The persistence model and the data
-   contract are the same decision.
+2. **Browser storage was a defensible home, and Postgres is a smaller step than
+   it looks.** Browser storage on an operator's laptop is an entirely reasonable
+   place for campaign spend aggregates and an indefensible one for a customer
+   list. Since Phase 2.0 a signed-in workspace lives in Supabase Postgres under
+   RLS instead — and the contract is what makes that a routine move rather than a
+   DPA conversation, because what travels is still only aggregates.
 3. **AI prompts carry nothing personal.** Every model call is built from
    initiatives, learnings, briefs and aggregate metrics. No prompt has personal
    data in it because no store has personal data in it, which keeps the AI
@@ -65,7 +67,7 @@ say so rather than to widen the contract.
 
 | What | Where | Notes |
 |---|---|---|
-| Initiatives, settings, learnings, weekly metrics, performance rows | `localStorage` in the operator's browser, under versioned `gos_*` keys | Single device, unencrypted at rest beyond the OS disk encryption. This is the current state, not the end state — see ROADMAP Phase 2.0. |
+| Initiatives, settings, learnings, weekly metrics, performance rows | Supabase Postgres when the workspace is signed in — documents per `gos_*` key, performance facts as rows, both scoped by RLS to workspace membership. `localStorage` otherwise, under the same keys | Signed in: encrypted at rest by the provider, reachable from any machine a member signs in from. Signed out: single device, unencrypted beyond OS disk encryption. The app states which of the two applies. |
 | JSON backups | Wherever the operator saves the download | The only off-device copy today. |
 | AI prompts and responses | Sent to the configured model provider through `api/proxy.js` | Not retained by this application. Retention is the provider's, under their terms. |
 | Generated images | In memory, session only | Deliberately not persisted — see DECISIONS.md. |
@@ -138,11 +140,19 @@ deal pressure.
 
 ## Known limitations, stated rather than omitted
 
-- **Single device, single user.** No access control inside the workspace,
-  because there is only one operator's browser.
+- **No access control INSIDE a workspace.** Membership is all-or-nothing: every
+  member reads and writes everything in it. Row-level isolation is per workspace,
+  not per person or per initiative.
+- **Single device when signed out.** A workspace that has never been signed in to
+  lives in one browser, and the app says so rather than implying otherwise.
 - **Unencrypted at rest** beyond whatever the operating system provides.
-- **Performance rows are capped at 5,000** and the oldest are dropped on merge,
-  with the count reported. Phase 2.0 removes the cap.
+- **Performance rows are capped at 5,000 in the browser store only**, oldest
+  dropped on merge with the count reported. A signed-in workspace has no cap —
+  that removal was the forcing condition for Phase 2.0.
+- **A failed chunk during a performance replace leaves fewer rows than it found.**
+  The delete has happened and part of the insert has not. It is reported rather
+  than silent, and the full set is still in memory for that session; a
+  transactional version needs a staging table and belongs with Phase 5.4.
 - **Model providers are subprocessors** in every sense except the paperwork,
   which does not exist yet because no client contract has required it. The data
   they receive is business content, never personal data.

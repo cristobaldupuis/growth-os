@@ -28,6 +28,7 @@
 // that call independently and identically; it is now made once, here.
 
 import { supabaseConfigured, rpc } from "./_supabase.js";
+import { authenticate, bearerToken } from "./_auth.js";
 
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "https://growth-os-iota-seven.vercel.app")
   .split(",").map((s) => s.trim()).filter(Boolean);
@@ -50,9 +51,46 @@ function originAllowed(req) {
   return false;
 }
 
-/** First forwarded hop, or "unknown". The rate-limit identity. */
+/** First forwarded hop, or "unknown". */
 export function clientIp(req) {
   return req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || "unknown";
+}
+
+/**
+ * Who to charge this call to. ROADMAP Phase 2.0 — "Proxy hardening, per-user
+ * auth", which the roadmap says is the same piece of work as the persistence
+ * migration because the token has to come from somewhere.
+ *
+ * A signed-in caller is identified by their user id; everyone else falls back to
+ * the forwarded IP, which is what every endpoint used before and is what the demo
+ * still uses. That fallback is why this is an improvement rather than a gate: a
+ * deployment with no Supabase behaves exactly as it did.
+ *
+ * ## Why the IP was never the right identity
+ *
+ * It attributes nothing to a person, and it is wrong in both directions at once.
+ * A client's team behind one office NAT is a SINGLE bucket, so the fourth person
+ * to open the app is rate limited by their colleagues' work. The same person on a
+ * phone is a NEW bucket every time the network hands them a different address, so
+ * the ceiling does not hold. Neither failure is visible from inside the limiter,
+ * which is why both persisted.
+ *
+ * ## Why an unverifiable token is not simply ignored
+ *
+ * A caller who presents a bearer token that does not verify is refused rather
+ * than quietly dropped into the IP bucket. Silently downgrading would make an
+ * expired session look like an anonymous visitor — the call would succeed, spend
+ * money, and land in the wrong bucket — and it would let anyone shed a full
+ * user bucket by mangling their own token. Presenting a credential is a claim,
+ * and a claim that fails is an error rather than an absence.
+ *
+ * Returns `{ id }`, or `{ error }` when a supplied token did not verify.
+ */
+export async function rateLimitIdentity(req) {
+  if (!bearerToken(req)) return { id: `ip:${clientIp(req)}`, kind: "ip" };
+  const user = await authenticate(req);
+  if (!user) return { error: "Your session has expired. Sign in again." };
+  return { id: `user:${user.id}`, kind: "user" };
 }
 
 // Local-dev fallback only. On serverless this is per-instance and resets on cold

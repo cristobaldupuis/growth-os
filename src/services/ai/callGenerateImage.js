@@ -117,7 +117,7 @@ export async function callGenerateImage({ prompt, aspectRatio = "4:5", model, re
   try {
     resp = await fetch(IMAGE_PROXY_URL, {
       method: "POST",
-      headers: AI_HEADERS(),
+      headers: await AI_HEADERS(),
       body: JSON.stringify({
         model: resolved, prompt, aspectRatio, count: 1,
         ...(referenceImages?.length ? { referenceImages } : {}),

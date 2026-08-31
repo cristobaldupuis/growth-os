@@ -347,6 +347,42 @@ failing.
 
 So the trigger is met, by the codebase rather than by a client. Build it.
 
+**Shipped (August 2026).**
+
+- [x] **The schema.** `supabase/migrations/0005_workspace.sql` — `workspaces`,
+  `workspace_members` (keyed on `auth.users`), `workspace_docs` and
+  `performance_rows`, with RLS policies written against a membership predicate.
+  Meant to be run, unlike 0001/0002.
+- [x] **Two shapes, split by what grows.** Operator-authored state is a JSONB
+  document per store key; performance facts are a real table with **no cap**,
+  which is the whole point. Facts are stored and the parse is derived, so a
+  schema correction can never leave stale-but-plausible dimensions behind — the
+  property 5.4 names as its reparse precondition, arriving early.
+- [x] **What was deliberately not done.** The normalisation drafted in
+  `0001_init.sql`. Every read path in `src/services/` is a synchronous pure
+  function over an in-memory array; normalising now does not move storage, it
+  turns a synchronous codebase into an async one and rewrites most of the suite
+  in the same change that first points the app at a network. 5.4 gets a table
+  with real history in it instead of an empty one.
+- [x] **Stale writes refused.** `workspace_docs.revision` plus
+  `bump_workspace_doc`; a write whose revision moved is a 409, not a clobber.
+  Auth makes a workspace multi-user for the first time and last-write-wins
+  silently discards a colleague's work.
+- [x] **`api/state.js` and `api/_auth.js`.** Per-user authorised; tokens checked
+  against `/auth/v1/user` rather than verified locally, because local
+  verification cannot see revocation.
+- [x] **The boot decision.** `services/workspaceBoot.js` runs before a single
+  `store.get`. Remote when configured **and** signed in — never keyed on
+  `workspaceMode`, which lives inside the settings that come out of the store
+  being chosen. A failed remote load falls back to the browser copy with a named
+  reason rather than refusing to start.
+- [x] **Per-user proxy authorisation**, below, closed in the same change.
+
+**Not done, and recorded rather than assumed:** there is no sign-in wall. Whether
+a deployment should refuse to render without a session is a per-deployment
+decision — the demo and a client instance want opposite answers — and it is a
+different change from moving where state lives.
+
 Postgres for the relational queries the dashboard already runs (win rate by
 category, cross-brand gaps, contribution), RLS for tenant isolation, and Supabase
 Auth for the session token the proxy needs. Schema draft is in
@@ -428,6 +464,19 @@ Connect the GA4 Data API to auto-populate funnel context. The recommendation eng
 The shared-secret model is gone (Phase 1.5); what remains is real per-user accountability. The proxy currently authorises on origin and caps cost by request shape, which is adequate for single-tenant demo and early client work but attributes nothing to a person.
 
 This step verifies a session token issued by the same auth that gates the app and rate limits per user rather than per IP. **It is the same piece of work as the Supabase migration above (2.0)** — the token has to come from somewhere — and should not be attempted separately.
+
+**Shipped (August 2026).** `rateLimitIdentity` in `api/_guard.js` keys the bucket
+on the caller's Supabase user id when a session is present and on the forwarded
+IP when it is not, across all five metered call sites (text, image, video, debate
+start, debate poll). The IP was wrong in both directions at once: a client's team
+behind one office NAT shared a single ceiling, while the same person on a phone
+got a fresh bucket every time the network changed their address.
+
+A bearer token that does not verify is **refused rather than silently downgraded**
+to the IP bucket — an expired session would otherwise look like an anonymous
+visitor, spend money, and land in the wrong bucket, and anyone could shed a full
+user bucket by mangling their own token. An anonymous caller sends no header and
+is treated exactly as before, which is what leaves the demo working.
 
 - [ ] **Health Metric Anomaly Flagging:** When a designated health metric moves beyond a configurable threshold in a week where experiments are active, surface a passive contextual flag in the Business Health Panel. Requires live data connections to be meaningful at scale.
 

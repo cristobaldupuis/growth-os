@@ -38,7 +38,9 @@
 // server also performs is worth having in the database.
 
 import { guardEntry, guardRateLimit, clientIp } from "./_guard.js";
-import { restBase, authHeaders, supabaseConfigured, rpc } from "./_supabase.js";
+import {
+  restBase, authHeaders, supabaseConfigured, authConfigured, authBase, publishableKey, rpc,
+} from "./_supabase.js";
 import { authenticate, membershipsFor, resolveWorkspace } from "./_auth.js";
 
 // Documents are small; a portfolio of a few hundred initiatives is well under a
@@ -258,7 +260,15 @@ export default async function handler(req, res) {
   // without it needs answered, and the app has to know before it decides whether
   // to run on the browser store.
   if (action === "status") {
-    res.status(200).json({ configured: supabaseConfigured() });
+    // The auth config travels with the status, so the app makes one request at
+    // boot rather than two, and so nothing about the project is compiled into the
+    // bundle. The password never passes through this function: the browser takes
+    // these two values and talks to Supabase Auth directly, which keeps this
+    // deployment out of the credential path entirely.
+    res.status(200).json({
+      configured: supabaseConfigured(),
+      auth: authConfigured() ? { url: authBase(), key: publishableKey() } : null,
+    });
     return;
   }
 

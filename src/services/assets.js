@@ -33,7 +33,14 @@
 
 /** Asset kinds. Kept as a set so a record with an unknown kind is rejected at
  *  the boundary rather than becoming a silent gap in a cost rollup. */
-export const ASSET_KINDS = new Set(["image", "video"]);
+//
+// "scene" is a third kind rather than a second flavour of "video" because
+// currentRoundAssets slots by kind: a variant can legitimately have both a
+// talking-head render and a generated scene, and folding them into one kind
+// would make the newer silently replace the older on screen while both still
+// billed. They are also priced on different axes — a render costs what its
+// script takes to say, a scene costs the duration you asked for.
+export const ASSET_KINDS = new Set(["image", "video", "scene"]);
 
 // Per-generation cost, in USD, for the image models this app calls. These are
 // list rates at the time of writing and are recorded as ESTIMATES — the record

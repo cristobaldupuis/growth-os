@@ -78,14 +78,26 @@ export function geminiNotConfiguredError() {
 }
 
 /** The upstream generateContent URL for the active mode. Both shapes end in `models/{id}:generateContent`. */
-export function geminiEndpoint(model) {
+export function geminiEndpoint(model, method = "generateContent") {
   if (geminiAuthMode() === "vertex") {
     const project = process.env.GCP_PROJECT_ID;
     const location = process.env.GCP_LOCATION;
-    return `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${model}:generateContent`;
+    return `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${model}:${method}`;
   }
-  return `${GEMINI_API}/${model}:generateContent`;
+  return `${GEMINI_API}/${model}:${method}`;
 }
+
+// `method` was hardcoded to "generateContent" while text and images were the only
+// Google calls, and both use it. Veo does not: video generation is a long-running
+// operation, submitted with `:predictLongRunning` and collected with
+// `:fetchPredictOperation`, on the same host and the same publishers/google path.
+//
+// Parameterising the suffix rather than adding a second builder is the whole
+// change — every hard part of reaching Vertex (minting an RS256 assertion,
+// exchanging it, caching the token, falling back to AI Studio) is auth, and auth
+// does not vary by method. See api/scene.js for the caller.
+export const VEO_SUBMIT_METHOD = "predictLongRunning";
+export const VEO_POLL_METHOD   = "fetchPredictOperation";
 
 /**
  * Build the RS256 JWT assertion a service account exchanges for an access

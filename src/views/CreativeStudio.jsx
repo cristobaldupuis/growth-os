@@ -11,6 +11,15 @@ import {
   callGenerateVideo, pollVideoJob, buildVideoScript, VIDEO_TIERS, VIDEO_TIER_LIST,
   estimateSpokenSeconds, estimateVideoCostUsd, VIDEO_POLL_INTERVAL_MS, VIDEO_POLL_TIMEOUT_MS,
 } from "../services/ai/callGenerateVideo.js";
+// The model is not imported: callGenerateVoice defaults it, and the studio has no
+// reason to name one. See the note there on why voice is not a routing group.
+import { callGenerateVoice, listVoices, estimateVoiceCostUsd } from "../services/ai/callGenerateVoice.js";
+import { modelFor } from "../services/ai/models.js";
+import {
+  callGenerateScene, pollSceneJob, buildScenePrompt, estimateSceneCostUsd,
+  SCENE_ASPECTS, SCENE_DURATIONS, DEFAULT_SCENE_DURATION,
+  SCENE_POLL_INTERVAL_MS, SCENE_POLL_TIMEOUT_MS,
+} from "../services/ai/callGenerateScene.js";
 import { mkAssetRecord, currentRoundAssets, imageCostUsd, costForInitiative } from "../services/assets.js";
 import { putAsset, getAssetUrl, readAssetBytes, probeDurableStorage, durableUnavailableReason } from "../services/assetStore.js";
 import { buildCreativeEvidence } from "../services/creativeEvidence.js";
@@ -93,6 +102,40 @@ export function CreativeStudio({
   const [vidErr, setVidErr]     = useState({});     // {variantIdx: message}
   const [elapsedMs, setElapsedMs] = useState(0);
 
+  // Auditions. Held in memory only and never written to the asset store — an
+  // audition is a thing you listen to and discard, and the whole argument for it
+  // is that it is cheap enough to redo rather than worth keeping. Keyed by bare
+  // variant index for the same reason: unlike an asset record it is not evidence,
+  // so it is cleared whenever the variant list changes rather than versioned.
+  // Scenes. A generated clip is video bytes, so the same rule the talking-head
+  // path already follows applies: the RECORD persists, the file does not. Held in
+  // session state for playback and gone on reload, which the card says out loud
+  // rather than letting the operator discover it.
+  const [sceneBusy, setSceneBusy] = useState(null);  // {idx, startedAt} while one generation is in flight
+  const [sceneErr, setSceneErr]   = useState({});    // {variantIdx: message}
+  const [sceneUrls, setSceneUrls] = useState({});    // {variantIdx: data URL}
+  const [sceneDur, setSceneDur]   = useState(DEFAULT_SCENE_DURATION);
+  const [sceneAspect, setSceneAspect] = useState("9:16");
+  const sceneRunId = useRef(0);
+
+  const [voices, setVoices]     = useState([]);     // [] until the library loads, or forever if unconfigured
+  const [voiceId, setVoiceId]   = useState("");
+  const [audBusy, setAudBusy]   = useState(null);   // variant idx while one take is in flight
+  const [audErr, setAudErr]     = useState({});     // {variantIdx: message}
+  const [auditions, setAuditions] = useState({});   // {variantIdx: {url, costUsd}}
+
+  // Read once, lazily, and its failure is deliberately silent. A deployment with
+  // no ELEVENLABS_API_KEY is a normal deployment — the endpoint says so plainly
+  // when called, but an operator who has not configured voice should not be shown
+  // an error for a feature they never asked for. No voices, no control.
+  useEffect(() => {
+    let live = true;
+    listVoices()
+      .then(vs => { if (!live) return; setVoices(vs); setVoiceId(cur => cur || vs[0]?.voiceId || ""); })
+      .catch(() => { /* unconfigured or unreachable — the audition control stays hidden */ });
+    return () => { live = false; };
+  }, []);
+
   // Asked once. The studio says plainly whether a frame will survive a reload
   // BEFORE the operator spends money generating it, rather than after.
   useEffect(() => { probeDurableStorage().then(setDurableBytes); }, []);
@@ -120,12 +163,47 @@ export function CreativeStudio({
     setVidErr({});
     setVidBusy(null);
     setPromptPreview(null);
+    // Index-keyed, so a new variant list would otherwise leave take 0 attached to
+    // a different creative idea — the exact mis-pointing the asset store is
+    // versioned to avoid.
+    setAudErr({});
+    setAudBusy(null);
+    setAuditions({});
+    sceneRunId.current += 1;
+    setSceneErr({});
+    setSceneBusy(null);
+    setSceneUrls({});
+  };
+
+  /**
+   * Audition one variant, using the render's own script.
+   *
+   * `buildVideoScript(variant)` rather than any voice-specific flattening: the
+   * only question an audition answers is what the render will sound like, so it
+   * has to be the same words. See callGenerateVoice.js.
+   */
+  const genAudition = async (variant, idx) => {
+    const text = buildVideoScript(variant);
+    if (!text || !voiceId) return;
+    setAudBusy(idx);
+    setAudErr(e => ({ ...e, [idx]: "" }));
+    try {
+      const out = await callGenerateVoice({ text, voiceId, initiativeId: selId });
+      // A data URL rather than a blob URL: nothing here has a lifecycle to manage,
+      // and an un-revoked blob URL per take is a leak that only shows up after a
+      // long session of exactly the iteration this feature encourages.
+      setAuditions(a => ({ ...a, [idx]: { url: `data:${out.mimeType};base64,${out.data}`, costUsd: out.costUsd } }));
+    } catch (e) {
+      setAudErr(er => ({ ...er, [idx]: e.message || "Could not generate the audition." }));
+    } finally {
+      setAudBusy(null);
+    }
   };
 
   // A render outlives the view that started it. Invalidate on unmount so the
   // poll loop stops rather than running out its five minutes against a torn-down
   // tree, burning the video proxy's poll budget on a result nobody can see.
-  useEffect(() => () => { videoRunId.current += 1; }, []);
+  useEffect(() => () => { videoRunId.current += 1; sceneRunId.current += 1; }, []);
 
   // A render takes 60-170s, so "rendering…" with no moving number reads as a
   // hang. The ticker is separate from the poll loop deliberately: polling every
@@ -437,6 +515,101 @@ export function CreativeStudio({
     } finally { if (current()) setVidBusy(null); }
   };
 
+  /**
+   * Generate one scene for a variant.
+   *
+   * Mirrors genVideo's discipline rather than the image path's, because a scene
+   * is a long-running billed job and not a request that returns: the asset record
+   * is written at SUBMIT, so a generation that stalls or fails is still
+   * attributable to the hypothesis that caused the spend.
+   *
+   * The clip itself is held in session state and nowhere else — video bytes are
+   * deliberately not durable here (see DECISIONS.md), and a Veo clip is the same
+   * order of megabytes as a HeyGen render.
+   */
+  const genScene = async (variant, idx) => {
+    if (!brief || !sel) return;
+    const runId = ++sceneRunId.current;
+    const current = () => sceneRunId.current === runId;
+    const startedAt = Date.now();
+
+    const prompt = buildScenePrompt(brief, variant, brand, { durationSeconds: sceneDur });
+    setSceneBusy({ idx, startedAt });
+    setSceneErr(e => ({ ...e, [idx]: "" }));
+
+    const writeRecord = (patch) => {
+      const name = nameFor(variant, idx);
+      return mkAssetRecord({
+        kind: "scene",
+        initiativeId: selId,
+        initId: sel.initId || sel.id,
+        brandId: sel.brandId || "default",
+        briefVersion: round.briefVersion,
+        variantsVersion: round.variantsVersion,
+        variantIdx: idx,
+        variantLabel: variant.label || "",
+        angleSlug: variant.angleSlug || "",
+        adName: name.name || "",
+        channel,
+        prompt,
+        aspect: sceneAspect,
+        durationSeconds: sceneDur,
+        ...patch,
+      });
+    };
+
+    try {
+      const { operationName, model, estimatedCostUsd } = await callGenerateScene({
+        prompt, aspectRatio: sceneAspect, durationSeconds: sceneDur, initiativeId: selId,
+      });
+      if (!current()) return;
+
+      for (;;) {
+        await new Promise(r => setTimeout(r, SCENE_POLL_INTERVAL_MS));
+        if (!current()) return;
+
+        if (Date.now() - startedAt > SCENE_POLL_TIMEOUT_MS) {
+          // Stalled, not failed. The job is alive on Google's side and will be
+          // billed, so the record is written with the operation id needed to
+          // collect it — the same call genVideo makes on its own timeout.
+          onSaveAssets([writeRecord({ model, provider: "gemini", jobId: operationName, costUsd: estimatedCostUsd }), ...(assets || [])]);
+          setSceneErr(e => ({ ...e,
+            [idx]: `Still generating after ${Math.round(SCENE_POLL_TIMEOUT_MS / 60000)} minutes, so this stopped watching. `
+                 + `The job is alive at the provider and will still be billed. It is recorded against this variant.` }));
+          break;
+        }
+
+        const result = await pollSceneJob({ operationName, model });
+        if (!current()) return;
+
+        if (result.status === "done") {
+          onSaveAssets([writeRecord({
+            model, provider: "gemini", jobId: operationName,
+            costUsd: estimatedCostUsd, mimeType: result.mimeType || "video/mp4",
+            providerUrl: result.gcsUri || null,
+          }), ...(assets || [])]);
+          // Inline bytes are playable; a GCS URI is not reachable from a browser,
+          // so it is recorded on the asset and the card says where the clip is
+          // rather than rendering a player that cannot load.
+          if (result.data) setSceneUrls(u => ({ ...u, [idx]: `data:${result.mimeType || "video/mp4"};base64,${result.data}` }));
+          break;
+        }
+
+        if (result.status === "failed") {
+          // Billed or not, the attempt is recorded: a failure with no row is how
+          // a spend console quietly disagrees with an invoice.
+          onSaveAssets([writeRecord({ model, provider: "gemini", jobId: operationName, costUsd: estimatedCostUsd }), ...(assets || [])]);
+          setSceneErr(e => ({ ...e, [idx]: result.error || "The provider reported a failed generation." }));
+          break;
+        }
+      }
+    } catch (e) {
+      if (current()) setSceneErr(er => ({ ...er, [idx]: e.message || "Could not generate the scene." }));
+    } finally {
+      if (current()) setSceneBusy(null);
+    }
+  };
+
   const downloadImage = (variant, idx) => {
     const asset = roundAssets[idx]?.image;
     const url = asset && imgUrls[asset.id];
@@ -679,6 +852,19 @@ export function CreativeStudio({
                 title={VIDEO_TIERS[tierKey].blurb}>
                 {VIDEO_TIER_LIST.map(v => <option key={v.key} value={v.key}>{v.label}</option>)}
               </select>
+              {voices.length > 0 && (
+                <>
+                  <label style={{ fontSize: 12, color: t.textSub }}>Voice</label>
+                  <select value={voiceId} onChange={e => setVoiceId(e.target.value)} style={{ ...gSl(t), width: 150, padding: "6px 8px" }}
+                    title="The voice an audition is read in. Auditions are not renders — nothing is kept.">
+                    {voices.map(v => (
+                      <option key={v.voiceId} value={v.voiceId}>
+                        {v.name}{v.accent ? ` · ${v.accent}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              )}
               <label style={{ fontSize: 12, color: t.textSub }}>Channel</label>
               <select value={channel} onChange={e => { setChannel(e.target.value); setEdits({}); }} style={{ ...gSl(t), width: 118, padding: "6px 8px" }}>
                 {channels.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
@@ -820,10 +1006,25 @@ export function CreativeStudio({
                       <div style={{ margin:"12px 0", padding:"11px 12px", background:t.surface, border:"1px solid "+t.borderSoft, borderRadius:10 }}>
                         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:9, flexWrap:"wrap" }}>
                           <div style={{ ...gSL(t), marginBottom:0 }}>Talking head</div>
-                          <button onClick={() => genVideo(v, i)} disabled={vidBusy !== null}
-                            style={{ ...(job ? gGh(t) : gG(t)), padding:"5px 11px", fontSize:11.5, opacity: vidBusy !== null ? 0.55 : 1 }}>
-                            {rendering ? "Rendering…" : job ? "Regenerate" : "Generate video"}
-                          </button>
+                          <div style={{ display:"flex", gap:7, alignItems:"center" }}>
+                            {/* Deliberately to the LEFT of the render button, and
+                                deliberately in the same card. The decision this
+                                supports is "is this read worth rendering", so it
+                                belongs next to the thing it saves you buying —
+                                not in a panel of its own where it reads as a
+                                separate feature. */}
+                            {voices.length > 0 && (
+                              <button onClick={() => genAudition(v, i)} disabled={audBusy !== null || vidBusy !== null}
+                                style={{ ...gGh(t), padding:"5px 11px", fontSize:11.5, opacity: (audBusy !== null || vidBusy !== null) ? 0.55 : 1 }}
+                                title="Hear this script read aloud before paying to render it.">
+                                {audBusy === i ? "Reading…" : auditions[i] ? "Re-read" : "Hear it"}
+                              </button>
+                            )}
+                            <button onClick={() => genVideo(v, i)} disabled={vidBusy !== null}
+                              style={{ ...(job ? gGh(t) : gG(t)), padding:"5px 11px", fontSize:11.5, opacity: vidBusy !== null ? 0.55 : 1 }}>
+                              {rendering ? "Rendering…" : job ? "Regenerate" : "Generate video"}
+                            </button>
+                          </div>
                         </div>
 
                         {/* Priced before spend, both tiers, so the difference is
@@ -835,7 +1036,32 @@ export function CreativeStudio({
                               {x.key === tierKey ? "· " : ""}{x.key.toLowerCase()} {usd(estimateVideoCostUsd(vidScript, x))}
                             </span>
                           ))}
+                          {/* Shown next to the render prices rather than on its
+                              own, because the number that matters is the RATIO —
+                              an audition priced in isolation looks like another
+                              cost, and priced beside the render it is the reason
+                              to press it first. Four decimals because a take runs
+                              a fraction of what a render does and $0.08 rounded
+                              to cents next to $4.20 hides the argument. */}
+                          {voices.length > 0 && estimateVoiceCostUsd(vidScript) !== null && (
+                            <span title="Cost to hear this script read aloud, against the cost of rendering it.">
+                              · audition ${estimateVoiceCostUsd(vidScript).toFixed(4)}
+                            </span>
+                          )}
                         </div>
+
+                        {audErr[i] && (
+                          <div style={{ marginTop:9, fontSize:11.5, color:t.red, lineHeight:1.5 }}>{audErr[i]}</div>
+                        )}
+
+                        {auditions[i] && (
+                          <div style={{ marginTop:9 }}>
+                            <audio src={auditions[i].url} controls style={{ width:"100%", maxWidth:320, display:"block" }} />
+                            <div style={{ fontSize:10.5, color:t.textMuted, fontFamily:t.mono, marginTop:5 }}>
+                              audition · {usd(auditions[i].costUsd || 0).replace("$0.00", "<$0.01")} · not kept on reload
+                            </div>
+                          </div>
+                        )}
 
                         {rendering && (
                           <div style={{ marginTop:9, fontSize:11.5, color:t.textSub, lineHeight:1.5 }}>
@@ -887,6 +1113,106 @@ export function CreativeStudio({
                             Reads this variant's own approved script, unchanged — the hook and beats above, nothing rewritten. The clip
                             itself is not kept here and the provider's link expires, so download what is worth keeping — but the render
                             is recorded against this variant either way.
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Generated scene. The sibling of the key frame above, not of
+                      the talking head: it answers "what does this hypothesis look
+                      like, moving", where the render answers "what does this
+                      script sound like from a person". Priced per clip because
+                      the duration is asked for rather than implied by a script,
+                      which is exactly why it is not a third video tier. */}
+                  {(() => {
+                    const scenePrompt = buildScenePrompt(brief, v, brand, { durationSeconds: sceneDur });
+                    const sceneModel  = modelFor("scene");
+                    const sceneCost   = estimateSceneCostUsd(sceneModel, sceneDur);
+                    const clip        = roundAssets[i]?.scene || null;
+                    const generating  = sceneBusy?.idx === i;
+                    if (!scenePrompt) return null;
+                    return (
+                      <div style={{ margin:"12px 0", padding:"11px 12px", background:t.surface, border:"1px solid "+t.borderSoft, borderRadius:10 }}>
+                        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:9, flexWrap:"wrap" }}>
+                          <div style={{ ...gSL(t), marginBottom:0 }}>Scene</div>
+                          <div style={{ display:"flex", gap:7, alignItems:"center", flexWrap:"wrap" }}>
+                            <select value={sceneAspect} onChange={e => setSceneAspect(e.target.value)}
+                              style={{ ...gSl(t), width:132, padding:"5px 7px", fontSize:11.5 }}>
+                              {SCENE_ASPECTS.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}
+                            </select>
+                            <select value={sceneDur} onChange={e => setSceneDur(Number(e.target.value))}
+                              style={{ ...gSl(t), width:72, padding:"5px 7px", fontSize:11.5 }}
+                              title="Clip length. Duration times the model's rate is the price, so this is the spend control.">
+                              {SCENE_DURATIONS.map(d => <option key={d} value={d}>{d}s</option>)}
+                            </select>
+                            <button onClick={() => genScene(v, i)} disabled={sceneBusy !== null}
+                              style={{ ...(clip ? gGh(t) : gG(t)), padding:"5px 11px", fontSize:11.5, opacity: sceneBusy !== null ? 0.55 : 1 }}>
+                              {generating ? "Generating…" : clip ? "Regenerate" : "Generate scene"}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Priced before spend, like the render tiers above. The
+                            duration select is the lever, so the number moves when
+                            the operator moves it rather than after they commit. */}
+                        <div style={{ marginTop:8, fontSize:11, fontFamily:t.mono, color:t.textMuted, display:"flex", gap:10, flexWrap:"wrap" }}>
+                          <span>{sceneDur}s clip</span>
+                          <span style={{ color:t.gold, fontWeight:700 }}>
+                            · {sceneCost === null ? "unpriced" : usd(sceneCost)}
+                          </span>
+                          <span>{sceneModel}</span>
+                        </div>
+
+                        {generating && (
+                          <div style={{ marginTop:9, fontSize:11.5, color:t.textSub, lineHeight:1.5 }}>
+                            Generating · {mmss(elapsedMs)} elapsed. Typically 1-3 minutes.
+                            Leaving this view cancels the wait, not the job.
+                          </div>
+                        )}
+
+                        {sceneErr[i] && (
+                          <div style={{ marginTop:9, fontSize:11.5, color:t.red, lineHeight:1.5 }}>{sceneErr[i]}</div>
+                        )}
+
+                        {clip && (
+                          <div style={{ marginTop:10 }}>
+                            {sceneUrls[i] ? (
+                              <>
+                                <video src={sceneUrls[i]} controls playsInline
+                                  style={{ maxWidth:"100%", width:260, borderRadius:9, border:"1px solid "+t.border, display:"block", background:"#000" }} />
+                                <div style={{ marginTop:8, padding:"8px 10px", borderRadius:8, background:t.warnBg, border:"1px solid "+t.warnBorder }}>
+                                  <div style={{ fontSize:11.5, color:t.text, lineHeight:1.5 }}>
+                                    <strong>Download this now.</strong> Clip bytes are held for this session only and are gone on reload —
+                                    the same rule the talking-head render follows, and for the same reason. Regenerating costs {usd(clip.costUsd || 0)} again.
+                                  </div>
+                                  <a href={sceneUrls[i]} download={`${(sel.initId || sel.id)}_${(v.label || "variant").replace(/\s+/g, "-")}_scene.mp4`}
+                                    style={{ ...gGh(t), padding:"5px 9px", fontSize:11, display:"inline-block", marginTop:7, textDecoration:"none" }}>
+                                    Download clip
+                                  </a>
+                                </div>
+                              </>
+                            ) : (
+                              // Either the bytes were never held (reload), or the
+                              // provider returned a GCS URI a browser cannot open.
+                              // The record survived either way, which is the point
+                              // of writing it at submit.
+                              <div style={{ width:260, padding:"14px 12px", borderRadius:9, border:"1px dashed "+t.border,
+                                background:t.surfaceAlt, fontSize:11.5, color:t.textMuted, fontFamily:t.serif, lineHeight:1.5 }}>
+                                Generated {fmtDate(clip.createdAt, settings)}. The clip is not held here{clip.providerUrl ? ` — collect it from ${clip.providerUrl}` : ""}.
+                              </div>
+                            )}
+                            <div style={{ fontSize:10.5, color:t.textMuted, fontFamily:t.mono, marginTop:6 }}>
+                              {clip.model} · {clip.durationSeconds || sceneDur}s · ~{usd(clip.costUsd || 0)}
+                            </div>
+                          </div>
+                        )}
+
+                        {!clip && !generating && !sceneErr[i] && (
+                          <div style={{ marginTop:8, fontSize:11.5, color:t.textMuted, fontFamily:t.serif, lineHeight:1.5 }}>
+                            Builds the shot from this variant's own approved brief — the opening beat, the promise and the proof — with no
+                            on-screen text, no spoken dialogue, and nothing the brief flagged as unverified. Picture only; the words come
+                            from the script above.
                           </div>
                         )}
                       </div>

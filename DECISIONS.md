@@ -225,6 +225,30 @@ The client also sends `{model, prompt, aspectRatio}` rather than a provider-shap
 
 ---
 
+## `npm test` globs rather than listing files
+
+**Decision:** `node --test "src/**/*.test.js" "api/**/*.test.js"` replaces the hand-maintained list of 37 paths.
+
+**Why:** the list was not wrong, it was silent. A test file has to be added in two places — written, then registered — and forgetting the second produces a file that passes when run directly and never runs in `verify` or CI. That is exactly what happened to `voice.test.js`: it shipped green, ran locally on demand, and contributed nothing to the suite until the next commit noticed the count had not moved. A test that does not run is worse than a missing one, because the repository reports coverage it does not have.
+
+**Why this is safe rather than a widening:** the list and the filesystem were checked against each other before the swap and matched exactly — 37 files, 614 tests, no file deliberately excluded and none listed that no longer existed. The glob is the same suite today and stays the same suite when someone adds the thirty-eighth.
+
+**The tradeoff accepted:** a glob will pick up a test file someone did not mean to run yet. That is the better failure — a WIP test that fails loudly in CI gets finished or deleted, while a real test nobody registered fails at nothing and is discovered by an outage.
+
+## Scene generation is a separate group from video, not a third tier
+
+**Decision:** Veo is reached through a `scene` feature group and `api/scene.js`, beside `image` rather than inside `video`. The `video` group now declares `requires: { lipSync: true }` and `scene` declares `requires: { sceneGen: true }`, so the console's two pickers cannot offer each other's models.
+
+**Why not a third tier:** the tier decision this file already records is "is this clip worth nine times the money" — one question, two answers. Scene generation is a different question, and the giveaway is that its price is not computed the same way. A talking head costs what its script takes to *say* (`estimateSpokenSeconds`); a scene costs the duration you *ask for*. Putting both behind one picker would mean one of the two prices lying about how it was derived.
+
+**Why `caps` rather than a new modality:** both produce video, and an operator asking what video cost this month means both — which is why `recordSceneUsage` keeps `modality: "video"` and separates on `group` instead. But `modality` alone was doing two jobs: it named the output format *and* was the only filter `modelsFor` applied. With one kind of video model in the catalogue those were the same set; with two they are not, and an empty `requires` on the video group stopped meaning "no constraint" and started meaning "a missing one". Stating both capabilities is what keeps the picker honest.
+
+**Why Vertex specifically:** Veo is the one provider here whose bill can land on Google Cloud credits. The Developer API draws on an AI Studio balance that excludes them; Vertex bills the project's Cloud Billing account where they sit. `api/_geminiAuth.js` already minted the Vertex token for image generation, so this cost no new auth machinery — `geminiEndpoint` gained a `method` argument and nothing else changed. Auto-detect still applies: with only `GEMINI_API_KEY` set, scene generation works and simply does not touch the credits.
+
+**Why `generateAudio` is forced off in the request rather than discouraged in the prompt:** Veo can invent its own spoken dialogue. `buildImagePrompt` and `buildVideoRequest` both refuse to render anything from `claimsToVerify` on the reasoning that an unverified claim inside a finished-looking asset launders an open question into something settled. Model-invented dialogue is that failure with no operator in the loop at all — nobody wrote the words and nobody reviewed them, and they arrive sounding authoritative. A prompt is a request; a parameter is a guarantee, so it is set in `buildVeoBody` and asserted in `scene.test.js`.
+
+**What is not confirmed:** the per-second rates. Google's own documentation was unreachable when this shipped and secondary sources disagree by a factor of five. The catalogue figures are the most Vertex-specific available and carry `costBasis: "estimate"` like every other rate here — check them against a real invoice before trusting the pre-spend display.
+
 ## Video generation is sold as two priced tiers, not three providers
 
 **Decision:** `VIDEO_TIERS` exposes exactly two choices — `STANDARD` (HeyGen, ~$0.017/sec) and `PREMIUM` (VEED Fabric 1.0 at 720p, $0.15/sec) — and both are priced against the actual script before the generate button is pressed. The provider id survives underneath as the wire value and the adapter-map key; it is simply not the thing the operator picks.
@@ -361,7 +385,7 @@ Signal AI is the opposite case and the reason the tiering is not uniform. Its en
 
 ## Model routing is a group-level operator decision, not a per-call literal
 
-**Decision:** Which model serves which feature is data, held in `src/services/ai/registry.js` and overridable at runtime from an admin console. Features are switched in six groups — `capture`, `analysis`, `debate`, `creative`, `image`, `video` — not individually. Each group declares a capability floor (`requires`) that is enforced both in the console's picker and server-side in `validateRouting` before anything is persisted. `api/proxy.js` derives its model allowlist from the same catalogue rather than keeping a second list.
+**Decision:** Which model serves which feature is data, held in `src/services/ai/registry.js` and overridable at runtime from an admin console. Features are switched in seven groups — `capture`, `analysis`, `debate`, `creative`, `image`, `video`, `scene` — not individually. Each group declares a capability floor (`requires`) that is enforced both in the console's picker and server-side in `validateRouting` before anything is persisted. `api/proxy.js` derives its model allowlist from the same catalogue rather than keeping a second list.
 
 **Why groups rather than per-feature:** Twelve independent model choices is not a decision anyone can hold in their head, and most of them are not real choices — Quick Capture, Hypothesis Expansion and ICE Assist fail in exactly the same way (schema drift on a transformation the operator reviews anyway), so there is no useful world in which they run on different models. Grouping by what the call has to do well makes each choice defensible and gives it a stated axis to be judged on.
 

@@ -55,6 +55,15 @@ test("a POST from an allowed origin passes through", () => {
   assert.equal(res.statusCode, null);
 });
 
+test("the preflight allows the Authorization header the app actually sends", () => {
+  // A same-origin POST never preflights, so getting this wrong is invisible on
+  // the default deployment and breaks every cross-origin one in ALLOWED_ORIGINS.
+  const res = mkRes();
+  guardEntry(mkReq({ origin: "https://allowed.example" }), res, ENTRY);
+  assert.match(res.headers["Access-Control-Allow-Headers"], /Authorization/);
+  assert.match(res.headers["Access-Control-Allow-Headers"], /Content-Type/);
+});
+
 test("an allowed origin is echoed back with Vary, so caches do not cross-serve", () => {
   const res = mkRes();
   guardEntry(mkReq({ origin: "https://allowed.example" }), res, ENTRY);

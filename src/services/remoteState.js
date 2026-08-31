@@ -22,9 +22,17 @@
 
 import { perfRowKey } from "./performance.js";
 import { accessToken } from "./auth.js";
+import { KEY_PERF } from "./store.js";
 
-/** Keys that live in the rows table rather than as a document. */
-export const PERF_KEY = "gos_perf_v1";
+/**
+ * The one key that lives in the rows table rather than as a document.
+ *
+ * Re-exported from `store.js` rather than written out again: two string literals
+ * for the same key drift, and the failure mode is that performance rows quietly
+ * start being saved as a document — reintroducing the whole-blob write this phase
+ * exists to remove.
+ */
+export const PERF_KEY = KEY_PERF;
 
 // Matches MAX_ROWS in api/state.js. Kept as a separate constant rather than
 // fetched, because a client that guesses high fails a whole chunk on a 413 and a

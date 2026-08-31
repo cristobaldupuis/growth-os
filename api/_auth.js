@@ -35,7 +35,7 @@
 // all of that, in the browser, where the refresh cycle already works. This module
 // only answers "whose token is this, and is it still good".
 
-import { restBase, secretKey, supabaseConfigured, authHeaders } from "./_supabase.js";
+import { authBase, restBase, secretKey, supabaseConfigured, authHeaders } from "./_supabase.js";
 
 const TIMEOUT_MS = 4000;
 
@@ -97,7 +97,7 @@ export async function authenticate(req) {
   if (cached) return cached;
 
   try {
-    const res = await fetch(`${restBase().replace(/\/rest\/v1$/, "")}/auth/v1/user`, {
+    const res = await fetch(`${authBase()}/user`, {
       headers: { apikey: secretKey(), Authorization: `Bearer ${token}` },
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });

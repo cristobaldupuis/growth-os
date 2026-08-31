@@ -161,7 +161,11 @@ export function guardEntry(req, res, { maxBodyBytes, methods = ["POST"] }) {
     res.setHeader("Vary", "Origin");
   }
   res.setHeader("Access-Control-Allow-Methods", [...methods, "OPTIONS"].join(", "));
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  // Authorization is here because the app sends the caller's Supabase session on
+  // every metered call (see rateLimitIdentity). A same-origin POST never
+  // preflights, so omitting it is invisible on the default deployment and fails
+  // every cross-origin one in ALLOWED_ORIGINS — the worst shape of bug to leave.
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
   if (req.method === "OPTIONS") { res.status(200).end(); return true; }
   if (!methods.includes(req.method)) { res.status(405).json({ error: "Method not allowed" }); return true; }

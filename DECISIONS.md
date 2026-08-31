@@ -225,6 +225,16 @@ The client also sends `{model, prompt, aspectRatio}` rather than a provider-shap
 
 ---
 
+## `npm test` globs rather than listing files
+
+**Decision:** `node --test "src/**/*.test.js" "api/**/*.test.js"` replaces the hand-maintained list of 37 paths.
+
+**Why:** the list was not wrong, it was silent. A test file has to be added in two places — written, then registered — and forgetting the second produces a file that passes when run directly and never runs in `verify` or CI. That is exactly what happened to `voice.test.js`: it shipped green, ran locally on demand, and contributed nothing to the suite until the next commit noticed the count had not moved. A test that does not run is worse than a missing one, because the repository reports coverage it does not have.
+
+**Why this is safe rather than a widening:** the list and the filesystem were checked against each other before the swap and matched exactly — 37 files, 614 tests, no file deliberately excluded and none listed that no longer existed. The glob is the same suite today and stays the same suite when someone adds the thirty-eighth.
+
+**The tradeoff accepted:** a glob will pick up a test file someone did not mean to run yet. That is the better failure — a WIP test that fails loudly in CI gets finished or deleted, while a real test nobody registered fails at nothing and is discovered by an outage.
+
 ## Scene generation is a separate group from video, not a third tier
 
 **Decision:** Veo is reached through a `scene` feature group and `api/scene.js`, beside `image` rather than inside `video`. The `video` group now declares `requires: { lipSync: true }` and `scene` declares `requires: { sceneGen: true }`, so the console's two pickers cannot offer each other's models.

@@ -1,6 +1,7 @@
 import { modelById } from "./registry.js";
 import { mkUsageRow, priceTextCall } from "../usage.js";
 import { imageCostUsd } from "../assets.js";
+import { accessToken } from "../auth.js";
 
 export const PROXY_URL = "/api/proxy";
 
@@ -18,9 +19,29 @@ export const PROXY_URL = "/api/proxy";
 // max_tokens ceiling, body size) rather than on possession of a token. See
 // api/proxy.js for the reasoning and DECISIONS.md for when this needs to become
 // real per-user auth.
-export const AI_HEADERS = () => ({
-  "Content-Type": "application/json",
-});
+// ROADMAP 2.0 added one header, and it is not a credential in the sense the
+// paragraph above rejects: it is the CALLER's own Supabase session token, held in
+// their browser because they signed in, scoped by RLS to their own workspaces,
+// and useless to anyone else. What it buys is the thing the paragraph above says
+// is still missing — the proxy can bound and attribute spend per PERSON rather
+// than per forwarded IP, which is one bucket for a whole office and a fresh one
+// every time a phone changes network. See rateLimitIdentity in api/_guard.js.
+//
+// Async, and every call site awaits it, because the token may need refreshing
+// first. A synchronous variant that omitted the header when a refresh was pending
+// would silently drop a signed-in user into the anonymous bucket — the failure
+// would look like a rate limit, at the worst moment, for no visible reason.
+//
+// Anonymous callers send no header at all and are identified by IP exactly as
+// before, which is what keeps the demo working untouched.
+export async function AI_HEADERS() {
+  const headers = { "Content-Type": "application/json" };
+  try {
+    const token = await accessToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
+  } catch { /* anonymous is a valid state, not a failure */ }
+  return headers;
+}
 
 // `getApiKey()` used to live here, returning the literal string "proxied" so that
 // call sites gating UI on "is AI configured" kept compiling after the credential
@@ -146,7 +167,7 @@ export async function postProxy({ group, fn, initiativeId = null, body }) {
 
   let resp;
   try {
-    resp = await fetch(PROXY_URL, { method: "POST", headers: AI_HEADERS(), body: JSON.stringify(body) });
+    resp = await fetch(PROXY_URL, { method: "POST", headers: await AI_HEADERS(), body: JSON.stringify(body) });
   } catch (err) {
     // A network failure spent nothing, but it is still worth a row: a console
     // showing calls-with-no-cost is how an operator notices the proxy is down.

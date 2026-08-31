@@ -1107,3 +1107,45 @@ them. Until that exists, this defect is cheaper than its fix.
 **The audit sample is a second, deliberately worse corpus.** The seeded ad account follows the convention because this tool built it. `SAMPLE_ACCOUNT_NAMES` is an account as found — a different delimiter, five slot shapes, 0% parse, 100% needing manual mapping. One detail is kept rather than fixed: the audit reads slot 3 as "Age · 80.8%" because `Broad` sits in that vocabulary, and the slot is plainly an audience slot. Leaving a confident wrong suggestion in the sample is the most direct demonstration available of why the audit reports coverage and refuses to propose a taxonomy — a tool that auto-assigned that slot would have been silently wrong in a client's first week.
 
 **Forcing condition:** the first real client export going through this path. At that point the seeded account is a fixture competing with real data for the same view, and it should move behind the workspace-mode switch that already distinguishes demo from live — a live workspace should never seed it.
+
+---
+
+## Workspace state moves to Postgres as documents, and only the facts become rows
+
+**Decision:** Phase 2.0 re-backs `store.js` with Supabase Postgres for a signed-in workspace. Operator-authored state — initiatives, settings, agenda, debates, recommendations, creative, asset records, the usage ledger — is one JSONB **document per store key**. Performance facts become a real **table** with no cap. Device preferences (theme, library view, rail, tour-seen) stay in `localStorage`. The normalisation drafted in `0001_init.sql` is deliberately not done.
+
+**What forced it, and it was not a client.** The soft trigger recorded elsewhere in this file was "the first client who needs a second user, a second device, or who asks where their data is stored." None of those arrived. What did was `PERF_ROW_LIMIT = 5000` in `services/performance.js`: browser storage caps around 5MB, so the importer dropped the oldest rows on every merge and reported the count. The campaign↔experiment bridge is the part of this product no competitor has and the part that ingests the most rows, and it was throwing away the history the whole thesis rests on. "Every experiment should make the next one smarter" is not a claim a store that forgets can support.
+
+**Why documents rather than the relational schema already drafted.** Because normalising is not a storage change. Every read path in `src/services/` — `portfolio.js`, `performance.js`, `items.js`, `learningAgenda.js` — is a synchronous pure function over an in-memory array, and the test suite is written against that shape. Turning those into SQL converts a synchronous codebase into an async one and rewrites most of the suite, in the same change that first points the app at a network it has never depended on. That is two risky changes wearing one name, and the second one is not the one that fixes the data loss.
+
+The split is therefore by what actually grows: a person types initiatives and settings, and a platform export generates performance rows by the tens of thousands. Documents for the first, a table for the second. Phase 5.4 then adds typed dimensions and `GROUP BY` reads on top of a table that already holds real history, which is a better starting position than the one it would have had.
+
+**Why facts are stored and the parse is not.** `performance_rows` keeps the name, level, date and metrics, and not `parsed`/`values`/`parseErrors`. Those are a pure function of the name and the naming schema, and the schema changes — a dimension is appended, a vocabulary value added, a delimiter corrected. A stored parse is a cached answer whose inputs moved, and stale-but-plausible dimensions are exactly what `parseName` refuses to produce at import time. Deriving on read costs one pass and can never be stale. It is also the precondition 5.4 names for its reparse job, obtained here for free.
+
+**Why a revision on every document.** Auth makes a workspace multi-user for the first time, and a whole-document write is last-write-wins: two people editing initiatives means one silently loses their work. `bump_workspace_doc` refuses a write whose revision moved and the endpoint answers 409 with the server's copy. This is the same rule as everywhere else in this codebase — refuse rather than guess, and never report a save that did not happen as one.
+
+**Why the boot decision cannot read settings.** Which store answers is decided by `services/workspaceBoot.js` before a single `store.get`, on exactly two facts: is a workspace store configured, and is somebody signed in. It is deliberately not keyed on `settings.workspaceMode`, because settings come out of the store being chosen — reading it first means reading the browser copy to decide whether to read the browser copy. Signing in is the opt-in, which is also what leaves the demo untouched.
+
+**Why no sign-in wall.** Whether a deployment should refuse to render without a session is a per-deployment decision and the demo and a client instance want opposite answers. Moving where state lives and gating who may see the app are two changes; only one of them was needed to stop losing rows.
+
+**Why the publishable key is served rather than bundled.** `api/state.js` hands the app the project URL and publishable key at boot, the way `api/routing.js` already serves model routing. There is no `VITE_SUPABASE_*`. The key is genuinely publishable — RLS protects the rows — so this is not the mistake recorded above about the `VITE_`-prefixed shared secret. It is that a credential compiled into a build artefact is rotated by a redeploy and one served from configuration is rotated by changing configuration. The password never touches this deployment: the browser talks to Supabase Auth directly.
+
+**Why tokens are checked against `/auth/v1/user`.** A Supabase access token is a JWT and could be verified locally with the project's JWT secret and no network hop. Local verification cannot see revocation — a signed-out session, a deleted user and a revoked refresh token all still carry a valid signature until expiry. For a surface that reads and writes a client's entire workspace, "this was valid when issued" is the wrong question. The hop is cached for sixty seconds, so it is paid once per burst.
+
+**The hazard that is written down rather than hidden:** a performance replace deletes then inserts in chunks, so a chunk that fails leaves fewer rows than it found. It is reported, not silent, and the full set is still in memory for that session. A transactional version needs a staging table and belongs with the fact model in 5.4.
+
+**Forcing condition:** the first read path that genuinely needs to query rather than scan — a rollup over more history than a browser should hold in memory, or a cross-workspace question. That is Phase 5.4, and it is where documents start costing more than they save. Until then, the arrays are in memory and the functions over them are pure and tested.
+
+---
+
+## The proxy's rate-limit identity is a person, not an address
+
+**Decision:** `rateLimitIdentity` in `api/_guard.js` keys every metered bucket on the caller's Supabase user id when a session is present, and on the forwarded IP when it is not. Applied to all five call sites: text, image, video, debate start, debate poll.
+
+**Why the IP was never right.** It attributes nothing to a person, and it is wrong in both directions at once. A client's growth team behind one office NAT is a single bucket, so the fourth person to open the app is rate limited by their colleagues' work. The same person on a phone gets a fresh bucket every time the network hands them a different address, so the ceiling does not hold at all. Neither failure is visible from inside the limiter, which is why both survived this long.
+
+**Why an unverifiable token is refused rather than ignored.** A caller presenting a bearer token that does not verify gets a 401, not a quiet demotion to the IP bucket. Silently downgrading would make an expired session look like an anonymous visitor — the call succeeds, spends money, and lands in the wrong bucket — and it would let anyone shed a full user bucket by mangling their own token. Presenting a credential is a claim; a claim that fails is an error, not an absence. A caller who presents nothing is making no claim and is treated exactly as before, which is what leaves the demo working.
+
+**Why this shipped with the migration rather than after it.** ROADMAP 2.1 already said so: the token has to come from somewhere. Building the session for state and then keying spend on IP for another phase would mean the app knowing who someone is everywhere except the one place that costs money.
+
+**Forcing condition:** a deployment where anonymous access is not wanted at all. At that point the fallback becomes a refusal and this becomes a gate, which is the sign-in wall deliberately not built here.

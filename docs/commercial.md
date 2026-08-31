@@ -155,11 +155,14 @@ Written as a prediction, in the product's own format:
 > the problem is real but not painful enough at this price, and the response is to
 > reposition — not to build more.
 
-**What would make this test invalid:** running it on the demo config. Every
-config in the repo is `DEMO_MODE = true` and no real client data has been through
-the naming parser. Until one real ad account has been ingested end to end, a
-demo shows the idea rather than the product, and a "no" cannot be distinguished
-from a "not shown properly."
+**What would make this test invalid:** running it on seeded data. The build flag
+is no longer the tell — `config.js` ships `DEMO_MODE = false`, and since Phase 1.8
+live-versus-demo is `settings.workspaceMode`, a property of the workspace rather
+than of the bundle. The thing that has not changed is the one that matters: **no
+real ad account has been through the naming parser.** Until one has been ingested
+end to end, a demo shows the idea rather than the product, and a "no" cannot be
+distinguished from a "not shown properly." ROADMAP 1.8 carries this as its
+outstanding item; it is a prerequisite for the falsification test, not part of it.
 
 ---
 

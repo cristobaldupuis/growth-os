@@ -346,7 +346,7 @@ This is what makes recommendations specific — instead of "test SMS cart recove
 | Runtime | React 18 / Vite |
 | Hosting | Vercel (frontend + serverless API proxy) |
 | Design | Sand/gold light theme, cool-charcoal dark theme; serif for prose, monospace for figures, dates and tags. All 66 themed colour pairings are checked against WCAG AA in CI |
-| State persistence | Environment-agnostic: `localStorage` (production), in-memory fallback for sandboxed environments. Write failures surface a persistent banner rather than failing silently |
+| State persistence | Supabase Postgres per workspace when configured and signed in; `localStorage` otherwise, with an in-memory fallback for sandboxed environments. Which store answered is stated in a strip at the top of the app, because "saved" means two different things. Write failures surface a persistent banner rather than failing silently |
 | AI | Anthropic Claude API via server-side proxy. Two tiers: `claude-sonnet-5` for reasoning (debate, synthesis, candidate generation), `claude-haiku-4-5` for schema-shaped transformation (quick capture, hypothesis expansion, ICE assist). Adaptive thinking throughout; prompt caching on the repeated-prefix flows |
 | Data I/O | CSV import/export; JSON backup/restore; Google Sheets template |
 
@@ -392,7 +392,10 @@ api/
   admin.js             # Model console backend — session, routing read/write, provider model lists
   routing.js           # Public read of group → model, fetched by the app at boot
   _session.js          # HMAC-signed admin session cookie
-  _routing.js          # Routing persistence (Upstash), soft on read, explicit on write
+  _routing.js          # Routing persistence (Supabase Postgres), soft on read, explicit on write
+  _supabase.js         # The one server-side datastore: routing, rate-limit counters, asset bytes
+  state.js             # Workspace state — documents and performance rows, per-user authorised
+  _auth.js             # Who is calling, per Supabase Auth. Also the proxy's rate-limit identity
 scripts/
   check-contrast.mjs   # Fails the build if any themed pairing drops below WCAG AA
 ```
@@ -401,9 +404,15 @@ scripts/
 
 **Config-first per-client deployment.** Client context lives in a `config.[client].js` file, isolated from app logic. App logic never imports a config file directly — every app-logic file imports from `src/activeConfig.js`, a one-line re-export barrel (`export * from "./config.[client].js"`). Switching clients, or standing up a new one, is a single-line edit to that barrel — no auth layer, no shared database, no cross-client data risk. Multi-tenant architecture is a planned future phase, triggered when managing per-client deployments becomes the operational constraint.
 
-**localStorage with a backend-agnostic store abstraction.** All state persists via `store.get` / `store.set`. The abstraction is backend-agnostic by design — migrating to Postgres is a layer swap when a real client constraint demands it, not a rewrite. The operational overhead of a backend is not justified before that trigger exists.
+**Two stores, and the app says which one answered.** All state persists via `store.get` / `store.set`. When the deployment has Supabase configured and somebody is signed in, workspace state lives in Postgres and there is no row cap; otherwise it is `localStorage`, exactly as before. Signing in is the opt-in, so the demo is untouched.
 
-**Serverless proxy, no browser-side credential of any kind.** All Anthropic calls route through `api/proxy.js`. It authorises on Origin/Referer against an allowlist, and bounds cost per request with a model allowlist, a `max_tokens` ceiling, a body-size limit and a system-prompt cap. Rate limiting is durable across instances via Upstash Redis and fails closed if the limiter is unreachable. An earlier version shipped a `VITE_`-prefixed shared secret, which Vite inlines into the browser bundle — see DECISIONS.md.
+The trigger for moving was the codebase rather than a client: performance rows were capped at 5,000 in `localStorage` with the oldest dropped on merge, so the one feature no competitor has was the one silently discarding history.
+
+What moved is storage, not the read paths. Operator-authored state is a JSONB document per store key; performance facts are a real table, because that is the collection that grows on its own. The rest of `services/` is still synchronous pure functions over in-memory arrays — normalising those is Phase 5.4's job, on a table that will by then hold real history. Device preferences (theme, library view, rail, tour-seen) deliberately stay in the browser.
+
+Documents carry a revision and a stale write is refused with a 409 rather than clobbering, because auth makes a workspace multi-user for the first time. See `supabase/migrations/0005_workspace.sql`.
+
+**Serverless proxy, no browser-side credential of any kind.** All Anthropic calls route through `api/proxy.js`. It authorises on Origin/Referer against an allowlist, and bounds cost per request with a model allowlist, a `max_tokens` ceiling, a body-size limit and a system-prompt cap. Spend is bounded per **person** when the caller is signed in and per forwarded IP when they are not — an IP is one bucket for a whole office and a fresh one every time a phone changes network, so it was wrong in both directions at once. Rate limiting is durable across instances via Supabase Postgres — one atomic `INSERT … ON CONFLICT DO UPDATE` per call — and fails closed if the limiter is unreachable. An earlier version shipped a `VITE_`-prefixed shared secret, which Vite inlines into the browser bundle — see DECISIONS.md.
 
 **No router, no state management library.** Keeps the app portable and the full state shape visible in one place — a deliberate tradeoff that favours legibility and AI-assisted development over framework convention. Both are addable later without structural changes.
 
@@ -571,16 +580,38 @@ ALLOWED_ORIGINS=https://your-deployment.vercel.app
 # and write neither, which is the point.
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SECRET_KEY=sb_secret_...
+# Needed only for workspace state and sign-in (Phase 2.0). Served to the app by
+# api/state.js rather than compiled into the bundle, so it is rotated by changing
+# configuration rather than by a redeploy. It is genuinely publishable — RLS is
+# what protects the rows — but it is still not a build-time constant.
+SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 # Optional. Defaults to "creative-assets".
 SUPABASE_ASSET_BUCKET=creative-assets
 ```
 
-**Apply `supabase/migrations/0003_runtime.sql` after setting those.** It creates
-the two tables the routing store and the rate limiter need, plus the atomic
-counter function the limiter calls. Paste it into the Supabase SQL editor and
-run it; it is idempotent. The other two migrations in that directory
-(`0001_init.sql`, `0002_assets.sql`) are proposals for a later phase and should
-**not** be run yet — see their headers.
+**Apply the live migrations after setting those**, in order: `0003_runtime.sql`
+(routing store, rate-limit counters and the atomic counter function),
+`0004_debate_runs.sql`, and `0005_workspace.sql` (workspaces, membership,
+documents and performance rows). Paste each into the Supabase SQL editor and run
+it; all three are idempotent. `0001_init.sql` and `0002_assets.sql` are proposals
+for a later phase and should **not** be run — see their headers.
+
+**To open a workspace** you also need a row to sign in to, which is a one-time
+setup per client rather than anything the app does:
+
+1. Enable Email auth in the Supabase dashboard and invite the operator.
+2. `insert into workspaces (slug, name) values ('acme', 'Acme');`
+3. `insert into workspace_members (workspace_id, user_id, role)` with that
+   workspace's id, the user's id from `auth.users`, and `'owner'`.
+
+Signing in is what moves a session onto the workspace store. A deployment with no
+`SUPABASE_PUBLISHABLE_KEY`, or a visitor who never signs in, runs on
+`localStorage` exactly as before — which is how the demo is left untouched. The
+strip at the top of the app always says which store answered.
+
+There is deliberately **no sign-in wall**: whether a given deployment should
+refuse to render without a session is a per-deployment decision, and the demo and
+a client instance want opposite answers.
 
 Earlier revisions of this project used Upstash Redis for the first two of those
 jobs. It is no longer read: neither is Redis-shaped (routing is one row read per

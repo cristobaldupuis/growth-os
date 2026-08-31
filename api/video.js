@@ -43,7 +43,7 @@
 // expires — same pattern as the image path's session-only base64.
 
 import { VIDEO_TIERS, estimateVideoCostUsd } from "../src/services/ai/callGenerateVideo.js";
-import { guardEntry, guardRateLimit, clientIp } from "./_guard.js";
+import { guardEntry, guardRateLimit, rateLimitIdentity } from "./_guard.js";
 
 export const ALLOWED_PROVIDERS = new Set(["heygen", "did", "fabric"]);
 
@@ -326,8 +326,10 @@ export default async function handler(req, res) {
   const action = req.body?.action;
   if (action !== "submit" && action !== "poll") return res.status(400).json({ error: "action must be \"submit\" or \"poll\"." });
 
+  const who = await rateLimitIdentity(req);
+  if (who.error) { res.status(401).json({ error: who.error }); return; }
   if (await guardRateLimit(req, res, {
-    key: `gos:vid:${action}:${clientIp(req)}`,
+    key: `gos:vid:${action}:${who.id}`,
     max: action === "submit" ? SUBMIT_RATE_LIMIT_MAX : POLL_RATE_LIMIT_MAX,
     limitMessage: "Video generation limit reached. Try again later.",
     label: "Video",

@@ -127,6 +127,35 @@ export function recordVideoUsage({ provider, costUsd, initiativeId = null, ok = 
 }
 
 /**
+ * Record one speech generation.
+ *
+ * `modality: "audio"` is a new value in a field that was already free-form, so
+ * the Spend console picks it up with no change — rollupUsage groups by whatever
+ * string it finds. That is the point of recording it here rather than leaving
+ * auditions unmetered: voice is individually cheap and therefore easy to run
+ * hundreds of times, which is exactly the shape of spend a ledger exists to make
+ * visible. An unmetered cheap call is how a bill becomes a surprise.
+ *
+ * `characters` rides along because ElevenLabs bills per character, so it is the
+ * unit an operator reconciles against — tokens are meaningless here and seconds
+ * are not known until the audio comes back.
+ */
+export function recordVoiceUsage({ model, costUsd, characters = null, initiativeId = null, ok = true, errorKind = null }) {
+  const entry = modelById(model);
+  record(mkUsageRow({
+    group: "voice", fn: "callGenerateVoice", model,
+    provider: entry?.provider || "elevenlabs", modality: "audio",
+    initiativeId, ok, errorKind,
+    costUsd: ok ? (typeof costUsd === "number" ? costUsd : null) : null,
+    rate: entry?.price || null,
+    // Reuses the input-token column rather than adding a column that only one
+    // provider populates. Characters ARE this provider's billed input unit, and
+    // a ledger with a per-provider column set stops being one table.
+    inputTokens: characters,
+  }));
+}
+
+/**
  * POST to the text proxy, record what it cost, and return the parsed body.
  *
  * Replaces the fetch/ok-check/parse/error-check preamble that was copy-pasted

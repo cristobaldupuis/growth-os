@@ -515,6 +515,19 @@ VEED_API_KEY=your_key
 #   printf '%s' 'you@example.com:your_key' | base64
 DID_API_KEY=your_base64_encoded_pair
 
+# Optional. Enables voice auditions in the Creative Studio — hearing a variant's
+# script read aloud before paying to render it. From elevenlabs.io -> Profile ->
+# API Keys. Without it the audition control does not appear at all (the voice
+# library read fails quietly and the studio renders as it did before), which is
+# deliberate: an operator who has not configured voice should not be shown an
+# error for a feature they never asked for.
+#
+# Note this is the TTS API, which is public and stable. ElevenLabs' Avatars
+# product renders the talking head too, but is ElevenCreative-only with no public
+# API as of this writing, so it is not reachable from a serverless function —
+# HeyGen and VEED Fabric remain the renderers. See api/voice.js.
+ELEVENLABS_API_KEY=your_key
+
 # --- Admin model console (/admin) ---------------------------------------------
 #
 # Both are required for the console to be reachable. If ADMIN_PASSWORD is unset
@@ -554,6 +567,13 @@ OPENROUTER_API_KEY=your_key
 # canonical deployment, so a missing value fails closed rather than opening up.
 ALLOWED_ORIGINS=https://your-deployment.vercel.app
 
+# Optional. This deployment's own base URL, used by api/debate.js for the
+# server-to-server self-dispatch that drives a debate from step to step. Falls
+# back to VERCEL_URL, which is the immutable deployment hostname rather than the
+# alias you use — either works for a server-to-server call, so set this only when
+# you want the dispatch to go through a specific domain.
+PUBLIC_BASE_URL=https://your-deployment.vercel.app
+
 # Supabase — the deployment's one server-side datastore. Strongly recommended
 # in production, because three separate things degrade without it:
 #
@@ -575,12 +595,24 @@ SUPABASE_SECRET_KEY=sb_secret_...
 SUPABASE_ASSET_BUCKET=creative-assets
 ```
 
-**Apply `supabase/migrations/0003_runtime.sql` after setting those.** It creates
-the two tables the routing store and the rate limiter need, plus the atomic
-counter function the limiter calls. Paste it into the Supabase SQL editor and
-run it; it is idempotent. The other two migrations in that directory
-(`0001_init.sql`, `0002_assets.sql`) are proposals for a later phase and should
-**not** be run yet — see their headers.
+**Apply `supabase/migrations/0003_runtime.sql` AND `0004_debate_runs.sql` after
+setting those.** `0003` creates the two tables the routing store and the rate
+limiter need plus the atomic counter function the limiter calls; `0004` creates
+the table server-side debates run in, and `api/debate.js` does not work without
+it. Paste both into the Supabase SQL editor and run them; both are idempotent.
+
+Skipping them does not degrade gracefully. The rate limiter fails CLOSED when its
+backend is unreachable — deliberately, because an unbounded proxy in front of a
+metered API is worse than a brief outage — so a deployment missing `0003` returns
+503 on every AI call and on the admin login, surfacing as "AI is temporarily
+unavailable" rather than as anything naming a database.
+
+Also run the storage-bucket statement at the bottom of `0002_assets.sql` (or
+create a private bucket named `creative-assets` by hand). That one statement is
+live; the tables above it in that file are not. The rest of `0002_assets.sql` and
+all of `0001_init.sql` are proposals for a later phase and should **not** be run
+yet — they reference each other's tables and will error out of order. See their
+headers.
 
 Earlier revisions of this project used Upstash Redis for the first two of those
 jobs. It is no longer read: neither is Redis-shaped (routing is one row read per

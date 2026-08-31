@@ -11,6 +11,9 @@ import {
   callGenerateVideo, pollVideoJob, buildVideoScript, VIDEO_TIERS, VIDEO_TIER_LIST,
   estimateSpokenSeconds, estimateVideoCostUsd, VIDEO_POLL_INTERVAL_MS, VIDEO_POLL_TIMEOUT_MS,
 } from "../services/ai/callGenerateVideo.js";
+// The model is not imported: callGenerateVoice defaults it, and the studio has no
+// reason to name one. See the note there on why voice is not a routing group.
+import { callGenerateVoice, listVoices, estimateVoiceCostUsd } from "../services/ai/callGenerateVoice.js";
 import { mkAssetRecord, currentRoundAssets, imageCostUsd, costForInitiative } from "../services/assets.js";
 import { putAsset, getAssetUrl, readAssetBytes, probeDurableStorage, durableUnavailableReason } from "../services/assetStore.js";
 import { buildCreativeEvidence } from "../services/creativeEvidence.js";
@@ -93,6 +96,29 @@ export function CreativeStudio({
   const [vidErr, setVidErr]     = useState({});     // {variantIdx: message}
   const [elapsedMs, setElapsedMs] = useState(0);
 
+  // Auditions. Held in memory only and never written to the asset store — an
+  // audition is a thing you listen to and discard, and the whole argument for it
+  // is that it is cheap enough to redo rather than worth keeping. Keyed by bare
+  // variant index for the same reason: unlike an asset record it is not evidence,
+  // so it is cleared whenever the variant list changes rather than versioned.
+  const [voices, setVoices]     = useState([]);     // [] until the library loads, or forever if unconfigured
+  const [voiceId, setVoiceId]   = useState("");
+  const [audBusy, setAudBusy]   = useState(null);   // variant idx while one take is in flight
+  const [audErr, setAudErr]     = useState({});     // {variantIdx: message}
+  const [auditions, setAuditions] = useState({});   // {variantIdx: {url, costUsd}}
+
+  // Read once, lazily, and its failure is deliberately silent. A deployment with
+  // no ELEVENLABS_API_KEY is a normal deployment — the endpoint says so plainly
+  // when called, but an operator who has not configured voice should not be shown
+  // an error for a feature they never asked for. No voices, no control.
+  useEffect(() => {
+    let live = true;
+    listVoices()
+      .then(vs => { if (!live) return; setVoices(vs); setVoiceId(cur => cur || vs[0]?.voiceId || ""); })
+      .catch(() => { /* unconfigured or unreachable — the audition control stays hidden */ });
+    return () => { live = false; };
+  }, []);
+
   // Asked once. The studio says plainly whether a frame will survive a reload
   // BEFORE the operator spends money generating it, rather than after.
   useEffect(() => { probeDurableStorage().then(setDurableBytes); }, []);
@@ -120,6 +146,37 @@ export function CreativeStudio({
     setVidErr({});
     setVidBusy(null);
     setPromptPreview(null);
+    // Index-keyed, so a new variant list would otherwise leave take 0 attached to
+    // a different creative idea — the exact mis-pointing the asset store is
+    // versioned to avoid.
+    setAudErr({});
+    setAudBusy(null);
+    setAuditions({});
+  };
+
+  /**
+   * Audition one variant, using the render's own script.
+   *
+   * `buildVideoScript(variant)` rather than any voice-specific flattening: the
+   * only question an audition answers is what the render will sound like, so it
+   * has to be the same words. See callGenerateVoice.js.
+   */
+  const genAudition = async (variant, idx) => {
+    const text = buildVideoScript(variant);
+    if (!text || !voiceId) return;
+    setAudBusy(idx);
+    setAudErr(e => ({ ...e, [idx]: "" }));
+    try {
+      const out = await callGenerateVoice({ text, voiceId, initiativeId: selId });
+      // A data URL rather than a blob URL: nothing here has a lifecycle to manage,
+      // and an un-revoked blob URL per take is a leak that only shows up after a
+      // long session of exactly the iteration this feature encourages.
+      setAuditions(a => ({ ...a, [idx]: { url: `data:${out.mimeType};base64,${out.data}`, costUsd: out.costUsd } }));
+    } catch (e) {
+      setAudErr(er => ({ ...er, [idx]: e.message || "Could not generate the audition." }));
+    } finally {
+      setAudBusy(null);
+    }
   };
 
   // A render outlives the view that started it. Invalidate on unmount so the
@@ -679,6 +736,19 @@ export function CreativeStudio({
                 title={VIDEO_TIERS[tierKey].blurb}>
                 {VIDEO_TIER_LIST.map(v => <option key={v.key} value={v.key}>{v.label}</option>)}
               </select>
+              {voices.length > 0 && (
+                <>
+                  <label style={{ fontSize: 12, color: t.textSub }}>Voice</label>
+                  <select value={voiceId} onChange={e => setVoiceId(e.target.value)} style={{ ...gSl(t), width: 150, padding: "6px 8px" }}
+                    title="The voice an audition is read in. Auditions are not renders — nothing is kept.">
+                    {voices.map(v => (
+                      <option key={v.voiceId} value={v.voiceId}>
+                        {v.name}{v.accent ? ` · ${v.accent}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              )}
               <label style={{ fontSize: 12, color: t.textSub }}>Channel</label>
               <select value={channel} onChange={e => { setChannel(e.target.value); setEdits({}); }} style={{ ...gSl(t), width: 118, padding: "6px 8px" }}>
                 {channels.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
@@ -820,10 +890,25 @@ export function CreativeStudio({
                       <div style={{ margin:"12px 0", padding:"11px 12px", background:t.surface, border:"1px solid "+t.borderSoft, borderRadius:10 }}>
                         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:9, flexWrap:"wrap" }}>
                           <div style={{ ...gSL(t), marginBottom:0 }}>Talking head</div>
-                          <button onClick={() => genVideo(v, i)} disabled={vidBusy !== null}
-                            style={{ ...(job ? gGh(t) : gG(t)), padding:"5px 11px", fontSize:11.5, opacity: vidBusy !== null ? 0.55 : 1 }}>
-                            {rendering ? "Rendering…" : job ? "Regenerate" : "Generate video"}
-                          </button>
+                          <div style={{ display:"flex", gap:7, alignItems:"center" }}>
+                            {/* Deliberately to the LEFT of the render button, and
+                                deliberately in the same card. The decision this
+                                supports is "is this read worth rendering", so it
+                                belongs next to the thing it saves you buying —
+                                not in a panel of its own where it reads as a
+                                separate feature. */}
+                            {voices.length > 0 && (
+                              <button onClick={() => genAudition(v, i)} disabled={audBusy !== null || vidBusy !== null}
+                                style={{ ...gGh(t), padding:"5px 11px", fontSize:11.5, opacity: (audBusy !== null || vidBusy !== null) ? 0.55 : 1 }}
+                                title="Hear this script read aloud before paying to render it.">
+                                {audBusy === i ? "Reading…" : auditions[i] ? "Re-read" : "Hear it"}
+                              </button>
+                            )}
+                            <button onClick={() => genVideo(v, i)} disabled={vidBusy !== null}
+                              style={{ ...(job ? gGh(t) : gG(t)), padding:"5px 11px", fontSize:11.5, opacity: vidBusy !== null ? 0.55 : 1 }}>
+                              {rendering ? "Rendering…" : job ? "Regenerate" : "Generate video"}
+                            </button>
+                          </div>
                         </div>
 
                         {/* Priced before spend, both tiers, so the difference is
@@ -835,7 +920,32 @@ export function CreativeStudio({
                               {x.key === tierKey ? "· " : ""}{x.key.toLowerCase()} {usd(estimateVideoCostUsd(vidScript, x))}
                             </span>
                           ))}
+                          {/* Shown next to the render prices rather than on its
+                              own, because the number that matters is the RATIO —
+                              an audition priced in isolation looks like another
+                              cost, and priced beside the render it is the reason
+                              to press it first. Four decimals because a take runs
+                              a fraction of what a render does and $0.08 rounded
+                              to cents next to $4.20 hides the argument. */}
+                          {voices.length > 0 && estimateVoiceCostUsd(vidScript) !== null && (
+                            <span title="Cost to hear this script read aloud, against the cost of rendering it.">
+                              · audition ${estimateVoiceCostUsd(vidScript).toFixed(4)}
+                            </span>
+                          )}
                         </div>
+
+                        {audErr[i] && (
+                          <div style={{ marginTop:9, fontSize:11.5, color:t.red, lineHeight:1.5 }}>{audErr[i]}</div>
+                        )}
+
+                        {auditions[i] && (
+                          <div style={{ marginTop:9 }}>
+                            <audio src={auditions[i].url} controls style={{ width:"100%", maxWidth:320, display:"block" }} />
+                            <div style={{ fontSize:10.5, color:t.textMuted, fontFamily:t.mono, marginTop:5 }}>
+                              audition · {usd(auditions[i].costUsd || 0).replace("$0.00", "<$0.01")} · not kept on reload
+                            </div>
+                          </div>
+                        )}
 
                         {rendering && (
                           <div style={{ marginTop:9, fontSize:11.5, color:t.textSub, lineHeight:1.5 }}>

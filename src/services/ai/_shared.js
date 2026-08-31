@@ -140,6 +140,28 @@ export function recordVideoUsage({ provider, costUsd, initiativeId = null, ok = 
  * unit an operator reconciles against — tokens are meaningless here and seconds
  * are not known until the audio comes back.
  */
+/**
+ * Record one scene generation, at SUBMIT, on the same reasoning as
+ * recordVideoUsage: a submitted job is billed whether or not anyone waits.
+ *
+ * `modality: "video"` and not a new value, unlike voice's "audio". A Veo clip and
+ * a HeyGen render are both video output billed per second — an operator asking
+ * "what did video cost this month" means both, and splitting the modality would
+ * make the honest answer require adding two rows in the console. What separates
+ * them is the GROUP ("scene" vs "video"), which is the axis the routing console
+ * already switches on and the axis a rollup can group by.
+ */
+export function recordSceneUsage({ model, costUsd, initiativeId = null, ok = true, errorKind = null }) {
+  const entry = modelById(model);
+  record(mkUsageRow({
+    group: "scene", fn: "callGenerateScene", model,
+    provider: entry?.provider || "gemini", modality: "video",
+    initiativeId, ok, errorKind,
+    costUsd: ok ? (typeof costUsd === "number" ? costUsd : null) : null,
+    rate: entry?.price || null,
+  }));
+}
+
 export function recordVoiceUsage({ model, costUsd, characters = null, initiativeId = null, ok = true, errorKind = null }) {
   const entry = modelById(model);
   record(mkUsageRow({

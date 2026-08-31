@@ -332,7 +332,7 @@ export const MODEL_CATALOGUE = [
     // ever disagree, callGenerateVideo.js is the one that charges.
     price: { perSecondUsd: 0.017 },
     blurb: "~$0.017/sec. Cheapest viable talking head; fine for reading a hook back.",
-    caps: {},
+    caps: { lipSync: true },
   },
   {
     id: "fabric",
@@ -341,7 +341,7 @@ export const MODEL_CATALOGUE = [
     modality: "video",
     price: { perSecondUsd: 0.15 },
     blurb: "~$0.15/sec. Photoreal lip-sync, roughly nine times the price.",
-    caps: {},
+    caps: { lipSync: true },
   },
   {
     id: "did",
@@ -350,7 +350,55 @@ export const MODEL_CATALOGUE = [
     modality: "video",
     price: { perSecondUsd: 0.035 },
     blurb: "~$0.035/sec. Above HeyGen without being visibly better; kept reachable, not a tier.",
-    caps: {},
+    caps: { lipSync: true },
+  },
+
+  // -- Scene generation -------------------------------------------------------
+  //
+  // A different job from the three above, which is why `caps` separates them
+  // rather than a comment. Those take an approved script and make a person say
+  // it; these take a visual direction and make a moving frame. Neither can do
+  // the other's work, and before this distinction existed the console would
+  // happily have routed "generate a scene" to a lip-sync renderer that has no
+  // idea what to do without a script.
+  //
+  // Reached through Vertex, not the Gemini Developer API — deliberately. Veo is
+  // the one provider here whose bill can land on Google Cloud credits, and
+  // api/_geminiAuth.js already mints the Vertex token, so this costs no new auth
+  // machinery. See the README on why the two Google surfaces bill differently.
+  //
+  // ## What is confirmed here and what is not
+  //
+  // Confirmed: the endpoint pattern (the same publishers/google/models path
+  // api/image.js already builds, with `:predictLongRunning` instead of
+  // `:generateContent`), the poll via `:fetchPredictOperation`, the
+  // instances/parameters body shape, and that both ids below are real.
+  //
+  // NOT confirmed against primary documentation: the per-second rates. Google's
+  // own docs were unreachable when this was written and secondary sources
+  // disagree by a factor of five ($0.15 to $0.75 a second). The figures below are
+  // the most Vertex-specific ones available and are recorded, like every other
+  // rate in this file, as ESTIMATES — `costBasis: "estimate"` on the row means a
+  // billing export can overwrite them without anyone guessing which were
+  // measured. Check them against your own first invoice before trusting the
+  // pre-spend display.
+  {
+    id: "veo-3.1-fast-generate-001",
+    provider: "gemini",
+    label: "Veo 3.1 Fast",
+    modality: "video",
+    price: { perSecondUsd: 0.15 },
+    blurb: "~$0.15/sec. The concepting tier — for deciding whether a scene is worth generating properly.",
+    caps: { sceneGen: true },
+  },
+  {
+    id: "veo-3.0-generate-001",
+    provider: "gemini",
+    label: "Veo 3.0",
+    modality: "video",
+    price: { perSecondUsd: 0.40 },
+    blurb: "~$0.40/sec. For a clip that will actually be shown to someone.",
+    caps: { sceneGen: true },
   },
 ];
 
@@ -430,10 +478,24 @@ export const FEATURE_GROUPS = {
   video: {
     label: "Video Generation",
     modality: "video",
-    optimiseFor: "Lip-sync realism per second spent. Billed per second of output, so the script length is the price — see estimateVideoCostUsd.",
-    requires: {},
+    optimiseFor: "Lip-sync realism per second spent. Billed per second of output, and the script length sets the duration, so the script IS the price — see estimateVideoCostUsd.",
+    // Was {} while every video model in the catalogue was a lip-sync renderer.
+    // Stated once scene generators arrived, because an empty `requires` on a
+    // modality that now holds two incompatible kinds of model is not "no
+    // constraint", it is a missing one — it would offer Veo as a talking-head
+    // renderer and fail at the first submit.
+    requires: { lipSync: true },
     calls: [
       { fn: "callGenerateVideo", surface: "Creative Studio — talking-head render from a variant script" },
+    ],
+  },
+  scene: {
+    label: "Scene Generation",
+    modality: "video",
+    optimiseFor: "Motion per cent spent, against a visual direction rather than a script. The sibling of Image Generation, not of Video: prompts are assembled from an approved brief (see buildScenePrompt) and the duration is requested rather than implied, so unlike a talking head the price is known before the prompt is written.",
+    requires: { sceneGen: true },
+    calls: [
+      { fn: "callGenerateScene", surface: "Creative Studio — moving key frame from a brief variant" },
     ],
   },
 };
@@ -458,6 +520,9 @@ export const DEFAULT_ROUTING = {
   creative: "claude-sonnet-5",
   image:    "gemini-2.5-flash-image",
   video:    "heygen",
+  // The cheap tier, for the same reason image defaults to Nano Banana rather
+  // than Pro: the default should be the one you concept with.
+  scene:    "veo-3.1-fast-generate-001",
 };
 
 /** True when `model` satisfies every capability `group` requires. */
@@ -540,3 +605,12 @@ export function resolveRouting(stored) {
 
 /** Text-modality model ids — the source of api/proxy.js's allowlist. */
 export const TEXT_MODEL_IDS = MODEL_CATALOGUE.filter(m => m.modality === "text").map(m => m.id);
+
+/** Scene-generator ids — the source of api/scene.js's allowlist, on exactly the
+ *  reasoning that makes TEXT_MODEL_IDS the source of api/proxy.js's: two lists
+ *  that have to agree, and no way to notice they don't until a feature 400s in
+ *  production. Filtered on the capability rather than the provider, so a
+ *  non-Google scene generator becomes one catalogue entry and no endpoint edit. */
+export const SCENE_MODEL_IDS = MODEL_CATALOGUE
+  .filter(m => m.modality === "video" && m.caps?.sceneGen === true)
+  .map(m => m.id);

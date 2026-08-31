@@ -485,6 +485,12 @@ GCP_LOCATION=us-central1
 #   gcloud services enable aiplatform.googleapis.com --project=your_gcp_project_id
 # or open console.cloud.google.com/apis/library/aiplatform.googleapis.com directly.
 GOOGLE_APPLICATION_CREDENTIALS=your_base64_or_raw_service_account_json
+#
+# NOTE: scene generation (Veo, in the Creative Studio) is the feature these vars
+# most affect. It works on a plain GEMINI_API_KEY, but a clip runs $0.60-$3.20
+# against an AI Studio balance that excludes Google Cloud credits. Set the three
+# vars above and the same generation bills the GCP project instead, where
+# promotional and free-trial credits actually apply.
 
 # Optional override. Forces "vertex" or "aistudio" regardless of which of the
 # above are set — e.g. to try Vertex without deleting a working

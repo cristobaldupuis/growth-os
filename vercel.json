@@ -27,9 +27,16 @@
     "api/routing.js": {
       "memory": 128,
       "maxDuration": 10
+    },
+    "api/state.js": {
+      "memory": 256,
+      "maxDuration": 30
     }
   },
   "rewrites": [
-    { "source": "/admin", "destination": "/admin.html" }
+    {
+      "source": "/admin",
+      "destination": "/admin.html"
+    }
   ]
 }

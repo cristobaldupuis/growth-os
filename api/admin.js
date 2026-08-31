@@ -34,7 +34,7 @@ import {
 import {
   MODEL_CATALOGUE, FEATURE_GROUPS, DEFAULT_ROUTING, validateRouting, resolveRouting, modelById,
 } from "../src/services/ai/registry.js";
-import { geminiConfigured, geminiAuthMode } from "./_geminiAuth.js";
+import { geminiConfigured, geminiAuthMode, geminiAuthHeaders } from "./_geminiAuth.js";
 
 const MAX_BODY_BYTES = 32 * 1024;
 // Low on purpose. A human clicking through a console does not need more, and this
@@ -47,18 +47,20 @@ const RATE_LIMIT_MAX = 40;
 // verify there; these are the providers whose IDs are seeded unverified.
 const MODEL_LIST_ENDPOINTS = {
   gemini: {
-    url: () => `https://generativelanguage.googleapis.com/v1beta/models?key=${process.env.GEMINI_API_KEY}`,
+    // AI Studio and Vertex expose different list endpoints with different auth,
+    // so both url and headers branch on the active mode — see api/_geminiAuth.js
+    // for what decides which side is active.
+    url: () => geminiAuthMode() === "vertex"
+      ? `https://${process.env.GCP_LOCATION}-aiplatform.googleapis.com/v1/publishers/google/models`
+      : `https://generativelanguage.googleapis.com/v1beta/models?key=${process.env.GEMINI_API_KEY}`,
+    headers: () => geminiAuthMode() === "vertex" ? geminiAuthHeaders() : {},
     keyVar: "GEMINI_API_KEY",
-    // Gemini returns `models: [{name: "models/gemini-x", ...}]`.
-    extract: (json) => (json?.models || []).map(m => String(m.name || "").replace(/^models\//, "")),
-    // Configured now means "AI Studio key OR Vertex service account", not just
-    // this one key var — see api/_geminiAuth.js. The list call above is AI
-    // Studio's ListModels endpoint specifically, which has no Vertex
-    // equivalent wired here, so a Vertex-only deployment is configured but
-    // not listable — notListableError below says that plainly.
+    // AI Studio returns `models: [{name: "models/gemini-x", ...}]`; Vertex's
+    // publisher-model list returns `models: [{name: "publishers/google/models/gemini-x", ...}]`.
+    extract: (json) => (json?.models || []).map(m => String(m.name || "").replace(/^(?:models|publishers\/google\/models)\//, "")),
+    // Configured means "AI Studio key OR Vertex service account", not just this
+    // one key var — see api/_geminiAuth.js.
     configured: geminiConfigured,
-    listable: () => geminiAuthMode() === "aistudio",
-    notListableError: "Gemini is running in Vertex mode; listing models isn't wired up for Vertex here yet — verify the id by using it directly.",
   },
   openai: {
     url: () => "https://api.openai.com/v1/models",
@@ -94,9 +96,8 @@ async function fetchProviderModels(provider) {
   if (!configured) {
     return { status: 400, error: `${spec.keyVar} is not set, so ${provider} models cannot be listed.` };
   }
-  if (spec.listable && !spec.listable()) return { status: 400, error: spec.notListableError };
   try {
-    const upstream = await fetch(spec.url(), { headers: spec.headers ? spec.headers() : {} });
+    const upstream = await fetch(spec.url(), { headers: spec.headers ? await spec.headers() : {} });
     const json = await upstream.json();
     if (!upstream.ok) {
       console.error("Model list failed", provider, upstream.status, json?.error?.message);

@@ -228,10 +228,14 @@ test("listModels for gemini reports GEMINI_API_KEY missing when nothing is confi
   } finally { if (saved) process.env.GEMINI_API_KEY = saved; }
 });
 
-test("listModels for gemini in Vertex mode says listing isn't wired up, not 'not configured'", async () => {
-  // Gemini IS configured here — just via Vertex, which this AI-Studio-only list
-  // endpoint can't serve. The console must say that, not claim the provider has
-  // no credentials at all just because the one env var it used to check is unset.
+test("listModels for gemini in Vertex mode is configured (not 'GEMINI_API_KEY missing') and actually attempts Vertex", async () => {
+  // Gemini IS configured here — just via Vertex, which used to have no list
+  // endpoint wired at all. It must not claim the provider has no credentials
+  // just because the one env var it used to check is unset, and it must now
+  // genuinely try Vertex's publisher-models list rather than return a canned
+  // "not wired up" message. The service-account JSON below is well-formed but
+  // missing client_email/private_key, so minting a token fails deterministically
+  // before any real network call — that's what turns up as a 502 here.
   const saved = {
     key: process.env.GEMINI_API_KEY,
     project: process.env.GCP_PROJECT_ID,
@@ -244,9 +248,8 @@ test("listModels for gemini in Vertex mode says listing isn't wired up, not 'not
   process.env.GOOGLE_APPLICATION_CREDENTIALS = "{}";
   try {
     const res = await post({ action: "listModels", provider: "gemini" }, await signIn());
-    assert.equal(res.statusCode, 400);
-    assert.match(res.body.error, /Vertex/);
-    assert.doesNotMatch(res.body.error, /GEMINI_API_KEY is not set/);
+    assert.equal(res.statusCode, 502);
+    assert.match(res.body.error, /Could not reach the provider/);
   } finally {
     for (const [k, v] of Object.entries({
       GEMINI_API_KEY: saved.key, GCP_PROJECT_ID: saved.project, GCP_LOCATION: saved.location, GOOGLE_APPLICATION_CREDENTIALS: saved.creds,

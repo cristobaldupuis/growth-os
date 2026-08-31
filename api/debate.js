@@ -49,7 +49,7 @@
 // deployment spend a reasoning model's budget in a loop.
 
 import { createHmac, timingSafeEqual, createHash, randomUUID } from "node:crypto";
-import { guardEntry, guardRateLimit, clientIp } from "./_guard.js";
+import { guardEntry, guardRateLimit, rateLimitIdentity } from "./_guard.js";
 import { supabaseConfigured, restBase, authHeaders, rpc } from "./_supabase.js";
 import { callText } from "./_textCall.js";
 import { buildPortfolioContext, buildPortfolioTools } from "../src/services/portfolio.js";
@@ -336,10 +336,14 @@ export default async function handler(req, res) {
 }
 
 async function handleStart(req, res) {
+  const who = await rateLimitIdentity(req);
+  if (who.error) { res.status(401).json({ error: who.error }); return; }
   if (await guardRateLimit(req, res, {
-    key: `gos:debate:start:${clientIp(req)}`,
+    key: `gos:debate:start:${who.id}`,
     max: START_RATE_LIMIT_MAX,
-    limitMessage: "Too many debates started from this address. Wait a while and try again.",
+    // No longer "from this address" when a session named a person — see
+    // rateLimitIdentity on why the address was wrong in both directions.
+    limitMessage: "Too many debates started. Wait a while and try again.",
     label: "Debate",
   })) return;
 
@@ -419,8 +423,10 @@ async function handleStep(req, res) {
 }
 
 async function handleStatus(req, res) {
+  const who = await rateLimitIdentity(req);
+  if (who.error) { res.status(401).json({ error: who.error }); return; }
   if (await guardRateLimit(req, res, {
-    key: `gos:debate:poll:${clientIp(req)}`,
+    key: `gos:debate:poll:${who.id}`,
     max: POLL_RATE_LIMIT_MAX,
     limitMessage: "Too many status checks. Wait a moment.",
     label: "Debate poll",

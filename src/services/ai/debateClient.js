@@ -16,6 +16,8 @@
 // browser already has the portfolio; sending it back on every poll would make a
 // two-second interval expensive for nothing.
 
+import { AI_HEADERS } from "./_shared.js";
+
 export const DEBATE_URL = "/api/debate";
 
 /** Every two seconds. A step is one model call, so turns land at roughly this
@@ -25,7 +27,10 @@ export const POLL_INTERVAL_MS = 2000;
 async function post(body) {
   const resp = await fetch(DEBATE_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    // Carries the caller's session when there is one, so a debate — the most
+    // expensive thing in the app per click — is bounded per person rather than
+    // per office. See AI_HEADERS in ./_shared.js.
+    headers: await AI_HEADERS(),
     body: JSON.stringify(body),
   });
   const data = await resp.json().catch(() => ({}));

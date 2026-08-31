@@ -247,7 +247,7 @@ export async function callGenerateVideo({ script, cta, avatarId, voiceId, aspect
   try {
     resp = await fetch(VIDEO_PROXY_URL, {
       method: "POST",
-      headers: AI_HEADERS(),
+      headers: await AI_HEADERS(),
       body: JSON.stringify({ action: "submit", provider, script, cta, avatarId, voiceId, aspectRatio }),
     });
   } catch (err) {
@@ -293,7 +293,7 @@ export async function callGenerateVideo({ script, cta, avatarId, voiceId, aspect
 export async function pollVideoJob({ jobId, provider }) {
   const resp = await fetch(VIDEO_PROXY_URL, {
     method: "POST",
-    headers: AI_HEADERS(),
+    headers: await AI_HEADERS(),
     body: JSON.stringify({ action: "poll", provider, jobId }),
   });
   if (!resp.ok) throw new Error(await proxyError(resp));

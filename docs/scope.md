@@ -142,7 +142,7 @@ chokepoint:
 | Klaviyo | private API key, server-held | **[planned, 2.1]** — campaign/flow *values* reports only |
 | Shopify | custom app admin token, non-expiring | **[planned, 2.1]** — aggregate queries, never traverses `customer` |
 | GA4 | service account | **[planned, 2.x]** — funnel actuals replace estimated drop-off |
-| Meta / Google Ads | OAuth, refreshing | **[planned, 5.5]** — hard prerequisite for Supabase |
+| Meta / Google Ads | OAuth, refreshing | **[planned, 5.5]** — gated on Supabase (2.0): a refresh token cannot live in a browser |
 
 Klaviyo and Shopify deliberately come first *because they do not need a backend* —
 a long-lived server-held secret is a Vercel environment variable. That reorders
@@ -164,7 +164,11 @@ reasons from the workspace's own state.
   were shown by a stated rule, and report the remainder they were not shown
   **[shipped]**.
 - **Learning synthesis** across closed initiatives into Patterns, Gaps (proven at
-  one retailer, missing at another), Lessons and Do Next **[shipped]**.
+  one retailer, missing at another), Lessons and Do Next **[shipped]** — over a
+  corpus that cannot yet retract. A learning has derived provenance and durability
+  and a prediction error, but no supersession edge, so one experiment cannot
+  contradict another and a belief that stopped being true keeps being cited with an
+  id attached **[planned, 5.8]**.
 - **Diagnostic escalation** — when a closed initiative's outcome diverges from its
   frozen prediction past a threshold, the system ranks which *un-captured*
   dimension most plausibly explains the gap and asks for exactly that one export.
@@ -331,6 +335,10 @@ Read this as the inventory of the finished thing.
   rather than hand-entered counts **[planned, 1.6 remainder]**
 - Calibration: prediction error against the frozen snapshot, on the card and in
   the library **[shipped]**
+- Supersession: `supersedes` / `contradicts` edges between closed initiatives,
+  confidence derived from the balance of evidence rather than typed, and superseded
+  learnings withdrawn from citation while the record stays. Conditions are read off
+  the parsed name rather than re-entered by hand **[planned, 5.8]**
 
 ### Taxonomy and the bridge
 - Schema-as-data with controlled vocabularies, per channel and per level; custom
@@ -353,8 +361,12 @@ Read this as the inventory of the finished thing.
 
 ### Facts and persistence
 - Supabase Postgres with RLS and Auth; the `store` abstraction re-backed;
-  per-user proxy authorisation on a session token from the same auth **[planned,
-  2.0 — the read paths are real work, not an adapter swap]**
+  per-user proxy authorisation on a session token from the same auth **[shipped,
+  2.0]**. Operator-authored state is a document per store key, performance facts
+  are a table with no cap, and device preferences stay in the browser. Documents
+  carry a revision and a stale write is refused rather than clobbering. The read
+  paths were deliberately left synchronous: normalising them is 5.4's work, on a
+  table that will hold real history by then
 - Campaign fact model at campaign/adset/ad × day with parsed dimensions, so every
   "break performance down by X" is a `GROUP BY` **[planned, 5.4]**
 - **`raw_name` and the schema version stamped on every fact row**, with a reparse

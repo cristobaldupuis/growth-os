@@ -59,6 +59,43 @@ const isQuotaError = (err) =>
     err.name === "QuotaExceededError" ||
     err.name === "NS_ERROR_DOM_QUOTA_REACHED");
 
+// -- The remote backend --------------------------------------------------------
+//
+// Phase 2.0. When a live workspace is signed in, the CLIENT's state moves to
+// Postgres and the DEVICE's preferences stay here. `attachRemote` is how the app
+// says which is which without every call site learning about a second store.
+//
+// The split is not cosmetic. Theme, library view, rail collapsed and tour-seen
+// are properties of this browser: syncing them would collapse someone's sidebar
+// because a colleague collapsed theirs. Everything else belongs to the workspace
+// and should be on any machine its members sign in from.
+
+/** Keys that stay in this browser even when a workspace is attached. */
+export const DEVICE_KEYS = new Set([KEY_THEME, KEY_LIB_VIEW, KEY_RAIL, KEY_TOUR_SEEN]);
+
+let remote = null;   // { saveDoc, savePerfRows, perfKey }
+let remoteCache = {};
+
+/**
+ * Route workspace state to `backend`, seeded with what the server already had.
+ *
+ * `docs` maps a store key to its JSON string, so `store.get` can answer from it
+ * without a request per key — the whole workspace arrived in one response.
+ */
+export function attachRemote(backend, docs = {}, perfJson = null) {
+  remote = backend;
+  remoteCache = { ...docs };
+  if (perfJson != null) remoteCache[backend.perfKey] = perfJson;
+}
+
+/** Return to browser-only storage — a sign-out, or a demo workspace. */
+export function detachRemote() { remote = null; remoteCache = {}; }
+
+export const remoteAttached = () => !!remote;
+
+/** True when this key belongs to the workspace rather than to this browser. */
+const isRemoteKey = (key) => !!remote && !DEVICE_KEYS.has(key);
+
 export const store = (() => {
   const mem = {};
   const hasLS = (() => { try { localStorage.setItem("__t","1"); localStorage.removeItem("__t"); return true; } catch { return false; } })();
@@ -68,11 +105,11 @@ export const store = (() => {
   // transition rather than on every keystroke-triggered save afterwards.
   let degraded = false;
 
-  const report = (key, err) => {
+  const report = (key, err, override) => {
     const quota = isQuotaError(err);
-    const message = quota
+    const message = override || (quota
       ? "Storage is full, so your latest changes are only held in this tab and will be lost when you reload. Download a backup now, then remove old initiatives or restore into a fresh workspace."
-      : "Changes could not be saved to this browser and are only held in this tab. Download a backup now.";
+      : "Changes could not be saved to this browser and are only held in this tab. Download a backup now.");
     console.error("store.set failed for " + key + ":", err);
     if (!degraded) {
       degraded = true;
@@ -83,9 +120,13 @@ export const store = (() => {
 
   return {
     /** True when writes are landing in a store that survives a reload. */
-    get durable() { return (hasWS || hasLS) && !degraded; },
+    get durable() { return (!!remote || hasWS || hasLS) && !degraded; },
 
     async get(key) {
+      // Answered from the workspace snapshot loaded at sign-in. Absent means the
+      // server genuinely has no value for this key, which is what lets App.jsx's
+      // load effect seed a fresh workspace exactly as it does a fresh browser.
+      if (isRemoteKey(key)) return remoteCache[key] ? { value: remoteCache[key] } : null;
       if (hasWS) { try { return await window.storage.get(key); } catch (err) { console.warn("store.get (window.storage) failed for " + key + ":", err); } }
       if (hasLS) { try { const v = localStorage.getItem(key); return v ? { value: v } : null; } catch (err) { console.warn("store.get (localStorage) failed for " + key + ":", err); } }
       return mem[key] ? { value: mem[key] } : null;
@@ -98,6 +139,30 @@ export const store = (() => {
      */
     async set(key, value) {
       mem[key] = value;  // always keep the session copy, even on the happy path
+
+      if (isRemoteKey(key)) {
+        remoteCache[key] = value;
+        try {
+          if (key === remote.perfKey) await remote.savePerfRows(JSON.parse(value));
+          else await remote.saveDoc(key, value);
+          return { ok: true, durable: true };
+        } catch (err) {
+          // Three failures that need three different sentences. A conflict is
+          // somebody else's save, and the fix is to reload rather than retry. A
+          // signed-out session is not an error to retry either. Anything else is
+          // the store being unreachable, and the answer is the same one this
+          // module has always given for a write that did not land: say so, and
+          // tell the operator to take a backup while the data is still in memory.
+          if (err.conflict) {
+            return report(key, err, "Someone else saved this workspace while you were working. Reload to pick up their changes — your unsaved edits are still in this tab until you do.");
+          }
+          if (err.signedOut) {
+            return report(key, err, "Your session expired, so this change was not saved. Sign in again — your edits are still in this tab.");
+          }
+          return report(key, err, "Changes could not be saved to the workspace store and are only held in this tab. Download a backup now.");
+        }
+      }
+
       if (hasWS) {
         try { await window.storage.set(key, value); return { ok: true, durable: true }; }
         catch (err) { return report(key, err); }

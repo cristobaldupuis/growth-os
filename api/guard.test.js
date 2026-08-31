@@ -18,7 +18,7 @@ delete process.env.SUPABASE_URL;
 delete process.env.SUPABASE_SECRET_KEY;
 delete process.env.SUPABASE_SERVICE_KEY;
 
-const { guardEntry, guardRateLimit, clientIp, HOUR_MS } = await import("./_guard.js");
+const { guardEntry, guardRateLimit, clientIp, rateLimitIdentity, HOUR_MS } = await import("./_guard.js");
 
 /** Point the limiter at a (stubbed) durable store for one test. */
 function configureStore() {
@@ -53,6 +53,15 @@ test("a POST from an allowed origin passes through", () => {
   const res = mkRes();
   assert.equal(guardEntry(mkReq({ origin: "https://allowed.example" }), res, ENTRY), false);
   assert.equal(res.statusCode, null);
+});
+
+test("the preflight allows the Authorization header the app actually sends", () => {
+  // A same-origin POST never preflights, so getting this wrong is invisible on
+  // the default deployment and breaks every cross-origin one in ALLOWED_ORIGINS.
+  const res = mkRes();
+  guardEntry(mkReq({ origin: "https://allowed.example" }), res, ENTRY);
+  assert.match(res.headers["Access-Control-Allow-Headers"], /Authorization/);
+  assert.match(res.headers["Access-Control-Allow-Headers"], /Content-Type/);
 });
 
 test("an allowed origin is echoed back with Vary, so caches do not cross-serve", () => {
@@ -255,4 +264,45 @@ test("the durable count decides the limit when the backend is healthy", async ()
 
 test("the default window is an hour, matching what every endpoint assumed", () => {
   assert.equal(HOUR_MS, 60 * 60 * 1000);
+});
+
+// -- Per-user rate-limit identity (ROADMAP 2.0) --------------------------------
+
+test("no credential falls back to the forwarded IP, exactly as before", async () => {
+  const who = await rateLimitIdentity({ headers: { "x-forwarded-for": "203.0.113.9, 10.0.0.1" } });
+  assert.equal(who.id, "ip:203.0.113.9");
+  assert.equal(who.kind, "ip");
+  assert.equal(who.error, undefined);
+});
+
+test("an unknown origin IP still produces a usable bucket", async () => {
+  const who = await rateLimitIdentity({ headers: {} });
+  assert.equal(who.id, "ip:unknown");
+});
+
+test("a token that does not verify is refused, not silently downgraded", async () => {
+  // Dropping it into the IP bucket would make an expired session look like an
+  // anonymous visitor — the call succeeds, spends money, lands in the wrong
+  // bucket — and would let anyone shed a full user bucket by mangling their own
+  // token. There is no Supabase configured in this test, so verification cannot
+  // succeed, which is exactly the shape of an expired session.
+  const who = await rateLimitIdentity({ headers: { authorization: "Bearer a.b.c" } });
+  assert.match(who.error, /session has expired/i);
+  assert.equal(who.id, undefined);
+});
+
+test("a malformed authorization header is an absent credential, not a failed one", async () => {
+  // "Basic ..." is not a claim to be a signed-in user, so it is not an error —
+  // it falls through to the IP the way any anonymous caller does.
+  for (const authorization of ["Basic abc", "Bearer notajwt", "", "Bearer "]) {
+    const who = await rateLimitIdentity({ headers: { authorization, "x-forwarded-for": "198.51.100.4" } });
+    assert.equal(who.id, "ip:198.51.100.4", authorization);
+  }
+});
+
+test("user buckets and IP buckets cannot collide", async () => {
+  // Namespaced, so a user whose id happens to look like an address does not
+  // share a ceiling with that address.
+  const ip = await rateLimitIdentity({ headers: { "x-forwarded-for": "203.0.113.9" } });
+  assert.ok(ip.id.startsWith("ip:"));
 });

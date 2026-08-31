@@ -49,8 +49,40 @@
 export const secretKey = () =>
   process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_KEY || "";
 
+/**
+ * The PUBLISHABLE key, which is safe in a browser and is not read here for any
+ * server-side call.
+ *
+ * It exists so api/state.js can hand it to the app at boot, the way api/routing.js
+ * hands over model routing. The alternative was a `VITE_SUPABASE_PUBLISHABLE_KEY`
+ * inlined into the bundle at build time, and this repository has already learned
+ * what that costs once — see DECISIONS.md on the `VITE_`-prefixed shared secret.
+ * This key is genuinely publishable (RLS is what protects the rows; see the policy
+ * block in 0005_workspace.sql), so the objection is not secrecy. It is that a
+ * credential baked into a build artefact is rotated by a redeploy, and one served
+ * from configuration is rotated by changing configuration.
+ *
+ * Both names again, for the same reason as the secret key: Supabase renamed `anon`
+ * to "publishable" (`sb_publishable_...`) and older projects carry the old name.
+ */
+export const publishableKey = () =>
+  process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || "";
+
 /** True when this deployment has somewhere durable to read and write. */
 export const supabaseConfigured = () => !!(process.env.SUPABASE_URL && secretKey());
+
+/**
+ * True when a browser can complete a sign-in against this project.
+ *
+ * Separate from `supabaseConfigured` because the two fail independently and need
+ * different fixes: a deployment can have a working server-side store and no
+ * publishable key, in which case the app must stay on the browser store and say
+ * why rather than showing a sign-in form that cannot succeed.
+ */
+export const authConfigured = () => !!(process.env.SUPABASE_URL && publishableKey());
+
+/** The project's auth base, for the browser to talk to directly. */
+export const authBase = () => baseUrl() + "/auth/v1";
 
 const baseUrl = () => String(process.env.SUPABASE_URL || "").replace(/\/+$/, "");
 

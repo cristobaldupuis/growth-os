@@ -86,6 +86,8 @@ import { TOUR_STEPS } from "./components/tourSteps.js";
 import { CBar } from "./components/CBar.jsx";
 import { interactive } from "./components/motion.js";
 import { EAlert } from "./components/EAlert.jsx";
+import { WorkspacePanel } from "./components/WorkspacePanel.jsx";
+import { bootWorkspace, bootMessage } from "./services/workspaceBoot.js";
 import { FR } from "./components/FR.jsx";
 import { MetricsLogModal } from "./components/MetricsLogModal.jsx";
 import { MetricsImportModal } from "./components/MetricsImportModal.jsx";
@@ -632,6 +634,12 @@ export default function App() {
   // Set when a durable write fails. Sticky — it stays until a backup is taken,
   // because the consequence (silent loss of everything since) doesn't go away.
   const [storageError, setStorageError] = useState(null);
+  // Which store answered this session, decided once at boot. See
+  // services/workspaceBoot.js — in particular why this is not keyed on
+  // `workspaceMode`, which lives inside the settings this decision has to be
+  // made before reading.
+  const [boot, setBoot] = useState(null);
+  const [showWorkspace, setShowWorkspace] = useState(false);
   // One timer, not one per call. Each toast used to set its own bare 3.5s
   // timeout, so an earlier toast's timer would fire while a later one was on
   // screen and clear it — two toasts three seconds apart meant the second was
@@ -723,6 +731,11 @@ export default function App() {
       .catch(() => { /* defaults already apply — see registry.js DEFAULT_ROUTING */ });
 
     const load = async ()=>{
+      // FIRST, before a single `store.get` below: decide which store answers.
+      // Attaching the workspace backend after the reads would load the browser
+      // copy and then save it over the server's, which is the one ordering bug
+      // in this file that would cost a client their history.
+      setBoot(await bootWorkspace());
       // Hoisted out of the try so the backup nudge below can still see what was
       // loaded even when parsing part of it threw.
       let settingsRaw = null, itemsRaw = null;
@@ -2012,6 +2025,60 @@ export default function App() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Workspace strip. Renders on a deployment that HAS a workspace store —
+        * never on one that does not, so the demo is untouched by this phase.
+        * Present even when everything is fine, because "saved" means two
+        * different things depending on which store answered and the operator
+        * should never have to guess which one they are looking at. */}
+      {boot && !(boot.mode === "local" && boot.reason === "not-configured") && (
+        <div style={{background:boot.mode==="remote"?t.surface:t.redBg,borderBottom:"1px solid "+(boot.mode==="remote"?t.border:t.red),padding:"7px 16px"}}>
+          <div style={{maxWidth:1440,margin:"0 auto",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+            <span style={{fontSize:12,fontFamily:t.sans,flex:1,minWidth:220,lineHeight:1.5,
+              color:boot.mode==="remote"?t.textMuted:t.red,fontWeight:boot.mode==="remote"?400:600}}>
+              {boot.mode === "remote"
+                ? <>Saving to <strong style={{color:t.text}}>{boot.workspace?.name || boot.workspace?.slug || "the workspace store"}</strong>.</>
+                : bootMessage(boot)}
+            </span>
+            <button style={{...gG(t),fontSize:11.5,padding:"5px 12px",flexShrink:0}}
+              onClick={()=>setShowWorkspace(true)}>
+              {boot.mode === "remote" ? "Workspace" : "Sign in"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showWorkspace && (
+        <WorkspacePanel
+          t={t} dk={dk} boot={boot}
+          onClose={()=>setShowWorkspace(false)}
+          // A full reload rather than re-running the load effect. Signing in or
+          // out changes which store answers every subsequent `store.get`, and
+          // re-deriving fourteen pieces of state in place against a backend that
+          // just changed underneath them is a much better way to end up showing
+          // one workspace's initiatives against another's performance rows. This
+          // happens twice a day at most.
+          onReload={async ()=>{ window.location.reload(); }}
+          // The browser copy, in the shape uploadInitial wants. Read from state
+          // rather than from the store because state is what the operator has
+          // been looking at, and it is what they mean by "this browser's
+          // workspace".
+          collectLocal={()=>({
+            docs: {
+              [KEY_ITEMS]:    JSON.stringify(items),
+              [KEY_SETTINGS]: JSON.stringify(settings),
+              [KEY_DEBATES]:  JSON.stringify(debates),
+              [KEY_METRICS]:  JSON.stringify(weeklyMetrics),
+              [KEY_RECS]:     JSON.stringify(recs),
+              [KEY_CREATIVE]: JSON.stringify(creative),
+              [KEY_ASSETS]:   JSON.stringify(assets),
+              [KEY_USAGE]:    JSON.stringify(usage),
+              [KEY_AGENDA]:   JSON.stringify(agenda),
+            },
+            perfRows,
+          })}
+        />
       )}
 
       {/* Content column. `#root` used to be pinned to 1126px in index.css, which

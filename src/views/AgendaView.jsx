@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { AGENDA_STATUSES, mkAgendaItem, agendaRollup } from "../services/learningAgenda.js";
+import { AGENDA_STATUSES, mkAgendaItem, agendaRollup,
+         contradictionQuestions, agendaItemFromContradiction } from "../services/learningAgenda.js";
 import { gG, gGh, gI, gTA, gSl, gSc, gSL } from "../components/styles.js";
 import { Modal } from "../components/Modal.jsx";
 import { SBdg } from "../components/badges.jsx";
@@ -17,6 +18,14 @@ export function AgendaView({ agenda, items, cats, brands, activeBrand, t, dk, on
   const [fStatus, setFStatus] = useState("All");
 
   const rolled = useMemo(() => agendaRollup(agenda, items), [agenda, items]);
+
+  // Contradictions the record already contains and nobody has adopted as a
+  // question yet (ROADMAP 5.8). Derived every render rather than stored: one
+  // that gets resolved should stop appearing on its own, and a persisted copy
+  // would need reconciling against the graph forever.
+  const contradictions = useMemo(
+    () => contradictionQuestions(items, agenda).filter(c => !c.alreadyAsked),
+    [items, agenda]);
 
   const scoped = useMemo(() => rolled.filter(a =>
     (activeBrand === "all" || (a.brandId || "default") === activeBrand) &&
@@ -54,6 +63,46 @@ export function AgendaView({ agenda, items, cats, brands, activeBrand, t, dk, on
           </button>
         ))}
       </div>
+
+      {/* Two live learnings that disagree is a finding, and the highest-value
+          thing a question can be pointed at: the business already paid to run
+          both experiments and the disagreement is already in the record.
+          Surfaced here rather than absorbed into a confidence figure. */}
+      {contradictions.length>0 && (
+        <div style={{...gSc(t),background:t.warnBg,border:"1px solid "+t.warnBorder}}>
+          <div style={{fontSize:11,fontWeight:700,color:t.warn,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:4}}>
+            {contradictions.length} contradiction{contradictions.length!==1?"s":""} in the record
+          </div>
+          <div style={{fontSize:12,color:t.textSub,fontFamily:t.sans,marginBottom:10,lineHeight:1.5,maxWidth:600}}>
+            Closed results that disagree, with neither retracted. Both are still being cited. Adopting one as a question is how it gets settled.
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {contradictions.map(c => (
+              <div key={c.key} style={{padding:"10px 12px",borderRadius:6,background:t.surface,border:"1px solid "+t.border}}>
+                {[c.a, c.b].map((side, i) => (
+                  <div key={side.ref} style={{marginBottom:i===0?7:9}}>
+                    <div style={{display:"flex",gap:6,alignItems:"baseline",flexWrap:"wrap"}}>
+                      <span style={{fontSize:10,color:t.gold,fontFamily:t.mono}}>{side.ref}</span>
+                      <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>{side.provenance}</span>
+                      {side.closedDate&&<span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono}}>{side.closedDate}</span>}
+                    </div>
+                    <p style={{margin:"3px 0 0",fontSize:12.5,color:t.text,fontFamily:t.serif,lineHeight:1.45,borderLeft:"2px solid "+t.warnBorder,paddingLeft:9}}>
+                      "{side.learning}"
+                    </p>
+                  </div>
+                ))}
+                <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+                  <button style={gGh(t,"sm")} onClick={()=>onViewInitiative(c.a.id)}>Open {c.a.ref}</button>
+                  <button style={gGh(t,"sm")} onClick={()=>onViewInitiative(c.b.id)}>Open {c.b.ref}</button>
+                  <button style={gG(t,"sm")} onClick={()=>setEditing(agendaItemFromContradiction(c, activeBrand, cats))}>
+                    Make this a question <IconArrowRight size={12}/>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {scoped.length===0 && (
         <div style={{padding:"40px 24px",textAlign:"center",color:t.textMuted,fontFamily:t.serif,border:"1px dashed "+t.border,borderRadius:8}}>

@@ -25,6 +25,8 @@
 // Store shape: one flat array under KEY_AGENDA, same as `items`. Small and
 // operator-authored, unlike the campaign-scale collections that needed a cap.
 
+import { openContradictions } from "./supersession.js";
+
 export const AGENDA_STATUSES = ["Open","Answered","Parked"];
 
 export const mkAgendaItem = (brandId, cats) => ({
@@ -66,6 +68,64 @@ export function agendaRollup(agenda, items) {
         : null,
     };
   });
+}
+
+/**
+ * Open contradictions, shaped as agenda questions waiting to be adopted
+ * (ROADMAP 5.8).
+ *
+ * Two live learnings that disagree is a finding. It is also, specifically, the
+ * highest-value thing a learning agenda question can be pointed at: the
+ * business already paid to run both experiments, the disagreement is already in
+ * the record, and nobody has to guess whether the question matters — it is the
+ * one place the portfolio is provably confused about itself.
+ *
+ * Derived on every render rather than stored. A contradiction that gets
+ * resolved — someone decides which result superseded which — should stop being
+ * a question by itself, and a persisted copy would need reconciling against the
+ * graph forever. `alreadyAsked` marks the ones an operator has already adopted
+ * so the prompt disappears from the list instead of nagging.
+ *
+ * The proposed question deliberately names both results rather than picking a
+ * side. Which one is right is the experiment; asserting it here would be the
+ * same confident-filler failure the rest of this layer refuses.
+ */
+export function contradictionQuestions(items, agenda) {
+  const asked = new Set((agenda||[]).map(a => a.fromContradiction).filter(Boolean));
+  return openContradictions(items).map(c => ({
+    key: c.key,
+    a: c.a,
+    b: c.b,
+    alreadyAsked: asked.has(c.key),
+    // Category only when both sides agree on one — a contradiction that spans
+    // two categories has no obvious home and guessing gives it a wrong one.
+    category: c.a.category && c.a.category === c.b.category ? c.a.category : "",
+    question: `Which holds: "${c.a.learning}" or "${c.b.learning}"?`,
+    holdConstant: "",
+    varies: "",
+    falsifyingResult: "",
+  }));
+}
+
+/**
+ * Adopt a contradiction as a real agenda item. Carries `fromContradiction` so
+ * the prompt that produced it can retire, and pre-fills the question with both
+ * sides named. Everything a person still owns — what to hold constant, what to
+ * vary, what would falsify it — stays empty on purpose.
+ */
+export function agendaItemFromContradiction(contradiction, brandId, cats) {
+  const base = mkAgendaItem(brandId, cats);
+  return {
+    ...base,
+    question: contradiction.question,
+    category: contradiction.category || base.category,
+    fromContradiction: contradiction.key,
+    notes: [
+      `Contradiction between two closed results.`,
+      `[${contradiction.a.ref}] ${contradiction.a.title} (${contradiction.a.provenance}): "${contradiction.a.learning}"`,
+      `[${contradiction.b.ref}] ${contradiction.b.title} (${contradiction.b.provenance}): "${contradiction.b.learning}"`,
+    ].join("\n"),
+  };
 }
 
 /**

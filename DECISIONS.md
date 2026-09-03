@@ -4,6 +4,31 @@ Architecture decisions worth remembering. The bar for this file is a real tradeo
 
 ---
 
+## A learning can be retracted, and confidence is read from the graph rather than typed
+
+**Decision:** Closed initiatives carry three relations on `results` — `supersedes`, `contradicts`, `confirms` — set by a person in the close flow. Everything else about a learning's standing is computed on read: `supersededBy` by inverting the stored edge, and a confidence *level* by walking the graph. No confidence field is stored anywhere.
+
+**Why the edges are the only hand-entered part:** the roadmap's own "what not to build" note is right that a structured learning record with typed conditions, mechanism, freshness and applicability is a trap — the conditions a result held under are already on the parsed name, deriving them from the join is free and stays true, and asking a marketer to re-type them produces a second set that disagrees with the first and goes stale the same way the free text did. What a join cannot derive is that two results are *about the same belief*. "Discount creative wins on prospecting" and "discount creative underperforms on prospecting" are either one belief revised or two claims about different quarters, and no amount of category matching or embedding similarity settles which. That is the one thing a person knows and the model does not, so that is the only thing a person is asked for.
+
+**Why only the forward edge is stored:** `supersededBy` could have been written to both records. Two rows that disagree about whether one retracts the other is a worse state than either answer alone, and there is no reconciliation rule that is obviously right. One writer, one direction, everything else derived.
+
+**Why a third edge the roadmap did not ask for:** the spec required confidence "computed from the supporting and contradicting closed initiatives" and named no edge that could mark a supporter. The alternative was inferring support from category and outcome — asserting that two Successes in Retention are about the same belief, which they routinely are not. A confidence number built on that inference is exactly the hand-set field this work exists to remove, laundered through arithmetic to look derived. `confirms` is the same act as `contradicts` pointed the agreeing way, and it stays on the right side of the line: a relation only a person knows, not a description a person re-types.
+
+**Why levels and not a percentage:** two experiments and one contradiction do not produce 67% of anything. A number that precise next to a belief invites being treated as a measurement, and the inputs do not support it. Five states — `retracted`, `contested`, `established`, `supported`, `provisional` — with `tracked` evidence weighted 1.0 and `backfilled` 0.5, so two remembered results cannot outvote one measured one. That weighting is the existing `provenance` distinction given a number rather than a new judgement.
+
+**Two rules that carry the argument, both deliberate:**
+
+1. **`contested` outranks any amount of support.** Averaging a contradiction away is precisely the confidently-wrong failure mode this exists to prevent. A reader shown "established" on a belief another experiment broke has been told the opposite of what the record says. Resolving a contradiction means someone deciding which result superseded which, and that stays a person's call.
+2. **Retracted evidence props nothing up.** A superseded supporter is skipped when summing, so a belief cannot stay `established` on the strength of two results that were themselves retracted last quarter.
+
+**Why retraction removes a learning from the index and not from the record:** a retracted belief is evidence about the business — it says the team believed something, acted on it, and was wrong, which is the calibration signal the whole prediction-snapshot apparatus exists to capture. Deleting it loses that. So the initiative and its result are untouched and only citation changes. The corollary is that every arithmetic surface keeps reading the record: win rates, category rollups and coverage counts are unaffected by retraction, because retracting a belief does not un-run the experiment that produced it.
+
+**Where the citation ban had to be enforced, which was more places than the index:** `buildLearningsIndex` was the named target, but three other paths hand learnings to a model that cites them. The Learning Library's "Ask the library" corpus and its synthesis payload now exclude retracted entries. `get_failure_patterns` and the 90-day block in `buildPortfolioContext` are prose, and there the initiative stays listed with its learning explicitly marked retracted rather than dropped — "this was tried and it failed" is still true, and removing the row would hide the attempt along with the belief.
+
+**Forcing condition:** if operators start using `contradicts` as a permanent state rather than a queue — contradictions accumulating and never being resolved into a supersession — then `contested` has become a shrug rather than a finding, and the agenda prompt is not doing its job. Revisit whether contradictions need an explicit resolution step with its own record.
+
+---
+
 ## Marketers Lab is an expansion of Growth OS, not a second product
 
 **Decision:** The Marketers Lab scope — tool integrations, campaign execution, creative direction, nomenclature-driven performance analysis, and campaign↔experiment linking — is built on this codebase and this data model. No new repository, no rewrite.

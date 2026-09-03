@@ -2,7 +2,8 @@ import { useState, useMemo, useCallback } from "react";
 import { COMPANY_NAME, BUSINESS_MODEL, NORTH_STAR_METRIC } from "../activeConfig.js";
 import { INIT_TYPES, OL, OD, brandColor, brandName, fmtCur, fmtDate } from "../constants.js";
 import { gG, gGh, gI, gSl, gSc } from "../components/styles.js";
-import { Bdg, OBdg, CBdg, TBdg } from "../components/badges.jsx";
+import { Bdg, OBdg, CBdg, TBdg, ConfBdg } from "../components/badges.jsx";
+import { buildSupersessionGraph, confidenceOf, learningRef, CONFIDENCE_NOTE } from "../services/supersession.js";
 import { CitationModal } from "../components/citation.jsx";
 import { renderCitedText, renderProse } from "../components/text.jsx";
 import { callSynthesizeLearnings } from "../services/ai/callSynthesizeLearnings.js";
@@ -37,12 +38,21 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
   const [askLoad,    setAskLoad]    = useState(false);
   const [askVisible, setAskVisible] = useState(false);
   const [citeItem,   setCiteItem]   = useState(null);
+  const [showRetracted, setShowRetracted] = useState(false);
 
   const normB = useCallback(
     id => (!id||id==="default") ? (brands&&brands[0]&&brands[0].id||"default") : id,
     [brands]
   );
   const closed = useMemo(()=>items.filter(e=>(e.status==="Completed"||e.status==="Killed")&&e.results&&e.results.keyLearning&&(activeBrand==="all"||normB(e.brandId)===normB(activeBrand))),[items,activeBrand,normB]);
+
+  // Built from the unscoped item list on purpose: an experiment at one brand can
+  // retract a belief recorded at another, and a learning's standing must not
+  // depend on which brand filter happened to be active when it was read.
+  const graph = useMemo(()=>buildSupersessionGraph(items),[items]);
+  const confOf = useCallback(e=>confidenceOf(learningRef(e), graph),[graph]);
+  const retracted = useMemo(()=>closed.filter(e=>{const c=confOf(e);return c&&c.level==="retracted";}),[closed,confOf]);
+  const citable   = useMemo(()=>closed.filter(e=>{const c=confOf(e);return !c||c.level!=="retracted";}),[closed,confOf]);
 
   const counts = useMemo(()=>{
     const c={};
@@ -52,6 +62,13 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
 
   const filtered = useMemo(()=>{
     return closed.filter(e=>{
+      // Retracted beliefs are out of the browsing list by default for the same
+      // reason they are out of the citation index: they read as current. They
+      // are one click away rather than gone, because the fact that the team
+      // believed one is itself evidence about the business.
+      const c = confOf(e);
+      if(!showRetracted && c && c.level==="retracted") return false;
+      if(showRetracted && !(c && c.level==="retracted")) return false;
       if(!activeOutcomes.includes(e.results.outcomeClassification)) return false;
       if(fCat!=="All"&&e.category!==fCat) return false;
       if(fType!=="All"&&e.initType!==fType) return false;
@@ -61,7 +78,7 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
       }
       return true;
     }).sort((a,b)=>(b.endDate||b.createdAt).localeCompare(a.endDate||a.createdAt));
-  },[closed,activeOutcomes,fCat,fType,query]);
+  },[closed,activeOutcomes,fCat,fType,query,confOf,showRetracted]);
 
   const toggleOutcome = (o)=>{
     setActiveOutcomes(prev=>prev.includes(o)?prev.filter(x=>x!==o):[...prev,o]);
@@ -72,13 +89,17 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
     if(!q || askLoad) return;
     setAskLoad(true); setAskVisible(true); setAskAnswer("");
     try {
-      const corpus = closed.map(e=>({
+      // Retracted learnings do not reach the corpus. This surface cites by
+      // [INIT-ID], which is exactly what makes a dead belief more persuasive
+      // than an unsourced one rather than less.
+      const corpus = citable.map(e=>({
         initId: e.initId || e.id,
         outcome: e.results.outcomeClassification || "Inconclusive",
         category: e.category,
         retailer: brandName(e.brandId||"default", brands),
         durability: e.results.durability==="structural" ? "structural" : "tactical",
         provenance: e.predictionSnapshot ? "tracked" : "backfilled",
+        confidence: (confOf(e)||{}).level || "provisional",
         closedDate: e.endDate || e.createdAt || null,
         learning: e.results.keyLearning,
         decision: e.results.decisionMade || "",
@@ -106,7 +127,7 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
         <div style={{fontSize:11,fontWeight:700,color:t.gold,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:8}}>Ask the library</div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"flex-start"}}>
           <input style={{...gI(t),flex:1,minWidth:200}} value={ask} onChange={e=>setAsk(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")runAsk();}} placeholder={String.fromCharCode(34)+"Have we tried creative angles for retention?"+String.fromCharCode(34)+"  ·  "+String.fromCharCode(34)+"What worked for us at BFCM?"+String.fromCharCode(34)}/>
-          <button style={{...gG(t),whiteSpace:"nowrap"}} disabled={askLoad||!ask.trim()||closed.length===0} onClick={runAsk}>
+          <button style={{...gG(t),whiteSpace:"nowrap"}} disabled={askLoad||!ask.trim()||citable.length===0} onClick={runAsk}>
             {askLoad ? <><IconSpinner size={13}/> Searching…</> : <><IconSearch size={13}/> Ask</>}
           </button>
         </div>
@@ -114,12 +135,12 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
         {askVisible&&(
           <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid "+t.goldBorder}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-              <div style={{fontSize:10,fontWeight:700,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Answer from {closed.length} closed initiative{closed.length!==1?"s":""}</div>
+              <div style={{fontSize:10,fontWeight:700,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Answer from {citable.length} citable learning{citable.length!==1?"s":""}</div>
               <button onClick={()=>{setAskVisible(false);setAskAnswer("");}} style={{background:"none",border:"none",color:t.textMuted,cursor:"pointer",fontSize:14}}>&#10005;</button>
             </div>
             {askLoad
               ? <div style={{fontSize:13,color:t.textMuted,fontFamily:t.serif}}>Reading the record…</div>
-              : <div style={{fontSize:13,color:t.textSub,lineHeight:1.75,whiteSpace:"pre-wrap",fontFamily:t.serif}}>{renderCitedText(askAnswer, (id)=>closed.find(e=>(e.initId||e.id)===id)||null, setCiteItem, t)}</div>}
+              : <div style={{fontSize:13,color:t.textSub,lineHeight:1.75,whiteSpace:"pre-wrap",fontFamily:t.serif}}>{renderCitedText(askAnswer, (id)=>citable.find(e=>(e.initId||e.id)===id)||null, setCiteItem, t)}</div>}
           </div>
         )}
       </div>
@@ -182,17 +203,29 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
         <div style={{fontSize:12,color:t.textMuted,fontFamily:t.serif}}>
           <span style={{fontFamily:t.mono}}>{filtered.length}</span> learning{filtered.length!==1?"s":""} {query?"matching":""}
-          {filtered.length===0&&closed.length>0&&<span style={{color:t.gold}}> · try adjusting filters or clicking more outcome tiles above</span>}
+          {filtered.length===0&&closed.length>0&&!showRetracted&&<span style={{color:t.gold}}> · try adjusting filters or clicking more outcome tiles above</span>}
         </div>
+        {/* A retraction nobody can see is a second way to be silently wrong
+            about the record, so the count is stated rather than implied by a
+            shorter list. */}
+        {retracted.length>0&&(
+          <button onClick={()=>setShowRetracted(v=>!v)} aria-pressed={showRetracted}
+            style={{fontSize:11,padding:"4px 10px",borderRadius:4,cursor:"pointer",fontWeight:600,fontFamily:t.sans,
+              background:showRetracted?t.redBg:t.surfaceAlt,border:"1px solid "+(showRetracted?t.red:t.border),
+              color:showRetracted?t.red:t.textMuted}}>
+            {showRetracted?"← Back to live learnings":retracted.length+" retracted, withheld from citation"}
+          </button>
+        )}
         {filtered.length>=2&&(
           <button style={{...gGh(t),fontSize:11,padding:"4px 10px"}} disabled={synthLoad}
             onClick={async()=>{
               setSynthLoad(true); setSynthVisible(true); setSynthesis("");
               try {
-                const payload = filtered.map(e=>({
+                const payload = filtered.filter(e=>{const c=confOf(e);return !c||c.level!=="retracted";}).map(e=>({
                   outcome: e.results.outcomeClassification,
                   category: e.category,
                   retailer: brandName(e.brandId||"default", brands),
+                  confidence: (confOf(e)||{}).level || "provisional",
                   learning: e.results.keyLearning,
                 }));
                 const result = await callSynthesizeLearnings(payload, settings||{companyName:COMPANY_NAME,businessModel:BUSINESS_MODEL,northStarMetric:NORTH_STAR_METRIC,northStarCurrent:"n/a",northStarTarget:"n/a"});
@@ -250,6 +283,7 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
                   {(item.results.durability==="structural")
                     ? <Bdg label="Structural" color={t.teal} bg={t.tealBg} border={t.teal} small/>
                     : <Bdg label="Tactical" color={t.textMuted} bg={t.surfaceAlt} border={t.border} small/>}
+                  <ConfBdg level={(confOf(item)||{}).level} t={t} small/>
                   {brands&&brands.length>1&&<Bdg label={brandName(item.brandId||"default",brands)} color={brandColor(item.brandId||"default",brands,dk)} bg={t.surfaceAlt} border={t.border} small/>}
                   {item.endDate&&<span style={{fontSize:10.5,color:t.textMuted,fontFamily:t.mono,marginLeft:"auto"}}>{fmtDate(item.endDate)}</span>}
                 </div>
@@ -261,6 +295,20 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
                   <span style={{...cLbl(t),fontWeight:600}}>Key learning</span>
                   "{renderProse(item.results.keyLearning)}"
                 </p>
+
+                {/* What the record says about this belief. Only rendered when
+                    it is something other than "one experiment, unchallenged" —
+                    a Provisional note on every card is noise. */}
+                {(()=>{ const c=confOf(item); if(!c||c.level==="provisional") return null;
+                  const tone = c.level==="retracted" ? t.red : c.level==="contested" ? t.warn : t.textMuted;
+                  const refs = c.level==="retracted" ? c.superseders : c.contradictors;
+                  return (
+                    <div style={{...cLine(t),color:tone,marginTop:5}}>
+                      {CONFIDENCE_NOTE[c.level]}
+                      {refs.length>0 && <span style={{fontFamily:t.mono,fontSize:10.5}}> ({refs.join(", ")})</span>}
+                    </div>
+                  );
+                })()}
 
                 {/* Initiative title */}
                 <div style={{...cLine(t),marginTop:0}}>
@@ -308,7 +356,7 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
         })}
       </div>
 
-      {citeItem && <CitationModal item={citeItem} t={t} dk={dk} cats={cats} brands={brands} onClose={()=>setCiteItem(null)}/>}
+      {citeItem && <CitationModal item={citeItem} t={t} dk={dk} cats={cats} brands={brands} items={items} onClose={()=>setCiteItem(null)}/>}
     </div>
   );
 }

@@ -192,7 +192,7 @@ export function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, cat
           </div>
         )}
       </div>
-      {citeItem && <CitationModal item={citeItem} t={t} dk={dk} cats={cats} brands={brands} onClose={()=>setCiteItem(null)}/>}
+      {citeItem && <CitationModal item={citeItem} t={t} dk={dk} cats={cats} brands={brands} items={items} onClose={()=>setCiteItem(null)}/>}
     </Modal>
   );
 }

@@ -150,5 +150,74 @@ test("a blank adNames column carries existing claims through rather than clearin
   assert.deepStrictEqual(result.adNames.map(e => e.name), ["Spring Sale - Prospecting"]);
 });
 
+// 8. Supersession edges (ROADMAP 5.8). Same class as the adNames guard, higher
+//    stakes: a round-trip that drops these silently un-retracts every belief
+//    someone retracted, and the record goes back to citing it as current.
+test("supersession edges survive a CSV round-trip", () => {
+  const item = {
+    id: "i1", initId: "NH-002", title: "Discount creative, second read",
+    status: "Completed",
+    results: {
+      keyLearning: "Discount creative underperforms on prospecting",
+      outcomeClassification: "Failed",
+      supersedes: ["NH-001"], contradicts: ["NH-004"], confirms: ["NH-003"],
+    },
+  };
+  const row = itemToCSVRow(item, BRANDS);
+  assert.strictEqual(row.supersedes, "NH-001");
+  assert.strictEqual(row.confirms, "NH-003");
+  const back = normalizeInitiativeRecord({ ...row, brandId: "Northcove Home" }, ctx);
+  assert.deepStrictEqual(back.results.supersedes, ["NH-001"]);
+  assert.deepStrictEqual(back.results.contradicts, ["NH-004"]);
+  assert.deepStrictEqual(back.results.confirms, ["NH-003"]);
+});
+
+test("multiple edges of one kind round-trip through the pipe separator", () => {
+  const item = {
+    id: "i1", initId: "NH-002", title: "t", status: "Completed",
+    results: { keyLearning: "x", outcomeClassification: "Success", supersedes: ["NH-001", "NH-009"] },
+  };
+  const row = itemToCSVRow(item, BRANDS);
+  assert.strictEqual(row.supersedes, "NH-001|NH-009");
+  const back = normalizeInitiativeRecord({ ...row, brandId: "Northcove Home" }, ctx);
+  assert.deepStrictEqual(back.results.supersedes, ["NH-001", "NH-009"]);
+});
+
+test("a blank supersedes column carries existing edges through rather than un-retracting", () => {
+  const existing = {
+    id: "i1", initId: "NH-002", title: "t", status: "Completed",
+    results: { keyLearning: "x", outcomeClassification: "Success", supersedes: ["NH-001"] },
+  };
+  const result = normalizeInitiativeRecord(
+    { initId: "NH-002", title: "t", results_keyLearning: "x", supersedes: "" },
+    { ...ctx, items: [existing] }
+  );
+  assert.deepStrictEqual(result.results.supersedes, ["NH-001"]);
+});
+
+test("a closed initiative with no edges imports with three empty arrays, not undefined", () => {
+  const result = normalizeInitiativeRecord(
+    { initId: "NH-007", title: "t", results_keyLearning: "x" }, ctx
+  );
+  assert.deepStrictEqual(result.results.supersedes, []);
+  assert.deepStrictEqual(result.results.contradicts, []);
+  assert.deepStrictEqual(result.results.confirms, []);
+});
+
+// 9. Durability had no line in the import mapping at all, so re-importing a
+//    closed initiative silently demoted every structural learning to tactical —
+//    which is what Signal reads to decide whether to discount a belief by age.
+test("durability survives a re-import instead of being demoted to tactical", () => {
+  const existing = {
+    id: "i1", initId: "NH-002", title: "t", status: "Completed",
+    results: { keyLearning: "x", outcomeClassification: "Success", durability: "structural" },
+  };
+  const result = normalizeInitiativeRecord(
+    { initId: "NH-002", title: "t", results_keyLearning: "x" },
+    { ...ctx, items: [existing] }
+  );
+  assert.strictEqual(result.results.durability, "structural");
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

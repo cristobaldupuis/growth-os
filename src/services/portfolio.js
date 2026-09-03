@@ -1,31 +1,83 @@
 import { brandName, DEFAULT_SETTINGS, METRIC_SOURCES } from "../constants.js";
+import { buildSupersessionGraph, confidenceOf, learningRef, supersededRefs } from "./supersession.js";
 
 // Compact, grounded view of the user's actual learning history. Used both for
 // candidate generation and to validate sourceLearningIds during expansion.
+//
+// ## Retracted learnings leave this index, and only this index
+//
+// A superseded learning is withheld from citation and stays exactly where it is
+// on the record. That asymmetry is the whole design (ROADMAP 5.8): every
+// consumer of this function — the creative brief generator, Signal AI's
+// portfolio tools, learning synthesis — ranks and cites what it is shown, so a
+// belief that stopped being true in March would otherwise keep being cited in
+// June with an experiment id attached, which makes it more persuasive than an
+// unsourced claim rather than less. Deleting it instead would lose the
+// calibration signal that the team believed it, which is evidence about the
+// business in its own right.
+//
+// `confidence` rides along for what remains, derived from the graph and the
+// provenance rather than typed. A `contested` learning is still offered for
+// citation — it is a real result — but it is offered saying so, which is the
+// difference between a knowledge base that argues and one that asserts.
 export function buildLearningsIndex(items, brands) {
   const closed = (items||[]).filter(e =>
     (e.status==="Completed"||e.status==="Killed") && e.results && e.results.keyLearning
   );
-  return closed.map(e => ({
-    id: e.id,
-    initId: e.initId || e.id,
-    title: e.title,
-    category: e.category,
-    initType: e.initType,
-    retailer: brandName(e.brandId, brands),
-    outcome: e.results.outcomeClassification || "Inconclusive",
-    learning: e.results.keyLearning,
-    actualRev: e.results.actualRevenueImpact != null ? e.results.actualRevenueImpact : null,
-    closedDate: e.endDate || e.createdAt || null,
-    durability: e.results.durability === "structural" ? "structural" : "tactical",
-    // Provenance — how trustworthy is this learning's evidence?
-    //   tracked    = ran through the system with a frozen launch prediction
-    //                (predictionSnapshot exists), so prediction-vs-actual is real.
-    //   backfilled = imported as history with no frozen prediction; the actual is
-    //                a remembered estimate. Still useful, but lower-confidence.
-    // Derived automatically from the snapshot, never user-set, so it can't be faked.
-    provenance: e.predictionSnapshot ? "tracked" : "backfilled",
-  }));
+  const graph = buildSupersessionGraph(items);
+  return closed.map(e => {
+    const ref = learningRef(e);
+    const conf = confidenceOf(ref, graph);
+    if (conf && conf.level === "retracted") return null;
+    return {
+      id: e.id,
+      initId: e.initId || e.id,
+      title: e.title,
+      category: e.category,
+      initType: e.initType,
+      retailer: brandName(e.brandId, brands),
+      outcome: e.results.outcomeClassification || "Inconclusive",
+      learning: e.results.keyLearning,
+      actualRev: e.results.actualRevenueImpact != null ? e.results.actualRevenueImpact : null,
+      closedDate: e.endDate || e.createdAt || null,
+      durability: e.results.durability === "structural" ? "structural" : "tactical",
+      // Provenance — how trustworthy is this learning's evidence?
+      //   tracked    = ran through the system with a frozen launch prediction
+      //                (predictionSnapshot exists), so prediction-vs-actual is real.
+      //   backfilled = imported as history with no frozen prediction; the actual is
+      //                a remembered estimate. Still useful, but lower-confidence.
+      // Derived automatically from the snapshot, never user-set, so it can't be faked.
+      provenance: e.predictionSnapshot ? "tracked" : "backfilled",
+      // Derived from the supersession graph, never user-set, for the same reason.
+      confidence: conf ? conf.level : "provisional",
+      contradictedBy: conf && conf.contradictors.length > 0 ? conf.contradictors : undefined,
+    };
+  }).filter(Boolean);
+}
+
+/**
+ * The learnings this index is deliberately not showing, and what retracted each.
+ *
+ * Exported so a surface can say "two learnings are withheld" rather than
+ * quietly returning a shorter list. A retraction nobody can see is a second way
+ * to be silently wrong about the record.
+ */
+export function withheldLearnings(items, brands) {
+  const graph = buildSupersessionGraph(items);
+  const out = [];
+  graph.forEach(node => {
+    const conf = confidenceOf(node.ref, graph);
+    if (!conf || conf.level !== "retracted") return;
+    out.push({
+      initId: node.item.initId || node.item.id,
+      title: node.item.title,
+      retailer: brandName(node.item.brandId, brands),
+      learning: node.item.results.keyLearning,
+      closedDate: node.item.endDate || node.item.createdAt || null,
+      supersededBy: conf.superseders,
+    });
+  });
+  return out;
 }
 
 // Win rate by category, derived from closed initiatives. Returns an object keyed
@@ -58,6 +110,11 @@ export function buildPortfolioTools(items, settings, brands, activeBrand) {
   const filter = e => activeBrand === "all" || (e.brandId||"default") === activeBrand;
   const all = items.filter(filter);
   const iceS = e => e.ice ? Math.round(((e.ice.impact||0)*(e.ice.certainty||0)*(e.ice.ease||0)/1000)*100) : 0;
+  // Retraction is computed against the whole portfolio, not the brand-scoped
+  // view: an experiment at one brand can retract a belief recorded at another,
+  // and scoping the graph would make a learning's status depend on which filter
+  // happened to be active when the agent asked.
+  const retracted = supersededRefs(items);
 
   return {
     // Tool definitions sent to the API
@@ -161,13 +218,23 @@ export function buildPortfolioTools(items, settings, brands, activeBrand) {
             ice:iceS(e), est_revenue:`$${(e.revenueImpact||0).toLocaleString()}`,
             hypothesis:(e.hypothesis||"").slice(0,120)+"…",
           }));
+        // The failure itself stays listed even when its learning has been
+        // retracted — "this was tried and it failed" is still true, and dropping
+        // the row would hide the attempt as well as the belief. What changes is
+        // that the belief is handed over marked dead rather than quoted as
+        // current, which is the difference the whole supersession edge exists to
+        // make.
         case "get_failure_patterns":
-          return failures.slice(0,6).map(e=>({
-            title:e.title, category:e.category,
-            outcome:e.results?.outcomeClassification,
-            key_learning:e.results?.keyLearning||"no learning recorded",
-            decision:e.results?.decisionMade||"no decision recorded",
-          }));
+          return failures.slice(0,6).map(e=>{
+            const by = retracted.get(learningRef(e));
+            return {
+              title:e.title, category:e.category,
+              outcome:e.results?.outcomeClassification,
+              key_learning:e.results?.keyLearning||"no learning recorded",
+              decision:e.results?.decisionMade||"no decision recorded",
+              ...(by ? { retracted_by: by, note: "This learning has been superseded — do not cite it as current." } : {}),
+            };
+          });
         case "get_blocked_initiatives":
           return blocked.map(e=>({
             id:e.initId, title:e.title, category:e.category,
@@ -250,13 +317,20 @@ export function buildPortfolioContext(items, settings, brands, activeBrand, week
     const d = e.endDate || e.createdAt;
     return d && new Date(d+"T12:00:00").getTime() >= cutoff90;
   }).sort((a,b)=>(b.endDate||"").localeCompare(a.endDate||""));
+  // Same rule as get_failure_patterns: the initiative stays on the list, its
+  // learning is marked retracted rather than quoted as current. This block is
+  // prose handed to a model that will cite from it, so an unmarked line here
+  // undoes the work buildLearningsIndex does one function up.
+  const retractedRefs = supersededRefs(items);
   const completedStr = completed90.length>0
     ? completed90.slice(0,16).map(e => {
         const oc = e.results.outcomeClassification || "Inconclusive";
         const ar = e.results.actualRevenueImpact;
         const arStr = typeof ar==="number" ? ` | actual ${ar>=0?"+":"-"}$${Math.abs(ar).toLocaleString()}` : " | actual rev not recorded";
         const learn = (e.results.keyLearning||"").replace(/\s+/g," ").slice(0,160);
-        return `  [${e.initId||e.id}] "${e.title}" | ${brandName(e.brandId, brands)} | ${e.category} | ${oc.toUpperCase()}${arStr}${learn?" — "+learn:""}`;
+        const by = retractedRefs.get(learningRef(e));
+        const retractedStr = by ? ` [RETRACTED by ${by.join(", ")} — do not cite as current]` : "";
+        return `  [${e.initId||e.id}] "${e.title}" | ${brandName(e.brandId, brands)} | ${e.category} | ${oc.toUpperCase()}${arStr}${learn?" — "+learn:""}${retractedStr}`;
       }).join("\n")
     : "  (none closed in the last 90 days)";
 

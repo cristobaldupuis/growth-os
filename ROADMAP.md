@@ -177,10 +177,17 @@ and does not wait on Supabase.
 - [ ] **Feed measured figures into Test Validity.** The rollup now knows each
   initiative's real spend, conversions and revenue from its ad names. The Test
   Validity panel still takes hand-entered control/variant counts.
-- [ ] **Performance rows do not survive the browser.** Capped at 5,000 rows in
-  `localStorage`, oldest dropped on merge with the count reported. This is the
-  read path proven against real exports, deliberately ahead of its storage —
-  Phase 5.4 is where it gets a home that fits.
+- [x] **Performance rows survive the browser** — closed by 2.0, not by 5.4.
+  This was written as read-path-ahead-of-its-storage, waiting on the campaign
+  fact model. The workspace migration overtook it:
+  `supabase/migrations/0005_workspace.sql` gives `performance_rows` its own
+  table, uncapped, keyed on the same `perfRowKey` the in-memory merge dedupes
+  with, so `ON CONFLICT` and `mergePerformanceRows` mean the same thing;
+  `api/state.js` reads and upserts it and `services/remoteState.js` routes rows
+  there. The 5,000-row cap still governs the `localStorage` path, which is now
+  the demo and offline case rather than the only case. 5.4 is still where the
+  metrics worth indexing get promoted out of JSONB — that is a different
+  problem from having somewhere to put them.
 
 ### Phase 1.7 — Interface audit remediation (August 2026)
 
@@ -841,23 +848,60 @@ This is also the honest answer to the pitch. "Stop relearning the same lessons"
 is a claim about a system that knows when a lesson expired, and the current model
 cannot represent that.
 
-**What to build:**
+**What was built** — `src/services/supersession.js`, September 2026.
 
-- [ ] **A supersession edge between closed initiatives** — `supersedes` /
-  `supersededBy`, plus `contradicts` for the weaker relation where two results
-  disagree and neither is decisive yet. Set from the close flow, where the person
-  writing the learning is the one who knows it conflicts with an earlier one.
-- [ ] **Confidence derived, never typed.** Computed from the supporting and
-  contradicting closed initiatives and their provenance, the way `provenance`
-  itself is derived. A hand-set confidence field is a number that was true once,
-  which is the failure this item exists to fix.
-- [ ] **Superseded learnings leave the index rather than the record.**
-  `buildLearningsIndex` stops offering them for citation; the initiative and its
-  result stay exactly where they are. A retracted belief is evidence about the
-  business — deleting it loses the calibration signal that the team believed it.
-- [ ] **A contradiction is surfaced, not silently absorbed.** Two live learnings
-  that disagree is a finding, and it is the highest-value thing a learning agenda
-  question can be pointed at.
+- [x] **A supersession edge between closed initiatives** — `supersedes` and
+  `contradicts`, set from the close flow, where the person writing the learning
+  is the one who knows it conflicts with an earlier one. Two departures from
+  this spec, both deliberate. **Only the forward edge is stored:**
+  `supersededBy` is derived by inverting `supersedes` rather than written to
+  both records, because two rows that disagree about whether one retracts the
+  other is a worse state than either answer. **A third edge, `confirms`,**
+  because the next item needs a supporter and nothing here could mark one — see
+  below. Edges are keyed on `initId`, not the internal `id`, so they survive the
+  CSV round-trip that regenerates ids in a fresh workspace.
+- [x] **Confidence derived, never typed.** `confidenceOf` reads the graph and
+  the provenance weights (`tracked` 1.0, `backfilled` 0.5, so two remembered
+  results do not outvote one measured one) and returns a level, not a
+  percentage: `retracted`, `contested`, `established`, `supported`,
+  `provisional`. Two rules carry the argument. **`contested` outranks any amount
+  of support** — averaging a contradiction away is precisely the
+  confidently-wrong failure, so a disputed belief reads disputed however many
+  results agree with it. **Retracted evidence props nothing up** — a superseded
+  supporter is skipped when summing, so a belief cannot stay `established` on
+  the strength of two results that were themselves retracted last quarter.
+
+  This is where `confirms` had to exist. The spec asked for confidence computed
+  from "the supporting and contradicting closed initiatives" and named no edge
+  that could mark a supporter. The alternative was inferring support from
+  category and outcome, which asserts that two Successes in Retention are about
+  the same belief; they routinely are not, and a confidence number built on that
+  inference is the hand-set field this item exists to remove, laundered through
+  arithmetic. `confirms` is the same act as `contradicts` pointed the agreeing
+  way, and stays inside the line drawn below: it is a relation only a person
+  knows, not a description a person re-types.
+- [x] **Superseded learnings leave the index rather than the record.**
+  `buildLearningsIndex` drops them; the initiative and its result are untouched,
+  and `withheldLearnings` names what is missing and what retracted it, because a
+  retraction nobody can see is a second way to be silently wrong. Three other
+  doors a dead belief could still walk through are closed with it: the Learning
+  Library's "Ask the library" corpus and its synthesis payload, and — because
+  they are prose a model cites from — `get_failure_patterns` and the 90-day
+  block in `buildPortfolioContext`, where the initiative stays listed and its
+  learning is marked retracted rather than quoted as current. "This was tried
+  and it failed" is still true; only the belief is dead. Win rates and every
+  other piece of arithmetic read the record, not the index, and are unaffected —
+  retracting a belief does not un-run the experiment.
+- [x] **A contradiction is surfaced, not silently absorbed.**
+  `contradictionQuestions` turns every open pair into a candidate agenda
+  question, shown at the top of the Learning agenda with both results quoted and
+  a one-click adopt. The proposed question names both sides rather than picking
+  one — which is right is the experiment, and asserting it here would be the
+  confident filler this layer refuses. Derived every render, so a contradiction
+  resolved by a later supersession stops appearing on its own.
+
+The line below held: no hand-entered conditions, mechanism, freshness or
+applicability were added, and confidence is computed on read rather than stored.
 
 **What not to build, and this is the part worth writing down.** The obvious
 version of this item is a structured learning record with hand-entered fields for

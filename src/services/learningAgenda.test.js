@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkAgendaItem, agendaRollup, seedInitiativeFromAgenda } from "./learningAgenda.js";
+import { mkAgendaItem, agendaRollup, seedInitiativeFromAgenda,
+         contradictionQuestions, agendaItemFromContradiction } from "./learningAgenda.js";
 
 test("mkAgendaItem: defaults to Open status and the given brand", () => {
   const a = mkAgendaItem("brandA", ["Retention"]);
@@ -64,4 +65,81 @@ test("seedInitiativeFromAgenda: empty agenda item produces empty seed fields", (
 
 test("seedInitiativeFromAgenda: null input returns empty object", () => {
   assert.deepEqual(seedInitiativeFromAgenda(null), {});
+});
+
+// -- Contradictions as agenda questions (ROADMAP 5.8) -------------------------
+
+const closed = (initId, opts = {}) => ({
+  id: "x-" + initId, initId, title: "Test " + initId,
+  category: opts.category || "Retention",
+  status: "Completed", endDate: "2026-06-01",
+  predictionSnapshot: opts.backfilled ? undefined : { ice:{}, revenueImpact:0, snapshotDate:"2026-05-01" },
+  results: {
+    keyLearning: opts.learning || ("learning from " + initId),
+    outcomeClassification: "Success",
+    supersedes: opts.supersedes || [], contradicts: opts.contradicts || [], confirms: [],
+  },
+});
+
+test("contradictionQuestions: names both sides rather than picking one", () => {
+  const items = [
+    closed("A", { learning: "Discount creative wins on prospecting" }),
+    closed("B", { contradicts: ["A"], learning: "Discount creative underperforms on prospecting" }),
+  ];
+  const [q] = contradictionQuestions(items, []);
+  assert.match(q.question, /Discount creative wins on prospecting/);
+  assert.match(q.question, /Discount creative underperforms on prospecting/);
+  assert.equal(q.alreadyAsked, false);
+});
+
+test("contradictionQuestions: inherits a category only when both sides share one", () => {
+  const same = contradictionQuestions([
+    closed("A", { category: "Retention" }),
+    closed("B", { category: "Retention", contradicts: ["A"] }),
+  ], []);
+  assert.equal(same[0].category, "Retention");
+
+  const split = contradictionQuestions([
+    closed("A", { category: "Retention" }),
+    closed("B", { category: "Acquisition", contradicts: ["A"] }),
+  ], []);
+  assert.equal(split[0].category, "");
+});
+
+test("contradictionQuestions: an adopted contradiction stops prompting", () => {
+  const items = [closed("A"), closed("B", { contradicts: ["A"] })];
+  const [q] = contradictionQuestions(items, []);
+  const adopted = agendaItemFromContradiction(q, "b1", ["Retention"]);
+  const [again] = contradictionQuestions(items, [adopted]);
+  assert.equal(again.alreadyAsked, true);
+});
+
+test("contradictionQuestions: resolved by supersession means no question left", () => {
+  const items = [closed("A"), closed("B", { contradicts: ["A"] }), closed("C", { supersedes: ["A"] })];
+  assert.deepEqual(contradictionQuestions(items, []), []);
+});
+
+test("agendaItemFromContradiction: carries both results into notes, leaves design to a person", () => {
+  const items = [closed("A", { backfilled: true }), closed("B", { contradicts: ["A"] })];
+  const [q] = contradictionQuestions(items, []);
+  const a = agendaItemFromContradiction(q, "b1", ["Retention"]);
+  assert.equal(a.status, "Open");
+  assert.equal(a.brandId, "b1");
+  assert.equal(a.fromContradiction, q.key);
+  assert.match(a.notes, /backfilled/);
+  assert.match(a.notes, /tracked/);
+  // Backward design stays the operator's — seeding it would be the confident
+  // filler this layer exists to refuse.
+  assert.equal(a.holdConstant, "");
+  assert.equal(a.varies, "");
+  assert.equal(a.falsifyingResult, "");
+});
+
+test("agendaItemFromContradiction: seeds a real initiative through the existing path", () => {
+  const items = [closed("A"), closed("B", { contradicts: ["A"] })];
+  const [q] = contradictionQuestions(items, []);
+  const a = agendaItemFromContradiction(q, "b1", ["Retention"]);
+  const seeded = seedInitiativeFromAgenda(a);
+  assert.equal(seeded.agendaId, a.id);
+  assert.match(seeded.hypothesis, /Which holds/);
 });

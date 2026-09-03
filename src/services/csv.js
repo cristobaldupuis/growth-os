@@ -8,6 +8,11 @@ import { splitCSVLine } from "./csvLine.js";
 // inside every one of these names by construction.
 const AD_NAME_SEP = " | ";
 
+// Same reasoning for the supersession edge columns: a pipe survives a CSV cell
+// and cannot appear inside an initId.
+const EDGE_SEP = "|";
+const parseEdges = (raw) => String(raw ?? "").split("|").map(s => s.trim()).filter(Boolean);
+
 export const CSV_COLS = [
   "initId","title","initType","category","status","brandId","owner",
   "hypothesis","primaryMetric","killCriteria","startDate","endDate",
@@ -21,6 +26,12 @@ export const CSV_COLS = [
   // round-trip (export -> edit -> re-import) never drops the calibration record.
   "snapshot_ice_impact","snapshot_ice_certainty","snapshot_ice_ease",
   "snapshot_revenueImpact","snapshot_date",
+  // Supersession edges (ROADMAP 5.8). Carried for the same reason the snapshot
+  // is: a round-trip that drops them silently un-retracts every belief someone
+  // retracted, which is worse than never having recorded it. Stored as initId
+  // because that is the identity a CSV re-import preserves — an internal `id`
+  // is regenerated in a fresh workspace and every edge would dangle.
+  "supersedes","contradicts","confirms",
 ];
 
 export const itemToCSVRow = (item, brands) => ({
@@ -65,6 +76,9 @@ export const itemToCSVRow = (item, brands) => ({
   snapshot_ice_ease:         item.predictionSnapshot?.ice?.ease ?? "",
   snapshot_revenueImpact:    item.predictionSnapshot?.revenueImpact ?? "",
   snapshot_date:             item.predictionSnapshot?.snapshotDate || "",
+  supersedes:  (item.results?.supersedes  || []).join(EDGE_SEP),
+  contradicts: (item.results?.contradicts || []).join(EDGE_SEP),
+  confirms:    (item.results?.confirms    || []).join(EDGE_SEP),
 });
 
 export const escapeCSV = (v) => {
@@ -225,6 +239,21 @@ export function normalizeInitiativeRecord(rec, ctx, attributionConfig = ATTRIBUT
       actualRevenueImpact: numOrNull(r.results_actualRevenueImpact),
       actualSpendCost:     numOrNull(r.results_actualSpendCost),
       actualResourceCost:  numOrNull(r.results_actualResourceCost),
+      // A blank column carries the existing edges through rather than clearing
+      // them — same rule as adNames, and for the same reason: most re-imports
+      // edit three columns in a spreadsheet, and silently un-retracting a
+      // belief because a column was left empty is exactly the quiet data loss
+      // that only surfaces later as a brief citing something dead.
+      supersedes:  r.supersedes  !== undefined && r.supersedes  !== "" ? parseEdges(r.supersedes)  : (existingById?.results?.supersedes  || []),
+      contradicts: r.contradicts !== undefined && r.contradicts !== "" ? parseEdges(r.contradicts) : (existingById?.results?.contradicts || []),
+      confirms:    r.confirms    !== undefined && r.confirms    !== "" ? parseEdges(r.confirms)    : (existingById?.results?.confirms    || []),
+      // Not a supersession field, but the same failure and it is in this
+      // object: `durability` had no line here at all, so re-importing a closed
+      // initiative silently demoted every structural learning to tactical —
+      // which is what Signal reads to decide whether to discount a belief by
+      // age. There is no CSV column for it, so the existing value carries
+      // through and a fresh import defaults as the close flow does.
+      durability: existingById?.results?.durability === "structural" ? "structural" : "tactical",
     } : (existingById?.results || null),
     _isUpdate: isUpdate,
     _source: idPrefix,

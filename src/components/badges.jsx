@@ -45,3 +45,27 @@ export function ICEChip({ice,t}) {
   if (s===null) return <span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>No ICE</span>;
   return <span style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:11,fontWeight:700,color:iceColor(s,t),fontFamily:t.mono,border:"1px solid "+t.border,borderRadius:4,padding:"2px 7px"}}>ICE {s}</span>;
 }
+
+// -- Confidence, derived (ROADMAP 5.8) -----------------------------------------
+//
+// The one badge in this file whose label is computed rather than stored.
+// `confidenceOf` reads the supersession graph and the provenance weights; there
+// is no field anyone can set to make a learning read `established`, which is the
+// entire point — a hand-set confidence is a number that was true once.
+//
+// `retracted` and `contested` carry warning chrome on purpose. A reader
+// skimming a wall of learnings should be able to see which beliefs the record
+// itself disputes without opening anything.
+export function ConfBdg({level,t,small}) {
+  if (!level) return null;
+  const map = {
+    retracted:   { label:"Retracted",   color:t.red,       bg:t.redBg,      border:t.red },
+    contested:   { label:"Contested",   color:t.warn,      bg:t.warnBg,     border:t.warnBorder },
+    established: { label:"Established", color:t.teal,      bg:t.tealBg,     border:t.teal },
+    supported:   { label:"Supported",   color:t.gold,      bg:t.goldBg,     border:t.goldBorder },
+    provisional: { label:"Provisional", color:t.textMuted, bg:t.surfaceAlt, border:t.border },
+  };
+  const c = map[level];
+  if (!c) return null;
+  return <Bdg label={c.label} color={c.color} bg={c.bg} border={c.border} small={small}/>;
+}

@@ -1,6 +1,7 @@
 import { OD, OL, brandName, brandColor, fmtDate, fmtCur } from "../constants.js";
 import { Modal } from "./Modal.jsx";
-import { Bdg, OBdg, CBdg, TBdg } from "./badges.jsx";
+import { Bdg, OBdg, CBdg, TBdg, ConfBdg } from "./badges.jsx";
+import { buildSupersessionGraph, confidenceOf, learningRef, CONFIDENCE_NOTE } from "../services/supersession.js";
 import { renderProse } from "./text.jsx";
 
 // ── Citation system ─────────────────────────────────────────────────────────
@@ -12,10 +13,15 @@ import { renderProse } from "./text.jsx";
 // Focused, read-only view of one initiative — title, outcome, learning,
 // decision, hypothesis. Deliberately lighter than the full DetailView so it
 // can open as an overlay without leaving the current surface.
-export function CitationModal({ item, t, dk, cats, brands, onClose }) {
+export function CitationModal({ item, t, dk, cats, brands, items, onClose }) {
   if (!item) return null;
   const r = item.results || {};
   const c = (dk?OD:OL)[r.outcomeClassification] || {};
+  // Derived here rather than passed in, so every surface that opens a citation
+  // shows the same standing without each one remembering to compute it. Without
+  // `items` the modal degrades to what it showed before — no confidence line,
+  // never a wrong one.
+  const conf = items ? confidenceOf(learningRef(item), buildSupersessionGraph(items)) : null;
   return (
     <Modal t={t} dk={dk} onClose={onClose} title="Referenced initiative" wide>
       <div style={{display:"flex",flexDirection:"column",gap:14}}>
@@ -32,6 +38,7 @@ export function CitationModal({ item, t, dk, cats, brands, onClose }) {
             {(r.durability==="structural")
               ? <Bdg label="Structural" color={t.teal} bg={t.tealBg} border={t.teal}/>
               : (r.keyLearning ? <Bdg label="Tactical" color={t.textMuted} bg={t.surfaceAlt} border={t.border}/> : null)}
+            {conf && <ConfBdg level={conf.level} t={t}/>}
             {item.endDate && <span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,marginLeft:"auto"}}>closed {fmtDate(item.endDate)}</span>}
           </div>
         </div>
@@ -40,6 +47,18 @@ export function CitationModal({ item, t, dk, cats, brands, onClose }) {
           <div style={{borderLeft:"3px solid "+(c.border||t.gold),paddingLeft:14}}>
             <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:6}}>Key learning</div>
             <p style={{margin:0,fontSize:15,fontWeight:600,color:t.text,lineHeight:1.6,fontFamily:t.serif}}>"{renderProse(r.keyLearning)}"</p>
+            {conf && conf.level!=="provisional" && (()=>{
+              const tone = conf.level==="retracted" ? t.red : conf.level==="contested" ? t.warn : t.textMuted;
+              const refs = conf.level==="retracted" ? conf.superseders
+                         : conf.level==="contested" ? conf.contradictors
+                         : conf.supporters;
+              return (
+                <div style={{fontSize:11.5,color:tone,fontFamily:t.serif,lineHeight:1.5,marginTop:7}}>
+                  {CONFIDENCE_NOTE[conf.level]}
+                  {refs.length>0 && <span style={{fontFamily:t.mono,fontSize:10.5}}> ({refs.join(", ")})</span>}
+                </div>
+              );
+            })()}
           </div>
         )}
 

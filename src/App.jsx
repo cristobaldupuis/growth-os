@@ -39,6 +39,8 @@ import { useDialog } from "./components/useDialog.js";
 import { iconFor } from "./components/iconRegistry.js";
 import { downloadCSV, itemToCSVRow, normaliseDate, parseCSV, normalizeInitiativeRecord } from "./services/csv.js";
 import { buildLearningsIndex, buildPortfolioContext } from "./services/portfolio.js";
+import { SupersessionPicker } from "./components/SupersessionPicker.jsx";
+import { edgesFromSelection, selectionFromEdges } from "./services/supersession.js";
 import { stampUpdatedAt } from "./services/items.js";
 import { killGateBlocked } from "./services/killGate.js";
 
@@ -1548,6 +1550,10 @@ export default function App() {
     if(!rForm||!rForm.keyLearning) return;
     const r={...rForm,
       durability: rForm.durability==="structural" ? "structural" : "tactical",
+      // Normalised through edgesFromSelection so all three arrays are always
+      // written: clearing the last edge of a kind has to persist as an empty
+      // array, or removing a retraction would silently leave it in force.
+      ...edgesFromSelection(selectionFromEdges({ results: rForm })),
       actualRevenueImpact:rForm.actualRevenueImpact!==""?parseInt(rForm.actualRevenueImpact)||0:null,
       actualSpendCost:rForm.actualSpendCost!==""&&rForm.actualSpendCost!==undefined?parseInt(rForm.actualSpendCost)||0:null,
       actualResourceCost:rForm.actualResourceCost!==""&&rForm.actualResourceCost!==undefined?parseInt(rForm.actualResourceCost)||0:null,
@@ -2473,6 +2479,23 @@ export default function App() {
                 {(rForm.durability||"tactical")==="structural"
                   ? "Structural: Signal treats this as enduring evidence; not discounted by age."
                   : "Tactical: Signal down-weights this as it ages; library search still surfaces it, flagged by recency."}
+              </div>
+            </FR>
+            {/* Supersession (ROADMAP 5.8). The only edge in the model a person
+                has to draw: provenance, prediction error and confidence are all
+                derived, but only someone who just held both results in their
+                head knows that two learnings are about the same belief. Optional
+                — most closes add nothing here and it costs one glance. */}
+            <FR label="Does this change an earlier learning? (optional)" t={t}>
+              <SupersessionPicker
+                items={items}
+                currentId={selId}
+                selection={selectionFromEdges({ results: rForm })}
+                onChange={sel=>setRForm({...rForm, ...edgesFromSelection(sel)})}
+                t={t}/>
+              <div style={{fontSize:10.5,color:t.textMuted,fontFamily:t.serif,marginTop:6,lineHeight:1.5}}>
+                A superseded learning stops being offered for citation and stays on the record — the brief generator and Signal
+                will no longer argue from it. Contradictions stay citable, flagged, and become candidate agenda questions.
               </div>
             </FR>
             <FR label="Actual revenue impact ($), leave blank if not measurable" t={t}><input style={gI(t)} type="number" value={rForm.actualRevenueImpact} placeholder="e.g. 42000 or -15000" onChange={e=>setRForm({...rForm,actualRevenueImpact:e.target.value})}/></FR>

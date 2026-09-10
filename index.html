@@ -60,10 +60,27 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Loaded without blocking first paint. A plain stylesheet link to a third
+         party holds the whole app behind that host's response: on a slow or
+         filtered network (corporate proxies and some privacy blockers refuse
+         fonts.googleapis.com outright) the page stays blank until the request
+         fails. The preload fetches it off the critical path and applies it when
+         it arrives; the fallback serif stack in constants.js renders until then,
+         and `display=swap` means the swap is a reflow rather than a flash of
+         invisible text. The <noscript> copy keeps the font for a JS-off visitor,
+         who is seeing the noscript notice anyway. -->
     <link
-      rel="stylesheet"
+      rel="preload"
+      as="style"
       href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,500;0,600;1,500;1,600&display=swap"
+      onload="this.onload=null;this.rel='stylesheet'"
     />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,500;0,600;1,500;1,600&display=swap"
+      />
+    </noscript>
   </head>
   <body>
     <div id="root"></div>

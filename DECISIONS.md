@@ -4,6 +4,38 @@ Architecture decisions worth remembering. The bar for this file is a real tradeo
 
 ---
 
+## The deployment has a daily ceiling as well as an hourly one per caller
+
+**Decision.** Every metered endpoint now checks two buckets, not one: the
+per-caller hourly bucket it always had, and a deployment-wide bucket one day
+wide (`globalKey`/`globalMax` on `guardRateLimit` in `api/_guard.js`). The
+daily figures are shipped defaults, overridable per feature with
+`DAILY_CAP_TEXT`, `DAILY_CAP_IMAGES`, `DAILY_CAP_VIDEO`, `DAILY_CAP_SCENES`,
+`DAILY_CAP_VOICE` and `DAILY_CAP_DEBATES`; `0` switches one off. Polls do not
+count, only the calls that cost money.
+
+**Why.** The per-caller limit bounds what one address or one signed-in person
+can spend — "roughly $25/hour/IP" in the proxy's own arithmetic — and bounds
+nothing about how many addresses there are. The demo is public and runs on the
+operator's own provider keys, so the actual worst case was that figure
+multiplied by however many addresses someone cared to bring. That is not a
+number the operator chose; the daily ceiling is. The shared bucket is checked
+first so a request the deployment cannot afford does not also consume the
+caller's own allowance on its way to a 429, and the refusal says it is the
+deployment's day that is spent rather than the caller's hour, because the two
+call for different responses.
+
+**What it does not do.** It is not a budget in dollars — a call is a call
+whichever model served it. Pricing the ceiling would need the cost model in
+`src/services/costModel.js` to run server-side, and that is the right next step
+if a client deployment ever needs a spend contract rather than a call count.
+
+**Forcing condition.** A client deployment whose team legitimately exceeds a
+default in a day. Raise that variable for that deployment; do not raise the
+shipped default, which is sized for a demo.
+
+---
+
 ## A learning can be retracted, and confidence is read from the graph rather than typed
 
 **Decision:** Closed initiatives carry three relations on `results` — `supersedes`, `contradicts`, `confirms` — set by a person in the close flow. Everything else about a learning's standing is computed on read: `supersededBy` by inverting the stored edge, and a confidence *level* by walking the graph. No confidence field is stored anywhere.

@@ -36,7 +36,7 @@
 // returns an operation name, `:fetchPredictOperation` collects it — so the
 // browser drives the cadence and a torn-down page costs nothing but the wait.
 
-import { guardEntry, guardRateLimit, clientIp } from "./_guard.js";
+import { guardEntry, guardRateLimit, clientIp, dailyCap } from "./_guard.js";
 import {
   geminiConfigured, geminiEndpoint, geminiAuthHeaders, geminiNotConfiguredError,
   VEO_SUBMIT_METHOD, VEO_POLL_METHOD,
@@ -165,6 +165,8 @@ export default async function handler(req, res) {
   if (await guardRateLimit(req, res, {
     key: polling ? `gos:scn:poll:${clientIp(req)}` : `gos:scn:submit:${clientIp(req)}`,
     max: polling ? POLL_RATE_LIMIT_MAX : SUBMIT_RATE_LIMIT_MAX,
+    globalKey: polling ? undefined : "gos:scn:submit:global",
+    globalMax: dailyCap("DAILY_CAP_SCENES", 40),
     limitMessage: polling ? "Too many status checks. Wait a moment." : "Scene generation limit reached. Try again later.",
     label: polling ? "Scene poll" : "Scene submit",
   })) return;

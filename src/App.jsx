@@ -91,6 +91,7 @@ import { EAlert } from "./components/EAlert.jsx";
 import { WorkspacePanel } from "./components/WorkspacePanel.jsx";
 import { bootWorkspace, bootMessage } from "./services/workspaceBoot.js";
 import { FR } from "./components/FR.jsx";
+import { ErrorBoundary } from "./components/ErrorBoundary.jsx";
 import { MetricsLogModal } from "./components/MetricsLogModal.jsx";
 import { MetricsImportModal } from "./components/MetricsImportModal.jsx";
 import { NextPlaysModal } from "./components/NextPlaysModal.jsx";
@@ -2093,6 +2094,10 @@ export default function App() {
         * ultrawide. 1440 keeps line lengths readable and still gives the Weekly
         * Pulse table room for all seven columns without scrolling. */}
       <main style={{width:"100%",maxWidth:1440,margin:"0 auto",flex:1}}>
+      {/* Keyed on the view so leaving a view that threw mounts the next one
+        * clean. The sidebar and header sit outside this boundary on purpose:
+        * a broken view must leave the visitor a way to go somewhere else. */}
+      <ErrorBoundary t={t} resetKey={nav} label={navName(nav)||"This view"} onHome={()=>setNav("dashboard")}>
       <Suspense fallback={<ViewLoading t={t}/>}>
       {nav==="dashboard"&&<DashView t={t} dk={dk} dash={dash} cats={cats} settings={settings} brands={brands} activeBrand={activeBrand} weeklyMetrics={weeklyMetrics} onLog={()=>setShowPulse(true)} onImport={()=>setShowMetricsImport(true)} dRange={dRange} setDRange={setDRange} cFrom={cFrom} cTo={cTo} setCFrom={setCFrom} setCTo={setCTo} onGo={()=>setNav("initiatives")} recs={recs} recsLoad={recsLoad} recsErr={recsErr} items={items} onGenerateRecs={generateRecommendations} onOpenRec={(batchId,recId)=>setShowRecModal({batchId,recId})} showToast={showToast} onSaveItems={saveItems}/>}
       {nav==="triage"&&<TriageView items={items} t={t} dk={dk} cats={cats} brands={brands} activeBrand={activeBrand} onDetail={(id)=>goDetail(id,"triage")}
@@ -2304,6 +2309,7 @@ export default function App() {
         </Modal>
       )}
       </Suspense>
+      </ErrorBoundary>
       </main>
         </div>
       </div>
@@ -2509,6 +2515,7 @@ export default function App() {
       )}
 
       {showCopilot&&(
+        <ErrorBoundary t={t} resetKey="copilot" label="The Signal panel" onHome={()=>setShowCopilot(false)}>
         <Suspense fallback={<ViewLoading t={t}/>}>
         <CopilotPanel
           t={t} dk={dk}
@@ -2540,6 +2547,7 @@ export default function App() {
           onClose={() => setShowCopilot(false)}
         />
         </Suspense>
+        </ErrorBoundary>
       )}
       {showRecModal && (
         <NextPlaysModal

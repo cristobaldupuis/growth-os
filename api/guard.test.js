@@ -18,7 +18,7 @@ delete process.env.SUPABASE_URL;
 delete process.env.SUPABASE_SECRET_KEY;
 delete process.env.SUPABASE_SERVICE_KEY;
 
-const { guardEntry, guardRateLimit, clientIp, rateLimitIdentity, HOUR_MS } = await import("./_guard.js");
+const { guardEntry, guardRateLimit, clientIp, rateLimitIdentity, HOUR_MS, DAY_MS, dailyCap } = await import("./_guard.js");
 
 /** Point the limiter at a (stubbed) durable store for one test. */
 function configureStore() {
@@ -305,4 +305,56 @@ test("user buckets and IP buckets cannot collide", async () => {
   // share a ceiling with that address.
   const ip = await rateLimitIdentity({ headers: { "x-forwarded-for": "203.0.113.9" } });
   assert.ok(ip.id.startsWith("ip:"));
+});
+
+// -- deployment-wide daily ceiling ----------------------------------------------
+
+test("the daily ceiling refuses everyone once the deployment's day is spent", async () => {
+  const opts = (ip) => ({ key: `gos:rl:ip:${ip}`, max: 100, limitMessage: "per-caller", label: "T",
+    globalKey: "test:global:a", globalMax: 2 });
+  assert.equal(await guardRateLimit(mkReq({ ip: "10.0.0.1" }), mkRes(), opts("10.0.0.1")), false, "1st");
+  assert.equal(await guardRateLimit(mkReq({ ip: "10.0.0.2" }), mkRes(), opts("10.0.0.2")), false, "2nd, different caller");
+  const res = mkRes();
+  assert.equal(await guardRateLimit(mkReq({ ip: "10.0.0.3" }), res, opts("10.0.0.3")), true, "3rd caller is refused by the shared bucket");
+  assert.equal(res.statusCode, 429);
+  assert.match(res.body.error, /daily limit/i, "the message says it is the deployment's day, not the caller's hour");
+});
+
+test("a refused-by-the-day request does not spend the caller's own allowance", async () => {
+  const opts = { key: "gos:rl:ip:solo", max: 1, limitMessage: "per-caller", label: "T",
+    globalKey: "test:global:b", globalMax: 1 };
+  await guardRateLimit(mkReq(), mkRes(), { ...opts, key: "gos:rl:ip:other" });
+  assert.equal(await guardRateLimit(mkReq(), mkRes(), opts), true, "day is spent");
+  // Lift the day and the caller's first request still fits their own ceiling.
+  assert.equal(await guardRateLimit(mkReq(), mkRes(), { ...opts, globalKey: "test:global:b2" }), false);
+});
+
+test("a daily ceiling of zero, or none, means no deployment-wide bucket", async () => {
+  for (const globalMax of [0, undefined]) {
+    const key = `gos:rl:ip:${String(globalMax)}`;
+    for (let i = 0; i < 3; i++) {
+      assert.equal(await guardRateLimit(mkReq(), mkRes(), { key, max: 10, limitMessage: "x", label: "T",
+        globalKey: "test:global:c", globalMax }), false);
+    }
+  }
+});
+
+test("the daily bucket is one day wide", () => {
+  assert.equal(DAY_MS, 24 * HOUR_MS);
+});
+
+test("dailyCap reads the environment, keeps the default on junk, and lets zero mean off", () => {
+  delete process.env.DAILY_CAP_TEST;
+  assert.equal(dailyCap("DAILY_CAP_TEST", 300), 300, "unset → default");
+  process.env.DAILY_CAP_TEST = "";
+  assert.equal(dailyCap("DAILY_CAP_TEST", 300), 300, "empty → default");
+  process.env.DAILY_CAP_TEST = "banana";
+  assert.equal(dailyCap("DAILY_CAP_TEST", 300), 300, "unparseable → default, not NaN");
+  process.env.DAILY_CAP_TEST = "-5";
+  assert.equal(dailyCap("DAILY_CAP_TEST", 300), 300, "negative → default");
+  process.env.DAILY_CAP_TEST = "0";
+  assert.equal(dailyCap("DAILY_CAP_TEST", 300), 0, "zero is a deliberate off");
+  process.env.DAILY_CAP_TEST = "42.9";
+  assert.equal(dailyCap("DAILY_CAP_TEST", 300), 42);
+  delete process.env.DAILY_CAP_TEST;
 });

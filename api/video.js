@@ -43,7 +43,7 @@
 // expires — same pattern as the image path's session-only base64.
 
 import { VIDEO_TIERS, estimateVideoCostUsd } from "../src/services/ai/callGenerateVideo.js";
-import { guardEntry, guardRateLimit, rateLimitIdentity } from "./_guard.js";
+import { guardEntry, guardRateLimit, rateLimitIdentity, dailyCap } from "./_guard.js";
 
 export const ALLOWED_PROVIDERS = new Set(["heygen", "did", "fabric"]);
 
@@ -331,6 +331,9 @@ export default async function handler(req, res) {
   if (await guardRateLimit(req, res, {
     key: `gos:vid:${action}:${who.id}`,
     max: action === "submit" ? SUBMIT_RATE_LIMIT_MAX : POLL_RATE_LIMIT_MAX,
+    // Submits are dollars; polls are not, so only submits count against the day.
+    globalKey: action === "submit" ? "gos:vid:submit:global" : undefined,
+    globalMax: dailyCap("DAILY_CAP_VIDEO", 40),
     limitMessage: "Video generation limit reached. Try again later.",
     label: "Video",
   })) return;

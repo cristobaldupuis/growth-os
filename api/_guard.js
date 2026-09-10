@@ -34,6 +34,19 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "https://growth-os-iota-
   .split(",").map((s) => s.trim()).filter(Boolean);
 
 export const HOUR_MS = 60 * 60 * 1000;
+export const DAY_MS = 24 * HOUR_MS;
+
+/**
+ * A deployment-wide daily ceiling, read from the environment with a shipped
+ * default. `0` disables it — a deliberate value, so an operator who wants no
+ * ceiling has to say so rather than get it by leaving a variable unset.
+ */
+export function dailyCap(envName, fallback) {
+  const raw = process.env[envName];
+  if (raw === undefined || raw === "") return fallback;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : fallback;
+}
 
 function originAllowed(req) {
   const origin = req.headers.origin;
@@ -202,6 +215,16 @@ function actualBodyBytes(body) {
   catch { return 0; }
 }
 
+/** Durable when configured, memory otherwise; true when `key` is over `max`. */
+async function limitedBy(key, max, window, label) {
+  const limited = await durableRateLimit(key, max, window);
+  if (limited === null) {
+    console.warn(`${label} rate limiting is in-memory only; set SUPABASE_URL/SUPABASE_SECRET_KEY and apply 0003_runtime.sql for a durable limit.`);
+    return memoryRateLimit(key, max, window);
+  }
+  return limited;
+}
+
 /**
  * Durable rate limit, falling back to the in-memory limiter, failing closed on
  * an unavailable backend.
@@ -213,8 +236,23 @@ function actualBodyBytes(body) {
  * their own namespaces (`gos:rl`, `gos:img`, `gos:vid:submit`) so that image
  * spend cannot exhaust, or be exhausted by, text calls.
  */
-export async function guardRateLimit(req, res, { key, max, window = HOUR_MS, limitMessage, label }) {
+export async function guardRateLimit(req, res, { key, max, window = HOUR_MS, limitMessage, label, globalKey, globalMax }) {
   try {
+    // The per-caller bucket bounds what one person (or one address) can spend.
+    // It bounds nothing about how many callers there are, and this deployment
+    // is public: the demo runs on the operator's own provider keys for anyone
+    // who opens it. So a second, deployment-wide bucket sits behind the first
+    // — one day wide, one row for everyone — and is what turns "$25 an hour per
+    // address" into a figure the operator actually chose. Checked first: a
+    // request the deployment cannot afford should not consume the caller's
+    // own allowance on the way to being refused.
+    if (globalKey && globalMax > 0) {
+      const over = await limitedBy(`${globalKey}:day`, globalMax, DAY_MS, label + " (daily)");
+      if (over) {
+        res.status(429).json({ error: "This deployment's daily limit for this feature has been reached. Try again tomorrow." });
+        return true;
+      }
+    }
     const limited = await durableRateLimit(key, max, window);
     if (limited === null) {
       // No durable store configured. Still limit, but say so — a production

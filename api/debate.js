@@ -49,7 +49,7 @@
 // deployment spend a reasoning model's budget in a loop.
 
 import { createHmac, timingSafeEqual, createHash, randomUUID } from "node:crypto";
-import { guardEntry, guardRateLimit, rateLimitIdentity } from "./_guard.js";
+import { guardEntry, guardRateLimit, rateLimitIdentity, dailyCap } from "./_guard.js";
 import { supabaseConfigured, restBase, authHeaders, rpc } from "./_supabase.js";
 import { callText } from "./_textCall.js";
 import { buildPortfolioContext, buildPortfolioTools } from "../src/services/portfolio.js";
@@ -341,6 +341,8 @@ async function handleStart(req, res) {
   if (await guardRateLimit(req, res, {
     key: `gos:debate:start:${who.id}`,
     max: START_RATE_LIMIT_MAX,
+    globalKey: "gos:debate:start:global",
+    globalMax: dailyCap("DAILY_CAP_DEBATES", 40),
     // No longer "from this address" when a session named a person — see
     // rateLimitIdentity on why the address was wrong in both directions.
     limitMessage: "Too many debates started. Wait a while and try again.",

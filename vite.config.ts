@@ -16,8 +16,8 @@ export default defineConfig({
       // remember. Reachable at /admin.html, or /admin via the rewrite in
       // vercel.json.
       input: {
-        main:  resolve(__dirname, 'index.html'),
-        admin: resolve(__dirname, 'admin.html'),
+        main:  resolve(import.meta.dirname, 'index.html'),
+        admin: resolve(import.meta.dirname, 'admin.html'),
       },
     },
   },

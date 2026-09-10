@@ -37,7 +37,7 @@
 // DECISIONS.md ("Proxy authentication") for the trigger and the shape of that
 // change. This file is the hardened single-tenant version, not multi-tenant auth.
 
-import { guardEntry, guardRateLimit, rateLimitIdentity } from "./_guard.js";
+import { guardEntry, guardRateLimit, rateLimitIdentity, dailyCap } from "./_guard.js";
 import { TEXT_MODEL_IDS, modelById } from "../src/services/ai/registry.js";
 import { adapters } from "./_adapters.js";
 
@@ -117,6 +117,12 @@ export default async function handler(req, res) {
   if (await guardRateLimit(req, res, {
     key: `gos:rl:${who.id}`,
     max: RATE_LIMIT_MAX,
+    // Deployment-wide, one day. The per-caller ceiling above bounds one address;
+    // this bounds all of them. 3,000 text calls a day is roughly sixty debates
+    // or a week of ordinary use, and at the catalogue's dearest model it is a
+    // figure the operator can afford to be wrong about for one day.
+    globalKey: "gos:rl:global",
+    globalMax: dailyCap("DAILY_CAP_TEXT", 3000),
     limitMessage: "Rate limit exceeded. Try again later.",
     label: "Text",
   })) return;

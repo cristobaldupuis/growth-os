@@ -45,7 +45,7 @@
 // go through api/asset.js into the bucket, which is a later change and a
 // deliberate one.
 
-import { guardEntry, guardRateLimit, clientIp } from "./_guard.js";
+import { guardEntry, guardRateLimit, clientIp, dailyCap } from "./_guard.js";
 
 const ELEVENLABS_API = "https://api.elevenlabs.io/v1";
 
@@ -177,6 +177,8 @@ export default async function handler(req, res) {
   if (await guardRateLimit(req, res, {
     key: `gos:voice:${clientIp(req)}`,
     max: RATE_LIMIT_MAX,
+    globalKey: "gos:voice:global",
+    globalMax: dailyCap("DAILY_CAP_VOICE", 300),
     limitMessage: "Voice generation limit reached. Try again later.",
     label: "Voice",
   })) return;

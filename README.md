@@ -582,6 +582,18 @@ OPENROUTER_API_KEY=your_key
 # canonical deployment, so a missing value fails closed rather than opening up.
 ALLOWED_ORIGINS=https://your-deployment.vercel.app
 
+# Optional. Deployment-wide DAILY ceilings on the metered endpoints, counted
+# across every visitor. The per-caller hourly limits bound what one address can
+# spend; these bound what the whole deployment can, which matters because the
+# public demo runs on your provider keys. Shipped defaults are shown. Set one to
+# 0 to switch that ceiling off — deliberately, rather than by leaving it unset.
+DAILY_CAP_TEXT=3000        # api/proxy.js — text calls (a debate is ~25–48 of these)
+DAILY_CAP_IMAGES=200       # api/image.js
+DAILY_CAP_VIDEO=40         # api/video.js — submits only, polls are free
+DAILY_CAP_SCENES=40        # api/scene.js — submits only
+DAILY_CAP_VOICE=300        # api/voice.js
+DAILY_CAP_DEBATES=40       # api/debate.js — debate starts
+
 # Optional. This deployment's own base URL, used by api/debate.js for the
 # server-to-server self-dispatch that drives a debate from step to step. Falls
 # back to VERCEL_URL, which is the immutable deployment hostname rather than the

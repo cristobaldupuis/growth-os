@@ -62,6 +62,17 @@ today's state: [docs/scope.md](./docs/scope.md).
 
 ## What's new
 
+- **A Custom voice video tier, and two renders that were quietly broken** —
+  D-ID is promoted from "reachable but not a tier" to a real option in Creative
+  Studio, because its `/talks` API takes an ElevenLabs voice id directly: the
+  same voice already used for the audition button now reaches the actual
+  billed render. Fixing the wiring to get there surfaced that the Voice picker
+  never reached any real render (every HeyGen clip used HeyGen's default voice
+  regardless of what was selected) and that the Premium tier (VEED Fabric)
+  could not render at all — it needs a still image to animate and nothing in
+  the UI ever supplied one. Both are fixed by the same brand-level
+  `avatarImageUrl` field. See DECISIONS.md, "D-ID is promoted to a tier, for
+  ElevenLabs voice, not for price or quality"
 - **The demo ships an ad account, authored to break the parser** — Performance
   is populated on arrival rather than behind a file picker, so the bridge (the
   parse, the four-way split, the dimension pivot) is what a visitor sees first
@@ -509,38 +520,55 @@ GOOGLE_APPLICATION_CREDENTIALS=your_base64_or_raw_service_account_json
 GEMINI_AUTH_MODE=vertex
 
 # Optional. Enables talking-head video generation in the Creative Studio. Each
-# tier needs only its own key — the standard tier works without the premium
-# one, and vice versa. Without either, video generation returns a clear "not
+# tier needs only its own key — Standard works without Custom voice or Premium,
+# and so on. Without any of the three, video generation returns a clear "not
 # configured" error rather than failing obscurely.
 #
 # Standard tier. A HeyGen API key, from Settings -> API in the HeyGen dashboard.
+# Reads its voice from the free-typed "HeyGen voice ID" field in Creative
+# Studio, not from the ElevenLabs picker beside it — see ELEVENLABS_API_KEY
+# below for why those are two different id spaces.
 HEYGEN_API_KEY=your_key
 
 # Premium tier. VEED Fabric 1.0 is served through fal.ai's inference queue
 # rather than a VEED-hosted endpoint, so this holds a fal.ai key (fal.ai/dashboard/keys),
 # sent as `Authorization: Key ...`. Named for the model rather than the host
-# because the model is what you are choosing.
+# because the model is what you are choosing. Animates a still image it fetches
+# itself (no stock avatar library) — set `avatarImageUrl` on the brand in
+# Settings, or every submit is refused before it reaches fal.ai.
 VEED_API_KEY=your_key
 
-# Optional, and not offered as a tier in the UI — D-ID currently prices above
-# HeyGen without being better. The adapter is kept so re-promoting it is a
-# one-line change. NOTE: this must be the ALREADY base64-encoded `email:key`
-# pair, not the raw key copied from D-ID Studio — the header is sent as
+# Custom voice tier. D-ID also animates a still it fetches itself, so it needs
+# the same brand `avatarImageUrl` as Premium above. What it buys over the other
+# two: `/talks` takes an ElevenLabs voice id directly, so the same voice picked
+# in Creative Studio's Voice dropdown (see ELEVENLABS_API_KEY) is what the
+# render actually speaks in, with no separate id to look up or paste in.
+# ElevenLabs voice output is billed to whichever ElevenLabs account is linked
+# under D-ID's own Integrations settings — not to this deployment's
+# ELEVENLABS_API_KEY, and not verified against a live D-ID account as of this
+# writing, so confirm the linkage in D-ID's dashboard before relying on it.
+# NOTE: DID_API_KEY must be the ALREADY base64-encoded `email:key` pair, not
+# the raw key copied from D-ID Studio — the header is sent as
 # `Basic $DID_API_KEY` verbatim. Encoding it twice is the usual cause of a 401.
 #   printf '%s' 'you@example.com:your_key' | base64
 DID_API_KEY=your_base64_encoded_pair
 
 # Optional. Enables voice auditions in the Creative Studio — hearing a variant's
-# script read aloud before paying to render it. From elevenlabs.io -> Profile ->
-# API Keys. Without it the audition control does not appear at all (the voice
+# script read aloud before paying to render it — AND is the voice actually used
+# by the Custom voice video tier above. From elevenlabs.io -> Profile -> API
+# Keys. Without it the audition control does not appear at all (the voice
 # library read fails quietly and the studio renders as it did before), which is
 # deliberate: an operator who has not configured voice should not be shown an
-# error for a feature they never asked for.
+# error for a feature they never asked for. Without it, the Custom voice tier
+# also has no voice to send and D-ID falls back to its own default.
 #
-# Note this is the TTS API, which is public and stable. ElevenLabs' Avatars
-# product renders the talking head too, but is ElevenCreative-only with no public
-# API as of this writing, so it is not reachable from a serverless function —
-# HeyGen and VEED Fabric remain the renderers. See api/voice.js.
+# Note this is the TTS API, which is public and stable and is the only
+# ElevenLabs surface this app calls. ElevenLabs' own Avatars product renders a
+# talking head too, but is ElevenCreative-only with no public API as of this
+# writing, so it is not reachable from a serverless function — HeyGen, D-ID and
+# VEED Fabric remain the renderers, and Scene generation (Veo) has no ElevenLabs
+# equivalent to route to at all: ElevenLabs does not generate a moving frame
+# from a visual direction, only speech and (via Avatars) a lip-synced still.
 ELEVENLABS_API_KEY=your_key
 
 # --- Admin model console (/admin) ---------------------------------------------

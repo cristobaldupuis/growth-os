@@ -348,6 +348,18 @@ export function SettingsView({t,dk,settings,onSave,onClose,onDownloadBackup,onRe
                   </div>
                 </div>
                 <BrandReferences t={t} brand={b} onChange={refs=>upd("referenceImages",refs)} />
+                <div style={{borderTop:"1px solid "+t.borderSoft,paddingTop:9,marginTop:2}}>
+                  <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:5,letterSpacing:"0.05em"}}>
+                    AVATAR IMAGE URL (for talking-head video)
+                  </label>
+                  <input style={{...gI(t),fontSize:11}} value={b.avatarImageUrl||""} onChange={e=>upd("avatarImageUrl",e.target.value)}
+                    placeholder="https://… a photo D-ID / VEED can fetch"/>
+                  <div style={{fontSize:10.5,color:t.textMuted,lineHeight:1.5,marginTop:4}}>
+                    A publicly-reachable image URL, not an upload — D-ID and VEED Fabric animate a still they fetch
+                    themselves, so a local file or session-only asset link will not resolve on their end. Required by
+                    Creative Studio's Custom voice and Premium video tiers; HeyGen does not need this.
+                  </div>
+                </div>
               </div>
             );})}
           </div>

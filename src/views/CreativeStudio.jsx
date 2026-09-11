@@ -120,6 +120,10 @@ export function CreativeStudio({
 
   const [voices, setVoices]     = useState([]);     // [] until the library loads, or forever if unconfigured
   const [voiceId, setVoiceId]   = useState("");
+  // A HeyGen-native id, never an ElevenLabs one — see the field's own note where
+  // it renders. Kept separate from `voiceId` because the two are different id
+  // spaces on different providers; conflating them would silently mis-send one.
+  const [heygenVoiceId, setHeygenVoiceId] = useState("");
   const [audBusy, setAudBusy]   = useState(null);   // variant idx while one take is in flight
   const [audErr, setAudErr]     = useState({});     // {variantIdx: message}
   const [auditions, setAuditions] = useState({});   // {variantIdx: {url, costUsd}}
@@ -415,6 +419,27 @@ export function CreativeStudio({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roundAssets]);
 
+  // The two params a render submits beyond script/aspect, resolved per provider
+  // rather than passed straight through — each provider reads a different id
+  // space for each, and sending the wrong one either 400s or is silently
+  // ignored:
+  //   voiceId   — HeyGen wants its own catalogue id (heygenVoiceId, free-typed,
+  //               since this app cannot list HeyGen's imported voices); D-ID's
+  //               CUSTOM_VOICE tier wants the ElevenLabs voiceId already used
+  //               for auditions; Fabric has no id-based voice input at all.
+  //   avatarId  — D-ID and Fabric both animate a still and read this as an
+  //               image URL (brand.avatarImageUrl); HeyGen reads it as one of
+  //               its own stock avatar ids, which this app never collects, so
+  //               it is never sent there — an image URL in that slot is not a
+  //               HeyGen avatar_id and would 400 the submit.
+  const videoParamsFor = (currentTier) => {
+    if (currentTier.provider === "heygen") return { voiceId: heygenVoiceId || undefined, avatarId: undefined };
+    if (currentTier.provider === "did" || currentTier.provider === "fabric") {
+      return { voiceId: currentTier.provider === "did" ? (voiceId || undefined) : undefined, avatarId: brand?.avatarImageUrl || undefined };
+    }
+    return { voiceId: undefined, avatarId: undefined };
+  };
+
   // Submit, then poll until the provider resolves. The loop lives here rather
   // than inside pollVideoJob because the UI has to keep reporting "still
   // rendering, 1:24 elapsed" between polls — a promise that resolves in three
@@ -461,7 +486,11 @@ export function CreativeStudio({
     };
 
     try {
-      const { jobId, provider } = await callGenerateVideo({ script, cta: variant.cta, aspectRatio: aspect, tier, initiativeId: selId });
+      const { voiceId: resolvedVoiceId, avatarId: resolvedAvatarId } = videoParamsFor(tier);
+      const { jobId, provider } = await callGenerateVideo({
+        script, cta: variant.cta, aspectRatio: aspect, tier, initiativeId: selId,
+        voiceId: resolvedVoiceId, avatarId: resolvedAvatarId,
+      });
       if (!current()) return;
 
       for (;;) {
@@ -856,13 +885,30 @@ export function CreativeStudio({
                 <>
                   <label style={{ fontSize: 12, color: t.textSub }}>Voice</label>
                   <select value={voiceId} onChange={e => setVoiceId(e.target.value)} style={{ ...gSl(t), width: 150, padding: "6px 8px" }}
-                    title="The voice an audition is read in. Auditions are not renders — nothing is kept.">
+                    title={tierKey === "CUSTOM_VOICE"
+                      ? "This ElevenLabs voice reads both the audition and the actual Custom voice render."
+                      : "The voice an audition is read in. Auditions are not renders — nothing is kept, and Standard/Premium renders do not use it."}>
                     {voices.map(v => (
                       <option key={v.voiceId} value={v.voiceId}>
                         {v.name}{v.accent ? ` · ${v.accent}` : ""}
                       </option>
                     ))}
                   </select>
+                </>
+              )}
+              {/* HeyGen's own voice catalogue is a different id space from the
+                  ElevenLabs picker above — an ElevenLabs voice only reaches HeyGen
+                  if it was imported as a third-party voice in HeyGen's own
+                  dashboard, which mints a HeyGen-native id. There is no API this
+                  app can call to list those, so it is a free-text field rather
+                  than a select: paste the id HeyGen's Studio shows you. Empty
+                  means HeyGen's default voice, same as before this existed. */}
+              {tierKey === "STANDARD" && (
+                <>
+                  <label style={{ fontSize: 12, color: t.textSub }}>HeyGen voice ID</label>
+                  <input value={heygenVoiceId} onChange={e => setHeygenVoiceId(e.target.value)}
+                    placeholder="optional" style={{ ...gSl(t), width: 130, padding: "6px 8px" }}
+                    title="A voice id from HeyGen's own catalogue — including any ElevenLabs voice you've imported there under Integrate 3rd Party Voice. Leave blank for HeyGen's default." />
                 </>
               )}
               <label style={{ fontSize: 12, color: t.textSub }}>Channel</label>
@@ -1001,6 +1047,11 @@ export function CreativeStudio({
                     const seconds   = estimateSpokenSeconds(vidScript);
                     const job       = roundAssets[i]?.video || null;
                     const rendering = vidBusy?.idx === i;
+                    // D-ID and Fabric animate a still they fetch themselves; HeyGen
+                    // does not need one. Checked here, before spend, rather than
+                    // left to surface as the adapter's own 400 after the operator
+                    // has already clicked render.
+                    const needsAvatar = (tier.provider === "did" || tier.provider === "fabric") && !brand?.avatarImageUrl;
                     if (!vidScript) return null;
                     return (
                       <div style={{ margin:"12px 0", padding:"11px 12px", background:t.surface, border:"1px solid "+t.borderSoft, borderRadius:10 }}>
@@ -1020,14 +1071,22 @@ export function CreativeStudio({
                                 {audBusy === i ? "Reading…" : auditions[i] ? "Re-read" : "Hear it"}
                               </button>
                             )}
-                            <button onClick={() => genVideo(v, i)} disabled={vidBusy !== null}
-                              style={{ ...(job ? gGh(t) : gG(t)), padding:"5px 11px", fontSize:11.5, opacity: vidBusy !== null ? 0.55 : 1 }}>
+                            <button onClick={() => genVideo(v, i)} disabled={vidBusy !== null || needsAvatar}
+                              title={needsAvatar ? `${tier.label} animates a photo it fetches itself — set an avatar image URL on this brand in Settings first.` : undefined}
+                              style={{ ...(job ? gGh(t) : gG(t)), padding:"5px 11px", fontSize:11.5, opacity: (vidBusy !== null || needsAvatar) ? 0.55 : 1 }}>
                               {rendering ? "Rendering…" : job ? "Regenerate" : "Generate video"}
                             </button>
                           </div>
                         </div>
 
-                        {/* Priced before spend, both tiers, so the difference is
+                        {needsAvatar && (
+                          <div style={{ marginTop:8, fontSize:11.5, color:t.warn, lineHeight:1.5 }}>
+                            {tier.label} needs an avatar image URL — it animates a still it fetches itself rather than
+                            offering stock avatars. Set one on this brand under Settings → Brands, or switch to Standard.
+                          </div>
+                        )}
+
+                        {/* Priced before spend, all tiers, so the difference is
                             legible rather than something you learn afterwards. */}
                         <div style={{ marginTop:8, fontSize:11, fontFamily:t.mono, color:t.textMuted, display:"flex", gap:10, flexWrap:"wrap" }}>
                           <span>~{Math.round(seconds)}s spoken</span>

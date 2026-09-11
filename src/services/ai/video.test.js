@@ -15,7 +15,7 @@ import {
 } from "../../../api/video.js";
 import {
   buildVideoScript, buildVideoRequest, callGenerateVideo,
-  VIDEO_TIERS, VIDEO_TIER_LIST, VIDEO_ASPECTS,
+  VIDEO_TIERS, VIDEO_TIER_LIST, VIDEO_ASPECTS, tierForProvider,
   estimateSpokenSeconds, estimateVideoCostUsd,
   SPOKEN_WORDS_PER_MINUTE, MIN_RENDER_SECONDS, BEAT_PAUSE_SECONDS,
 } from "./callGenerateVideo.js";
@@ -72,11 +72,14 @@ test("a tier name never reaches the wire in place of a provider id", () => {
 // -- Tier resolution when the caller does not pick one -------------------------
 //
 // The bug: `tier ? tier.provider : modelFor("video")` submitted against whatever
-// provider the `video` group was routed to, with no tier behind it. Route the
-// group to D-ID — which is reachable but deliberately not a tier — and every
-// caller without an operator at the picker submitted to a provider that cannot be
+// provider the `video` group was routed to, with no tier behind it. Back when
+// D-ID had no tier of its own, routing the group to it meant every caller
+// without an operator at the picker submitted to a provider that could not be
 // priced and that rejects any submit with no avatar image URL. It read as "the
-// video feature is broken".
+// video feature is broken". D-ID has a tier now (CUSTOM_VOICE), so it can no
+// longer stand in for "a routed provider with no tier" — these tests use a
+// provider id that is not in the catalogue at all for that case, which is the
+// only way left to reach the fallback branch.
 
 /** Capture the submit body for a call that passes no tier. */
 async function submitWithRouting(routedModel, args = {}) {
@@ -103,13 +106,28 @@ test("no tier and a routed provider that HAS a tier resolves to that tier", asyn
   assert.equal(out.tier.id, VIDEO_TIERS.PREMIUM.id);
 });
 
-test("no tier and a routed provider with NO tier falls back to standard", async () => {
-  // D-ID is the case. Falling back to STANDARD is not arbitrary: HeyGen is the one
+test("routing the video group to D-ID resolves to its own tier, not a fallback", async () => {
+  // D-ID used to be the example of "reachable but has no tier" — it has one now
+  // (CUSTOM_VOICE), so routing to it is no longer the fallback case; it is just
+  // another instance of the test above.
+  const { sent, out } = await submitWithRouting("did");
+  assert.equal(sent.provider, VIDEO_TIERS.CUSTOM_VOICE.provider);
+  assert.equal(out.tier.id, VIDEO_TIERS.CUSTOM_VOICE.id);
+});
+
+test("a provider with no tier at all falls back to standard", () => {
+  // Every provider the app actually ships (heygen, fabric, did) has a tier now,
+  // so there is no real routed value left that reaches this branch through
+  // applyRouting — an id resolveRouting does not recognise is dropped back to
+  // the default before modelFor ever sees it. What is tested directly, then, is
+  // the piece callGenerateVideo's resolution actually depends on:
+  // `tierForProvider(...) || VIDEO_TIERS.STANDARD` needs tierForProvider to
+  // genuinely return null for an unmapped provider, which is what protects a
+  // future provider added to api/video.js's adapter map before it has a tier.
+  // Falling back to STANDARD is not arbitrary either way: HeyGen is the one
   // provider here with a stock avatar library, so it is the only one that can
   // succeed when no avatar image was supplied.
-  const { sent, out } = await submitWithRouting("did");
-  assert.equal(sent.provider, VIDEO_TIERS.STANDARD.provider);
-  assert.equal(out.tier.id, VIDEO_TIERS.STANDARD.id);
+  assert.equal(tierForProvider("some-future-provider"), null);
 });
 
 test("an explicit tier always beats the routing", async () => {

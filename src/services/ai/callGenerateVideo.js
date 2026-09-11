@@ -30,7 +30,8 @@ import { modelFor } from "./models.js";
 
 export const VIDEO_PROXY_URL = "/api/video";
 
-// Two tiers, not three providers — the same shape as IMAGE_MODELS.FAST/.PRO.
+// Tiers name the DECISION, not the provider — the same shape as
+// IMAGE_MODELS.FAST/.PRO.
 //
 // The earlier draft of this module exposed HeyGen / D-ID / VEED as the primary
 // selector, on the theory that the operator would want to A/B providers. That
@@ -40,12 +41,19 @@ export const VIDEO_PROXY_URL = "/api/video";
 // answerable; the provider stays underneath as `provider`, which is still what
 // goes over the wire and still what api/video.js's adapter map keys on.
 //
+// CUSTOM_VOICE is the one exception to "the decision is money, not provider",
+// because D-ID is the only provider here whose voice input is an ElevenLabs
+// voice id rather than a stock catalogue pick — see api/video.js. That is a
+// capability difference, not a price/quality one, which is why it earns a tier
+// despite landing between STANDARD and PREMIUM on cost.
+//
 // `costPerSecond` is a planning estimate for the pre-spend display, not billed
 // by this app — real billing happens on the provider's own account. Re-check
 // these when providers change pricing; treat them as approximate.
 //
 // Rates verified August 2026:
 //   HeyGen Avatar III digital twin  ~$0.0167/sec (~$1/min) via the API credit rate
+//   D-ID /talks                      ~$0.035/sec
 //   VEED Fabric 1.0 720p             $0.15/sec on fal.ai (480p is $0.08)
 export const VIDEO_TIERS = {
   /** Cheapest viable talking-head render. The default for testing a script. */
@@ -56,27 +64,29 @@ export const VIDEO_TIERS = {
     costPerSecond: 0.017,
     blurb: "Stock or cloned avatar, script read straight. Fine for reading a hook back before anyone shoots.",
   },
-  /** Best current lip-sync realism, and roughly nine times the price. */
+  /** The one tier that speaks an ElevenLabs voice id, not a stock catalogue pick. */
+  CUSTOM_VOICE: {
+    id: "custom-voice",
+    provider: "did",
+    label: "Custom voice · D-ID",
+    costPerSecond: 0.035,
+    blurb: "Your own ElevenLabs voice, lip-synced onto a photo you supply — D-ID has no stock avatar library, "
+      + "so this needs an avatar image URL set on the brand. Requires an ElevenLabs account linked in D-ID's own "
+      + "Integrations settings; billed to that ElevenLabs account, not through this app.",
+  },
+  /** Best current lip-sync realism, and roughly nine times HeyGen's price. */
   PREMIUM: {
     id: "premium",
     provider: "fabric",
     label: "Premium · VEED Fabric 1.0",
     costPerSecond: 0.15,
-    blurb: "Photoreal lip-sync from a still. For a clip that will actually be shown to someone.",
+    blurb: "Photoreal lip-sync from a still. Also needs an avatar image URL on the brand — for a clip that will actually be shown to someone.",
   },
 };
 
-// D-ID stays implemented in api/video.js but is deliberately not a tier. At
-// current pricing it lands around $0.035/sec — above HeyGen without being
-// visibly better — so surfacing it would add a third option that no operator
-// has a reason to pick. It remains in the adapter map so re-promoting it is a
-// one-line change here if that pricing relationship inverts again.
 export const VIDEO_TIER_LIST = Object.entries(VIDEO_TIERS).map(([key, tier]) => ({ key, ...tier }));
 
-/**
- * The tier that renders on `provider`, or null. Mirrors `tierForProvider` in
- * api/video.js — D-ID is reachable but is not a named tier, so this can miss.
- */
+/** The tier that renders on `provider`, or null. */
 export const tierForProvider = (provider) =>
   Object.values(VIDEO_TIERS).find(t => t.provider === provider) || null;
 
@@ -227,13 +237,15 @@ export async function callGenerateVideo({ script, cta, avatarId, voiceId, aspect
   // has always promised and what the code did not do.
   //
   // It used to be `tier ? tier.provider : modelFor("video")`, which took the
-  // routed provider id and submitted against it directly. Route the `video` group
-  // to D-ID in the admin console and every caller that does not pass a tier (the
-  // test bench, and anything else with no operator at the picker) submitted to a
-  // provider that is reachable but is not a tier — so no cost estimate could be
-  // computed for it, and D-ID additionally rejects any submit with no avatar image
-  // URL. The failure read as "the video feature is broken" rather than "this
-  // provider needs a still to animate".
+  // routed provider id and submitted against it directly. Back when D-ID had no
+  // tier of its own, routing the `video` group to it meant every caller that did
+  // not pass a tier (the test bench, and anything else with no operator at the
+  // picker) submitted to a provider with no cost estimate available and no
+  // avatar image supplied — D-ID rejects that outright. The failure read as "the
+  // video feature is broken" rather than "this provider needs a still to
+  // animate". D-ID has a tier now (CUSTOM_VOICE), but the fallback below stays:
+  // it is what protects a future provider added to the adapter map before it has
+  // a tier of its own.
   //
   // Now: an explicit tier always wins, a routed provider resolves through its own
   // tier when it has one, and anything else falls back to STANDARD — which is

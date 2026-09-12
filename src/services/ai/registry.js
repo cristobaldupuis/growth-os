@@ -349,7 +349,7 @@ export const MODEL_CATALOGUE = [
     label: "D-ID",
     modality: "video",
     price: { perSecondUsd: 0.035 },
-    blurb: "~$0.035/sec. Above HeyGen without being visibly better; kept reachable, not a tier.",
+    blurb: "~$0.035/sec. The only voice-capable tier that speaks an ElevenLabs voice id directly — see VIDEO_TIERS.CUSTOM_VOICE.",
     caps: { lipSync: true },
   },
 

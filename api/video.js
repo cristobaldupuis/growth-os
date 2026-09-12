@@ -168,9 +168,14 @@ const adapters = {
     },
   },
 
-  // D-ID. Implemented and reachable, but not surfaced as a tier — see the note
-  // beside VIDEO_TIERS in callGenerateVideo.js for why (it currently prices
-  // above HeyGen without being better).
+  // D-ID. Promoted to a real tier (VIDEO_TIERS.CUSTOM_VOICE) for one reason:
+  // it is the only provider here whose `script.provider` block takes a voice id
+  // from ElevenLabs directly, so it is the only one that can carry a voice this
+  // app already has (see callGenerateVoice.js / api/voice.js) all the way
+  // through to a billed render with no second mapping step. `voiceId` on this
+  // tier is therefore always read as an ElevenLabs voice id, never D-ID's own
+  // Microsoft-backed default voices — see CreativeStudio.jsx, which sources it
+  // from the same picker the audition button uses.
   //
   // Two corrections from the first draft, both of which would have failed on
   // the first real call:
@@ -200,8 +205,11 @@ const adapters = {
             input: script,
             // Omit `provider` entirely to take D-ID's default voice. An explicit
             // provider block with an undefined voice_id is rejected, so the
-            // spread is load-bearing rather than tidiness.
-            ...(voiceId ? { provider: { type: "microsoft", voice_id: voiceId } } : {}),
+            // spread is load-bearing rather than tidiness. `elevenlabs` requires
+            // an ElevenLabs account linked under D-ID's own Integrations settings
+            // (D-ID calls ElevenLabs on the operator's behalf, billed to the
+            // linked ElevenLabs account) — see the README.
+            ...(voiceId ? { provider: { type: "elevenlabs", voice_id: voiceId } } : {}),
           },
         }),
       });

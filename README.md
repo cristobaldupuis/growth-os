@@ -242,6 +242,28 @@ Log or import weekly metrics per brand and source (manual, Meta, GA4, Google Ads
 
 ---
 
+## MCP connector
+
+Read and write a workspace from Claude — or any MCP client — instead of only the browser. `api/mcp.js` exposes the same ledger `api/state.js` already serves the app through, behind a standard OAuth 2.1 remote-MCP handshake: `whoami`, `list_initiatives`, `get_initiative`, `create_initiative`, `update_initiative`, `list_agenda`, `list_learnings`, `get_performance_summary`. The two write tools enforce the same pre-registration and kill-criteria gates the form does — an initiative created through Claude cannot skip the discipline one created through the UI can't skip either.
+
+Scope: the ledger only. No tool reaches Meta, Google Ads, or any execution surface — see DECISIONS.md, "The MCP connector is a second, narrower OAuth server, and its tools never leave the ledger," for why that boundary is deliberate and where the line actually sits.
+
+### Connecting a client
+
+No setup beyond an existing Supabase-backed deployment (Phase 2.0) — the connector reuses that configuration and needs no separate credentials of its own. Point any MCP client at:
+
+```
+https://<your-deployment>/api/mcp
+```
+
+- **Claude Code:** `claude mcp add --transport http marketers-lab https://<your-deployment>/api/mcp`, then approve the sign-in it opens in your browser.
+- **Claude Desktop:** Settings → Connectors → Add custom connector, paste the URL above, and complete the sign-in it opens.
+- **claude.ai:** Settings → Connectors → Add custom connector, same URL. Once added at the organisation level, the same connector is available to **Claude in Slack** with no separate Slack app or install flow — see DECISIONS.md for why that was the reason to build a remote server rather than a simpler local one.
+
+The sign-in step is the workspace's own login (the same email and password the app uses) — no separate account, and the client never sees the password itself.
+
+---
+
 ## ✦ Signal AI — Autonomous C-Suite strategy debate
 
 A multi-agent system where configurable C-Suite personas query your live portfolio data, debate what you're missing, and synthesise 3 net-new initiatives the team isn't currently running.
@@ -407,6 +429,10 @@ api/
   _supabase.js         # The one server-side datastore: routing, rate-limit counters, asset bytes
   state.js             # Workspace state — documents and performance rows, per-user authorised
   _auth.js             # Who is calling, per Supabase Auth. Also the proxy's rate-limit identity
+  mcp.js               # MCP connector — Streamable HTTP JSON-RPC, hand-rolled, no SDK dependency
+  oauth.js             # The MCP connector's own OAuth 2.1 server: DCR, authorize, token, metadata
+  _oauth.js            # Shared OAuth plumbing — PKCE, token hashing, access-token verification
+  _mcpTools.js         # The tool catalogue — reads and writes the same docs api/state.js serves
 scripts/
   check-contrast.mjs   # Fails the build if any themed pairing drops below WCAG AA
 ```
@@ -443,6 +469,7 @@ See [ROADMAP.md](./ROADMAP.md) for the full phase breakdown.
 - **Phase 3:** Autonomous orchestration — background execution, Zod output validation, prompt versioning, continuous audit loop
 - **Phase 4:** Multi-tenant platform — Supabase RLS, federated knowledge base (pgvector), cross-customer anonymised benchmarking
 - **Phase 5 — Marketers Lab:** learning agenda layer, kill-criteria gate, campaign fact model, Meta/Google connectors, campaign execution behind a proposal gate, creative production
+- **MCP connector (complete):** OAuth-backed remote MCP server — read/write the ledger from Claude Desktop, Claude Code, claude.ai, or Claude in Slack
 
 ---
 

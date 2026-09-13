@@ -682,11 +682,14 @@ SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 SUPABASE_ASSET_BUCKET=creative-assets
 ```
 
-**Apply `supabase/migrations/0003_runtime.sql` AND `0004_debate_runs.sql` after
-setting those.** `0003` creates the two tables the routing store and the rate
-limiter need plus the atomic counter function the limiter calls; `0004` creates
-the table server-side debates run in, and `api/debate.js` does not work without
-it. Paste both into the Supabase SQL editor and run them; both are idempotent.
+**Apply the live migrations after setting those, in order:**
+
+- `0003_runtime.sql` — routing store, rate-limit counters, and the atomic counter function the limiter calls
+- `0004_debate_runs.sql` — the table server-side Signal AI debates run in; `api/debate.js` does not work without it
+- `0005_workspace.sql` — workspaces, membership, documents and performance rows
+- `0006_mcp.sql` — the MCP connector's own OAuth clients, authorization codes and tokens
+
+Paste each into the Supabase SQL editor and run it; all four are idempotent.
 
 Skipping them does not degrade gracefully. The rate limiter fails CLOSED when its
 backend is unreachable — deliberately, because an unbounded proxy in front of a
@@ -700,12 +703,13 @@ live; the tables above it in that file are not. The rest of `0002_assets.sql` an
 all of `0001_init.sql` are proposals for a later phase and should **not** be run
 yet — they reference each other's tables and will error out of order. See their
 headers.
-**Apply the live migrations after setting those**, in order: `0003_runtime.sql`
-(routing store, rate-limit counters and the atomic counter function),
-`0004_debate_runs.sql`, and `0005_workspace.sql` (workspaces, membership,
-documents and performance rows). Paste each into the Supabase SQL editor and run
-it; all three are idempotent. `0001_init.sql` and `0002_assets.sql` are proposals
-for a later phase and should **not** be run — see their headers.
+
+**To check all of the above actually landed**, rather than reading four SQL
+files against memory: `npm run check:supabase` (needs `SUPABASE_URL` and
+`SUPABASE_SECRET_KEY` in the environment, or a `.env.local` from `vercel env
+pull`). It reads every table and function each live migration creates back out
+of PostgREST's own schema listing, plus the storage bucket, and says exactly
+which migration to run for anything missing.
 
 **To open a workspace** you also need a row to sign in to, which is a one-time
 setup per client rather than anything the app does:

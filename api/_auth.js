@@ -79,19 +79,24 @@ export function bearerToken(req) {
 }
 
 /**
- * The authenticated user for a request, or null.
+ * The user a raw Supabase access token belongs to, or null.
  *
- * Null covers every failure identically — no token, malformed token, expired,
- * revoked, Supabase unreachable — because the caller's response to all of them is
- * the same 401 and distinguishing them in the reply would describe the auth
- * system to an unauthenticated caller. The console log distinguishes them for
- * whoever is debugging.
+ * Split out from `authenticate` so a caller that has the token from somewhere
+ * other than the Authorization header — api/oauth.js's authorize action takes
+ * one in a POST body, because the browser that just signed in hands it over
+ * directly rather than this module reading a header — can reuse the same
+ * checked-against-Supabase, cached verification rather than a second
+ * implementation that could drift from this one.
+ *
+ * Null covers every failure identically — malformed, expired, revoked,
+ * Supabase unreachable — for the same reason `authenticate` below does: the
+ * caller's response to all of them is the same refusal, and distinguishing
+ * them in the reply would describe the auth system to whoever holds a token
+ * that does not work. The console log distinguishes them for whoever is
+ * debugging.
  */
-export async function authenticate(req) {
-  if (!supabaseConfigured()) return null;
-
-  const token = bearerToken(req);
-  if (!token) return null;
+export async function verifyToken(token) {
+  if (!supabaseConfigured() || !token) return null;
 
   const cached = cacheGet(token);
   if (cached) return cached;
@@ -111,6 +116,17 @@ export async function authenticate(req) {
     console.error("auth: could not verify access token:", err);
     return null;
   }
+}
+
+/**
+ * The authenticated user for a request, or null.
+ *
+ * A thin wrapper over `verifyToken`: pulls the bearer token off the
+ * Authorization header (the shape every endpoint but the OAuth authorize step
+ * receives it in) and verifies it.
+ */
+export async function authenticate(req) {
+  return verifyToken(bearerToken(req));
 }
 
 /**

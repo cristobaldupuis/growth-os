@@ -489,6 +489,66 @@ is treated exactly as before, which is what leaves the demo working.
 
 ---
 
+## MCP connector — an access surface, not a data connector
+
+Everything above this section is about getting more data INTO the workspace.
+This is the opposite direction: getting the workspace's own ledger OUT to
+wherever the operator is already working — Claude Desktop, Claude Code,
+claude.ai, and Claude in Slack — instead of requiring the browser tab. It
+depends on Phase 2.0 (Supabase) for the same reason everything else in this
+phase does: there is nowhere durable to mint a token against without it.
+
+**Shipped (September 2026).**
+
+- [x] **A real remote MCP server**, not a local script the operator has to run.
+  `api/mcp.js` is a hand-rolled Streamable HTTP JSON-RPC transport — deliberately
+  not `@modelcontextprotocol/sdk`, reasoning in DECISIONS.md — behind a
+  dedicated OAuth 2.1 authorization server, `api/oauth.js`: dynamic client
+  registration, PKCE-only public clients, and single-use refresh-token rotation
+  with reuse detection that revokes a whole token family on replay. Schema in
+  `supabase/migrations/0006_mcp.sql`.
+- [x] **Eight tools, read-heavy, two writes**, all scoped to the ledger:
+  `whoami`, `list_initiatives`, `get_initiative`, `create_initiative`,
+  `update_initiative`, `list_agenda`, `list_learnings`,
+  `get_performance_summary`. The two writes call the same
+  `validateInitiative`/`killGateBlocked` functions the form does — an
+  initiative created through Claude cannot skip pre-registration or the
+  kill-criteria gate.
+- [x] **No ad-platform tool, and none is coming free with this.** DECISIONS.md's
+  proposal-gate rule for Meta/Google Ads writes (5.6) is unaffected — this
+  connector reaches the same table the browser already writes to, which is a
+  different risk class from a write that spends money. Adding an execution
+  tool later goes through that same gate, not a lighter MCP-shaped one.
+- [x] **Slack without a bespoke integration.** Because the connector is a real
+  OAuth-backed remote server rather than a local stdio one, an organisation
+  adds it to Claude in Slack the same way any org-level MCP connector is
+  added — no separate Slack app, no second implementation of the tools. This
+  was the deciding reason to build the harder remote shape instead of a
+  simpler local one.
+
+**What is not verified.** The protocol and OAuth logic are covered by
+`api/oauth.test.js` and `api/mcp.test.js`; the full authorize→token→tool-call
+round trip has not been clicked through against a live claude.ai connector,
+Claude Desktop, or a Slack connector setup, none of which can be driven from
+the environment this shipped from. Same discipline as an `unverified` model
+catalogue entry — check it against a real client before relying on it.
+
+**What this cost.** `scripts/check-functions.mjs` caps this deployment's plan
+at twelve Serverless Functions; `api/mcp.js` plus `api/oauth.js` (five actions
+folded into one file, dispatched by `?action=`) land the deployment at exactly
+twelve of twelve. Zero function slots remain — the next new endpoint needs a
+fold into an existing action set or a plan upgrade, decided before the pull
+request that needs it.
+
+**Not done, on purpose.** The tool set is deliberately narrow — no delete, no
+bulk operations, no performance-row writes. Read-heavy with two gated writes
+was the right size for a first version driven by a person typing requests into
+Claude; the trigger to grow it is the Slack connector becoming a real, used
+surface, since a chat interface invites different requests than a Claude Code
+session does.
+
+---
+
 ## Phases 3 and 4 are gated on customers, not on readiness
 
 **Neither phase starts before 10 paying clients.** They are recorded here because

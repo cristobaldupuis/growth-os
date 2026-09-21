@@ -205,6 +205,34 @@ async function handleSaveDoc(req, res, workspace, user) {
   res.status(200).json({ revision: Number(next) });
 }
 
+async function handlePerfSummary(req, res, workspace) {
+  const body = req.body || {};
+  const channel = body.channel ? String(body.channel) : null;
+  const dateFrom = body.dateFrom ? String(body.dateFrom) : null;
+  const dateTo = body.dateTo ? String(body.dateTo) : null;
+  const datePattern = /^\\d{4}-\\d{2}-\\d{2}$/;
+  if (dateFrom && !datePattern.test(dateFrom)) {
+    res.status(400).json({ error: "dateFrom must be YYYY-MM-DD." });
+    return;
+  }
+  if (dateTo && !datePattern.test(dateTo)) {
+    res.status(400).json({ error: "dateTo must be YYYY-MM-DD." });
+    return;
+  }
+  if (dateFrom && dateTo && dateFrom > dateTo) {
+    res.status(400).json({ error: "dateFrom must be on or before dateTo." });
+    return;
+  }
+
+  const summary = await rpc("performance_summary", {
+    p_workspace: workspace.id,
+    p_channel: channel,
+    p_date_from: dateFrom,
+    p_date_to: dateTo,
+  });
+  res.status(200).json({ summary });
+}
+
 async function handlePerfWrite(req, res, workspace, { replace }) {
   const incoming = Array.isArray(req.body?.rows) ? req.body.rows : null;
   if (!incoming) { res.status(400).json({ error: "No rows supplied." }); return; }
@@ -310,6 +338,7 @@ export default async function handler(req, res) {
   try {
     if (action === "load")        return await handleLoad(res, workspace);
     if (action === "saveDoc")     return await handleSaveDoc(req, res, workspace, user);
+    if (action === "performanceSummary") return await handlePerfSummary(req, res, workspace);
     if (action === "perfMerge")   return await handlePerfWrite(req, res, workspace, { replace: false });
     if (action === "perfReplace") return await handlePerfWrite(req, res, workspace, { replace: true });
     res.status(400).json({ error: "Unknown action." });

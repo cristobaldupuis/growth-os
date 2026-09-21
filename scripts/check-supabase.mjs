@@ -102,6 +102,11 @@ const MIGRATIONS = [
     tables: ["oauth_clients", "oauth_codes", "oauth_tokens"],
     functions: [],
   },
+  {
+    file: "0007_performance_aggregation.sql",
+    tables: [],
+    functions: ["performance_summary"],
+  },
 ];
 
 async function fetchOpenApiPaths() {

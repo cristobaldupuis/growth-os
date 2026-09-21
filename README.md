@@ -688,8 +688,9 @@ SUPABASE_ASSET_BUCKET=creative-assets
 - `0004_debate_runs.sql` — the table server-side Signal AI debates run in; `api/debate.js` does not work without it
 - `0005_workspace.sql` — workspaces, membership, documents and performance rows
 - `0006_mcp.sql` — the MCP connector's own OAuth clients, authorization codes and tokens
+- `0007_performance_aggregation.sql` — the `performance_summary` RPC the browser and MCP use to aggregate performance rows server-side
 
-Paste each into the Supabase SQL editor and run it; all four are idempotent.
+Paste each into the Supabase SQL editor and run it; all five are idempotent.
 
 Skipping them does not degrade gracefully. The rate limiter fails CLOSED when its
 backend is unreachable — deliberately, because an unbounded proxy in front of a

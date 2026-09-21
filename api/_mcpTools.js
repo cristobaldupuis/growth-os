@@ -32,6 +32,7 @@ import { agendaRollup } from "../src/services/learningAgenda.js";
 import { buildLearningsIndex } from "../src/services/portfolio.js";
 import { pgFetch, scopeHas } from "./_oauth.js";
 import { rpc } from "./_supabase.js";
+import { randomUUID } from "node:crypto";
 
 /** Thrown for a tool-level failure the CALLER can fix (bad input, a gate not
  * cleared, not found) — surfaced as a normal (isError) tool result rather
@@ -192,7 +193,7 @@ export const TOOLS = [
   },
   {
     name: "get_performance_summary",
-    description: "Spend, conversions and revenue from imported performance rows, aggregated by channel.",
+    description: "Spend, conversions, revenue and derived ratios from imported performance rows. Aggregation runs in Postgres, so results cover the full matching dataset without a browser row cap.",
     scope: "read",
     inputSchema: {
       type: "object",
@@ -200,7 +201,6 @@ export const TOOLS = [
         channel: { type: "string" },
         dateFrom: { type: "string", description: "YYYY-MM-DD, inclusive." },
         dateTo: { type: "string", description: "YYYY-MM-DD, inclusive." },
-        limit: { type: "integer", minimum: 1, maximum: 2000, default: 500, description: "Rows read before aggregating." },
       },
       additionalProperties: false,
     },
@@ -243,7 +243,7 @@ const HANDLERS = {
     }
 
     const record = {
-      id: "e-" + Date.now(), title: args.title, hypothesis: args.hypothesis,
+      id: "e-" + randomUUID(), title: args.title, hypothesis: args.hypothesis,
       observation: args.observation, successMetric: args.successMetric,
       category: args.category || "", initType: args.initType || "A/B Test", owner: args.owner || "",
       primaryMetric: "", killCriteria: "", status: "Draft", riskType: "", agendaId: args.agendaId || null,
@@ -300,36 +300,20 @@ const HANDLERS = {
   },
 
   async get_performance_summary(ctx, args) {
-    const filters = [`workspace_id=eq.${ctx.workspaceId}`];
-    if (args.channel) filters.push(`channel=eq.${encodeURIComponent(args.channel)}`);
-    if (args.dateFrom) filters.push(`date=gte.${encodeURIComponent(args.dateFrom)}`);
-    if (args.dateTo) filters.push(`date=lte.${encodeURIComponent(args.dateTo)}`);
-    const limit = Math.min(Math.max(Number(args.limit) || 500, 1), 2000);
-
-    const res = await pgFetch(
-      `/performance_rows?${filters.join("&")}&select=name,level,channel,date,campaign_name,adset_name,metrics` +
-      `&order=date.desc.nullslast&limit=${limit}`,
-    );
-    const rows = await res.json();
-
-    const byChannel = new Map();
-    for (const r of rows) {
-      const key = r.channel || "unknown";
-      const agg = byChannel.get(key) || { channel: key, rows: 0, spend: 0, conversions: 0, revenue: 0 };
-      const m = r.metrics || {};
-      agg.rows += 1;
-      agg.spend += Number(m.spend) || 0;
-      agg.conversions += Number(m.conversions) || 0;
-      agg.revenue += Number(m.revenue) || 0;
-      byChannel.set(key, agg);
+    const validDate = (value) => value == null || /^\d{4}-\d{2}-\d{2}$/.test(String(value));
+    if (!validDate(args.dateFrom) || !validDate(args.dateTo)) {
+      throw new ToolError("dateFrom and dateTo must be YYYY-MM-DD.");
+    }
+    if (args.dateFrom && args.dateTo && String(args.dateFrom) > String(args.dateTo)) {
+      throw new ToolError("dateFrom must be on or before dateTo.");
     }
 
-    return {
-      rowsRead: rows.length,
-      truncated: rows.length === limit,
-      byChannel: Array.from(byChannel.values()),
-      sample: rows.slice(0, 20),
-    };
+    return rpc("performance_summary", {
+      p_workspace: ctx.workspaceId,
+      p_channel: args.channel ? String(args.channel) : null,
+      p_date_from: args.dateFrom ? String(args.dateFrom) : null,
+      p_date_to: args.dateTo ? String(args.dateTo) : null,
+    });
   },
 };
 

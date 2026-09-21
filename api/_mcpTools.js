@@ -32,6 +32,7 @@ import { agendaRollup } from "../src/services/learningAgenda.js";
 import { buildLearningsIndex } from "../src/services/portfolio.js";
 import { pgFetch, scopeHas } from "./_oauth.js";
 import { rpc } from "./_supabase.js";
+import { randomUUID } from "node:crypto";
 
 /** Thrown for a tool-level failure the CALLER can fix (bad input, a gate not
  * cleared, not found) — surfaced as a normal (isError) tool result rather
@@ -200,7 +201,7 @@ export const TOOLS = [
         channel: { type: "string" },
         dateFrom: { type: "string", description: "YYYY-MM-DD, inclusive." },
         dateTo: { type: "string", description: "YYYY-MM-DD, inclusive." },
-              },
+      },
       additionalProperties: false,
     },
   },
@@ -242,7 +243,7 @@ const HANDLERS = {
     }
 
     const record = {
-      id: "e-" + Date.now(), title: args.title, hypothesis: args.hypothesis,
+      id: "e-" + randomUUID(), title: args.title, hypothesis: args.hypothesis,
       observation: args.observation, successMetric: args.successMetric,
       category: args.category || "", initType: args.initType || "A/B Test", owner: args.owner || "",
       primaryMetric: "", killCriteria: "", status: "Draft", riskType: "", agendaId: args.agendaId || null,

@@ -338,7 +338,8 @@ export default async function handler(req, res) {
   try {
     if (action === "load")        return await handleLoad(res, workspace);
     if (action === "saveDoc")     return await handleSaveDoc(req, res, workspace, user);
-    if (action === "performanceSummary") return await handlePerfSummary(req, res, workspace);\n    if (action === "perfMerge")   return await handlePerfWrite(req, res, workspace, { replace: false });
+    if (action === "performanceSummary") return await handlePerfSummary(req, res, workspace);
+    if (action === "perfMerge")   return await handlePerfWrite(req, res, workspace, { replace: false });
     if (action === "perfReplace") return await handlePerfWrite(req, res, workspace, { replace: true });
     res.status(400).json({ error: "Unknown action." });
   } catch (err) {

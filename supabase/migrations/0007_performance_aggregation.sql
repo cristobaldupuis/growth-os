@@ -73,7 +73,7 @@ as $$
     where date is not null
     group by date
     order by date
-  ),
+  )
   select jsonb_build_object(
     'rows', t.rows,
     'spend', t.spend,

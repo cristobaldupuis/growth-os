@@ -615,38 +615,7 @@ const HANDLERS = {
     return { total: filtered.length, returned: Math.min(filtered.length, limit), learnings: filtered.slice(0, limit) };
   },
 
-  async get_performance_summary(ctx, args) {
-    const filters = [`workspace_id=eq.${ctx.workspaceId}`];
-    if (args.channel) filters.push(`channel=eq.${encodeURIComponent(args.channel)}`);
-    if (args.dateFrom) filters.push(`date=gte.${encodeURIComponent(args.dateFrom)}`);
-    if (args.dateTo) filters.push(`date=lte.${encodeURIComponent(args.dateTo)}`);
-    const limit = Math.min(Math.max(Number(args.limit) || 500, 1), 2000);
 
-    const res = await pgFetch(
-      `/performance_rows?${filters.join("&")}&select=name,level,channel,date,campaign_name,adset_name,metrics` +
-      `&order=date.desc.nullslast&limit=${limit}`,
-    );
-    const rows = await res.json();
-
-    const byChannel = new Map();
-    for (const r of rows) {
-      const key = r.channel || "unknown";
-      const agg = byChannel.get(key) || { channel: key, rows: 0, spend: 0, conversions: 0, revenue: 0 };
-      const m = r.metrics || {};
-      agg.rows += 1;
-      agg.spend += Number(m.spend) || 0;
-      agg.conversions += Number(m.conversions) || 0;
-      agg.revenue += Number(m.revenue) || 0;
-      byChannel.set(key, agg);
-    }
-
-    return {
-      rowsRead: rows.length,
-      truncated: rows.length === limit,
-      byChannel: Array.from(byChannel.values()),
-      sample: rows.slice(0, 20),
-    };
-  },
 };
 
 /** Run one tool call. Throws ToolError for a caller-fixable failure. */

@@ -243,7 +243,7 @@ const HANDLERS = {
     }
 
     const record = {
-      id: "e-" + Date.now(), title: args.title, hypothesis: args.hypothesis,
+      id: "e-" + crypto.randomUUID(), title: args.title, hypothesis: args.hypothesis,
       observation: args.observation, successMetric: args.successMetric,
       category: args.category || "", initType: args.initType || "A/B Test", owner: args.owner || "",
       primaryMetric: "", killCriteria: "", status: "Draft", riskType: "", agendaId: args.agendaId || null,

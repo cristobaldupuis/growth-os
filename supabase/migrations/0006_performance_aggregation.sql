@@ -74,18 +74,6 @@ as $$
     group by date
     order by date
   ),
-  ratio_json as (
-    select
-      jsonb_build_object(
-        'roas', case when t.spend > 0 then t.revenue / t.spend else null end,
-        'cpa', case when t.conversions > 0 then t.spend / t.conversions else null end,
-        'cpc', case when t.clicks > 0 then t.spend / t.clicks else null end,
-        'cpm', case when t.impressions > 0 then t.spend / t.impressions * 1000 else null end,
-        'ctr', case when t.impressions > 0 then t.clicks / t.impressions * 100 else null end,
-        'cvr', case when t.clicks > 0 then t.conversions / t.clicks * 100 else null end
-      ) as ratios
-    from totals t
-  )
   select jsonb_build_object(
     'rows', t.rows,
     'spend', t.spend,

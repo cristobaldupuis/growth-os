@@ -12,7 +12,7 @@ import {
   DEMO_MODE,
 } from "./activeConfig.js";
 
-import { KEY_ITEMS, KEY_SETTINGS, KEY_DEBATES, KEY_METRICS, KEY_RECS, KEY_CREATIVE, KEY_PERF, KEY_ASSETS, KEY_USAGE, KEY_AGENDA, KEY_THEME, KEY_LIB_VIEW, KEY_RAIL, KEY_TOUR_SEEN, store, onWriteError, handleDownloadBackup, handleRestoreBackup } from "./services/store.js";
+import { KEY_ITEMS, KEY_SETTINGS, KEY_DEBATES, KEY_METRICS, KEY_RECS, KEY_CREATIVE, KEY_PERF, KEY_ASSETS, KEY_USAGE, KEY_AGENDA, KEY_THEME, KEY_LIB_VIEW, KEY_RAIL, KEY_TOUR_SEEN, store, onWriteError, onRemoteChange, onSyncNotice, syncRemote, remoteAttached, handleDownloadBackup, handleRestoreBackup } from "./services/store.js";
 import { resolveSchema } from "./services/naming.js";
 import { attachInitiatives, annotateRow } from "./services/performance.js";
 import { isLiveWorkspace, backupStatus } from "./services/dataSafety.js";
@@ -692,11 +692,47 @@ export default function App() {
   const cats   = settings.categories || DEFAULT_SETTINGS.categories;
   const brands = settings.brands || DEFAULT_SETTINGS.brands || CONFIG_BRANDS;
 
+  // Pick up other writers' changes while this tab is open: on returning to the
+  // tab, and once a minute while it is visible. Once a minute is an idle poll of
+  // revisions only (see handleDocs in api/state.js), well inside that
+  // endpoint's rate limit; a hidden tab does not poll at all.
+  useEffect(()=>{
+    const tick = () => { if (remoteAttached() && document.visibilityState === "visible") syncRemote(); };
+    const timer = setInterval(tick, 60 * 1000);
+    window.addEventListener("focus", tick);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", tick);
+      document.removeEventListener("visibilitychange", tick);
+    };
+  }, []);
+
   useEffect(()=>{
     // A failed durable write means everything since it is tab-local and one
     // reload from gone, so it gets a persistent banner rather than a toast that
     // disappears after 3.5 seconds.
     onWriteError(({ message }) => setStorageError(message));
+
+    // Another writer — a colleague, or Claude through the MCP connector — changed
+    // a document this tab holds. These are how their version reaches React state;
+    // without it the next local save would write their change back out. Usage is
+    // deliberately absent: its ledger is mirrored in a ref and appended from AI
+    // call sites, so it keeps the old conflict behaviour rather than a half-fit.
+    onRemoteChange({
+      [KEY_ITEMS]:    setItems,
+      [KEY_AGENDA]:   setAgenda,
+      [KEY_SETTINGS]: setSettings,
+      [KEY_DEBATES]:  setDebates,
+      [KEY_METRICS]:  setWeeklyMetrics,
+      [KEY_RECS]:     setRecs,
+      [KEY_CREATIVE]: setCreative,
+      [KEY_ASSETS]:   setAssets,
+    });
+    onSyncNotice(({ conflicts }) => showToast(
+      `Someone else edited ${conflicts.length === 1 ? "an item" : `${conflicts.length} items`} you also changed. The most recent edit was kept.`,
+      "info",
+    ));
 
     // Record what every AI call costs. Installed once, like the routing above and
     // for the same reason: the call sites are plain async functions a long way

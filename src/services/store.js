@@ -1,3 +1,6 @@
+import { MERGEABLE_KEYS, mergeRecordLists } from "./docMerge.js";
+import { deepEqual } from "./items.js";
+
 export const KEY_ITEMS    = "gos_items_v4";
 export const KEY_SETTINGS = "gos_settings_v2";
 export const KEY_THEME    = "gos_theme_v1";
@@ -73,8 +76,115 @@ const isQuotaError = (err) =>
 /** Keys that stay in this browser even when a workspace is attached. */
 export const DEVICE_KEYS = new Set([KEY_THEME, KEY_LIB_VIEW, KEY_RAIL, KEY_TOUR_SEEN]);
 
-let remote = null;   // { saveDoc, savePerfRows, perfKey }
+let remote = null;   // { saveDoc, savePerfRows, perfKey, pullChanges?, acceptRemote?, baseOf? }
 let remoteCache = {};
+
+// -- Other writers -------------------------------------------------------------
+//
+// A workspace has more than one writer: a colleague in another browser, and
+// Claude through the MCP connector. When their change reaches this tab — merged
+// into a save that raced theirs, or picked up by `syncRemote` — the app's React
+// state has to take the new value, or its next save writes theirs back out.
+// `onRemoteChange` is how it says which keys it can take and how.
+
+let remoteSetters = {};   // doc key → (parsedValue) => void
+let syncNotice = null;    // ({ key, conflicts }) => void
+
+/**
+ * Register how the app adopts a value another writer produced, per doc key.
+ * Keys with no setter are never adopted — see `syncRemote`.
+ */
+export function onRemoteChange(setters) { remoteSetters = { ...setters }; }
+
+/** Register a callback for a merge that had to break a tie on some records. */
+export function onSyncNotice(fn) { syncNotice = fn; }
+
+// Saves per key run one at a time. Two overlapping saves of the same document
+// would both carry the same revision, and the second would 409 against the
+// first — merging this tab against itself. Chained, each save goes out with the
+// revision the previous one produced and the newest value in the cache.
+const saveChains = {};
+let inFlight = 0;
+
+function adopt(key, jsonString) {
+  remoteCache[key] = jsonString;
+  const set = remoteSetters[key];
+  if (set) set(JSON.parse(jsonString));
+}
+
+function saveRemoteDoc(key) {
+  const run = async () => {
+    const sent = remoteCache[key];
+    try {
+      const result = await remote.saveDoc(key, sent);
+      if (result && result.merged) {
+        // Someone else's records are now in what was stored. Adopt it — unless
+        // this tab moved on while the save was out, in which case fold the
+        // newer local edit onto the merged copy and let the next save send it.
+        let next = result.merged;
+        if (remoteCache[key] !== sent) {
+          const refolded = mergeRecordLists(JSON.parse(sent), JSON.parse(remoteCache[key]), JSON.parse(result.merged));
+          if (refolded) next = JSON.stringify(refolded.value);
+        }
+        adopt(key, next);
+        if (result.conflicts?.length && syncNotice) syncNotice({ key, conflicts: result.conflicts });
+      }
+      return result;
+    } finally {
+      inFlight--;
+    }
+  };
+  // Counted from the moment it is queued, not from when it starts, so a poll
+  // cannot slip into the gap between two chained saves.
+  inFlight++;
+  const chained = (saveChains[key] || Promise.resolve()).catch(() => {}).then(run);
+  saveChains[key] = chained;
+  return chained;
+}
+
+/**
+ * Pull in documents another writer has changed, and hand them to the app.
+ *
+ * A document this tab has not touched since it last synced is simply replaced.
+ * One it has touched is merged when it is a record list (docMerge.js) and the
+ * merged copy saved back; anything else is left alone, and the next save meets
+ * the 409 and the "reload" message, as before. Skipped while a save is out: a
+ * pull landing between a save's request and its response would read this tab's
+ * own write as someone else's.
+ *
+ * Resolves to the keys adopted. Never throws — a failed poll is not an error
+ * anyone needs to see; the next one or the next save will find the same state.
+ */
+export async function syncRemote() {
+  if (!remote || !remote.pullChanges || inFlight > 0) return [];
+  let changes;
+  try { changes = await remote.pullChanges(); }
+  catch (err) { console.warn("syncRemote: could not check for changes:", err); return []; }
+  if (inFlight > 0) return [];
+
+  const adopted = [];
+  for (const [key, { value, revision }] of Object.entries(changes)) {
+    if (!remoteSetters[key]) continue;
+    const local = remoteCache[key] != null ? JSON.parse(remoteCache[key]) : undefined;
+    const base = remote.baseOf ? remote.baseOf(key) : undefined;
+
+    if (deepEqual(local, base) || local === undefined) {
+      remote.acceptRemote(key, value, revision);
+      adopt(key, JSON.stringify(value));
+      adopted.push(key);
+      continue;
+    }
+    if (!MERGEABLE_KEYS.has(key)) continue;
+    const result = mergeRecordLists(base, local, value);
+    if (!result) continue;
+    remote.acceptRemote(key, value, revision);
+    adopt(key, JSON.stringify(result.value));
+    adopted.push(key);
+    if (result.conflicts.length && syncNotice) syncNotice({ key, conflicts: result.conflicts });
+    if (!deepEqual(result.value, value)) await store.set(key, remoteCache[key]);
+  }
+  return adopted;
+}
 
 /**
  * Route workspace state to `backend`, seeded with what the server already had.
@@ -90,6 +200,9 @@ export function attachRemote(backend, docs = {}, perfJson = null) {
 
 /** Return to browser-only storage — a sign-out, or a demo workspace. */
 export function detachRemote() { remote = null; remoteCache = {}; }
+
+/** Test seam: drop per-key save chains and the in-flight count. */
+export function _resetSync() { for (const k of Object.keys(saveChains)) delete saveChains[k]; inFlight = 0; remoteSetters = {}; syncNotice = null; }
 
 export const remoteAttached = () => !!remote;
 
@@ -144,7 +257,7 @@ export const store = (() => {
         remoteCache[key] = value;
         try {
           if (key === remote.perfKey) await remote.savePerfRows(JSON.parse(value));
-          else await remote.saveDoc(key, value);
+          else await saveRemoteDoc(key);
           return { ok: true, durable: true };
         } catch (err) {
           // Three failures that need three different sentences. A conflict is

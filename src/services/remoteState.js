@@ -23,6 +23,7 @@
 import { perfRowKey } from "./performance.js";
 import { accessToken } from "./auth.js";
 import { KEY_PERF } from "./store.js";
+import { MERGEABLE_KEYS, mergeRecordLists } from "./docMerge.js";
 
 /**
  * The one key that lives in the rows table rather than as a document.
@@ -40,7 +41,15 @@ export const PERF_KEY = KEY_PERF;
 export const CHUNK = 2000;
 
 let revisions = new Map();   // doc key → revision last seen from the server
+// doc key → the parsed value the server held at that revision. The common
+// ancestor for a three-way merge (see docMerge.js): without it, "the remote
+// has an item this tab lacks" cannot be told apart from "this tab deleted it".
+let bases = new Map();
 let workspace = null;
+
+// Attempts at a save that keeps losing the race. Each retry re-merges against
+// the newest copy, so three only runs out under sustained concurrent writing.
+const SAVE_ATTEMPTS = 3;
 
 // Indirected so a test can supply a token without a browser session. Production
 // never replaces it; `accessToken` is the only real source.
@@ -49,9 +58,12 @@ let tokenSource = accessToken;
 export const currentWorkspace = () => workspace;
 
 /** Test seams. */
-export function _reset() { revisions = new Map(); workspace = null; tokenSource = accessToken; }
+export function _reset() { revisions = new Map(); bases = new Map(); workspace = null; tokenSource = accessToken; }
 export function _setTokenSource(fn) { tokenSource = fn; }
 export const _revisionOf = (key) => revisions.get(key);
+
+/** The value the server held at the revision this client last saw. */
+export const baseOf = (key) => bases.get(key);
 
 async function call(body, fetchImpl = fetch) {
   const token = await tokenSource(fetchImpl);
@@ -97,10 +109,12 @@ export async function loadWorkspace(name = null, fetchImpl = fetch) {
   const body = await call({ action: "load", ...(name ? { workspace: name } : {}) }, fetchImpl);
   workspace = body.workspace || null;
   revisions = new Map();
+  bases = new Map();
 
   const docs = {};
   for (const [key, entry] of Object.entries(body.docs || {})) {
     revisions.set(key, entry.revision);
+    bases.set(key, entry.value);
     // Stringified here because the store's contract is a string and every caller
     // in App.jsx parses one. Converting at the boundary keeps that true rather
     // than making half the app handle two shapes.
@@ -111,22 +125,65 @@ export async function loadWorkspace(name = null, fetchImpl = fetch) {
 }
 
 /**
- * Write one document. Resolves to `{ ok, revision }`.
+ * Write one document. Resolves to `{ ok, revision, merged, conflicts }`.
  *
- * A conflict rejects rather than resolving falsy, because the caller has to do
- * something about it — reload — and a return value is easier to ignore than a
- * throw. `revision: 0` on a key never seen means "create".
+ * When someone else saved first, a record-list document (see MERGEABLE_KEYS)
+ * is merged three ways against their copy and the save retried. `merged` is
+ * then the JSON string actually stored — the caller MUST adopt it, or its next
+ * save would write the other person's records back out — and `conflicts` lists
+ * record ids settled by a tie-break. `merged` is null when nothing was merged.
+ *
+ * Any other conflict still rejects, because the caller has to do something
+ * about it — reload — and a return value is easier to ignore than a throw.
+ * `revision: 0` on a key never seen means "create".
  */
 export async function saveDoc(key, jsonString, fetchImpl = fetch) {
-  const value = JSON.parse(jsonString);
-  const body = await call({
-    action: "saveDoc",
-    key,
-    value,
-    revision: revisions.get(key) ?? 0,
-  }, fetchImpl);
-  revisions.set(key, body.revision);
-  return { ok: true, revision: body.revision };
+  let value = JSON.parse(jsonString);
+  let mergedAny = false;
+  const conflicts = [];
+  let lastErr = null;
+
+  for (let attempt = 0; attempt < SAVE_ATTEMPTS; attempt++) {
+    try {
+      const body = await call({
+        action: "saveDoc",
+        key,
+        value,
+        revision: revisions.get(key) ?? 0,
+      }, fetchImpl);
+      revisions.set(key, body.revision);
+      bases.set(key, value);
+      return { ok: true, revision: body.revision, merged: mergedAny ? JSON.stringify(value) : null, conflicts };
+    } catch (err) {
+      if (!err.conflict || !MERGEABLE_KEYS.has(key) || !err.current) throw err;
+      const result = mergeRecordLists(bases.get(key), value, err.current.value);
+      if (!result) throw err;
+      revisions.set(key, err.current.revision);
+      bases.set(key, err.current.value);
+      value = result.value;
+      conflicts.push(...result.conflicts.filter(id => !conflicts.includes(id)));
+      mergedAny = true;
+      lastErr = err;
+    }
+  }
+  throw lastErr;
+}
+
+/**
+ * The documents someone else has changed since this client last saw them, as
+ * `{ key: { value, revision } }`. Does NOT advance the revision or base — the
+ * caller decides whether it can take each one (see `acceptRemote`), because
+ * taking a revision without taking its value is how a save would overwrite it.
+ */
+export async function pullChanges(fetchImpl = fetch) {
+  const body = await call({ action: "docs", since: Object.fromEntries(revisions) }, fetchImpl);
+  return body.docs || {};
+}
+
+/** Record that this client now holds `value` at `revision` for `key`. */
+export function acceptRemote(key, value, revision) {
+  revisions.set(key, revision);
+  bases.set(key, value);
 }
 
 /**

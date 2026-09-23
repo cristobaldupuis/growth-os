@@ -168,6 +168,35 @@ async function handleLoad(res, workspace) {
   });
 }
 
+/**
+ * The documents that have moved since the caller last saw them.
+ *
+ * `since` maps a doc key to the revision the caller holds. Answers only the
+ * keys whose stored revision differs (or that the caller has never seen), so the
+ * app can poll for someone else's edits — a colleague, or Claude through the MCP
+ * connector — without re-downloading the workspace and its performance rows.
+ * Two reads rather than one so an idle poll moves revisions, not values.
+ */
+export async function handleDocs(req, res, workspace) {
+  const since = req.body?.since && typeof req.body.since === "object" ? req.body.since : {};
+  const revs = await (await pgFetch(
+    `/workspace_docs?workspace_id=eq.${workspace.id}&select=key,revision`,
+  )).json();
+  const moved = revs
+    .filter(r => DOC_KEYS.has(r.key) && Number(since[r.key]) !== Number(r.revision))
+    .map(r => r.key);
+
+  const docs = {};
+  if (moved.length) {
+    const list = moved.map(k => `"${k}"`).join(",");
+    const rows = await (await pgFetch(
+      `/workspace_docs?workspace_id=eq.${workspace.id}&key=in.(${encodeURIComponent(list)})&select=key,value,revision`,
+    )).json();
+    for (const row of rows) docs[row.key] = { value: row.value, revision: row.revision };
+  }
+  res.status(200).json({ docs });
+}
+
 async function handleSaveDoc(req, res, workspace, user) {
   const key = String(req.body?.key || "");
   if (!DOC_KEYS.has(key)) { res.status(400).json({ error: "Unknown state key." }); return; }
@@ -347,6 +376,7 @@ export default async function handler(req, res) {
 
   try {
     if (action === "load")        return await handleLoad(res, workspace);
+    if (action === "docs")        return await handleDocs(req, res, workspace);
     if (action === "saveDoc")     return await handleSaveDoc(req, res, workspace, user);
     if (action === "performanceSummary") return await handlePerfSummary(req, res, workspace);
     if (action === "perfMerge")   return await handlePerfWrite(req, res, workspace, { replace: false });

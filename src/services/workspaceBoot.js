@@ -25,7 +25,7 @@
 // assumed here.
 
 import { loadAuthConfig, currentUser } from "./auth.js";
-import { loadWorkspace, savePerfRows, saveDoc, PERF_KEY } from "./remoteState.js";
+import { loadWorkspace, savePerfRows, saveDoc, pullChanges, acceptRemote, baseOf, PERF_KEY } from "./remoteState.js";
 import { attachRemote, detachRemote } from "./store.js";
 
 /**
@@ -72,7 +72,7 @@ export async function bootWorkspace(deps = {}) {
     // Performance rows arrive as objects and go into the cache as the JSON string
     // `store.get` returns, so App.jsx's load effect parses one shape whichever
     // backend answered.
-    attach({ perfKey: PERF_KEY, saveDoc, savePerfRows }, docs, JSON.stringify(perfRows));
+    attach({ perfKey: PERF_KEY, saveDoc, savePerfRows, pullChanges, acceptRemote, baseOf }, docs, JSON.stringify(perfRows));
     return { mode: "remote", workspace, docs, perfRows };
   } catch (err) {
     detach();

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DOC_KEYS, MAX_ROWS, toRow, fromRow } from "./state.js";
+import { DOC_KEYS, MAX_ROWS, toRow, fromRow, handleDocs } from "./state.js";
 import { bearerToken, resolveWorkspace } from "./_auth.js";
 import { perfRowKey } from "../src/services/performance.js";
 
@@ -136,4 +136,54 @@ test("a workspace the caller does not belong to is a 403, not a 404", () => {
 test("no memberships at all is a 403", () => {
   assert.equal(resolveWorkspace([], null).status, 403);
   assert.equal(resolveWorkspace([], "acme").status, 403);
+});
+
+// -- Polling for other writers' changes ------------------------------------------
+
+test("docs answers only the documents whose revision moved", async () => {
+  process.env.SUPABASE_URL = "https://db.example.test";
+  process.env.SUPABASE_SECRET_KEY = "sk";
+  const realFetch = globalThis.fetch;
+  const urls = [];
+  globalThis.fetch = async (url) => {
+    urls.push(String(url));
+    const body = String(url).includes("key=in.")
+      ? [{ key: "gos_items_v4", value: [{ id: "c" }], revision: 5 }]
+      : [
+          { key: "gos_items_v4", revision: 5 },
+          { key: "gos_settings_v2", revision: 2 },
+          { key: "not_a_doc_key", revision: 9 },
+        ];
+    return { ok: true, status: 200, json: async () => body, text: async () => "" };
+  };
+  const res = { status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
+  try {
+    await handleDocs({ body: { since: { gos_items_v4: 4, gos_settings_v2: 2 } } }, res, { id: WS });
+  } finally {
+    globalThis.fetch = realFetch;
+    delete process.env.SUPABASE_URL;
+    delete process.env.SUPABASE_SECRET_KEY;
+  }
+  assert.equal(res.code, 200);
+  assert.deepEqual(Object.keys(res.body.docs), ["gos_items_v4"]);
+  assert.equal(urls.length, 2);
+  assert.ok(decodeURIComponent(urls[1]).includes('key=in.("gos_items_v4")'), "only the moved key is fetched, and never a non-doc key");
+});
+
+test("an idle poll reads revisions only", async () => {
+  process.env.SUPABASE_URL = "https://db.example.test";
+  process.env.SUPABASE_SECRET_KEY = "sk";
+  const realFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => { calls++; return { ok: true, status: 200, json: async () => [{ key: "gos_items_v4", revision: 3 }] }; };
+  const res = { status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
+  try {
+    await handleDocs({ body: { since: { gos_items_v4: 3 } } }, res, { id: WS });
+  } finally {
+    globalThis.fetch = realFetch;
+    delete process.env.SUPABASE_URL;
+    delete process.env.SUPABASE_SECRET_KEY;
+  }
+  assert.deepEqual(res.body.docs, {});
+  assert.equal(calls, 1);
 });

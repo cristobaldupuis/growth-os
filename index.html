@@ -41,7 +41,11 @@
          the first painted pixel is already the right one.
 
          Deliberately inline and deliberately before the stylesheet: a deferred
-         script would run after the flash it exists to prevent. -->
+         script would run after the flash it exists to prevent.
+
+         Allowed by its sha256 hash in vercel.json's Content-Security-Policy, as
+         is the font link's onload below. Changing either means updating that
+         hash; `npm run check:csp` names the new one. -->
     <script>
       (function () {
         try {

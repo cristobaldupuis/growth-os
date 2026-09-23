@@ -21,6 +21,11 @@ jobs:
 
       - run: npm ci
 
+      - name: Dependency audit
+        # High and critical only: a moderate advisory in a dev-only transitive
+        # dependency should not block a merge, but one that ships should.
+        run: npm audit --audit-level=high
+
       - name: Lint
         run: npm run lint
 
@@ -42,3 +47,9 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Content-Security-Policy covers the built pages
+        # The CSP allows inline code by exact hash. Editing the theme boot script
+        # or the font onload in index.html without updating vercel.json would
+        # make production refuse to run it, which nothing else here would notice.
+        run: npm run check:csp

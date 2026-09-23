@@ -10,9 +10,10 @@
     "preview": "vite preview",
     "test": "node --test \"src/**/*.test.js\" \"api/**/*.test.js\"",
     "check:contrast": "node scripts/check-contrast.mjs",
-    "verify": "npm run lint && npm run test && npm run check:contrast && npm run check:functions && npm run build",
+    "verify": "npm run lint && npm run test && npm run check:contrast && npm run check:functions && npm run build && npm run check:csp",
     "check:functions": "node scripts/check-functions.mjs",
-    "check:supabase": "node scripts/check-supabase.mjs"
+    "check:supabase": "node scripts/check-supabase.mjs",
+    "check:csp": "node scripts/check-csp.mjs"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",

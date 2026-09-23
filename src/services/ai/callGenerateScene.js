@@ -135,7 +135,7 @@ export async function callGenerateScene({
   try {
     resp = await fetch(SCENE_PROXY_URL, {
       method: "POST",
-      headers: AI_HEADERS(),
+      headers: await AI_HEADERS(),
       body: JSON.stringify({
         action: "submit", model: resolved, prompt, aspectRatio, durationSeconds,
         ...(resolution ? { resolution } : {}),
@@ -173,7 +173,7 @@ export async function callGenerateScene({
 export async function pollSceneJob({ operationName, model }) {
   const resp = await fetch(SCENE_PROXY_URL, {
     method: "POST",
-    headers: AI_HEADERS(),
+    headers: await AI_HEADERS(),
     body: JSON.stringify({ action: "poll", model, operationName }),
   });
   if (!resp.ok) throw new Error(await proxyError(resp));

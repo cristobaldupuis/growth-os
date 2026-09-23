@@ -98,7 +98,7 @@ export function estimateVoiceCostUsd(text, model = DEFAULT_VOICE_MODEL) {
 export async function listVoices() {
   const resp = await fetch(VOICE_PROXY_URL, {
     method: "POST",
-    headers: AI_HEADERS(),
+    headers: await AI_HEADERS(),
     body: JSON.stringify({ action: "voices" }),
   });
   if (!resp.ok) throw new Error(await proxyError(resp));
@@ -128,7 +128,7 @@ export async function callGenerateVoice({
   try {
     resp = await fetch(VOICE_PROXY_URL, {
       method: "POST",
-      headers: AI_HEADERS(),
+      headers: await AI_HEADERS(),
       body: JSON.stringify({
         action: "speak", text, voiceId, model,
         ...(outputFormat  ? { outputFormat }  : {}),

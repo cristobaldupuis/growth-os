@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Modal } from "./Modal.jsx";
 import { gG, gGh, gSL, gSl } from "./styles.js";
 import { METRIC_SOURCES, fmtCur, parseMetricsCSV } from "../constants.js";
 import { splitCSVLine } from "../services/csvLine.js";
-import { detectCsvShape, parsePerformanceCSV, mergePerformanceRows, attachInitiatives } from "../services/performance.js";
+import { detectCsvShape, parsePerformanceCSV, mergePerformanceRows, attachInitiatives, annotateRow, statsFor } from "../services/performance.js";
+import { connectorStatus, syncConnector } from "../services/connectors.js";
 import { resolveSchema, listChannels } from "../services/naming.js";
 import { scanHeaders, piiNotice } from "../services/dataSafety.js";
 import { IconCheck } from "./icons.jsx";
@@ -35,6 +36,15 @@ export function MetricsImportModal({t, dk, weeklyMetrics, perfRows, items, setti
   const [channel, setChannel] = useState("");
   const [conflictMode, setConflictMode] = useState("overwrite"); // overwrite | skip
   const [pii, setPii] = useState(null);
+  // "csv", or the connector a sync came from. A synced batch has no raw text to
+  // re-parse, so the channel picker is replaced by where the rows came from.
+  const [source, setSource] = useState("csv");
+  const [connectors, setConnectors] = useState(null);
+  const [syncDays, setSyncDays] = useState(30);
+  const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState("");
+
+  useEffect(() => { let live = true; connectorStatus().then(c => { if (live) setConnectors(c); }); return () => { live = false; }; }, []);
 
   const schema = resolveSchema(settings);
   const channels = listChannels(schema);
@@ -73,6 +83,28 @@ export function MetricsImportModal({t, dk, weeklyMetrics, perfRows, items, setti
       setParsed(parseMetricsCSV(text));
     }
     setStep("preview");
+  };
+
+  // A connector sync lands in the same preview as an uploaded export: annotated
+  // against the naming schema, counted, and written only on confirm.
+  const handleSync = async (provider) => {
+    setSyncing(true); setSyncError("");
+    try {
+      const res = await syncConnector(provider, syncDays);
+      const rows = (res.rows || []).map(r => annotateRow(r, schema));
+      const errors = [];
+      if (!rows.length) errors.push(`Nothing to import: no sends with activity in the last ${res.days} days.`);
+      if (res.renamed) errors.push(`${res.renamed} message name${res.renamed!==1?"s are":" is"} shared by more than one flow, so ${res.renamed!==1?"they were":"it was"} prefixed with the flow name to keep rows apart. Those will not parse against your naming convention.`);
+      setPerf({ rows, errors, stats: statsFor(rows), identityLevel: "message" });
+      setShape("performance");
+      setSource(provider);
+      setPii(null);
+      setStep("preview");
+    } catch (err) {
+      setSyncError(err.message || "Sync failed.");
+    } finally {
+      setSyncing(false);
+    }
   };
 
   const handleFile = (e) => {
@@ -153,6 +185,21 @@ export function MetricsImportModal({t, dk, weeklyMetrics, perfRows, items, setti
               <strong style={{color:t.textSub}}>Campaign export</strong> — needs an <span style={{fontFamily:t.mono}}>Ad name</span>, <span style={{fontFamily:t.mono}}>Ad set name</span>, <span style={{fontFamily:t.mono}}>Ad group name</span> or <span style={{fontFamily:t.mono}}>Campaign name</span> column. Each name is parsed through your naming convention and joined to an initiative by its tracking tag.<br/>
               Column names are case-insensitive, and platform export headers ("Amount spent (USD)", "Purchases conversion value", "Impr.") are recognised as they come.
             </div>
+            {connectors?.klaviyo?.configured && (
+              <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap",padding:"10px 12px",borderRadius:9,background:t.surfaceAlt,border:"1px solid "+t.border}}>
+                <div style={{flex:"1 1 240px",minWidth:0,fontSize:12,fontFamily:t.serif,color:t.text,lineHeight:1.55}}>
+                  <strong>Or sync from Klaviyo</strong> — daily flow message performance (delivered, clicks, conversions, revenue). You will see a preview before anything is saved.
+                </div>
+                <select value={syncDays} onChange={e=>setSyncDays(Number(e.target.value))} disabled={syncing}
+                  style={{...gSl(t),width:130,padding:"6px 9px",fontSize:12}}>
+                  {[7,30,60].filter(d => d <= (connectors.klaviyo.maxDays || 60)).map(d=><option key={d} value={d}>Last {d} days</option>)}
+                </select>
+                <button style={{...gG(t),fontSize:12,padding:"6px 14px"}} disabled={syncing} onClick={()=>handleSync("klaviyo")}>
+                  {syncing ? "Syncing…" : "Sync"}
+                </button>
+                {syncError && <div style={{flexBasis:"100%",fontSize:11.5,fontFamily:t.serif,color:t.red}}>{syncError}</div>}
+              </div>
+            )}
           </>
         )}
 
@@ -171,17 +218,17 @@ export function MetricsImportModal({t, dk, weeklyMetrics, perfRows, items, setti
             <div style={{display:"flex",gap:10,alignItems:"flex-end",flexWrap:"wrap",padding:"10px 12px",borderRadius:9,background:t.goldBg,border:"1px solid "+t.goldBorder}}>
               <div style={{flex:"1 1 260px",minWidth:0}}>
                 <div style={{fontSize:12.5,color:t.text,fontFamily:t.serif,lineHeight:1.55}}>
-                  <strong>Campaign-level export detected</strong> — {perf.identityLevel || "ad"}-level rows.
+                  <strong>{source === "csv" ? "Campaign-level export detected" : `Synced from ${connectors?.[source]?.label || source}`}</strong> — {perf.identityLevel || "ad"}-level rows.
                   Names are parsed against your naming convention rather than treated as free text.
                 </div>
               </div>
-              <div>
+              {source === "csv" && <div>
                 <div style={{...gSL(t),marginBottom:4}}>Channel</div>
                 <select value={effChannel} onChange={e=>{setChannel(e.target.value); readPerf(rawText, e.target.value);}}
                   style={{...gSl(t),width:150,padding:"6px 9px",fontSize:12}}>
                   {channels.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}
                 </select>
-              </div>
+              </div>}
             </div>
 
             {perf.errors.length>0 && (
@@ -212,9 +259,14 @@ export function MetricsImportModal({t, dk, weeklyMetrics, perfRows, items, setti
 
             {perf.stats && perf.stats.total>0 && perf.stats.parsed===0 && (
               <div style={{padding:"9px 12px",borderRadius:9,background:t.warnBg,border:"1px solid "+t.warnBorder,fontSize:12,color:t.text,fontFamily:t.serif,lineHeight:1.55}}>
+                {source === "csv" ? <>
                 Nothing parsed against <strong>{channels.find(c=>c.id===effChannel)?.label}</strong>. Try another channel above —
                 a slot-count mismatch means the names were built from a different template, and parsing refuses to guess
                 at an alignment rather than mis-attributing every row.
+                </> : <>
+                None of these message names follow your naming convention, so they will not break down by dimension.
+                They still import, and still attribute to an initiative whose assigned names include the flow or message.
+                </>}
               </div>
             )}
 

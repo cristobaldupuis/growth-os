@@ -721,7 +721,7 @@ export default function App() {
     // fallback means a call that somehow beats it runs on the committed default
     // rather than failing. Blocking first paint on a network read to learn a
     // setting that only matters at click time would be the wrong trade.
-    fetch("/api/routing")
+    fetch("/api/state?action=routing")
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (!data?.routing) return;

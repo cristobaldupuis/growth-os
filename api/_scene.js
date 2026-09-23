@@ -1,4 +1,5 @@
-// api/scene.js — Veo scene generation on Vertex AI.
+// api/_scene.js — Veo scene generation on Vertex AI. Served by api/video.js
+// under `?kind=scene` (formerly its own function, api/scene.js).
 //
 // The moving key frame. A sibling of api/image.js, not of api/video.js, and the
 // distinction is the whole design: api/video.js takes an approved SCRIPT and has

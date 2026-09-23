@@ -9,8 +9,8 @@
       "maxDuration": 60
     },
     "api/video.js": {
-      "memory": 128,
-      "maxDuration": 30
+      "memory": 256,
+      "maxDuration": 60
     },
     "api/admin.js": {
       "memory": 128,
@@ -24,10 +24,6 @@
       "memory": 256,
       "maxDuration": 60
     },
-    "api/routing.js": {
-      "memory": 128,
-      "maxDuration": 10
-    },
     "api/state.js": {
       "memory": 256,
       "maxDuration": 30
@@ -39,12 +35,24 @@
     "api/oauth.js": {
       "memory": 128,
       "maxDuration": 15
+    },
+    "api/voice.js": {
+      "memory": 128,
+      "maxDuration": 60
     }
   },
   "rewrites": [
     {
       "source": "/admin",
       "destination": "/admin.html"
+    },
+    {
+      "source": "/api/scene",
+      "destination": "/api/video?kind=scene"
+    },
+    {
+      "source": "/api/routing",
+      "destination": "/api/state?action=routing"
     },
     {
       "source": "/.well-known/oauth-authorization-server",

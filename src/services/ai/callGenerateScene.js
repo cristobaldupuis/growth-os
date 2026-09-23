@@ -11,7 +11,7 @@ import { AI_HEADERS, proxyError, recordSceneUsage } from "./_shared.js";
 import { modelFor } from "./models.js";
 import { modelById } from "./registry.js";
 
-export const SCENE_PROXY_URL = "/api/scene";
+export const SCENE_PROXY_URL = "/api/video?kind=scene";
 
 // Kept in step with api/scene.js, which refuses anything outside them. Veo
 // renders landscape and portrait only, so the 4:5 and 1:1 the image path offers

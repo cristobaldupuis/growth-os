@@ -645,7 +645,7 @@ ALLOWED_ORIGINS=https://your-deployment.vercel.app
 DAILY_CAP_TEXT=3000        # api/proxy.js — text calls (a debate is ~25–48 of these)
 DAILY_CAP_IMAGES=200       # api/image.js
 DAILY_CAP_VIDEO=40         # api/video.js — submits only, polls are free
-DAILY_CAP_SCENES=40        # api/scene.js — submits only
+DAILY_CAP_SCENES=40        # api/_scene.js (via /api/video?kind=scene) — submits only
 DAILY_CAP_VOICE=300        # api/voice.js
 DAILY_CAP_DEBATES=40       # api/debate.js — debate starts
 

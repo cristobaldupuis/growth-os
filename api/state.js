@@ -42,6 +42,7 @@ import {
   restBase, authHeaders, supabaseConfigured, authConfigured, authBase, publishableKey, rpc,
 } from "./_supabase.js";
 import { authenticate, membershipsFor, resolveWorkspace } from "./_auth.js";
+import routingHandler from "./_routingRead.js";
 
 // Documents are small; a portfolio of a few hundred initiatives is well under a
 // megabyte of JSON. Performance rows arrive chunked (see MAX_ROWS below), so this
@@ -276,6 +277,15 @@ async function handlePerfWrite(req, res, workspace, { replace }) {
 // -- Handler -------------------------------------------------------------------
 
 export default async function handler(req, res) {
+  // The model-routing read used to be its own function (api/routing.js). It
+  // lives behind this one now only to stay inside the Hobby plan's twelve
+  // Serverless Functions; it keeps its own guard, cache header and handler, and
+  // /api/routing still reaches it through the rewrite in vercel.json. Dispatched
+  // before this endpoint's own guard because it is a GET-only, unauthenticated
+  // read with a different body ceiling — and dispatched on the query alone, so a
+  // POST here gets the routing read's own 405 rather than falling into state.
+  if (req.query?.action === "routing") return routingHandler(req, res);
+
   if (guardEntry(req, res, { maxBodyBytes: MAX_BODY_BYTES, methods: ["GET", "POST"] })) return;
 
   const action = req.method === "GET"

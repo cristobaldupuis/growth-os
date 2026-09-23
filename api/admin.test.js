@@ -29,7 +29,11 @@ delete process.env.SUPABASE_SECRET_KEY;
 delete process.env.SUPABASE_SERVICE_KEY;
 
 const adminHandler = (await import("./admin.js")).default;
-const routingHandler = (await import("./routing.js")).default;
+// The routing read is served by api/state.js under `?action=routing` (it was
+// its own function until the function budget ran out). Driving it through the
+// real state handler proves the dispatch as well as the read.
+const stateHandler = (await import("./state.js")).default;
+const routingHandler = (req, res) => stateHandler({ ...req, query: { ...(req.query || {}), action: "routing" } }, res);
 const { DEFAULT_ROUTING } = await import("../src/services/ai/registry.js");
 
 /** Minimal res double capturing status, body and headers. */

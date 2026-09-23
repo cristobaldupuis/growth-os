@@ -44,6 +44,7 @@
 
 import { VIDEO_TIERS, estimateVideoCostUsd } from "../src/services/ai/callGenerateVideo.js";
 import { guardEntry, guardRateLimit, rateLimitIdentity, dailyCap } from "./_guard.js";
+import sceneHandler from "./_scene.js";
 
 export const ALLOWED_PROVIDERS = new Set(["heygen", "did", "fabric"]);
 
@@ -326,6 +327,13 @@ const adapters = {
 };
 
 export default async function handler(req, res) {
+  // Veo scene generation used to be its own function (api/scene.js). It is
+  // dispatched from here only to stay inside the Hobby plan's twelve Serverless
+  // Functions: the two share a submit/poll shape but nothing else, so the scene
+  // path keeps its own validator, buckets and daily cap in api/_scene.js.
+  // /api/scene still reaches it through the rewrite in vercel.json.
+  if (req.query?.kind === "scene") return sceneHandler(req, res);
+
   if (guardEntry(req, res, { maxBodyBytes: MAX_BODY_BYTES })) return;
 
   // Which bucket and which ceiling applies is decided by the action, so this

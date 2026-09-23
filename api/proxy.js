@@ -41,6 +41,11 @@ import { guardEntry, guardRateLimit, rateLimitIdentity, dailyCap } from "./_guar
 import { TEXT_MODEL_IDS, modelById } from "../src/services/ai/registry.js";
 import { adapters } from "./_adapters.js";
 
+// Every upstream call is bounded below the function's own limit (function
+// maxDuration is 60s), so a provider that hangs becomes this endpoint's error
+// response rather than a platform kill with nothing logged.
+const UPSTREAM_TIMEOUT_MS = 55000;
+
 // Only models this app can route to. An allowlist means a leaked request can't be
 // edited to invoke something with a different cost profile.
 //
@@ -153,6 +158,7 @@ export default async function handler(req, res) {
 
   try {
     const upstream = await fetch(adapter.endpoint(req.body.model), {
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
       method: "POST",
       // Awaited uniformly: every adapter but Gemini's returns a plain object here,
       // and awaiting a non-Promise just resolves to it. Only Vertex mode needs the

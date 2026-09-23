@@ -39,6 +39,8 @@
 // server-side and is guarded on origin and rate exactly like the image and video
 // proxies.
 
+import { AI_HEADERS } from "./ai/_shared.js";
+
 export const ASSET_PROXY_URL = "/api/asset";
 
 /** Session-only byte store. Deliberately module-level rather than React state:
@@ -110,7 +112,9 @@ export async function putAsset({ key, mimeType, data }) {
     try {
       const resp = await fetch(ASSET_PROXY_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        // The signed-in person's token, so the upload counts against their own
+        // bucket rather than their office's shared address — see AI_HEADERS.
+        headers: await AI_HEADERS(),
         body: JSON.stringify({ action: "put", key: storageKey, mimeType, data }),
       });
       if (resp.ok) {

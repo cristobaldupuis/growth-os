@@ -37,12 +37,18 @@
 // returns an operation name, `:fetchPredictOperation` collects it — so the
 // browser drives the cadence and a torn-down page costs nothing but the wait.
 
-import { guardEntry, guardRateLimit, clientIp, dailyCap } from "./_guard.js";
+import { guardEntry, guardRateLimit, rateLimitIdentity, dailyCap } from "./_guard.js";
 import {
   geminiConfigured, geminiEndpoint, geminiAuthHeaders, geminiNotConfiguredError,
   VEO_SUBMIT_METHOD, VEO_POLL_METHOD,
 } from "./_geminiAuth.js";
 import { SCENE_MODEL_IDS } from "../src/services/ai/registry.js";
+
+// Every upstream call is bounded below the function's own limit (one Vertex
+// submit or poll inside api/video.js's 60s function), so a provider that hangs
+// becomes this endpoint's error response rather than a platform kill with
+// nothing logged.
+const UPSTREAM_TIMEOUT_MS = 25000;
 
 // Derived from the catalogue rather than hand-kept — the same control, and the
 // same reasoning, as api/proxy.js's ALLOWED_MODELS. A scene model the console can
@@ -163,8 +169,10 @@ export default async function handler(req, res) {
   // Separate namespaces, and separate ceilings, for the same reason api/video.js
   // splits them: a submit is dollars and a poll is nothing, so one budget for
   // both would either throttle a running job or fail to bound spend.
+  const who = await rateLimitIdentity(req);
+  if (who.error) { res.status(401).json({ error: who.error }); return; }
   if (await guardRateLimit(req, res, {
-    key: polling ? `gos:scn:poll:${clientIp(req)}` : `gos:scn:submit:${clientIp(req)}`,
+    key: polling ? `gos:scn:poll:${who.id}` : `gos:scn:submit:${who.id}`,
     max: polling ? POLL_RATE_LIMIT_MAX : SUBMIT_RATE_LIMIT_MAX,
     globalKey: polling ? undefined : "gos:scn:submit:global",
     globalMax: dailyCap("DAILY_CAP_SCENES", 40),
@@ -185,6 +193,7 @@ async function handleSubmit(req, res) {
 
   try {
     const upstream = await fetch(geminiEndpoint(req.body.model, VEO_SUBMIT_METHOD), {
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
       method: "POST",
       headers: await geminiAuthHeaders(),
       body: JSON.stringify(buildVeoBody(req.body)),
@@ -211,6 +220,7 @@ async function handlePoll(req, res) {
 
   try {
     const upstream = await fetch(geminiEndpoint(req.body.model, VEO_POLL_METHOD), {
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
       method: "POST",
       headers: await geminiAuthHeaders(),
       body: JSON.stringify({ operationName: req.body.operationName }),

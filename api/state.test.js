@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DOC_KEYS, MAX_ROWS, toRow, fromRow, handleDocs } from "./state.js";
+import { DOC_KEYS, MAX_ROWS, toRow, fromRow, handleDocs, readOnlyRefuses } from "./state.js";
 import { bearerToken, resolveWorkspace } from "./_auth.js";
 import { perfRowKey } from "../src/services/performance.js";
 
@@ -186,4 +186,14 @@ test("an idle poll reads revisions only", async () => {
   }
   assert.deepEqual(res.body.docs, {});
   assert.equal(calls, 1);
+});
+
+// -- Viewer role -------------------------------------------------------------------
+
+test("a viewer can read and poll but not write", () => {
+  for (const a of ["load", "docs", "performanceSummary"]) assert.equal(readOnlyRefuses("viewer", a), false, a);
+  for (const a of ["saveDoc", "perfMerge", "perfReplace"]) assert.equal(readOnlyRefuses("viewer", a), true, a);
+  for (const role of ["owner", "member"]) {
+    for (const a of ["saveDoc", "perfMerge", "perfReplace"]) assert.equal(readOnlyRefuses(role, a), false, `${role} ${a}`);
+  }
 });

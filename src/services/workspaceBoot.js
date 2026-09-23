@@ -72,7 +72,12 @@ export async function bootWorkspace(deps = {}) {
     // Performance rows arrive as objects and go into the cache as the JSON string
     // `store.get` returns, so App.jsx's load effect parses one shape whichever
     // backend answered.
-    attach({ perfKey: PERF_KEY, saveDoc, savePerfRows, pullChanges, acceptRemote, baseOf }, docs, JSON.stringify(perfRows));
+    //
+    // A viewer (0008_viewer_role.sql) gets the same backend marked read-only:
+    // the server would refuse their writes anyway, and refusing them here
+    // instead keeps a routine click from reading as a failed save.
+    const readOnly = workspace?.role === "viewer";
+    attach({ perfKey: PERF_KEY, saveDoc, savePerfRows, pullChanges, acceptRemote, baseOf, readOnly }, docs, JSON.stringify(perfRows));
     return { mode: "remote", workspace, docs, perfRows };
   } catch (err) {
     detach();

@@ -56,6 +56,12 @@ const MAX_BODY_BYTES = 4 * 1024 * 1024;
 // landed converges rather than duplicating.
 export const MAX_ROWS = 2000;
 
+/** Actions that change the workspace — refused for a `viewer` (0008_viewer_role.sql). */
+export const WRITE_ACTIONS = new Set(["saveDoc", "perfMerge", "perfReplace"]);
+
+/** True when this membership may not perform `action`. */
+export const readOnlyRefuses = (role, action) => role === "viewer" && WRITE_ACTIONS.has(action);
+
 // PostgREST's default page size. Load pages until a short page arrives.
 const PAGE = 1000;
 
@@ -371,6 +377,11 @@ export default async function handler(req, res) {
   } catch (err) {
     console.error("state: membership lookup failed:", err, "ip:", clientIp(req));
     res.status(503).json({ error: "Could not reach the workspace store." });
+    return;
+  }
+
+  if (readOnlyRefuses(workspace.role, action)) {
+    res.status(403).json({ error: "You have view-only access to this workspace, so changes are not saved.", readOnly: true });
     return;
   }
 

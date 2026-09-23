@@ -168,7 +168,8 @@ export async function syncRemote() {
     const local = remoteCache[key] != null ? JSON.parse(remoteCache[key]) : undefined;
     const base = remote.baseOf ? remote.baseOf(key) : undefined;
 
-    if (deepEqual(local, base) || local === undefined) {
+    // A viewer's local edits are never saved, so the server's copy always wins.
+    if (remote.readOnly || deepEqual(local, base) || local === undefined) {
       remote.acceptRemote(key, value, revision);
       adopt(key, JSON.stringify(value));
       adopted.push(key);
@@ -205,6 +206,11 @@ export function detachRemote() { remote = null; remoteCache = {}; }
 export function _resetSync() { for (const k of Object.keys(saveChains)) delete saveChains[k]; inFlight = 0; remoteSetters = {}; syncNotice = null; }
 
 export const remoteAttached = () => !!remote;
+
+/** True when the attached workspace is view-only for this user. */
+export const remoteReadOnly = () => !!remote?.readOnly;
+
+export const READ_ONLY_MESSAGE = "You have view-only access to this workspace. Changes you make stay in this tab and are not saved.";
 
 /** True when this key belongs to the workspace rather than to this browser. */
 const isRemoteKey = (key) => !!remote && !DEVICE_KEYS.has(key);
@@ -255,6 +261,9 @@ export const store = (() => {
 
       if (isRemoteKey(key)) {
         remoteCache[key] = value;
+        // Not reported through the write-error banner: the view-only banner is
+        // already on screen and says the same thing without calling it a fault.
+        if (remote.readOnly) return { ok: false, durable: false, readOnly: true, message: READ_ONLY_MESSAGE };
         try {
           if (key === remote.perfKey) await remote.savePerfRows(JSON.parse(value));
           else await saveRemoteDoc(key);
@@ -268,6 +277,9 @@ export const store = (() => {
           // tell the operator to take a backup while the data is still in memory.
           if (err.conflict) {
             return report(key, err, "Someone else saved this workspace while you were working. Reload to pick up their changes — your unsaved edits are still in this tab until you do.");
+          }
+          if (err.status === 403 && err.readOnly) {
+            return report(key, err, READ_ONLY_MESSAGE);
           }
           if (err.signedOut) {
             return report(key, err, "Your session expired, so this change was not saved. Sign in again — your edits are still in this tab.");

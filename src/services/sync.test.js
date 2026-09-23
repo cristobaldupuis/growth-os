@@ -137,3 +137,36 @@ test("polling with no remote attached is a no-op", async () => {
   _resetSync(); detachRemote();
   assert.deepEqual(await syncRemote(), []);
 });
+
+test("a viewer's edits stay in the tab, are never sent, and do not trip the error banner", async () => {
+  const { onWriteError, remoteReadOnly } = await import("./store.js");
+  _reset(); _resetSync(); detachRemote();
+  let sent = 0, errored = 0;
+  onWriteError(() => { errored++; });
+  attachRemote({ perfKey: PERF_KEY, saveDoc: async () => { sent++; }, savePerfRows: async () => { sent++; }, readOnly: true }, {});
+  assert.equal(remoteReadOnly(), true);
+  const r = await store.set(KEY_ITEMS, "[]");
+  assert.equal(r.ok, false);
+  assert.equal(r.readOnly, true);
+  assert.match(r.message, /view-only/);
+  assert.equal(sent, 0);
+  assert.equal(errored, 0);
+  onWriteError(null);
+  detachRemote();
+});
+
+test("a viewer's poll takes the server copy over any local edit", async () => {
+  const server = fakeServer({ [KEY_SETTINGS]: { companyName: "X" } });
+  _reset(); _resetSync(); detachRemote();
+  _setTokenSource(async () => "t");
+  const { docs } = await loadWorkspace(null, server);
+  attachRemote({ perfKey: PERF_KEY, saveDoc: (k, v) => saveDoc(k, v, server), savePerfRows: async () => {},
+    pullChanges: () => pullChanges(server), acceptRemote, baseOf, readOnly: true }, docs);
+  const seen = {};
+  onRemoteChange({ [KEY_SETTINGS]: v => { seen.s = v; } });
+  await store.set(KEY_SETTINGS, JSON.stringify({ companyName: "local only" }));
+  server.otherWriter(KEY_SETTINGS, v => ({ ...v, companyName: "Y" }));
+  await syncRemote();
+  assert.equal(seen.s.companyName, "Y");
+  detachRemote();
+});

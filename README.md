@@ -689,6 +689,7 @@ SUPABASE_ASSET_BUCKET=creative-assets
 - `0005_workspace.sql` — workspaces, membership, documents and performance rows
 - `0006_mcp.sql` — the MCP connector's own OAuth clients, authorization codes and tokens
 - `0007_performance_aggregation.sql` — the `performance_summary` RPC the browser and MCP use to aggregate performance rows server-side
+- `0008_viewer_role.sql` — a read-only `viewer` workspace role: RLS write policies move to `is_workspace_writer`, and the file ends with the SQL to seat a viewer
 
 Paste each into the Supabase SQL editor and run it; all five are idempotent.
 

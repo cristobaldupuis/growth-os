@@ -52,7 +52,7 @@ import { randomUUID } from "node:crypto";
 import { verifyToken, membershipsFor, resolveWorkspace } from "./_auth.js";
 import {
   pgFetch, originOf, newClientId, newAuthCode, newToken, hashToken, pkceVerify,
-  isAcceptableRedirectUri, normalizeScope, parseFormOrJson, bodyTooLarge,
+  isAcceptableRedirectUri, normalizeScope, scopeForRole, parseFormOrJson, bodyTooLarge,
   ACCESS_TOKEN_TTL_MS, REFRESH_TOKEN_TTL_MS, AUTH_CODE_TTL_MS,
 } from "./_oauth.js";
 import { guardRateLimit, clientIp } from "./_guard.js";
@@ -436,7 +436,7 @@ async function handleAuthorize(req, res) {
         code_challenge_method: "S256",
         user_id: user.id,
         workspace_id: workspace.id,
-        scope: normalizeScope(body.scope),
+        scope: scopeForRole(normalizeScope(body.scope), workspace.role),
         expires_at: new Date(Date.now() + AUTH_CODE_TTL_MS).toISOString(),
       }),
     });

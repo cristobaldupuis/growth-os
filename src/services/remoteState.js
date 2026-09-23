@@ -93,6 +93,7 @@ async function call(body, fetchImpl = fetch) {
     const err = new Error(parsed.error || `The workspace store returned ${res.status}.`);
     err.status = res.status;
     err.choices = parsed.choices || null;
+    err.readOnly = !!parsed.readOnly;
     throw err;
   }
   return parsed;

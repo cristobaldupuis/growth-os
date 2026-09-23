@@ -102,3 +102,13 @@ test("every local reason says something specific, and remote says nothing", asyn
   assert.equal(bootMessage({ mode: "remote", workspace: {} }), null);
   assert.equal(bootMessage(null), null);
 });
+
+test("a viewer's workspace attaches read-only, everyone else's does not", async () => {
+  const viewer = spies({ load: async () => ({ workspace: { id: "w1", role: "viewer" }, docs: {}, perfRows: [] }) });
+  await bootWorkspace(viewer.deps);
+  assert.equal(viewer.calls.attached.backend.readOnly, true);
+
+  const member = spies({ load: async () => ({ workspace: { id: "w1", role: "member" }, docs: {}, perfRows: [] }) });
+  await bootWorkspace(member.deps);
+  assert.equal(member.calls.attached.backend.readOnly, false);
+});

@@ -2080,7 +2080,9 @@ export default function App() {
           <div style={{maxWidth:1440,margin:"0 auto",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
             <span style={{fontSize:12,fontFamily:t.sans,flex:1,minWidth:220,lineHeight:1.5,
               color:boot.mode==="remote"?t.textMuted:t.red,fontWeight:boot.mode==="remote"?400:600}}>
-              {boot.mode === "remote"
+              {boot.mode === "remote" && boot.workspace?.role === "viewer"
+                ? <><strong style={{color:t.text}}>View only</strong> · {boot.workspace?.name || boot.workspace?.slug || "this workspace"}. Changes you make stay in this tab and are not saved.</>
+                : boot.mode === "remote"
                 ? <>Saving to <strong style={{color:t.text}}>{boot.workspace?.name || boot.workspace?.slug || "the workspace store"}</strong>.</>
                 : bootMessage(boot)}
             </span>

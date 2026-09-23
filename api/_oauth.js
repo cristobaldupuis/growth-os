@@ -98,6 +98,14 @@ export function normalizeScope(requested) {
 
 export const scopeHas = (scope, needed) => String(scope || "").split(/\s+/).includes(needed);
 
+/**
+ * The scope a membership may actually hold. A `viewer` (0008_viewer_role.sql)
+ * is capped at `read` whatever the client asked for — granting `write` and
+ * refusing it on every call would put a scope on the consent page that means
+ * nothing.
+ */
+export const scopeForRole = (scope, role) => (role === "viewer" ? "read" : scope);
+
 /** This deployment's own origin, from the request rather than a hardcoded
  * value — so the metadata documents below are correct on a preview deployment
  * or a custom domain without an environment variable to keep in sync. Vercel

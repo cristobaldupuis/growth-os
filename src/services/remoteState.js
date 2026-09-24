@@ -191,18 +191,16 @@ export function acceptRemote(key, value, revision) {
  * Write the whole performance set.
  *
  * The caller has already merged in memory (`mergePerformanceRows`), so this is a
- * replace: the first chunk clears the table, the rest merge onto it.
+ * replace — done as stage-then-commit (see handlePerfStage in api/state.js).
+ * Every chunk is upserted under one batch the server issues on the first chunk,
+ * and only the final `perfCommit` deletes the rows the batch did not rewrite.
+ * A chunk that fails leaves the old rows in place alongside whatever new ones
+ * landed, so a failed save can no longer shrink the table; the failure still
+ * propagates, and `store.set` still reports `durable:false`.
  *
- * **The honest hazard.** If a later chunk fails, the table holds fewer rows than
- * it did before — the delete has happened and part of the insert has not. It is
- * not silent: the failure propagates, `store.set` reports `durable:false`, and
- * the existing banner tells the operator to download a backup, with the full set
- * still in memory for this session. A transactional version needs a staging table
- * and belongs with the fact model in Phase 5.4; pretending the window does not
- * exist would be worse than writing it down.
- *
- * Sending nothing is still a replace, because "the set is now empty" is a real
- * state — it is what Reset Demo produces.
+ * Sending nothing is still a replace — stage nothing, commit, and the table is
+ * empty — because "the set is now empty" is a real state: it is what Reset Demo
+ * produces.
  */
 export async function savePerfRows(rows, fetchImpl = fetch) {
   const all = (rows || []).map(r => ({
@@ -220,15 +218,13 @@ export async function savePerfRows(rows, fetchImpl = fetch) {
   for (let i = 0; i < all.length; i += CHUNK) chunks.push(all.slice(i, i + CHUNK));
   if (!chunks.length) chunks.push([]);
 
-  let total = 0;
-  for (let i = 0; i < chunks.length; i++) {
-    const body = await call({
-      action: i === 0 ? "perfReplace" : "perfMerge",
-      rows: chunks[i],
-    }, fetchImpl);
-    total = body.total ?? total;
+  let batch = null;
+  for (const chunk of chunks) {
+    const body = await call({ action: "perfStage", rows: chunk, ...(batch ? { batch } : {}) }, fetchImpl);
+    batch = body.batch;
   }
-  return { ok: true, total };
+  const done = await call({ action: "perfCommit", batch }, fetchImpl);
+  return { ok: true, total: done.total ?? null };
 }
 
 /**

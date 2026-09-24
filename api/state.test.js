@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DOC_KEYS, MAX_ROWS, toRow, fromRow, handleDocs, readOnlyRefuses } from "./state.js";
+import { DOC_KEYS, MAX_ROWS, toRow, fromRow, handleDocs, readOnlyRefuses, validBatch, handlePerfStage, handlePerfCommit, BATCH_MAX_AGE_MS } from "./state.js";
 import { bearerToken, resolveWorkspace } from "./_auth.js";
 import { perfRowKey } from "../src/services/performance.js";
 
@@ -192,8 +192,68 @@ test("an idle poll reads revisions only", async () => {
 
 test("a viewer can read and poll but not write", () => {
   for (const a of ["load", "docs", "performanceSummary"]) assert.equal(readOnlyRefuses("viewer", a), false, a);
-  for (const a of ["saveDoc", "perfMerge", "perfReplace"]) assert.equal(readOnlyRefuses("viewer", a), true, a);
+  for (const a of ["saveDoc", "perfMerge", "perfReplace", "perfStage", "perfCommit"]) assert.equal(readOnlyRefuses("viewer", a), true, a);
   for (const role of ["owner", "member"]) {
     for (const a of ["saveDoc", "perfMerge", "perfReplace"]) assert.equal(readOnlyRefuses(role, a), false, `${role} ${a}`);
   }
+});
+
+// -- Staged performance replace ----------------------------------------------------
+
+async function withPg(handler, fn) {
+  process.env.SUPABASE_URL = "https://db.example.test";
+  process.env.SUPABASE_SECRET_KEY = "sk";
+  const real = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, init = {}) => {
+    calls.push({ url: decodeURIComponent(String(url)), method: init.method || "GET", body: init.body ? JSON.parse(init.body) : null });
+    return { ok: true, status: 200, json: async () => [], text: async () => "", headers: { get: () => "0-0/7" } };
+  };
+  const res = { status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
+  try { await fn(res); } finally {
+    globalThis.fetch = real;
+    delete process.env.SUPABASE_URL;
+    delete process.env.SUPABASE_SECRET_KEY;
+  }
+  return { res, calls };
+}
+
+test("a batch time must be the server's own shape, recent, and not in the future", () => {
+  const now = Date.parse("2026-09-24T10:00:00.000Z");
+  assert.equal(validBatch("2026-09-24T09:59:00.000Z", now), "2026-09-24T09:59:00.000Z");
+  assert.equal(validBatch("2026-09-24T08:59:59.000Z", now), null, "older than an hour");
+  assert.equal(validBatch("2026-09-24T10:05:00.000Z", now), null, "in the future");
+  assert.equal(validBatch("2026-09-24", now), null);
+  assert.equal(validBatch("1970-01-01T00:00:00.000Z", now), null, "cannot be used to delete everything since the epoch");
+  assert.equal(validBatch(undefined, now), null);
+  assert.ok(BATCH_MAX_AGE_MS >= 10 * 60 * 1000);
+});
+
+test("staging upserts with the batch time and deletes nothing", async () => {
+  const { res, calls } = await withPg(null, (res) => handlePerfStage(
+    { body: { rows: [{ ...appRow, rowKey: perfRowKey(appRow) }] } }, res, { id: WS }));
+  assert.equal(res.code, 200);
+  assert.match(res.body.batch, /^\d{4}-\d{2}-\d{2}T/);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].method, "POST");
+  assert.equal(calls[0].body[0].imported_at, res.body.batch);
+  assert.ok(!calls.some(c => c.method === "DELETE"));
+});
+
+test("a later chunk reuses the batch; a stale one is refused before any write", async () => {
+  const batch = new Date(Date.now() - 1000).toISOString();
+  const ok = await withPg(null, (res) => handlePerfStage({ body: { batch, rows: [] } }, res, { id: WS }));
+  assert.equal(ok.res.body.batch, batch);
+  const stale = await withPg(null, (res) => handlePerfStage({ body: { batch: "2020-01-01T00:00:00.000Z", rows: [] } }, res, { id: WS }));
+  assert.equal(stale.res.code, 400);
+  assert.equal(stale.calls.length, 0);
+});
+
+test("commit deletes only rows older than the batch, in this workspace", async () => {
+  const batch = new Date(Date.now() - 1000).toISOString();
+  const { res, calls } = await withPg(null, (res) => handlePerfCommit({ body: { batch } }, res, { id: WS }));
+  const del = calls.find(c => c.method === "DELETE");
+  assert.ok(del.url.includes(`workspace_id=eq.${WS}`));
+  assert.ok(del.url.includes(`imported_at=lt.${batch}`));
+  assert.equal(res.body.total, 7);
 });

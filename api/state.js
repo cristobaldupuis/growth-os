@@ -57,7 +57,21 @@ const MAX_BODY_BYTES = 4 * 1024 * 1024;
 export const MAX_ROWS = 2000;
 
 /** Actions that change the workspace — refused for a `viewer` (0008_viewer_role.sql). */
-export const WRITE_ACTIONS = new Set(["saveDoc", "perfMerge", "perfReplace"]);
+export const WRITE_ACTIONS = new Set(["saveDoc", "perfMerge", "perfReplace", "perfStage", "perfCommit"]);
+
+// How old a staged batch may be when it is committed. A save of the largest
+// set this app holds is a few dozen chunk requests; an hour is generous, and a
+// ceiling at all stops a stale or forged batch time from being used to delete
+// everything imported since it.
+export const BATCH_MAX_AGE_MS = 60 * 60 * 1000;
+
+/** The batch time from a request, or null when it is missing, malformed or stale. */
+export function validBatch(raw, now = Date.now()) {
+  if (typeof raw !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(raw)) return null;
+  const t = Date.parse(raw);
+  if (!Number.isFinite(t) || t > now + 5000 || now - t > BATCH_MAX_AGE_MS) return null;
+  return raw;
+}
 
 /** True when this membership may not perform `action`. */
 export const readOnlyRefuses = (role, action) => role === "viewer" && WRITE_ACTIONS.has(action);
@@ -201,6 +215,61 @@ export async function handleDocs(req, res, workspace) {
     for (const row of rows) docs[row.key] = { value: row.value, revision: row.revision };
   }
   res.status(200).json({ docs });
+}
+
+/**
+ * Stage one chunk of a whole-set replace. ROADMAP 2.0's "honest hazard".
+ *
+ * The old replace deleted the workspace's rows and then inserted the new set
+ * chunk by chunk, so a chunk that failed left the table with FEWER rows than
+ * before — history gone until the next successful save. Staging inverts the
+ * order: every chunk is upserted with `imported_at` set to one server-issued
+ * batch time, and nothing is deleted until `perfCommit` removes the rows older
+ * than that batch. A failure anywhere before the commit leaves the old set plus
+ * whatever new rows landed: too many, never too few, and the next save
+ * converges. No migration needed — `imported_at` already exists.
+ *
+ * The first chunk sends no batch and receives one; the rest send it back.
+ */
+export async function handlePerfStage(req, res, workspace) {
+  const batch = req.body?.batch == null ? new Date().toISOString() : validBatch(req.body.batch);
+  if (!batch) { res.status(400).json({ error: "That import batch has expired. Save again." }); return; }
+
+  const incoming = Array.isArray(req.body?.rows) ? req.body.rows : null;
+  if (!incoming) { res.status(400).json({ error: "No rows supplied." }); return; }
+  if (incoming.length > MAX_ROWS) {
+    res.status(413).json({ error: `Send at most ${MAX_ROWS} rows per request.`, maxRows: MAX_ROWS });
+    return;
+  }
+  const rows = incoming.map(r => ({ ...toRow(workspace.id, r), imported_at: batch })).filter(r => r.row_key && r.name && r.level);
+  if (rows.length !== incoming.length) {
+    res.status(400).json({ error: "Every row needs a rowKey, a name and a level." });
+    return;
+  }
+  if (rows.length) {
+    await pgFetch(`/performance_rows?on_conflict=workspace_id,row_key`, {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify(rows),
+    });
+  }
+  res.status(200).json({ batch, written: rows.length });
+}
+
+/** Finish a staged replace: drop every row the batch did not rewrite. */
+export async function handlePerfCommit(req, res, workspace) {
+  const batch = validBatch(req.body?.batch);
+  if (!batch) { res.status(400).json({ error: "That import batch has expired. Save again." }); return; }
+  await pgFetch(
+    `/performance_rows?workspace_id=eq.${workspace.id}&imported_at=lt.${encodeURIComponent(batch)}`,
+    { method: "DELETE" },
+  );
+  const countRes = await pgFetch(
+    `/performance_rows?workspace_id=eq.${workspace.id}&select=row_key`,
+    { headers: { Prefer: "count=exact", Range: "0-0" } },
+  );
+  const total = Number(String(countRes.headers.get("content-range") || "").split("/")[1]);
+  res.status(200).json({ total: Number.isFinite(total) ? total : null });
 }
 
 async function handleSaveDoc(req, res, workspace, user) {
@@ -390,6 +459,10 @@ export default async function handler(req, res) {
     if (action === "docs")        return await handleDocs(req, res, workspace);
     if (action === "saveDoc")     return await handleSaveDoc(req, res, workspace, user);
     if (action === "performanceSummary") return await handlePerfSummary(req, res, workspace);
+    if (action === "perfStage")   return await handlePerfStage(req, res, workspace);
+    if (action === "perfCommit")  return await handlePerfCommit(req, res, workspace);
+    // perfMerge/perfReplace are the pre-staging protocol, kept so a tab still
+    // running the previous bundle can save through a deploy.
     if (action === "perfMerge")   return await handlePerfWrite(req, res, workspace, { replace: false });
     if (action === "perfReplace") return await handlePerfWrite(req, res, workspace, { replace: true });
     res.status(400).json({ error: "Unknown action." });

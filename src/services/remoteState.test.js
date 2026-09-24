@@ -93,27 +93,41 @@ test("the derived parse is not sent", async () => {
   for (const field of ["parsed", "values", "parseErrors"]) assert.equal(field in sent, false, field);
 });
 
-test("the first chunk replaces and the rest merge", async () => {
+test("a replace stages every chunk under one batch, then commits once", async () => {
   setup();
   const many = Array.from({ length: CHUNK + 5 }, (_, i) => ({ ...row, name: `n${i}` }));
-  const f = mockFetch([{ body: { total: many.length } }]);
-  await savePerfRows(many, f);
+  const f = mockFetch([
+    { body: { batch: "2026-09-24T10:00:00.000Z", written: CHUNK } },
+    { body: { batch: "2026-09-24T10:00:00.000Z", written: 5 } },
+    { body: { total: many.length } },
+  ]);
+  const out = await savePerfRows(many, f);
 
-  assert.equal(f.calls.length, 2);
-  // Deleting once, at the start, is what makes this a replace. Deleting on every
-  // chunk would leave only the last chunk in the table.
-  assert.equal(f.calls[0].body.action, "perfReplace");
-  assert.equal(f.calls[1].body.action, "perfMerge");
+  assert.deepEqual(f.calls.map(c => c.body.action), ["perfStage", "perfStage", "perfCommit"]);
+  assert.equal(f.calls[0].body.batch, undefined, "the server issues the batch");
+  assert.equal(f.calls[1].body.batch, "2026-09-24T10:00:00.000Z");
+  assert.equal(f.calls[2].body.batch, "2026-09-24T10:00:00.000Z");
   assert.equal(f.calls[0].body.rows.length, CHUNK);
   assert.equal(f.calls[1].body.rows.length, 5);
+  assert.equal(out.total, many.length);
+});
+
+test("a failed chunk never reaches the commit, so nothing is deleted", async () => {
+  setup();
+  const many = Array.from({ length: CHUNK + 5 }, (_, i) => ({ ...row, name: `n${i}` }));
+  const f = mockFetch([
+    { body: { batch: "2026-09-24T10:00:00.000Z" } },
+    { status: 503, body: { error: "down" } },
+  ]);
+  await assert.rejects(() => savePerfRows(many, f));
+  assert.ok(!f.calls.some(c => c.body.action === "perfCommit"));
 });
 
 test("an empty set is still a replace, because emptiness is a real state", async () => {
   setup();
-  const f = mockFetch([{ body: { total: 0 } }]);
+  const f = mockFetch([{ body: { batch: "2026-09-24T10:00:00.000Z" } }, { body: { total: 0 } }]);
   await savePerfRows([], f);
-  assert.equal(f.calls.length, 1);
-  assert.equal(f.calls[0].body.action, "perfReplace");
+  assert.deepEqual(f.calls.map(c => c.body.action), ["perfStage", "perfCommit"]);
   assert.deepEqual(f.calls[0].body.rows, []);
 });
 
@@ -154,7 +168,7 @@ test("uploading a browser workspace into an empty remote one writes every doc", 
   const result = await uploadInitial({ [KEY_ITEMS]: "[]" }, [row], f);
   assert.equal(result.uploaded, true);
   assert.equal(f.calls[1].body.action, "saveDoc");
-  assert.ok(f.calls.some(c => c.body.action === "perfReplace"));
+  assert.ok(f.calls.some(c => c.body.action === "perfStage"));
 });
 
 test("a remote workspace that already has data is never merged into", async () => {

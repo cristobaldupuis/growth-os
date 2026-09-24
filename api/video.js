@@ -44,6 +44,14 @@
 
 import { VIDEO_TIERS, estimateVideoCostUsd } from "../src/services/ai/callGenerateVideo.js";
 import { guardEntry, guardRateLimit, rateLimitIdentity, dailyCap } from "./_guard.js";
+import sceneHandler from "./_scene.js";
+import voiceHandler from "./_voice.js";
+
+// Every upstream call is bounded below the function's own limit (each
+// submit/poll is one quick provider call inside a 60s function), so a provider
+// that hangs becomes this endpoint's error response rather than a platform kill
+// with nothing logged.
+const UPSTREAM_TIMEOUT_MS = 25000;
 
 export const ALLOWED_PROVIDERS = new Set(["heygen", "did", "fabric"]);
 
@@ -137,6 +145,7 @@ const adapters = {
         : aspectRatio === "1:1" ? { width: 720, height: 720 }
         : { width: 720, height: 1280 }; // 9:16 / 4:5 both default portrait; refine per-provider if needed
       const resp = await fetch("https://api.heygen.com/v2/video/generate", {
+        signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Api-Key": apiKey },
         body: JSON.stringify({
@@ -157,6 +166,7 @@ const adapters = {
       // key is re-checked rather than assumed from the submit that started the job.
       if (!apiKey) throw Object.assign(new Error("HeyGen is not configured on this deployment."), { status: 500 });
       const resp = await fetch(`https://api.heygen.com/v1/video_status.get?video_id=${encodeURIComponent(jobId)}`, {
+        signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
         headers: { "X-Api-Key": apiKey },
       });
       const data = await resp.json();
@@ -196,6 +206,7 @@ const adapters = {
         throw Object.assign(new Error("D-ID renders animate a still image, so they need an avatar image URL."), { status: 400 });
       }
       const resp = await fetch("https://api.d-id.com/talks", {
+        signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Basic ${apiKey}` },
         body: JSON.stringify({
@@ -225,6 +236,7 @@ const adapters = {
       // `Basic undefined` and surface D-ID's 401 as if the render had failed.
       if (!apiKey) throw Object.assign(new Error("D-ID is not configured on this deployment."), { status: 500 });
       const resp = await fetch(`https://api.d-id.com/talks/${encodeURIComponent(jobId)}`, {
+        signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
         headers: { Authorization: `Basic ${apiKey}` },
       });
       const data = await resp.json();
@@ -277,6 +289,7 @@ const adapters = {
         );
       }
       const resp = await fetch(`${FAL_QUEUE}/${FABRIC_TEXT_ENDPOINT}`, {
+        signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Key ${apiKey}` },
         body: JSON.stringify({
@@ -302,7 +315,7 @@ const adapters = {
       const auth = { Authorization: `Key ${apiKey}` };
       const id = encodeURIComponent(jobId);
 
-      const statusResp = await fetch(`${FAL_QUEUE}/${FABRIC_BASE_ENDPOINT}/requests/${id}/status`, { headers: auth });
+      const statusResp = await fetch(`${FAL_QUEUE}/${FABRIC_BASE_ENDPOINT}/requests/${id}/status`, { headers: auth, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
       const statusData = await statusResp.json();
       if (!statusResp.ok) throw Object.assign(new Error(falError(statusData) || "Fabric status check failed."), { status: statusResp.status });
 
@@ -312,7 +325,7 @@ const adapters = {
       // below distinguishes an error payload rather than assuming success.
       if (statusData?.status !== "COMPLETED") return { status: "processing" };
 
-      const resultResp = await fetch(`${FAL_QUEUE}/${FABRIC_BASE_ENDPOINT}/requests/${id}`, { headers: auth });
+      const resultResp = await fetch(`${FAL_QUEUE}/${FABRIC_BASE_ENDPOINT}/requests/${id}`, { headers: auth, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
       const result = await resultResp.json();
       if (!resultResp.ok) return { status: "failed", error: falError(result) || "Render failed." };
 
@@ -326,6 +339,17 @@ const adapters = {
 };
 
 export default async function handler(req, res) {
+  // Veo scene generation used to be its own function (api/scene.js). It is
+  // dispatched from here only to stay inside the Hobby plan's twelve Serverless
+  // Functions: the two share a submit/poll shape but nothing else, so the scene
+  // path keeps its own validator, buckets and daily cap in api/_scene.js.
+  // /api/scene still reaches it through the rewrite in vercel.json.
+  if (req.query?.kind === "scene") return sceneHandler(req, res);
+  // ElevenLabs voice, likewise (formerly api/voice.js), with its own validator,
+  // buckets and DAILY_CAP_VOICE in api/_voice.js. /api/voice still reaches it
+  // through the rewrite in vercel.json.
+  if (req.query?.kind === "voice") return voiceHandler(req, res);
+
   if (guardEntry(req, res, { maxBodyBytes: MAX_BODY_BYTES })) return;
 
   // Which bucket and which ceiling applies is decided by the action, so this
@@ -364,6 +388,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ jobId, provider: req.body.provider, estimatedCostUsd });
     } catch (err) {
       console.error("Video submit failed", req.body.provider, err.status, err.message);
+      if (err.name === "TimeoutError") return res.status(504).json({ error: "The video provider did not answer in time. Check its dashboard before retrying — the job may have started." });
       return res.status(err.status || 502).json({ error: err.message || "Video submit failed." });
     }
   }
@@ -376,6 +401,7 @@ export default async function handler(req, res) {
     return res.status(200).json(result);
   } catch (err) {
     console.error("Video poll failed", req.body.provider, err.status, err.message);
+    if (err.name === "TimeoutError") return res.status(504).json({ error: "The video provider did not answer in time. Try the status check again." });
     return res.status(err.status || 502).json({ error: err.message || "Video status check failed." });
   }
 }

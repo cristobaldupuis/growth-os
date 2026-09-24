@@ -74,3 +74,17 @@ test("step copy is present and readable at the card's size", () => {
       `step ${i + 1} ("${step.title}") is ${step.body.length} characters — too long for the card`);
   });
 });
+
+test("every deferred view the tour anchors in is warmed when the tour opens", () => {
+  // A step in a lazy view races its own chunk: the tour polls ~40 frames and
+  // then gives up on the spotlight. So each such view needs its loader called
+  // in App's showTour effect, and this fails when a step is added without one.
+  const app = readFileSync(join(SRC, "App.jsx"), "utf8");
+  const warm = /if \(!showTour\) return;([\s\S]*?)\}, \[showTour\]\);/.exec(app);
+  assert.ok(warm, "App.jsx no longer has the tour warm-up effect");
+  const LOADERS = { performance: "loadPerformanceView", creative: "loadCreativeStudio", readout: "loadClientReadoutView" };
+  for (const nav of new Set(TOUR_STEPS.map(s => s.nav))) {
+    if (!LOADERS[nav]) continue;
+    assert.ok(warm[1].includes(`${LOADERS[nav]}()`), `the tour visits "${nav}" but never warms ${LOADERS[nav]}`);
+  }
+});

@@ -48,11 +48,11 @@
 // is the strongest signal available without a client secret to check, because
 // these are public clients (see 0006_mcp.sql).
 
-import { randomUUID } from "node:crypto";
+import { randomUUID, randomBytes } from "node:crypto";
 import { verifyToken, membershipsFor, resolveWorkspace } from "./_auth.js";
 import {
   pgFetch, originOf, newClientId, newAuthCode, newToken, hashToken, pkceVerify,
-  isAcceptableRedirectUri, normalizeScope, parseFormOrJson, bodyTooLarge,
+  isAcceptableRedirectUri, normalizeScope, scopeForRole, describeRedirect, impersonationWarning, parseFormOrJson, bodyTooLarge,
   ACCESS_TOKEN_TTL_MS, REFRESH_TOKEN_TTL_MS, AUTH_CODE_TTL_MS,
 } from "./_oauth.js";
 import { guardRateLimit, clientIp } from "./_guard.js";
@@ -215,9 +215,40 @@ const AUTHORIZE_PAGE_CSS = `
   button:disabled { opacity:.6; cursor:default; }
   .err { color:#e08a6b; font-size:12px; min-height:16px; margin-top:10px; }
   .scope { font-size:12px; color:#8f8778; margin-top:18px; border-top:1px solid #302c25; padding-top:14px; }
+  .dest { margin:14px 0 16px; padding:10px 12px; border:1px solid #3d382f; border-radius:6px; background:#141310; }
+  .dest-label { font-size:11px; color:#8f8778; text-transform:uppercase; letter-spacing:.04em; }
+  .dest-host { font-size:14px; font-weight:600; margin-top:3px; word-break:break-all; }
+  .warn { font-size:12px; line-height:1.5; color:#f1b39b; background:#3a1f16; border:1px solid #8a3d24;
+    border-radius:6px; padding:10px 12px; margin-bottom:16px; }
+  button.secondary { background:transparent; color:#e8e3da; border:1px solid #3d382f; margin-top:8px; }
 `;
 
+/**
+ * The consent page's own Content-Security-Policy. vercel.json's page policy
+ * deliberately skips /api/*, because this page's one script embeds per-request
+ * values and so cannot be allowed by a fixed hash; it runs under a fresh nonce
+ * instead. It may talk to this origin and to Supabase Auth (the password goes
+ * there directly) and nothing else. `form-action 'none'` also means that if
+ * the script ever fails to load, submitting the form cannot fall back to a GET
+ * that would put the password in the URL.
+ */
+function setPageCsp(res, nonce) {
+  let supabaseOrigin = "";
+  try { supabaseOrigin = new URL(process.env.SUPABASE_URL || "").origin; } catch { /* unset: 'self' only */ }
+  res.setHeader("Content-Security-Policy", [
+    "default-src 'none'",
+    nonce ? `script-src 'nonce-${nonce}'` : "script-src 'none'",
+    "style-src 'unsafe-inline'",
+    `connect-src 'self'${supabaseOrigin ? " " + supabaseOrigin : ""}`,
+    "img-src 'self'",
+    "base-uri 'none'",
+    "form-action 'none'",
+    "frame-ancestors 'none'",
+  ].join("; "));
+}
+
 function renderErrorPage(res, status, title, description) {
+  setPageCsp(res, null);
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.status(status).end(`<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="robots" content="noindex, nofollow">
@@ -230,6 +261,10 @@ function renderErrorPage(res, status, title, description) {
 
 function renderLoginPage(res, { clientName, clientId, redirectUri, codeChallenge, codeChallengeMethod, state, scope, resource }) {
   const payload = toScriptJson({ clientId, redirectUri, codeChallenge, codeChallengeMethod, state, scope, resource });
+  const dest = describeRedirect(redirectUri);
+  const warning = impersonationWarning(clientName, redirectUri);
+  const nonce = randomBytes(16).toString("base64");
+  setPageCsp(res, nonce);
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.status(200).end(`<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="robots" content="noindex, nofollow">
@@ -237,9 +272,14 @@ function renderLoginPage(res, { clientName, clientId, redirectUri, codeChallenge
 <title>Marketers Lab · Connect</title>
 <style>${AUTHORIZE_PAGE_CSS}</style></head><body><main class="card">
 <h1>Connect ${escapeHtml(clientName || "an MCP client")}</h1>
-<p>Sign in to grant it access to one workspace. Your password goes straight to Supabase and is never seen by this page.</p>
+<div class="dest">
+  <div class="dest-label">Access will be sent to</div>
+  <div class="dest-host">${escapeHtml(dest.loopback ? `an app on this computer (${dest.host})` : dest.host)}</div>
+</div>
+${warning ? `<div class="warn" role="alert">${escapeHtml(warning)}</div>` : ""}
 <form id="f">
   <div id="creds">
+    <p>Sign in to choose what to grant. Your password goes straight to Supabase and is never seen by this page.</p>
     <label for="email">Email</label>
     <input id="email" name="email" type="email" autocomplete="username" required>
     <label for="password">Password</label>
@@ -249,23 +289,36 @@ function renderLoginPage(res, { clientName, clientId, redirectUri, codeChallenge
     <label for="workspace">Workspace</label>
     <select id="workspace" name="workspace"></select>
   </div>
-  <div class="scope">Requested access: <strong id="scopeLabel"></strong></div>
+  <div id="consent" style="display:none">
+    <p><strong id="consentClient"></strong> is asking for <strong id="consentScope"></strong> access to the workspace <strong id="consentWs"></strong>.</p>
+    <p>It will be able to act as you on that workspace until you disconnect it.</p>
+  </div>
+  <div class="scope" id="scopeRow">Requested access: <strong id="scopeLabel"></strong></div>
   <button id="submit" type="submit">Continue</button>
+  <button id="deny" type="button" class="secondary" style="display:none">Deny</button>
   <div class="err" id="err"></div>
 </form>
-<script>
+<script nonce="${nonce}">
 (function () {
   var params = ${payload};
-  document.getElementById("scopeLabel").textContent = (params.scope || "read") === "read" ? "read-only" : "read and write";
+  var clientName = ${toScriptJson(clientName || "This client")};
+  var scopeText = function (s) { return (s || "read") === "read" ? "read-only" : "read and write"; };
+  document.getElementById("scopeLabel").textContent = scopeText(params.scope);
   var form = document.getElementById("f");
   var errEl = document.getElementById("err");
   var submitBtn = document.getElementById("submit");
+  var denyBtn = document.getElementById("deny");
   var wsChoice = document.getElementById("wschoice");
   var wsSelect = document.getElementById("workspace");
   var accessToken = null;
+  // signin → (workspace) → consent. The server issues a code only on an
+  // explicit "allow" from the consent step, never as a side effect of signing in.
+  var stage = "signin";
+  var chosenWorkspace = null;
+  var idleLabel = "Continue";
 
   function setErr(msg) { errEl.textContent = msg || ""; }
-  function setBusy(busy) { submitBtn.disabled = busy; submitBtn.textContent = busy ? "Working…" : "Continue"; }
+  function setBusy(busy) { submitBtn.disabled = busy; denyBtn.disabled = busy; submitBtn.textContent = busy ? "Working…" : idleLabel; }
 
   async function authConfig() {
     var r = await fetch("/api/state?action=status");
@@ -288,7 +341,7 @@ function renderLoginPage(res, { clientName, clientId, redirectUri, codeChallenge
     return body.access_token;
   }
 
-  async function complete(workspace) {
+  async function post(workspace, decision) {
     var r = await fetch("/api/oauth?action=authorize", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -302,9 +355,18 @@ function renderLoginPage(res, { clientName, clientId, redirectUri, codeChallenge
         scope: params.scope,
         resource: params.resource,
         workspace: workspace || undefined,
+        decision: decision || undefined,
       }),
     });
     var body = await r.json().catch(function () { return {}; });
+    if (!r.ok || body.error) throw new Error(body.error_description || body.error || "Could not connect this client.");
+    return body;
+  }
+
+  function show(id, on) { document.getElementById(id).style.display = on ? "block" : "none"; }
+
+  function handle(body) {
+    if (body.redirect) { window.location.href = body.redirect; return; }
     if (body.needsWorkspace) {
       wsSelect.innerHTML = "";
       body.choices.forEach(function (c) {
@@ -312,29 +374,41 @@ function renderLoginPage(res, { clientName, clientId, redirectUri, codeChallenge
         opt.value = c.id; opt.textContent = c.name || c.slug || c.id;
         wsSelect.appendChild(opt);
       });
-      wsChoice.style.display = "block";
-      document.getElementById("creds").style.display = "none";
+      show("creds", false); show("wschoice", true);
+      stage = "workspace";
       setErr("This account is in more than one workspace — pick one.");
       return;
     }
-    if (!r.ok || body.error) throw new Error(body.error_description || body.error || "Could not connect this client.");
-    window.location.href = body.redirect;
+    if (body.needsConsent) {
+      chosenWorkspace = body.workspace.id;
+      document.getElementById("consentClient").textContent = clientName;
+      document.getElementById("consentScope").textContent = scopeText(body.scope);
+      document.getElementById("consentWs").textContent = body.workspace.name || body.workspace.slug || body.workspace.id;
+      show("creds", false); show("wschoice", false); show("scopeRow", false); show("consent", true);
+      denyBtn.style.display = "block";
+      idleLabel = "Allow";
+      stage = "consent";
+      setErr("");
+    }
   }
+
+  denyBtn.addEventListener("click", function () {
+    setErr(""); setBusy(true);
+    post(chosenWorkspace, "deny").then(handle).catch(function (e) { setErr(e.message); }).finally(function () { setBusy(false); });
+  });
 
   form.addEventListener("submit", function (ev) {
     ev.preventDefault();
     setErr(""); setBusy(true);
     (async function () {
       try {
-        if (wsChoice.style.display !== "none") {
-          await complete(wsSelect.value);
-          return;
-        }
+        if (stage === "consent") return handle(await post(chosenWorkspace, "allow"));
+        if (stage === "workspace") return handle(await post(wsSelect.value, null));
         accessToken = await signIn(
           document.getElementById("email").value,
           document.getElementById("password").value,
         );
-        await complete(null);
+        handle(await post(null, null));
       } catch (e) {
         setErr(e.message || "Something went wrong.");
       } finally {
@@ -401,6 +475,17 @@ async function handleAuthorize(req, res) {
     return;
   }
 
+  // Deny needs nothing but a registered client and redirect: it only sends the
+  // browser back with the RFC 6749 error the client asked to be told about.
+  if (body.decision === "deny") {
+    const denied = new URL(body.redirect_uri);
+    denied.searchParams.set("error", "access_denied");
+    denied.searchParams.set("error_description", "The person declined to connect this client.");
+    if (body.state) denied.searchParams.set("state", String(body.state));
+    res.status(200).json({ redirect: denied.toString() });
+    return;
+  }
+
   const user = await verifyToken(String(body.supabase_access_token || ""));
   if (!user) {
     fail(res, 401, "access_denied", "Sign-in failed or your session expired. Try again.");
@@ -423,6 +508,22 @@ async function handleAuthorize(req, res) {
     return;
   }
 
+  // The scope a viewer can actually hold, not the one the client asked for —
+  // this is what the consent step shows and what the code is minted with.
+  const grantedScope = scopeForRole(normalizeScope(body.scope), workspace.role);
+
+  // Signing in is not consent. Until the person has seen the destination, the
+  // workspace and the scope together and pressed Allow, answer with what the
+  // consent step needs to show and issue nothing.
+  if (body.decision !== "allow") {
+    res.status(200).json({
+      needsConsent: true,
+      workspace: { id: workspace.id, name: workspace.name, slug: workspace.slug },
+      scope: grantedScope,
+    });
+    return;
+  }
+
   const code = newAuthCode();
   try {
     await pgFetch("/oauth_codes", {
@@ -436,7 +537,7 @@ async function handleAuthorize(req, res) {
         code_challenge_method: "S256",
         user_id: user.id,
         workspace_id: workspace.id,
-        scope: normalizeScope(body.scope),
+        scope: grantedScope,
         expires_at: new Date(Date.now() + AUTH_CODE_TTL_MS).toISOString(),
       }),
     });

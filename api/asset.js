@@ -34,7 +34,7 @@
 // here is what the app generated and can afford to keep: image bytes, and any
 // blob the operator explicitly chooses to preserve.
 
-import { guardEntry, guardRateLimit, clientIp } from "./_guard.js";
+import { guardEntry, guardRateLimit, rateLimitIdentity, dailyCap } from "./_guard.js";
 
 export const BUCKET = process.env.SUPABASE_ASSET_BUCKET || "creative-assets";
 
@@ -68,6 +68,11 @@ const KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 // asset.test.js and the storage paths below address them by these names.
 export { secretKey, supabaseConfigured } from "./_supabase.js";
 import { supabaseConfigured, authHeaders } from "./_supabase.js";
+
+// Every upstream call is bounded below the function's own limit (function
+// maxDuration is 30s), so a provider that hangs becomes this endpoint's error
+// response rather than a platform kill with nothing logged.
+const UPSTREAM_TIMEOUT_MS = 20000;
 
 const storageBase = () => process.env.SUPABASE_URL.replace(/\/+$/, "") + "/storage/v1";
 
@@ -162,6 +167,7 @@ export default async function handler(req, res) {
     if (!KEY_PATTERN.test(key)) { res.status(400).json({ error: "Invalid asset key." }); return; }
     try {
       const signed = await fetch(`${storageBase()}/object/sign/${BUCKET}/${key}`, {
+        signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
         method: "POST",
         headers: { ...authHeaders(), "Content-Type": "application/json" },
         body: JSON.stringify({ expiresIn: SIGNED_URL_TTL_SECONDS }),
@@ -189,16 +195,25 @@ export default async function handler(req, res) {
   const invalid = validatePut(req.body);
   if (invalid) { res.status(400).json({ error: invalid }); return; }
 
+  const who = await rateLimitIdentity(req);
+  if (who.error) { res.status(401).json({ error: who.error }); return; }
   if (await guardRateLimit(req, res, {
-    key: "gos:asset:" + clientIp(req),
+    key: `gos:asset:${who.id}`,
     max: RATE_LIMIT_MAX,
-    limitMessage: "Too many asset uploads from this address. Wait a while and try again.",
+    // The one write path without a deployment-wide ceiling until now. Each upload
+    // is up to 12MB into the operator's bucket, and like every other endpoint
+    // this one is reachable by anyone who can set an Origin header, so the
+    // per-caller bucket alone bounded nothing about how many callers there are.
+    globalKey: "gos:asset:global",
+    globalMax: dailyCap("DAILY_CAP_ASSETS", 500),
+    limitMessage: "Too many asset uploads. Wait a while and try again.",
     label: "Asset storage",
   })) return;
 
   try {
     const bytes = Buffer.from(req.body.data, "base64");
     const upload = await fetch(`${storageBase()}/object/${BUCKET}/${req.body.key}`, {
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
       method: "POST",
       headers: {
         ...authHeaders(),

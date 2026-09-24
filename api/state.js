@@ -42,6 +42,7 @@ import {
   restBase, authHeaders, supabaseConfigured, authConfigured, authBase, publishableKey, rpc,
 } from "./_supabase.js";
 import { authenticate, membershipsFor, resolveWorkspace } from "./_auth.js";
+import routingHandler from "./_routingRead.js";
 
 // Documents are small; a portfolio of a few hundred initiatives is well under a
 // megabyte of JSON. Performance rows arrive chunked (see MAX_ROWS below), so this
@@ -54,6 +55,43 @@ const MAX_BODY_BYTES = 4 * 1024 * 1024;
 // because the upsert is keyed on `row_key`, so a retry of a chunk that partly
 // landed converges rather than duplicating.
 export const MAX_ROWS = 2000;
+
+/** Actions that change the workspace — refused for a `viewer` (0008_viewer_role.sql). */
+export const WRITE_ACTIONS = new Set([
+  "saveDoc", "perfMerge", "perfReplace", "perfStage", "perfCommit",
+  "memberAdd", "memberRole", "memberRemove",
+]);
+
+export const ROLES = new Set(["owner", "member", "viewer"]);
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * True when changing `userId` to `nextRole` (null for removal) would leave the
+ * workspace with no owner. A workspace nobody can manage is only recoverable
+ * from the SQL editor, so the last owner cannot demote or remove themselves.
+ */
+export function lastOwnerBlocked(members, userId, nextRole) {
+  const target = members.find(m => m.user_id === userId);
+  if (!target || target.role !== "owner" || nextRole === "owner") return false;
+  return members.filter(m => m.role === "owner").length <= 1;
+}
+
+// How old a staged batch may be when it is committed. A save of the largest
+// set this app holds is a few dozen chunk requests; an hour is generous, and a
+// ceiling at all stops a stale or forged batch time from being used to delete
+// everything imported since it.
+export const BATCH_MAX_AGE_MS = 60 * 60 * 1000;
+
+/** The batch time from a request, or null when it is missing, malformed or stale. */
+export function validBatch(raw, now = Date.now()) {
+  if (typeof raw !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(raw)) return null;
+  const t = Date.parse(raw);
+  if (!Number.isFinite(t) || t > now + 5000 || now - t > BATCH_MAX_AGE_MS) return null;
+  return raw;
+}
+
+/** True when this membership may not perform `action`. */
+export const readOnlyRefuses = (role, action) => role === "viewer" && WRITE_ACTIONS.has(action);
 
 // PostgREST's default page size. Load pages until a short page arrives.
 const PAGE = 1000;
@@ -136,7 +174,7 @@ async function pgFetch(path, init = {}) {
 
 // -- Actions -------------------------------------------------------------------
 
-async function handleLoad(res, workspace) {
+async function handleLoad(res, workspace, memberships = []) {
   const docRes = await pgFetch(
     `/workspace_docs?workspace_id=eq.${workspace.id}&select=key,value,revision`,
   );
@@ -162,9 +200,164 @@ async function handleLoad(res, workspace) {
 
   res.status(200).json({
     workspace: { id: workspace.id, slug: workspace.slug, name: workspace.name, role: workspace.role },
+    // Every workspace this account is seated in, for the Workspace panel's
+    // switcher. Names and roles only — nothing from inside the others.
+    workspaces: memberships.map(m => ({ id: m.id, slug: m.slug, name: m.name, role: m.role })),
     docs,
     perfRows: rows,
   });
+}
+
+/**
+ * The documents that have moved since the caller last saw them.
+ *
+ * `since` maps a doc key to the revision the caller holds. Answers only the
+ * keys whose stored revision differs (or that the caller has never seen), so the
+ * app can poll for someone else's edits — a colleague, or Claude through the MCP
+ * connector — without re-downloading the workspace and its performance rows.
+ * Two reads rather than one so an idle poll moves revisions, not values.
+ */
+export async function handleDocs(req, res, workspace) {
+  const since = req.body?.since && typeof req.body.since === "object" ? req.body.since : {};
+  const revs = await (await pgFetch(
+    `/workspace_docs?workspace_id=eq.${workspace.id}&select=key,revision`,
+  )).json();
+  const moved = revs
+    .filter(r => DOC_KEYS.has(r.key) && Number(since[r.key]) !== Number(r.revision))
+    .map(r => r.key);
+
+  const docs = {};
+  if (moved.length) {
+    const list = moved.map(k => `"${k}"`).join(",");
+    const rows = await (await pgFetch(
+      `/workspace_docs?workspace_id=eq.${workspace.id}&key=in.(${encodeURIComponent(list)})&select=key,value,revision`,
+    )).json();
+    for (const row of rows) docs[row.key] = { value: row.value, revision: row.revision };
+  }
+  res.status(200).json({ docs });
+}
+
+/**
+ * Stage one chunk of a whole-set replace. ROADMAP 2.0's "honest hazard".
+ *
+ * The old replace deleted the workspace's rows and then inserted the new set
+ * chunk by chunk, so a chunk that failed left the table with FEWER rows than
+ * before — history gone until the next successful save. Staging inverts the
+ * order: every chunk is upserted with `imported_at` set to one server-issued
+ * batch time, and nothing is deleted until `perfCommit` removes the rows older
+ * than that batch. A failure anywhere before the commit leaves the old set plus
+ * whatever new rows landed: too many, never too few, and the next save
+ * converges. No migration needed — `imported_at` already exists.
+ *
+ * The first chunk sends no batch and receives one; the rest send it back.
+ */
+export async function handlePerfStage(req, res, workspace) {
+  const batch = req.body?.batch == null ? new Date().toISOString() : validBatch(req.body.batch);
+  if (!batch) { res.status(400).json({ error: "That import batch has expired. Save again." }); return; }
+
+  const incoming = Array.isArray(req.body?.rows) ? req.body.rows : null;
+  if (!incoming) { res.status(400).json({ error: "No rows supplied." }); return; }
+  if (incoming.length > MAX_ROWS) {
+    res.status(413).json({ error: `Send at most ${MAX_ROWS} rows per request.`, maxRows: MAX_ROWS });
+    return;
+  }
+  const rows = incoming.map(r => ({ ...toRow(workspace.id, r), imported_at: batch })).filter(r => r.row_key && r.name && r.level);
+  if (rows.length !== incoming.length) {
+    res.status(400).json({ error: "Every row needs a rowKey, a name and a level." });
+    return;
+  }
+  if (rows.length) {
+    await pgFetch(`/performance_rows?on_conflict=workspace_id,row_key`, {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify(rows),
+    });
+  }
+  res.status(200).json({ batch, written: rows.length });
+}
+
+/** Finish a staged replace: drop every row the batch did not rewrite. */
+export async function handlePerfCommit(req, res, workspace) {
+  const batch = validBatch(req.body?.batch);
+  if (!batch) { res.status(400).json({ error: "That import batch has expired. Save again." }); return; }
+  await pgFetch(
+    `/performance_rows?workspace_id=eq.${workspace.id}&imported_at=lt.${encodeURIComponent(batch)}`,
+    { method: "DELETE" },
+  );
+  const countRes = await pgFetch(
+    `/performance_rows?workspace_id=eq.${workspace.id}&select=row_key`,
+    { headers: { Prefer: "count=exact", Range: "0-0" } },
+  );
+  const total = Number(String(countRes.headers.get("content-range") || "").split("/")[1]);
+  res.status(200).json({ total: Number.isFinite(total) ? total : null });
+}
+
+/**
+ * The Workspace panel's Members list: read by anyone seated, changed only by an
+ * owner. It manages seats in THIS app's table and nothing else — it finds
+ * people who already have an account and never creates one, which stays with
+ * Supabase Auth (see WorkspacePanel.jsx). The two lookups it needs read
+ * auth.users and are service-role-only RPCs from 0008_viewer_role.sql.
+ */
+export async function handleMembers(req, res, workspace, user, action) {
+  const list = async () => (await rpc("workspace_member_list", { p_workspace: workspace.id })) || [];
+  const answer = async () => res.status(200).json({
+    members: await list(), canManage: workspace.role === "owner", you: user.id,
+  });
+
+  if (action === "members") return answer();
+
+  if (workspace.role !== "owner") {
+    res.status(403).json({ error: "Only a workspace owner can change who is in it." });
+    return;
+  }
+  const members = await list();
+  const role = req.body?.role;
+
+  if (action === "memberAdd") {
+    const email = String(req.body?.email || "").trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { res.status(400).json({ error: "Enter an email address." }); return; }
+    if (!ROLES.has(role)) { res.status(400).json({ error: "Pick a role." }); return; }
+    const userId = await rpc("workspace_user_id_by_email", { p_email: email });
+    if (!userId) {
+      res.status(404).json({ error: "No account uses that email yet. Create one in Supabase under Authentication → Users (or have them sign up), then add them here." });
+      return;
+    }
+    const existing = members.find(m => m.user_id === userId);
+    if (existing) { res.status(409).json({ error: `Already in this workspace as ${existing.role}.` }); return; }
+    await pgFetch("/workspace_members", {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ workspace_id: workspace.id, user_id: userId, role }),
+    });
+    return answer();
+  }
+
+  const userId = String(req.body?.userId || "");
+  if (!UUID.test(userId)) { res.status(400).json({ error: "Unknown member." }); return; }
+  if (!members.some(m => m.user_id === userId)) { res.status(404).json({ error: "That person is not in this workspace." }); return; }
+  const where = `/workspace_members?workspace_id=eq.${workspace.id}&user_id=eq.${userId}`;
+
+  if (action === "memberRole") {
+    if (!ROLES.has(role)) { res.status(400).json({ error: "Pick a role." }); return; }
+    if (lastOwnerBlocked(members, userId, role)) {
+      res.status(409).json({ error: "This is the only owner. Make someone else an owner first." });
+      return;
+    }
+    await pgFetch(where, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ role }) });
+    return answer();
+  }
+
+  if (action === "memberRemove") {
+    if (lastOwnerBlocked(members, userId, null)) {
+      res.status(409).json({ error: "This is the only owner. Make someone else an owner first." });
+      return;
+    }
+    await pgFetch(where, { method: "DELETE" });
+    return answer();
+  }
+
+  res.status(400).json({ error: "Unknown action." });
 }
 
 async function handleSaveDoc(req, res, workspace, user) {
@@ -276,6 +469,15 @@ async function handlePerfWrite(req, res, workspace, { replace }) {
 // -- Handler -------------------------------------------------------------------
 
 export default async function handler(req, res) {
+  // The model-routing read used to be its own function (api/routing.js). It
+  // lives behind this one now only to stay inside the Hobby plan's twelve
+  // Serverless Functions; it keeps its own guard, cache header and handler, and
+  // /api/routing still reaches it through the rewrite in vercel.json. Dispatched
+  // before this endpoint's own guard because it is a GET-only, unauthenticated
+  // read with a different body ceiling — and dispatched on the query alone, so a
+  // POST here gets the routing read's own 405 rather than falling into state.
+  if (req.query?.action === "routing") return routingHandler(req, res);
+
   if (guardEntry(req, res, { maxBodyBytes: MAX_BODY_BYTES, methods: ["GET", "POST"] })) return;
 
   const action = req.method === "GET"
@@ -320,9 +522,9 @@ export default async function handler(req, res) {
     label: "state",
   })) return;
 
-  let workspace;
+  let workspace, memberships;
   try {
-    const memberships = await membershipsFor(user.id);
+    memberships = await membershipsFor(user.id);
     const resolved = resolveWorkspace(memberships, req.body?.workspace || req.query?.workspace || null);
     if (resolved.error) {
       res.status(resolved.status).json({ error: resolved.error, ...(resolved.choices ? { choices: resolved.choices } : {}) });
@@ -335,10 +537,21 @@ export default async function handler(req, res) {
     return;
   }
 
+  if (readOnlyRefuses(workspace.role, action)) {
+    res.status(403).json({ error: "You have view-only access to this workspace, so changes are not saved.", readOnly: true });
+    return;
+  }
+
   try {
-    if (action === "load")        return await handleLoad(res, workspace);
+    if (action === "load")        return await handleLoad(res, workspace, memberships);
+    if (action === "docs")        return await handleDocs(req, res, workspace);
     if (action === "saveDoc")     return await handleSaveDoc(req, res, workspace, user);
     if (action === "performanceSummary") return await handlePerfSummary(req, res, workspace);
+    if (action === "members" || action.startsWith("member")) return await handleMembers(req, res, workspace, user, action);
+    if (action === "perfStage")   return await handlePerfStage(req, res, workspace);
+    if (action === "perfCommit")  return await handlePerfCommit(req, res, workspace);
+    // perfMerge/perfReplace are the pre-staging protocol, kept so a tab still
+    // running the previous bundle can save through a deploy.
     if (action === "perfMerge")   return await handlePerfWrite(req, res, workspace, { replace: false });
     if (action === "perfReplace") return await handlePerfWrite(req, res, workspace, { replace: true });
     res.status(400).json({ error: "Unknown action." });

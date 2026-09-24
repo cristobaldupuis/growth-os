@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Modal } from "./Modal.jsx";
 import { gG, gGh, gI, gSL } from "./styles.js";
 import { signIn, signOut, currentUser } from "../services/auth.js";
-import { uploadInitial } from "../services/remoteState.js";
+import { uploadInitial, listMembers, addMember, setMemberRole, removeMember } from "../services/remoteState.js";
+import { chooseWorkspace } from "../services/workspaceBoot.js";
 
 // -- Workspace and sign-in -----------------------------------------------------
 //
@@ -24,10 +25,94 @@ import { uploadInitial } from "../services/remoteState.js";
 //
 // ## What this panel will not do
 //
-// Sign anyone up, reset a password, or invite a colleague. Those are Supabase's
+// Sign anyone up, reset a password, or send an invitation. Those are Supabase's
 // dashboard, and putting them here would mean this app holding a flow it does not
-// own for a user table it does not manage. An operator provisions members once,
-// per client, in the same sitting they create the workspace row.
+// own for a user table it does not manage.
+//
+// What it does manage is SEATS — who is in this workspace and in which role —
+// because that table is this app's own (0005_workspace.sql). An owner adds
+// someone who already has an account, changes a role, or removes a seat; a
+// person with no account yet is pointed at Supabase to create one. The same
+// line, drawn where the data changes owner.
+//
+// ## Which workspace
+//
+// An account seated in several workspaces picks one here, and the choice is
+// remembered per browser (see chooseWorkspace). Switching reloads, for the same
+// reason signing in does: every store read happened at boot.
+
+const ROLE_HELP = {
+  owner:  "Owner — edits everything and manages members",
+  member: "Member — edits everything",
+  viewer: "Viewer — sees everything, changes nothing",
+};
+
+function Members({ t, onError }) {
+  const [state, setState] = useState(null);   // { members, canManage, you }
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState("member");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    listMembers().then(s => { if (live) setState(s); }).catch(err => { if (live) onError(err.message); });
+    return () => { live = false; };
+  }, [onError]);
+
+  const run = async (fn) => {
+    setBusy(true); onError(null);
+    try { setState(await fn()); return true; }
+    catch (err) { onError(err.message); return false; }
+    finally { setBusy(false); }
+  };
+
+  if (!state) return <div style={{fontSize:12.5,color:t.textMuted,fontFamily:t.sans,marginBottom:16}}>Loading members…</div>;
+
+  const cell = { fontSize:12.5, color:t.text, fontFamily:t.sans };
+  return (
+    <div style={{marginBottom:18}}>
+      <div style={gSL(t)}>Members</div>
+      <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:10}}>
+        {state.members.map(m => (
+          <div key={m.user_id} style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+            <span style={{...cell,flex:"1 1 180px",minWidth:0,overflow:"hidden",textOverflow:"ellipsis",fontFamily:t.mono}}>
+              {m.email}{m.user_id === state.you ? " (you)" : ""}
+            </span>
+            {state.canManage ? (
+              <>
+                <select aria-label={`Role for ${m.email}`} value={m.role} disabled={busy}
+                  onChange={e => run(() => setMemberRole(m.user_id, e.target.value))}
+                  style={{...gI(t),width:"auto",padding:"4px 8px",fontSize:12}}>
+                  {Object.keys(ROLE_HELP).map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+                <button type="button" disabled={busy} aria-label={`Remove ${m.email}`}
+                  onClick={() => { if (window.confirm(`Remove ${m.email} from this workspace?`)) run(() => removeMember(m.user_id)); }}
+                  style={{...gG(t),background:"transparent",color:t.textMuted,border:"1px solid "+t.border,padding:"4px 10px",fontSize:12}}>
+                  Remove
+                </button>
+              </>
+            ) : <span style={{...cell,color:t.textMuted}}>{m.role}</span>}
+          </div>
+        ))}
+      </div>
+      {state.canManage && (
+        <form onSubmit={async e => { e.preventDefault(); if (await run(() => addMember(email.trim(), role))) setEmail(""); }}
+          style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+          <input type="email" required placeholder="colleague@company.com" aria-label="Email of the person to add"
+            value={email} onChange={e=>setEmail(e.target.value)} style={{...gI(t),flex:"1 1 180px",minWidth:0}} />
+          <select aria-label="Role for the new member" value={role} onChange={e=>setRole(e.target.value)}
+            style={{...gI(t),width:"auto",padding:"6px 8px",fontSize:12}}>
+            {Object.keys(ROLE_HELP).map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+          <button type="submit" disabled={busy} style={gG(t)}>{busy ? "Working…" : "Add"}</button>
+          <div style={{flexBasis:"100%",fontSize:11.5,color:t.textMuted,fontFamily:t.sans,lineHeight:1.5}}>
+            {ROLE_HELP[role]}. They need an account on this deployment first.
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
 
 export function WorkspacePanel({ t, dk, boot, onClose, onReload, collectLocal }) {
   const [email, setEmail] = useState("");
@@ -36,6 +121,9 @@ export function WorkspacePanel({ t, dk, boot, onClose, onReload, collectLocal })
   const [error, setError] = useState(null);
   const user = currentUser();
   const remote = boot && boot.mode === "remote";
+  const choices = boot?.reason === "ambiguous-workspace" ? (boot.choices || [])
+    : remote && (boot.workspaces || []).length > 1 ? boot.workspaces : [];
+  const open = async (id) => { setBusy(true); chooseWorkspace(id); await onReload(); };
 
   const submit = async (e) => {
     e.preventDefault();
@@ -97,6 +185,25 @@ export function WorkspacePanel({ t, dk, boot, onClose, onReload, collectLocal })
           {error}
         </div>
       )}
+
+      {user && choices.length > 0 && (
+        <div style={{marginBottom:18}}>
+          <div style={gSL(t)}>{remote ? "Switch workspace" : "Choose a workspace"}</div>
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            {choices.map(c => {
+              const current = remote && c.id === boot.workspace?.id;
+              return (
+                <button key={c.id} type="button" disabled={busy || current} onClick={() => open(c.id)}
+                  style={{...gG(t),textAlign:"left",background:current?t.surfaceAlt:"transparent",color:t.text,border:"1px solid "+t.border}}>
+                  {c.name || c.slug || c.id}{c.role ? ` · ${c.role}` : ""}{current ? " · open" : ""}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {user && remote && <Members t={t} onError={setError} />}
 
       {!user && (
         <form onSubmit={submit}>

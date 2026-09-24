@@ -328,6 +328,13 @@ export async function callTool(ctx, name, rawArgs) {
         : "This connection does not have read access.",
     );
   }
+  // Re-checked on every call rather than trusted from the token: someone
+  // demoted to viewer after connecting keeps a write-scoped token until it
+  // expires, and the role is what verifyAccessToken just read, not what was
+  // true at mint time.
+  if (tool.scope === "write" && ctx.role === "viewer") {
+    throw new ToolError("You have view-only access to this workspace, so this tool is unavailable.");
+  }
   const args = rawArgs && typeof rawArgs === "object" ? rawArgs : {};
   return HANDLERS[name](ctx, args);
 }

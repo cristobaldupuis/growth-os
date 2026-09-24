@@ -107,6 +107,11 @@ const MIGRATIONS = [
     tables: [],
     functions: ["performance_summary"],
   },
+  {
+    file: "0008_viewer_role.sql",
+    tables: [],
+    functions: ["is_workspace_writer", "workspace_user_id_by_email", "workspace_member_list"],
+  },
 ];
 
 async function fetchOpenApiPaths() {

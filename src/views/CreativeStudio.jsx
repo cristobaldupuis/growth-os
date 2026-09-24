@@ -699,7 +699,7 @@ export function CreativeStudio({
     <div style={{ maxWidth: 1180, margin: "0 auto", padding: "0 20px 60px" }}>
 
       {/* Header */}
-      <div style={{ margin: "22px 0 18px" }}>
+      <div data-tour="creative-studio" style={{ margin: "22px 0 18px" }}>
         <h2 style={{ fontFamily: t.serif, fontSize: 24, fontWeight: 600, margin: 0, color: t.text }}>Creative Studio</h2>
         <p style={{ fontSize: 13, color: t.textSub, margin: "6px 0 0", maxWidth: 680, lineHeight: 1.6 }}>
           Brief and produce creative against an initiative, so every asset carries the experiment it belongs to.

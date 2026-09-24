@@ -25,6 +25,12 @@ import { validateBody } from "./proxy.js";
 import { adapters } from "./_adapters.js";
 import { modelById } from "../src/services/ai/registry.js";
 
+// Every upstream call is bounded below the function's own limit (debate.js runs
+// this inside a 60s function, after its own bookkeeping), so a provider that
+// hangs becomes this endpoint's error response rather than a platform kill with
+// nothing logged.
+const UPSTREAM_TIMEOUT_MS = 50000;
+
 /**
  * Send an Anthropic-shaped request body to whichever provider serves its model,
  * and return the response normalised back into the Anthropic shape.
@@ -52,6 +58,7 @@ export async function callText(body) {
   }
 
   const upstream = await fetch(adapter.endpoint(body.model), {
+    signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     method: "POST",
     headers: await adapter.headers(apiKey),
     body: JSON.stringify(adapter.toRequest(body)),

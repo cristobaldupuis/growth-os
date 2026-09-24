@@ -11,7 +11,7 @@ import { test } from "node:test";
 import {
   validateSceneBody, validateScenePollBody, buildVeoBody, extractVideo,
   ALLOWED_SCENE_MODELS, ALLOWED_ASPECTS, ALLOWED_DURATIONS, MAX_PROMPT_CHARS,
-} from "../../../api/scene.js";
+} from "../../../api/_scene.js";
 import {
   callGenerateScene, pollSceneJob, buildScenePrompt, estimateSceneCostUsd,
   SCENE_ASPECTS, SCENE_DURATIONS, DEFAULT_SCENE_DURATION,

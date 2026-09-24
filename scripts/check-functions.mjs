@@ -88,6 +88,24 @@ const count = files.length;
 console.log(`Serverless Functions this deployment would create: ${count} of ${LIMIT}`);
 for (const f of files) console.log(`  ${f}`);
 
+// vercel.json's `functions` block has to agree with the files, in both
+// directions. A key naming a file that no longer exists fails the deployment
+// outright ("pattern doesn't match any Serverless Functions"); a routable file
+// with no key silently runs on the platform defaults — 10s and 1024MB on Hobby —
+// which is how api/voice.js and api/scene.js shipped: a timeout on the slowest
+// calls in the app, at four to eight times the memory of every tuned function.
+const VERCEL_JSON = join(ROOT, "vercel.json");
+if (existsSync(VERCEL_JSON)) {
+  const configured = Object.keys(JSON.parse(readFileSync(VERCEL_JSON, "utf8")).functions || {});
+  const stale = configured.filter(k => !files.includes(k));
+  const unconfigured = files.filter(f => !configured.includes(f));
+  if (stale.length || unconfigured.length) {
+    if (stale.length) console.error(`\nFAIL: vercel.json configures functions that do not exist: ${stale.join(", ")}`);
+    if (unconfigured.length) console.error(`\nFAIL: functions with no memory/maxDuration in vercel.json (they would run on platform defaults): ${unconfigured.join(", ")}`);
+    process.exit(1);
+  }
+}
+
 if (count > LIMIT) {
   console.error(
     `\nFAIL: ${count} functions exceeds the ${LIMIT} this plan allows, so the deployment will be ` +

@@ -124,3 +124,20 @@ test("update_initiative's schema names exactly the keys the handler allows", () 
   const tool = TOOLS.find((t) => t.name === "update_initiative");
   for (const key of ALLOWED_PATCH_KEYS) assert.match(tool.inputSchema.properties.patch.description, new RegExp(key));
 });
+
+// -- Viewer role (0008_viewer_role.sql) ------------------------------------------
+
+test("callTool refuses a write tool to a viewer even on a write-scoped token", async () => {
+  // A member demoted to viewer after connecting still holds a write-scoped token
+  // until it expires; the role read on this call is what decides.
+  const viewer = { ...ctx("read write"), role: "viewer" };
+  await assert.rejects(() => callTool(viewer, "update_initiative", { id: "x", patch: {} }), /view-only/);
+  await assert.rejects(() => callTool(viewer, "create_initiative", {}), /view-only/);
+});
+
+test("a viewer's token is capped at read scope when it is minted", async () => {
+  const { scopeForRole } = await import("./_oauth.js");
+  assert.equal(scopeForRole("read write", "viewer"), "read");
+  assert.equal(scopeForRole("read write", "member"), "read write");
+  assert.equal(scopeForRole("read write", "owner"), "read write");
+});

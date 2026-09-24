@@ -29,6 +29,12 @@
 
 import { createSign } from "node:crypto";
 
+// Every upstream call is bounded below the function's own limit (a token
+// exchange, ahead of the call it authorises), so a provider that hangs becomes
+// this endpoint's error response rather than a platform kill with nothing
+// logged.
+const UPSTREAM_TIMEOUT_MS = 8000;
+
 const GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/models";
 const TOKEN_URI = "https://oauth2.googleapis.com/token";
 const VERTEX_SCOPE = "https://www.googleapis.com/auth/cloud-platform";
@@ -128,6 +134,7 @@ function signVertexJwt(signingInput, privateKeyPem) {
 
 async function exchangeAssertion(assertion) {
   const res = await fetch(TOKEN_URI, {
+    signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({

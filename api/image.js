@@ -27,6 +27,11 @@
 import { guardEntry, guardRateLimit, rateLimitIdentity, dailyCap } from "./_guard.js";
 import { geminiConfigured, geminiEndpoint, geminiAuthHeaders } from "./_geminiAuth.js";
 
+// Every upstream call is bounded below the function's own limit (function
+// maxDuration is 60s), so a provider that hangs becomes this endpoint's error
+// response rather than a platform kill with nothing logged.
+const UPSTREAM_TIMEOUT_MS = 55000;
+
 // Image models this app actually calls. "Nano Banana" is the community name for
 // Gemini 2.5 Flash Image; the Pro tier is the Gemini 3 image preview.
 export const ALLOWED_IMAGE_MODELS = new Set([
@@ -150,6 +155,7 @@ export default async function handler(req, res) {
 
   try {
     const upstream = await fetch(geminiEndpoint(req.body.model), {
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
       method: "POST",
       headers: await geminiAuthHeaders(),
       body: JSON.stringify(buildGeminiBody(req.body)),

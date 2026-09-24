@@ -46,12 +46,12 @@ import { killGateBlocked } from "./services/killGate.js";
 
 // -- Deferred views ------------------------------------------------------------
 //
-// Four views the app does not need to boot. Each is reached by a deliberate
-// click — a nav item or the Signal button — never on first paint, and none is
-// anchored by a guided-tour step, which is the constraint that decides what can
-// move here. The tour polls ~40 frames for its target before falling back to a
-// centred card, so putting a tour-anchored view behind a network fetch would
-// quietly degrade the demo on a slow connection rather than fail loudly.
+// Views the app does not need to boot. Each is reached by a deliberate click —
+// a nav item or the Signal button — never on first paint. Three of them are
+// anchored by guided-tour steps (Performance, Creative Studio, Summary), and
+// the tour polls only ~40 frames for its target before falling back to a
+// centred card, so each of those has its loader hoisted and warmed the moment
+// the tour opens (see the effect beside `showTour`).
 // DashView stays eager for the same reason in reverse: it IS first paint.
 //
 // Named exports, so each needs the default-shape adapter React.lazy expects.
@@ -65,10 +65,13 @@ import { killGateBlocked } from "./services/killGate.js";
 // means the module is already resolved several steps before it is needed.
 const loadPerformanceView = () => import("./views/PerformanceView.jsx");
 
-const CreativeStudio    = lazy(() => import("./views/CreativeStudio.jsx").then(m => ({ default: m.CreativeStudio })));
+const loadCreativeStudio    = () => import("./views/CreativeStudio.jsx");
+const loadClientReadoutView = () => import("./views/ClientReadoutView.jsx");
+
+const CreativeStudio    = lazy(() => loadCreativeStudio().then(m => ({ default: m.CreativeStudio })));
 const PerformanceView   = lazy(() => loadPerformanceView().then(m => ({ default: m.PerformanceView })));
 const CopilotPanel      = lazy(() => import("./views/CopilotPanel.jsx").then(m => ({ default: m.CopilotPanel })));
-const ClientReadoutView = lazy(() => import("./views/ClientReadoutView.jsx").then(m => ({ default: m.ClientReadoutView })));
+const ClientReadoutView = lazy(() => loadClientReadoutView().then(m => ({ default: m.ClientReadoutView })));
 const SettingsView      = lazy(() => import("./views/SettingsView.jsx").then(m => ({ default: m.SettingsView })));
 import { applyRouting } from "./services/ai/models.js";
 import { onUsage } from "./services/ai/_shared.js";
@@ -197,7 +200,7 @@ const GUIDE_SECTIONS = [
     views: ["performance"],
     label: "Read performance through the ad names",
     feature: "Performance + naming convention",
-    what: "Import a campaign-level export from Meta or Google and every ad name is parsed back through your naming convention. Spend and conversions pivot by any dimension the name carries, and any ad whose name ends in an initiative's tracking tag is joined to it automatically. The convention itself is documented here too.",
+    what: "Import a campaign-level export from Meta or Google — or, where Klaviyo is connected, sync its flow performance from the same Import dialog — and every name is parsed back through your naming convention. Spend and conversions pivot by any dimension the name carries, and any ad whose name ends in an initiative's tracking tag is joined to it automatically. Synced and imported rows share one identity, so re-syncing replaces rather than duplicates. The convention itself is documented here too.",
     why: "A naming convention is the cheapest attribution layer that exists — it turns any performance export into a dimensional fact table with no API integration, and it is what closes the loop between a creative brief and what the creative actually did.",
     cta: "Open Performance",
     action: "performance",
@@ -211,6 +214,16 @@ const GUIDE_SECTIONS = [
     why: "Keeps the portfolio moving and gives the standup its agenda.",
     cta: "Open Triage",
     action: "triage",
+  },
+  {
+    id: "workspace",
+    views: ["settings"],
+    label: "Work on it together",
+    feature: "Workspace, members & the Claude connector",
+    what: "Sign in and the portfolio lives on the server rather than in this browser. An account in several client workspaces switches between them here. Owners add colleagues who already have an account as owner, member or viewer — a viewer sees everything and can change nothing. Edits made elsewhere, by a colleague or by Claude through the MCP connector at /api/mcp, merge into what you have open rather than overwriting it.",
+    why: "One source of truth per client that the whole team, the client's own people, and Claude can all work from — with the client's seat read-only by construction, not by convention.",
+    cta: "Open Workspace",
+    action: "workspace",
   },
   {
     id: "data",
@@ -697,11 +710,16 @@ export default function App() {
 
   // Guided tour (demo mode only). See components/GuidedTour.jsx
   const [showTour,   setShowTour]   = useState(false);
-  // The tour walks through Performance, which is a deferred chunk. Start
-  // fetching it the moment the tour opens — four steps before it is needed —
-  // so the step never races its own module. Idempotent: the dynamic import
-  // resolves from the module cache on every call after the first.
-  useEffect(() => { if (showTour) loadPerformanceView(); }, [showTour]);
+  // The tour walks through Performance, Creative Studio and Summary, all
+  // deferred chunks. Start fetching them the moment the tour opens — several
+  // steps before each is needed — so no step races its own module.
+  // Idempotent: a dynamic import resolves from the module cache after the first.
+  useEffect(() => {
+    if (!showTour) return;
+    loadPerformanceView();
+    loadCreativeStudio();
+    loadClientReadoutView();
+  }, [showTour]);
   const [tourStep,   setTourStep]   = useState(0);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   // Mobile only. The sidebar is a permanent column above 900px and a drawer
@@ -2413,8 +2431,9 @@ export default function App() {
           nav={nav}
           onNavigate={(action)=>{
             setGuideSection(null);
-            if(action==="signal")        setShowCopilot(true);
-            else if(action==="settings") requestNav("settings");
+            if(action==="signal")         setShowCopilot(true);
+            else if(action==="workspace") setShowWorkspace(true);
+            else if(action==="settings")  requestNav("settings");
             else                         setNav(action); // dashboard | library | initiatives | triage
           }}/>
       )}

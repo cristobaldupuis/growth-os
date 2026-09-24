@@ -745,13 +745,13 @@ export function CreativeStudio({
             }}>
               {tag ? (
                 <div style={{ fontSize: 12.5, color: t.text }}>
-                  Tracking tag <code style={{ fontFamily: t.mono, fontWeight: 700 }}>{tag}</code> — every ad name below ends with it,
+                  Tracking tag <code style={{ fontFamily: t.sans, fontWeight: 700 }}>{tag}</code> — every ad name below ends with it,
                   so performance rows carrying this tag join back to this initiative.
                 </div>
               ) : (
                 <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
                   <div style={{ fontSize: 12.5, color: t.text, flex: "1 1 340px" }}>
-                    No tracking tag set. Assets will be named <code style={{ fontFamily: t.mono }}>…{schema.delimiter}{schema.placeholder || NA}</code> and
+                    No tracking tag set. Assets will be named <code style={{ fontFamily: t.sans }}>…{schema.delimiter}{schema.placeholder || NA}</code> and
                     will not attribute back to this initiative.
                   </div>
                   <button onClick={assignTag} style={gG(t)}>Assign {suggestTrackingTag(sel, schema)}</button>
@@ -795,7 +795,7 @@ export function CreativeStudio({
               <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit,minmax(250px,1fr))", marginBottom: 16 }}>
                 {(brief.angles || []).map((a, i) => (
                   <div key={i} style={{ background: t.surfaceAlt, border: "1px solid " + t.border, borderRadius: 11, padding: "12px 14px" }}>
-                    <div style={{ fontFamily: t.mono, fontSize: 11, color: t.gold, fontWeight: 700, letterSpacing: "0.04em" }}>{a.slug}</div>
+                    <div style={{ fontFamily: t.sans, fontSize: 11, color: t.gold, fontWeight: 700, letterSpacing: "0.04em" }}>{a.slug}</div>
                     <div style={{ fontFamily: t.serif, fontSize: 14, fontWeight: 600, color: t.text, margin: "3px 0 6px" }}>{a.label}</div>
                     <div style={{ fontSize: 12.5, color: t.textSub, lineHeight: 1.55, marginBottom: 7 }}>{a.theory}</div>
                     <div style={{ fontSize: 12, color: t.textMuted, lineHeight: 1.55 }}>{a.execution}</div>
@@ -847,7 +847,7 @@ export function CreativeStudio({
           <div style={{ ...gCd(t), marginBottom: 14, display:"flex", gap:16, flexWrap:"wrap", alignItems:"baseline" }}>
             {spend.count > 0 && (
               <div style={{ fontSize:12, color:t.textSub, fontFamily:t.sans }}>
-                <strong style={{ color:t.text, fontFamily:t.mono }}>{usd(spend.usd)}</strong> to produce{" "}
+                <strong style={{ color:t.text, fontFamily:t.sans }}>{usd(spend.usd)}</strong> to produce{" "}
                 {spend.count} asset{spend.count === 1 ? "" : "s"} for this initiative
                 {spend.unpriced > 0 && (
                   <span style={{ color:t.textMuted }}>
@@ -942,7 +942,7 @@ export function CreativeStudio({
 
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", alignItems: "baseline" }}>
                     <div style={{ fontFamily: t.serif, fontSize: 15, fontWeight: 600, color: t.text }}>{v.label}</div>
-                    <div style={{ fontFamily: t.mono, fontSize: 10.5, color: t.textMuted, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                    <div style={{ fontFamily: t.sans, fontSize:12, color: t.textMuted}}>
                       {v.angleSlug}{v.varies ? " · varies: " + v.varies : ""}
                     </div>
                   </div>
@@ -991,7 +991,7 @@ export function CreativeStudio({
 
                     {promptPreview?.idx === i && (
                       <pre style={{ margin:"9px 0 0", padding:"9px 10px", background:t.surfaceAlt, border:"1px solid "+t.border,
-                        borderRadius:8, fontSize:11, fontFamily:t.mono, color:t.textSub, whiteSpace:"pre-wrap", lineHeight:1.5, maxHeight:210, overflowY:"auto" }}>
+                        borderRadius:8, fontSize:11, fontFamily:t.sans, color:t.textSub, whiteSpace:"pre-wrap", lineHeight:1.5, maxHeight:210, overflowY:"auto" }}>
                         {promptPreview.text}
                       </pre>
                     )}
@@ -1016,12 +1016,12 @@ export function CreativeStudio({
                             model and ad name are recorded. Regenerate to get the frame back.
                           </div>
                         )}
-                        <div style={{ fontSize:10.5, color:t.textMuted, fontFamily:t.mono, marginTop:6 }}>
+                        <div style={{ fontSize:10.5, color:t.textMuted, fontFamily:t.sans, marginTop:6 }}>
                           {shot.aspect} · {shot.costUsd != null ? usd(shot.costUsd) : "cost not recorded"} ·{" "}
                           {shot.bytesDurable ? "stored" : "this session only — download to keep it"}
                         </div>
                         {shot.adName && (
-                          <div style={{ fontSize:10.5, color:t.textMuted, fontFamily:t.mono, marginTop:3, wordBreak:"break-all" }}>
+                          <div style={{ fontSize:10.5, color:t.textMuted, fontFamily:t.sans, marginTop:3, wordBreak:"break-all" }}>
                             {shot.adName}
                           </div>
                         )}
@@ -1088,7 +1088,7 @@ export function CreativeStudio({
 
                         {/* Priced before spend, all tiers, so the difference is
                             legible rather than something you learn afterwards. */}
-                        <div style={{ marginTop:8, fontSize:11, fontFamily:t.mono, color:t.textMuted, display:"flex", gap:10, flexWrap:"wrap" }}>
+                        <div style={{ marginTop:8, fontSize:11, fontFamily:t.sans, color:t.textMuted, display:"flex", gap:10, flexWrap:"wrap" }}>
                           <span>~{Math.round(seconds)}s spoken</span>
                           {VIDEO_TIER_LIST.map(x => (
                             <span key={x.key} style={{ color: x.key === tierKey ? t.gold : t.textMuted, fontWeight: x.key === tierKey ? 700 : 400 }}>
@@ -1116,7 +1116,7 @@ export function CreativeStudio({
                         {auditions[i] && (
                           <div style={{ marginTop:9 }}>
                             <audio src={auditions[i].url} controls style={{ width:"100%", maxWidth:320, display:"block" }} />
-                            <div style={{ fontSize:10.5, color:t.textMuted, fontFamily:t.mono, marginTop:5 }}>
+                            <div style={{ fontSize:10.5, color:t.textMuted, fontFamily:t.sans, marginTop:5 }}>
                               audition · {usd(auditions[i].costUsd || 0).replace("$0.00", "<$0.01")} · not kept on reload
                             </div>
                           </div>
@@ -1161,7 +1161,7 @@ export function CreativeStudio({
                                 longer held here — collect it from the provider's dashboard, or regenerate.
                               </div>
                             )}
-                            <div style={{ fontSize:10.5, color:t.textMuted, fontFamily:t.mono, marginTop:6 }}>
+                            <div style={{ fontSize:10.5, color:t.textMuted, fontFamily:t.sans, marginTop:6 }}>
                               {job.provider} · {job.durationSeconds ? Math.round(job.durationSeconds) + "s" : "~" + Math.round(seconds) + "s est."} · ~{usd(job.costUsd || 0)}
                             </div>
                           </div>
@@ -1215,7 +1215,7 @@ export function CreativeStudio({
                         {/* Priced before spend, like the render tiers above. The
                             duration select is the lever, so the number moves when
                             the operator moves it rather than after they commit. */}
-                        <div style={{ marginTop:8, fontSize:11, fontFamily:t.mono, color:t.textMuted, display:"flex", gap:10, flexWrap:"wrap" }}>
+                        <div style={{ marginTop:8, fontSize:11, fontFamily:t.sans, color:t.textMuted, display:"flex", gap:10, flexWrap:"wrap" }}>
                           <span>{sceneDur}s clip</span>
                           <span style={{ color:t.gold, fontWeight:700 }}>
                             · {sceneCost === null ? "unpriced" : usd(sceneCost)}
@@ -1261,7 +1261,7 @@ export function CreativeStudio({
                                 Generated {fmtDate(clip.createdAt, settings)}. The clip is not held here{clip.providerUrl ? ` — collect it from ${clip.providerUrl}` : ""}.
                               </div>
                             )}
-                            <div style={{ fontSize:10.5, color:t.textMuted, fontFamily:t.mono, marginTop:6 }}>
+                            <div style={{ fontSize:10.5, color:t.textMuted, fontFamily:t.sans, marginTop:6 }}>
                               {clip.model} · {clip.durationSeconds || sceneDur}s · ~{usd(clip.costUsd || 0)}
                             </div>
                           </div>
@@ -1289,11 +1289,11 @@ export function CreativeStudio({
                       const value = isInit ? (tag || (schema.placeholder || NA)) : (values[seg.key] || "");
                       return (
                         <div key={seg.key}>
-                          <label style={{ fontSize: 10, fontFamily: t.mono, color: t.textMuted, letterSpacing: "0.06em", textTransform: "uppercase", display: "block", marginBottom: 3 }}>
+                          <label style={{ fontSize:12, fontFamily: t.sans, color: t.textMuted, display: "block", marginBottom: 3 }}>
                             {seg.label}
                           </label>
                           {isInit ? (
-                            <div style={{ ...gI(t), background: t.surfaceAlt, color: t.textMuted, fontFamily: t.mono, fontSize: 12, cursor: "not-allowed" }} title="Set from the initiative's tracking tag">
+                            <div style={{ ...gI(t), background: t.surfaceAlt, color: t.textMuted, fontFamily: t.sans, fontSize: 12, cursor: "not-allowed" }} title="Set from the initiative's tracking tag">
                               {value}
                             </div>
                           ) : seg.vocab ? (
@@ -1304,7 +1304,7 @@ export function CreativeStudio({
                             </select>
                           ) : (
                             <input value={value} onChange={e => setEdits({ ...edits, [i]: { ...(edits[i] || {}), [seg.key]: e.target.value } })}
-                              style={{ ...gI(t), fontSize: 12, padding: "6px 8px", fontFamily: t.mono }} />
+                              style={{ ...gI(t), fontSize: 12, padding: "6px 8px", fontFamily: t.sans }} />
                           )}
                         </div>
                       );
@@ -1318,11 +1318,11 @@ export function CreativeStudio({
                     {nameSet.map(n => (
                       <div key={n.level}>
                         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                          <div style={{ fontFamily: t.mono, fontSize: 9.5, letterSpacing: "0.09em", textTransform: "uppercase", color: t.textMuted, minWidth: 62 }}>
+                          <div style={{ fontFamily: t.sans, fontSize:12, color: t.textMuted, minWidth: 62 }}>
                             {n.label}
                           </div>
                           <div style={{
-                            flex: 1, fontFamily: t.mono, fontSize: 11.5, wordBreak: "break-all",
+                            flex: 1, fontFamily: t.sans, fontSize: 11.5, wordBreak: "break-all",
                             padding: "8px 10px", borderRadius: 8, background: t.surface,
                             border: "1px solid " + (n.errors.length ? t.warnBorder : t.border), color: t.text,
                           }}>
@@ -1343,7 +1343,7 @@ export function CreativeStudio({
           </div>
 
           {record?.generatedAt && (
-            <div style={{ fontSize: 11, color: t.textMuted, fontFamily: t.mono, marginTop: 14 }}>
+            <div style={{ fontSize: 11, color: t.textMuted, fontFamily: t.sans, marginTop: 14 }}>
               Last generated {fmtDate(record.generatedAt.slice(0, 10))}
             </div>
           )}

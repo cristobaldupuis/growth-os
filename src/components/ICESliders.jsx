@@ -13,7 +13,7 @@ export function ICESliders({ice,onChange,t}) {
         <div key={d.key}>
           <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
             <span style={{fontSize:12,color:t.textSub,fontFamily:t.serif}}>{d.label}</span>
-            <span style={{fontSize:12,fontWeight:700,color:t.gold,fontFamily:t.mono}}>{(ice&&ice[d.key])||0}</span>
+            <span style={{fontSize:12,fontWeight:700,color:t.gold,fontFamily:t.sans}}>{(ice&&ice[d.key])||0}</span>
           </div>
           <input type="range" min={1} max={10} step={1} value={(ice&&ice[d.key])||5}
             onChange={e=>onChange({...ice,[d.key]:parseInt(e.target.value)})} style={{width:"100%"}}/>
@@ -22,8 +22,8 @@ export function ICESliders({ice,onChange,t}) {
       ))}
       <div style={{display:"flex",alignItems:"center",gap:8,paddingTop:4,borderTop:"1px solid "+t.border}}>
         <span style={{fontSize:12,color:t.textMuted,fontFamily:t.serif}}>ICE Score:</span>
-        <span style={{fontSize:18,fontWeight:700,fontFamily:t.mono,color:score!==null?iceColor(score,t):t.textMuted}}>{score!==null?score:"—"}</span>
-        <span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>/100</span>
+        <span style={{fontSize:18,fontWeight:700,fontFamily:t.sans,color:score!==null?iceColor(score,t):t.textMuted}}>{score!==null?score:"—"}</span>
+        <span style={{fontSize:11,color:t.textMuted,fontFamily:t.sans}}>/100</span>
       </div>
     </div>
   );

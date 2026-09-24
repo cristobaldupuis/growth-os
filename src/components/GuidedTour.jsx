@@ -100,7 +100,7 @@ function TourSpotlight({ t, dk, stepIndex, step, isLast, onBack, onNext, onSkip,
       <div role="dialog" aria-modal="true" aria-label={"Tour step " + (stepIndex+1) + " of " + TOUR_STEPS.length + ": " + step.title}
         style={{...cardStyle, background:t.surface, border:"1px solid "+t.goldBorder, borderRadius:t.r.lg, padding:"16px 18px", boxShadow:t.shadowHi}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-          <span style={{fontSize:10,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color:t.gold,fontFamily:t.mono}}>
+          <span style={{fontSize:12,fontWeight:600,color:t.gold,fontFamily:t.sans}}>
             {stepIndex+1} of {TOUR_STEPS.length}
           </span>
           <button onClick={onSkip} style={{background:"none",border:"none",color:t.textMuted,cursor:"pointer",fontSize:11,fontFamily:t.sans,textDecoration:"underline",padding:0}}>

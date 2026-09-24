@@ -48,7 +48,7 @@ export function renderCitedText(text, idResolver, onCite, t) {
     if (!item) return <span key={i}>{part}</span>;
     return (
       <button key={i} onClick={()=>onCite(item)} title={item.title}
-        style={{display:"inline",padding:"0 4px",margin:"0 1px",fontSize:"0.82em",fontWeight:700,fontFamily:t.mono,
+        style={{display:"inline",padding:"0 4px",margin:"0 1px",fontSize:"0.82em",fontWeight:700,fontFamily:t.sans,
           color:t.gold,background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:4,cursor:"pointer",lineHeight:1.4,verticalAlign:"baseline"}}>
         {item.initId || m[1].trim()}
       </button>

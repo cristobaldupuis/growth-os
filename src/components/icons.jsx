@@ -81,6 +81,14 @@ export const IconEdit = (p) => <Icon {...p}><path d="M11.2 2.6l2.2 2.2-7.5 7.5-2
 export const IconCopy = (p) => <Icon {...p}><rect x="5.6" y="5.6" width="7.6" height="7.6" rx="1.3"/><path d="M10.4 5.6V4a1.2 1.2 0 00-1.2-1.2H4a1.2 1.2 0 00-1.2 1.2v5.2A1.2 1.2 0 004 10.4h1.6"/></Icon>;
 export const IconUpload = (p) => <Icon {...p}><path d="M8 10.8V2.6M4.8 5.8L8 2.6l3.2 3.2M2.8 10.5v1.9a1 1 0 001 1h8.4a1 1 0 001-1v-1.9"/></Icon>;
 export const IconDownload = (p) => <Icon {...p}><path d="M8 2.6v8.2M4.8 7.6L8 10.8l3.2-3.2M2.8 10.5v1.9a1 1 0 001 1h8.4a1 1 0 001-1v-1.9"/></Icon>;
+export const IconDashboard = (p) => <Icon {...p}><rect x="2.3" y="2.3" width="4.9" height="6.3" rx="1"/><rect x="8.8" y="2.3" width="4.9" height="3.6" rx="1"/><rect x="8.8" y="7.5" width="4.9" height="6.2" rx="1"/><rect x="2.3" y="10.2" width="4.9" height="3.5" rx="1"/></Icon>;
+export const IconBook = (p) => <Icon {...p}><path d="M8 4.6v9"/><path d="M2.3 11.9V3.2a.6.6 0 01.6-.6h3.1A2 2 0 018 4.6a2 2 0 012-2h3.1a.6.6 0 01.6.6v8.7a.6.6 0 01-.6.6H9.8A1.8 1.8 0 008 13.6a1.8 1.8 0 00-1.8-1.1H2.9a.6.6 0 01-.6-.6z"/></Icon>;
+export const IconLineChart = (p) => <Icon {...p}><path d="M2.3 2.3v10.4a1 1 0 001 1h10.4"/><path d="M13 5.8L9.6 9.2 7 6.6 4.9 8.7"/></Icon>;
+export const IconInbox = (p) => <Icon {...p}><path d="M14 8.6H10.4L9.2 10.4H6.8L5.6 8.6H2"/><path d="M4.1 3.7L2 8.6v3.7a1 1 0 001 1h10a1 1 0 001-1V8.6l-2.1-4.9a1 1 0 00-.9-.6H5a1 1 0 00-.9.6z"/></Icon>;
+export const IconImage = (p) => <Icon {...p}><rect x="2.3" y="2.3" width="11.4" height="11.4" rx="1.4"/><circle cx="6" cy="6" r="1.2"/><path d="M13.7 10L11.4 7.7a1 1 0 00-1.4 0L4.4 13.7"/></Icon>;
+export const IconFileText = (p) => <Icon {...p}><path d="M9.6 1.9H4.3a1 1 0 00-1 1v10.2a1 1 0 001 1h7.4a1 1 0 001-1V5z"/><path d="M9.4 1.9V5h3.2M10.4 8.6H5.6M10.4 11H5.6M6.8 6.2H5.6"/></Icon>;
+export const IconChevronsUpDown = (p) => <Icon {...p}><path d="M5 10l3 3 3-3M5 6l3-3 3 3"/></Icon>;
+export const IconSliders = (p) => <Icon {...p}><path d="M2.5 4.5h6.6M12.9 4.5h.6M2.5 11.5h.6M6.9 11.5h6.6"/><circle cx="11" cy="4.5" r="1.9"/><circle cx="5" cy="11.5" r="1.9"/></Icon>;
 export const IconImport = (p) => <Icon {...p}><path d="M4.5 2.7v10.6M2.2 5l2.3-2.3L6.8 5M11.5 13.3V2.7M9.2 11l2.3 2.3L13.8 11"/></Icon>;
 
 /* -- Status and semantics --------------------------------------------------- */

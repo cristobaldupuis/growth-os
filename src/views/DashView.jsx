@@ -7,7 +7,7 @@ import { Spark } from "../components/Spark.jsx";
 import { WeeklyStandupModal } from "../components/WeeklyStandupModal.jsx";
 import { buildCrossBrandTransfers } from "../services/portfolio.js";
 import { renderProse } from "../components/text.jsx";
-import { IconImport, IconPlus, IconChart, IconBolt, IconAlert, IconChevronDown, IconChevronRight, IconCopy, IconSparkle, IconSpinner, IconDiamond, IconTrendUp, IconTrendDown, IconCheck, IconClose } from "../components/icons.jsx";
+import { IconImport, IconPlus, IconChart, IconAlert, IconChevronDown, IconChevronRight, IconCopy, IconSparkle, IconSpinner, IconDiamond, IconTrendUp, IconTrendDown, IconCheck, IconClose } from "../components/icons.jsx";
 
 // -- Weekly Pulse --------------------------------------------------------------
 function WeeklyPulseSection({t, brands, weeklyMetrics, onLog, onImport}) {
@@ -68,7 +68,7 @@ function WeeklyPulseSection({t, brands, weeklyMetrics, onLog, onImport}) {
     if (typeof d !== "number" || !isFinite(d)) return null;
     const pos = d >= 0;
     return (
-      <span style={{display:"inline-flex",alignItems:"center",gap:2,fontSize:10,fontWeight:600,fontFamily:t.mono,color:pos?t.teal:t.red,marginLeft:4,verticalAlign:"-1px"}}>
+      <span style={{display:"inline-flex",alignItems:"center",gap:2,fontSize:12,fontWeight:500,fontFamily:t.sans,color:pos?t.teal:t.red,marginLeft:6,verticalAlign:"-1px"}}>
         {pos?<IconTrendUp size={10}/>:<IconTrendDown size={10}/>}{Math.abs(d).toFixed(1)}%
       </span>
     );
@@ -87,9 +87,9 @@ function WeeklyPulseSection({t, brands, weeklyMetrics, onLog, onImport}) {
             style={{background:"none",border:"none",cursor:"pointer",color:t.textMuted,padding:0,lineHeight:1,display:"inline-flex"}}>
             {expanded?<IconChevronDown size={14}/>:<IconChevronRight size={14}/>}
           </button>
-          <span style={{fontSize:11,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono}}>Weekly Pulse</span>
+          <span style={{fontSize:15,fontWeight:600,color:t.text,fontFamily:t.sans,letterSpacing:"-0.01em"}}>Weekly pulse</span>
           {!isEmpty && (
-            <span style={{fontSize:10,padding:"2px 7px",borderRadius:3,background:stalenessBg,border:"1px solid "+stalenessBorder,color:stalenessColor,fontFamily:t.sans,fontWeight:600}}>
+            <span style={{fontSize:12,padding:"2px 8px",borderRadius:t.r.pill,background:stalenessBg,border:"1px solid "+stalenessBorder,color:stalenessColor,fontFamily:t.sans,fontWeight:500}}>
               {isStale && <IconAlert size={11} style={{display:"inline-block",verticalAlign:"-1px",marginRight:4}}/>}
               {renderProse(isStale ? `Last logged ${daysSince}d ago` : `Updated ${daysSince===0?"today":daysSince+"d ago"}`)}
             </span>
@@ -117,42 +117,42 @@ function WeeklyPulseSection({t, brands, weeklyMetrics, onLog, onImport}) {
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
               {/* Revenue sparkline strip */}
               {revenueByWeek.some(v=>v>0) && (
-                <div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:t.surfaceAlt,borderRadius:5}}>
-                  <span style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,minWidth:60}}>Revenue</span>
-                  <Spark vals={revenueByWeek} color={t.gold} w={100} h={24}/>
-                  <span style={{fontSize:11,fontWeight:700,color:t.gold,fontFamily:t.mono,marginLeft:4}}>
+                <div style={{display:"flex",alignItems:"center",gap:14,padding:"12px 14px",background:t.surfaceAlt,borderRadius:t.r.md}}>
+                  <span style={{fontSize:12.5,color:t.textMuted,fontFamily:t.sans}}>Revenue</span>
+                  <Spark vals={revenueByWeek} color={t.gold} w={180} h={32}/>
+                  <span style={{fontSize:16,fontWeight:600,color:t.text,fontFamily:t.sans,letterSpacing:"-0.01em"}}>
                     {fmtCur(revenueByWeek[revenueByWeek.length-1])}
                   </span>
-                  <span style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginLeft:"auto"}}>last <span style={{fontFamily:t.mono}}>{weeks.length}</span> entries</span>
+                  <span style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,marginLeft:"auto"}}>last <span style={{fontFamily:t.sans}}>{weeks.length}</span> entries</span>
                 </div>
               )}
 
               {/* Summary table */}
               <div style={{overflowX:"auto"}}>
-                <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,fontFamily:t.mono}}>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:13,fontFamily:t.sans}}>
                   <thead>
-                    <tr style={{borderBottom:"1px solid "+t.border}}>
+                    <tr style={{borderBottom:"1px solid "+t.borderSoft}}>
                       {["Brand","Date","Source","Revenue","Spend","ROAS","CVR"].map(h=>(
-                        <th key={h} style={{textAlign:"left",padding:"4px 8px",color:t.textMuted,fontWeight:600,letterSpacing:"0.05em",fontSize:10,textTransform:"uppercase",whiteSpace:"nowrap"}}>{h}</th>
+                        <th key={h} style={{textAlign:"left",padding:"8px 8px",color:t.textMuted,fontWeight:500,fontSize:12,whiteSpace:"nowrap"}}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {summaryRows.map((row,i)=>(
-                      <tr key={i} style={{borderBottom:"1px solid "+t.border,opacity:row.date?1:0.4}}>
-                        <td style={{padding:"6px 8px",color:t.text,fontWeight:600,whiteSpace:"nowrap"}}>{row.brand}</td>
-                        <td style={{padding:"6px 8px",color:t.textMuted,whiteSpace:"nowrap"}}>{row.date?fmtDate(row.date):"—"}</td>
-                        <td style={{padding:"6px 8px",color:t.textMuted,whiteSpace:"nowrap"}}>
+                      <tr key={i} style={{borderBottom:"1px solid "+t.borderSoft,opacity:row.date?1:0.4}}>
+                        <td style={{padding:"11px 8px",color:t.text,fontWeight:500,whiteSpace:"nowrap"}}>{row.brand}</td>
+                        <td style={{padding:"11px 8px",color:t.textMuted,whiteSpace:"nowrap"}}>{row.date?fmtDate(row.date):"—"}</td>
+                        <td style={{padding:"11px 8px",color:t.textMuted,whiteSpace:"nowrap"}}>
                           {row.source ? (METRIC_SOURCES.find(s=>s.id===row.source)?.label||row.source) : "—"}
                         </td>
-                        <td style={{padding:"6px 8px",color:t.gold,fontWeight:700,whiteSpace:"nowrap"}}>
+                        <td style={{padding:"11px 8px",color:t.text,fontWeight:600,whiteSpace:"nowrap"}}>
                           {row.revenue!=null?fmtCur(row.revenue):"—"}{deltaEl(row.revDelta)}
                         </td>
-                        <td style={{padding:"6px 8px",color:t.textSub,whiteSpace:"nowrap"}}>{row.spend!=null?fmtCur(row.spend):"—"}</td>
-                        <td style={{padding:"6px 8px",color:t.textSub,whiteSpace:"nowrap"}}>
+                        <td style={{padding:"11px 8px",color:t.textSub,whiteSpace:"nowrap"}}>{row.spend!=null?fmtCur(row.spend):"—"}</td>
+                        <td style={{padding:"11px 8px",color:t.textSub,whiteSpace:"nowrap"}}>
                           {row.roas!=null?row.roas.toFixed(2)+"x":"—"}{deltaEl(row.roasDelta)}
                         </td>
-                        <td style={{padding:"6px 8px",color:t.textSub,whiteSpace:"nowrap"}}>{row.cvr!=null?row.cvr.toFixed(2)+"%":"—"}</td>
+                        <td style={{padding:"11px 8px",color:t.textSub,whiteSpace:"nowrap"}}>{row.cvr!=null?row.cvr.toFixed(2)+"%":"—"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -209,7 +209,7 @@ function FunnelCoverageMap({t, items, cats, brands, activeBrand}) {
             Where active work and revenue are concentrated across the funnel, and which stages are uncovered.
           </div>
         </div>
-        <span style={{fontSize:12,fontWeight:600,color:t.gold,fontFamily:t.mono}}>{fmtK(totalRevInPlay)} in play</span>
+        <span style={{fontSize:12,fontWeight:600,color:t.gold,fontFamily:t.sans}}>{fmtK(totalRevInPlay)} in play</span>
       </div>
 
       {/* A coverage gap is an opportunity, not a failure, and red is reserved
@@ -238,20 +238,20 @@ function FunnelCoverageMap({t, items, cats, brands, activeBrand}) {
                 <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:5}}>
                   <span style={{fontSize:13,fontWeight:600,color:isGap?t.textMuted:t.text,fontFamily:t.sans}}>{s.cat}</span>
                   {isGap
-                    ? <span style={{fontSize:10,fontWeight:600,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.04em"}}>UNCOVERED</span>
-                    : <span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>{s.running} running · {s.draft} draft · {s.done} done</span>}
+                    ? <span style={{fontSize:10,fontWeight:600,color:t.textMuted,fontFamily:t.sans,letterSpacing:"0.04em"}}>Uncovered</span>
+                    : <span style={{fontSize:11,color:t.textMuted,fontFamily:t.sans}}>{s.running} running · {s.draft} draft · {s.done} done</span>}
                 </div>
                 <ChargeBar t={t} pct={barPct} height={7} muted={isGap} index={i}/>
               </div>
               {/* Quality */}
               <div style={{width:62,textAlign:"right",flexShrink:0}}>
-                <div style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>ICE</div>
-                <div style={{fontSize:14,fontWeight:600,color:s.avgIce!=null?t.text:t.textMuted,fontFamily:t.mono,lineHeight:1.2}}>{s.avgIce!=null?s.avgIce:"—"}</div>
+                <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans}}>ICE</div>
+                <div style={{fontSize:14,fontWeight:600,color:s.avgIce!=null?t.text:t.textMuted,fontFamily:t.sans,lineHeight:1.2}}>{s.avgIce!=null?s.avgIce:"—"}</div>
               </div>
               {/* Revenue in play */}
               <div style={{width:74,textAlign:"right",flexShrink:0}}>
-                <div style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>In play</div>
-                <div style={{fontSize:14,fontWeight:600,color:s.revInPlay>0?t.gold:t.textMuted,fontFamily:t.mono,lineHeight:1.2,letterSpacing:"-0.02em"}}>{fmtK(s.revInPlay)}</div>
+                <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans}}>In play</div>
+                <div style={{fontSize:14,fontWeight:600,color:s.revInPlay>0?t.gold:t.textMuted,fontFamily:t.sans,lineHeight:1.2,letterSpacing:"-0.02em"}}>{fmtK(s.revInPlay)}</div>
               </div>
             </div>
           );
@@ -338,7 +338,7 @@ function BusinessHealthPanel({ t, settings, weeklyMetrics, activeBrand, brands }
     const pos  = d > 0;
     const good = higherIsBetter ? pos : !pos;
     return (
-      <span style={{fontSize:10,fontWeight:600,fontFamily:t.mono,color:good?t.teal:t.red,marginLeft:4}}>
+      <span style={{fontSize:10,fontWeight:600,fontFamily:t.sans,color:good?t.teal:t.red,marginLeft:4}}>
         {pos?"▲":"▼"}{Math.abs(d).toFixed(1)}%
       </span>
     );
@@ -356,8 +356,8 @@ function BusinessHealthPanel({ t, settings, weeklyMetrics, activeBrand, brands }
             {expanded?<IconChevronDown size={14}/>:<IconChevronRight size={14}/>}
           </button>
           <div>
-            <span style={{fontSize:11,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono}}>Business Health</span>
-            <div style={{fontSize:11,color:t.textMuted,fontFamily:t.sans,marginTop:1}}>
+            <span style={{fontSize:15,fontWeight:600,color:t.text,fontFamily:t.sans,letterSpacing:"-0.01em"}}>Business health</span>
+            <div style={{fontSize:12.5,color:t.textMuted,fontFamily:t.sans,marginTop:2}}>
               {(!activeBrand||activeBrand==="all")
                 ? "Portfolio-level guardrail metrics: watch these when experiments are running"
                 : brandName(activeBrand,brands)+"'s guardrail metrics: watch these when experiments are running"}
@@ -367,7 +367,7 @@ function BusinessHealthPanel({ t, settings, weeklyMetrics, activeBrand, brands }
       </div>
 
       {expanded && (
-        <div style={{marginTop:12,display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:10}}>
+        <div style={{marginTop:14,display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:10}}>
           {healthMetrics.map(metric => {
             const autoVal  = calcCurrent(metric);
             const priorVal = calcPrior(metric);
@@ -382,20 +382,20 @@ function BusinessHealthPanel({ t, settings, weeklyMetrics, activeBrand, brands }
             ) : null;
 
             return (
-              <div key={metric.key} style={{background:t.surface,border:"1px solid "+t.border,borderRadius:12,padding:"14px 16px",boxShadow:t.shadow,minHeight:96,display:"flex",flexDirection:"column"}}>
-                <div style={{fontSize:9.5,letterSpacing:"0.1em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,fontWeight:600,marginBottom:"auto",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>{metric.label}</div>
+              <div key={metric.key} style={{background:t.surfaceAlt,border:"1px solid "+t.borderSoft,borderRadius:t.r.md,padding:"14px 16px",minHeight:96,display:"flex",flexDirection:"column"}}>
+                <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,fontWeight:600,marginBottom:"auto",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>{metric.label}</div>
                 <div style={{marginTop:9,display:"flex",alignItems:"baseline",flexWrap:"wrap",gap:2}}>
                   {fmtd !== null
-                    ? <span style={{fontSize:26,fontWeight:700,color:t.gold,fontFamily:t.mono,lineHeight:1,letterSpacing:"-0.03em"}}>{fmtd}</span>
-                    : <span style={{fontSize:22,fontWeight:700,color:t.textMuted,fontFamily:t.mono,lineHeight:1}}>—</span>}
+                    ? <span style={{fontSize:t.fs.figure,fontWeight:600,color:t.text,fontFamily:t.sans,lineHeight:1,letterSpacing:"-0.02em"}}>{fmtd}</span>
+                    : <span style={{fontSize:t.fs.figure,fontWeight:600,color:t.textFaint,fontFamily:t.sans,lineHeight:1}}>—</span>}
                   {fmtd !== null && deltaChip(val, priorVal, metric.higherIsBetter)}
                 </div>
                 {fmtd === null && (
-                  <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginTop:4,lineHeight:1.4}}>Configure in Settings</div>
+                  <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,marginTop:6,lineHeight:1.4}}>Configure in Settings</div>
                 )}
                 {showTgt && tgtPct !== null && (
                   <div style={{marginTop:8}}>
-                    <div style={{fontSize:9.5,color:t.textMuted,fontFamily:t.mono,marginBottom:3}}>Target {fmtVal(metric, metric.target)}</div>
+                    <div style={{fontSize:9.5,color:t.textMuted,fontFamily:t.sans,marginBottom:3}}>Target {fmtVal(metric, metric.target)}</div>
                     <div style={{height:3,borderRadius:2,background:t.border,overflow:"hidden"}}>
                       <div style={{width:tgtPct+"%",height:"100%",borderRadius:2,background:tgtPct>=100?t.teal:t.gold,transition:"width .3s"}}/>
                     </div>
@@ -518,14 +518,14 @@ function ContributionView({t, contribution, totals, dRange, activeBrand, brands,
             sub:"draft, probability-weighted" },
         ].map(m=>(
           <div key={m.key} style={{padding:"12px 14px",borderRadius:t.r.md,
-            background:m.hero?t.goldBg:t.surface,
-            border:"1px solid "+(m.hero?t.goldBorder:t.border)}}>
+            background:t.surfaceAlt,
+            border:"1px solid "+t.borderSoft}}>
             <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
               <span aria-hidden="true" style={{width:8,height:8,borderRadius:2,background:m.swatch,flexShrink:0,
                 border:"1px solid "+(m.key==="pipeline"?t.border:"transparent")}}/>
-              <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>{m.label}</span>
+              <span style={{fontSize:12,color:t.textMuted,fontFamily:t.sans}}>{m.label}</span>
             </div>
-            <div style={{fontSize:t.fs.display,fontWeight:700,fontFamily:t.mono,color:m.ink,letterSpacing:"-0.02em",lineHeight:1}}>{fmtBig(m.value)}</div>
+            <div style={{fontSize:t.fs.display,fontWeight:700,fontFamily:t.sans,color:m.ink,letterSpacing:"-0.02em",lineHeight:1}}>{fmtBig(m.value)}</div>
             <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginTop:4}}>{m.sub}</div>
           </div>
         ))}
@@ -562,7 +562,7 @@ function ContributionView({t, contribution, totals, dRange, activeBrand, brands,
                     win rate {row.winRate}%{row.usesFallback?" (portfolio avg)":""}
                   </span>
                 </div>
-                <span style={{fontSize:13,fontWeight:700,color:t.text,fontFamily:t.mono,letterSpacing:"-0.01em"}}>{fmtBig(rowTotal)}</span>
+                <span style={{fontSize:13,fontWeight:700,color:t.text,fontFamily:t.sans,letterSpacing:"-0.01em"}}>{fmtBig(rowTotal)}</span>
               </div>
               <div className="gos-track" style={{display:"flex",height:10,background:t.rampTrack}}>
                 {row.realised>0 && <div className="gos-fill" title={"Realised: "+fmt(row.realised)}
@@ -572,7 +572,7 @@ function ContributionView({t, contribution, totals, dRange, activeBrand, brands,
                 {row.pipeline>0 && <div className="gos-fill" title={"Pipeline: "+fmt(row.pipeline)}
                   style={{width:pct(row.pipeline)+"%",background:colorPipeline,borderRadius:0,"--gos-spark":t.spark,"--gos-delay":stagger(ri)}}/>}
               </div>
-              <div style={{display:"flex",gap:12,marginTop:4,fontSize:10,color:t.textMuted,fontFamily:t.mono,flexWrap:"wrap"}}>
+              <div style={{display:"flex",gap:12,marginTop:4,fontSize:10,color:t.textMuted,fontFamily:t.sans,flexWrap:"wrap"}}>
                 {row.realised>0 && <span><span style={{display:"inline-block",width:7,height:7,background:colorRealised,marginRight:4,borderRadius:1,verticalAlign:"middle"}}/>Realised {fmt(row.realised)}</span>}
                 {row.inflight>0 && <span><span style={{display:"inline-block",width:7,height:7,background:colorInflight,marginRight:4,borderRadius:1,verticalAlign:"middle"}}/>In-flight {fmt(row.inflight)}</span>}
                 {row.pipeline>0 && <span><span style={{display:"inline-block",width:7,height:7,background:colorPipeline,border:"1px solid "+t.border,marginRight:4,borderRadius:1,verticalAlign:"middle"}}/>Pipeline {fmt(row.pipeline)}</span>}
@@ -664,7 +664,7 @@ function NextPlaysCard({ t, recs, recsLoad, recsErr, items, onGenerate, onOpenRe
   // opens the detail modal directly (Option 2 — skip the intermediate list).
   if (latest && !recsLoad) {
     return (
-      <div style={{...gCd(t),display:"flex",flexDirection:"column",gap:8,border:"1px solid "+t.goldBorder,padding:"10px 14px"}}>
+      <div style={{...gCd(t),display:"flex",flexDirection:"column",gap:10}}>
         {/* Staleness nudge — shown when the current week has no slate yet */}
         {/* Says which slate you're looking at rather than that none exists — the
           * old copy read "This week's plays haven't been generated yet" directly
@@ -681,7 +681,7 @@ function NextPlaysCard({ t, recs, recsLoad, recsErr, items, onGenerate, onOpenRe
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             <span style={{color:t.gold,display:"inline-flex"}}><IconDiamond size={13}/></span>
-            <span style={{fontSize:12,fontWeight:600,fontFamily:t.serif,color:t.text,letterSpacing:"0.02em"}}>Next Plays</span>
+            <span style={{fontSize:15,fontWeight:600,color:t.text,fontFamily:t.sans,letterSpacing:"-0.01em"}}>Next plays</span>
             <span style={{fontSize:10,color:t.textMuted,fontFamily:t.sans}}>
               {renderProse(pending.length > 0 ? pending.length+" ready" : "all resolved")}
             </span>
@@ -693,7 +693,7 @@ function NextPlaysCard({ t, recs, recsLoad, recsErr, items, onGenerate, onOpenRe
           </div>
           <div style={{display:"flex",gap:6,alignItems:"center"}}>
             {(accepted.length > 0 || dismissed.length > 0) && (
-              <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginRight:4}}>
+              <span style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginRight:4}}>
                 {accepted.length > 0 && <span style={{display:"inline-flex",alignItems:"center",gap:3}}><IconCheck size={11}/>{accepted.length}</span>}
                 {accepted.length > 0 && dismissed.length > 0 && <span> · </span>}
                 {dismissed.length > 0 && <span style={{display:"inline-flex",alignItems:"center",gap:3}}><IconClose size={11}/>{dismissed.length}</span>}
@@ -729,12 +729,12 @@ function NextPlaysCard({ t, recs, recsLoad, recsErr, items, onGenerate, onOpenRe
                     {rec.title}
                   </span>
                   {/* Meta chips — hide on narrow screens via flexShrink */}
-                  <span style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,padding:"1px 5px",border:"1px solid "+t.border,borderRadius:3,textTransform:"uppercase",letterSpacing:"0.04em",flexShrink:0}}>{rec.category}</span>
+                  <span style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,padding:"1px 5px",border:"1px solid "+t.border,borderRadius:3,flexShrink:0}}>{rec.category}</span>
                   <span style={{fontSize:9,color:t.textMuted,fontFamily:t.sans,flexShrink:0,display:"none"}} className="np-brand">{rec.brandTarget}</span>
                   {/* ICE — always visible, the most important signal at a glance */}
                   <span style={{display:"flex",gap:3,alignItems:"baseline",flexShrink:0}}>
-                    <span style={{fontSize:9,color:t.textMuted,fontFamily:t.mono}}>ICE</span>
-                    <span style={{fontSize:13,fontWeight:700,color:iceColor(iceTotal,t),fontFamily:t.mono,minWidth:18,textAlign:"right"}}>
+                    <span style={{fontSize:9,color:t.textMuted,fontFamily:t.sans}}>ICE</span>
+                    <span style={{fontSize:13,fontWeight:700,color:iceColor(iceTotal,t),fontFamily:t.sans,minWidth:18,textAlign:"right"}}>
                       {iceTotal!==null?iceTotal:"—"}
                     </span>
                   </span>
@@ -760,7 +760,7 @@ function NextPlaysCard({ t, recs, recsLoad, recsErr, items, onGenerate, onOpenRe
             >
               <span style={{color:t.textMuted,display:"inline-flex"}}>{diffExpanded ? <IconChevronDown size={11}/> : <IconChevronRight size={11}/>}</span>
               <span style={{fontSize:10,color:t.textSub,fontFamily:t.sans}}>Changes from last week</span>
-              <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginLeft:2}}>
+              <span style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginLeft:2}}>
                 {[
                   diff.entered.length > 0 && `${diff.entered.length} new`,
                   diff.dropped.length > 0 && `${diff.dropped.length} dropped`,
@@ -799,29 +799,27 @@ function NextPlaysCard({ t, recs, recsLoad, recsErr, items, onGenerate, onOpenRe
   // -- FULL MODE — empty state or loading. Earns the click; once recs exist, --
   // -- this collapses to the compact strip above. -----------------------------
   return (
-    <div style={{...gCd(t),display:"flex",flexDirection:"column",gap:12,border:"1px solid "+t.goldBorder}}>
+    <div style={{...gCd(t),display:"flex",flexDirection:"column",gap:14}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           <span style={{color:t.gold,display:"inline-flex"}}><IconDiamond size={15}/></span>
-          <span style={{fontSize:13,fontWeight:600,fontFamily:t.serif,color:t.text,letterSpacing:"0.02em"}}>Next Plays</span>
-          <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.04em",textTransform:"uppercase"}}>
-            AI-recommended experiments
-          </span>
+          <span style={{fontSize:15,fontWeight:600,color:t.text,fontFamily:t.sans,letterSpacing:"-0.01em"}}>Next plays</span>
+          <span style={{fontSize:11,fontWeight:600,color:t.gold,background:t.goldBg,borderRadius:t.r.sm,padding:"2px 6px",fontFamily:t.sans}}>AI</span>
         </div>
         <button onClick={onGenerate} disabled={recsLoad}
-          style={{...gG(t),fontSize:11,padding:"5px 11px",opacity:recsLoad?0.6:1}}>
+          style={{...gGh(t,"sm"),opacity:recsLoad?0.6:1}}>
           {recsLoad
             ? <><IconSpinner size={12}/> Generating…</>
-            : <><IconSparkle size={12}/> Generate</>}
+            : <><span style={{color:t.gold,display:"inline-flex"}}><IconSparkle size={13}/></span> Generate plays</>}
         </button>
       </div>
 
       {/* Empty state — first run */}
       {!recsLoad && !recsErr && (
-        <div style={{padding:"14px 16px",background:t.surfaceAlt,border:"1px dashed "+t.border,borderRadius:6,fontSize:12,color:t.textSub,fontFamily:t.serif,lineHeight:1.6}}>
+        <div style={{padding:"16px 18px",background:t.surfaceAlt,borderRadius:t.r.md,fontSize:13,color:t.textSub,fontFamily:t.sans,lineHeight:1.6}}>
           {renderProse(closedCount === 0
-            ? "No experiments closed yet. Recommendations will be sharpest once you have a few logged learnings, but you can still generate from your current portfolio state."
-            : "Generate to see 3 grounded experiment recommendations, with hypothesis, ICE, and reasoning trace pre-filled. Based on your "+closedCount+" closed initiative"+(closedCount===1?"":"s")+" and current portfolio state.")}
+            ? "No experiments closed yet. Plays get sharper once you have a few logged learnings, but you can still generate from the current portfolio."
+            : "Get three experiment ideas from your "+closedCount+" closed initiative"+(closedCount===1?"":"s")+". Each comes with a hypothesis, an ICE score and the reasoning behind it.")}
         </div>
       )}
 
@@ -881,20 +879,16 @@ const SECONDARY_TILES = (dash) => [
 ];
 
 function StatTile({ t, m, index, big }) {
-  const isMoney = typeof m.v === "string" && /^[^\d-]*[\d]/.test(m.v) && !/^\d+$/.test(m.v);
-  const isPct   = typeof m.v === "string" && m.v.endsWith("%");
-  const isMulti = typeof m.v === "string" && m.v.endsWith("x");
-  const isFinancial = (typeof m.v === "string" && m.v !== "—" && (isMoney || isPct || isMulti));
   const p = tile(t, t.goldFill, index);
   return (
     <div className={p.className} style={{...p.style,
-      background:m.hero?t.goldBg:t.surface,
-      border:"1px solid "+(m.hero?t.goldBorder:t.border),
-      borderRadius:t.r.lg,padding:big?"16px 18px":"14px 16px",boxShadow:t.shadow,
+      background:t.surface,
+      border:"1px solid "+t.border,
+      borderRadius:t.r.lg,padding:big?"18px 20px":"14px 16px",boxShadow:t.shadow,
       minHeight:big?104:96,display:"flex",flexDirection:"column"}}>
-      <div style={{fontSize:9.5,letterSpacing:"0.1em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,fontWeight:600,marginBottom:"auto",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>{m.l}</div>
-      <div style={{fontSize:big?t.fs.display:t.fs.figure,fontWeight:700,color:isFinancial?t.gold:t.text,fontFamily:t.mono,lineHeight:1,letterSpacing:"-0.03em",marginTop:9}}>{m.v}</div>
-      {m.s&&m.s!==" "&&<div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginTop:7,whiteSpace:"nowrap",letterSpacing:"0.02em"}}>{m.s}</div>}
+      <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,fontWeight:600,marginBottom:"auto",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>{m.l}</div>
+      <div style={{fontSize:big?28:t.fs.figure,fontWeight:600,color:m.v==="—"?t.textFaint:t.text,fontFamily:t.sans,lineHeight:1,letterSpacing:"-0.02em",marginTop:10}}>{m.v}</div>
+      {m.s&&m.s!==" "&&<div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,marginTop:8,whiteSpace:"nowrap"}}>{m.s}</div>}
     </div>
   );
 }
@@ -945,32 +939,52 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
   const transfers = buildCrossBrandTransfers(items, brands).slice(0, 3);
 
   return (
-    <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:14}}>
-      {/* North star */}
-      <div data-tour="northstar" style={{...gCd(t),background:t.goldBg,border:"1px solid "+t.goldBorder,display:"flex",alignItems:"center",gap:24,flexWrap:"wrap"}}>
-        <div>
-          <div style={{fontSize:10,letterSpacing:"0.10em",textTransform:"uppercase",color:t.gold,fontFamily:t.mono,marginBottom:4}}>North star</div>
-          <div style={{fontSize:15,fontWeight:600,color:t.text,fontFamily:t.serif}}>{ns.metric}</div>
-        </div>
-        <div style={{display:"flex",gap:20,flexWrap:"wrap"}}>
-          <div><div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginBottom:2}}>Current</div><div style={{fontSize:26,fontWeight:600,color:t.gold,fontFamily:t.sans,letterSpacing:"-0.02em"}}>{ns.current}</div></div>
-          <div style={{fontSize:20,color:t.textMuted,alignSelf:"center"}}>&#8594;</div>
-          <div><div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginBottom:2}}>Target</div><div style={{fontSize:26,fontWeight:600,color:t.text,fontFamily:t.sans,letterSpacing:"-0.02em"}}>{ns.target}</div></div>
-        </div>
-        {nsGap !== null && (
-          <div style={{fontSize:11,color:t.textMuted,fontFamily:t.sans,lineHeight:1.5}}
-            title="Weighted pipeline is the sum of estimated revenue on running and draft initiatives, each multiplied by its category win rate. It is an absolute figure over each initiative's own run length, so it is shown alongside the gap rather than divided into it.">
-            <div>Gap to target <strong style={{color:t.text,fontFamily:t.mono}}>{fmtCur(nsGap)}</strong>{nsPeriodLabel}</div>
-            <div>Weighted pipeline <strong style={{color:t.gold,fontFamily:t.mono}}>{fmtCur(forwardPipeline)}</strong></div>
+    <div style={{padding:"24px 32px 40px",display:"flex",flexDirection:"column",gap:16}}>
+      {/* North star. A plain card with one progress bar: the figure is the
+        * content, so it is set in ink, and the accent is spent on the bar that
+        * says how far along it is. */}
+      {(()=>{
+        const pct = (nsCurrentNum !== null && nsTargetNum)
+          ? Math.max(0, Math.min(100, Math.round(nsCurrentNum / nsTargetNum * 100))) : null;
+        return (
+          <div data-tour="northstar" style={{...gCd(t),padding:"20px 22px",display:"flex",flexDirection:"column",gap:14}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+              <span style={{fontSize:13,fontWeight:500,color:t.textMuted,fontFamily:t.sans}}>
+                North star · <span style={{color:t.text}}>{ns.metric}</span>
+                {activeBrand!=="all"&&<> · <span style={{color:t.gold}}>{brandName(activeBrand,brands)}</span></>}
+              </span>
+              {pct !== null && (
+                <span style={{fontSize:12,fontWeight:500,color:t.gold,background:t.goldBg,borderRadius:t.r.pill,padding:"2px 9px",fontFamily:t.sans}}>{pct}% to target</span>
+              )}
+            </div>
+            <div style={{display:"flex",alignItems:"baseline",gap:10,flexWrap:"wrap"}}>
+              <span style={{fontSize:t.fs.display,fontWeight:600,color:t.text,fontFamily:t.sans,letterSpacing:"-0.02em",lineHeight:1}}>{ns.current}</span>
+              <span style={{fontSize:14,color:t.textMuted,fontFamily:t.sans}}>of {ns.target} target</span>
+            </div>
+            {pct !== null && (
+              <div role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Progress to north star target"
+                style={{height:8,borderRadius:t.r.pill,background:t.borderSoft,overflow:"hidden"}}>
+                <div style={{width:pct+"%",height:"100%",borderRadius:t.r.pill,background:t.goldFill}}/>
+              </div>
+            )}
+            <div style={{display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap",fontSize:13,color:t.textMuted,fontFamily:t.sans}}>
+              {nsGap !== null ? (
+                <span title="Weighted pipeline is the sum of estimated revenue on running and draft initiatives, each multiplied by its category win rate. It is an absolute figure over each initiative's own run length, so it is shown alongside the gap rather than divided into it.">
+                  Gap <strong style={{color:t.text,fontWeight:600}}>{fmtCur(nsGap)}</strong>{nsPeriodLabel}
+                  <span style={{margin:"0 8px",color:t.textFaint}}>·</span>
+                  Weighted pipeline <strong style={{color:t.text,fontWeight:600}}>{fmtCur(forwardPipeline)}</strong>
+                </span>
+              ) : <span/>}
+              <span>{settings.businessModel}</span>
+            </div>
           </div>
-        )}
-        <div style={{marginLeft:"auto",fontSize:11,color:t.textMuted,fontFamily:t.sans,textAlign:"right"}}>
-          {activeBrand!=="all"&&<div style={{fontSize:12,fontWeight:600,color:t.gold,marginBottom:2}}>{brandName(activeBrand,brands)}</div>}
-          {settings.businessModel}
-        </div>
-      </div>
+        );
+      })()}
 
-      {/* This week's focus — attention nudges + weekly standup entry point */}
+      {/* This week's focus — attention nudges + weekly standup entry point.
+        * A white card with amber state pills rather than an amber panel: the
+        * panel tinted the whole block as an alarm, and red "running 36d" chips
+        * read as errors when they are reminders. */}
       {(()=>{
         const today = new Date();
         const expiring = (dash._runningItems||[]).filter(e => {
@@ -989,35 +1003,35 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
         ].slice(0,3);
         const hasNudges = nudges.length>0;
         return (
-          <div style={hasNudges
-            ? {padding:"10px 14px",background:t.warnBg,border:"1px solid "+t.warnBorder,borderRadius:6}
-            : {padding:"10px 14px",background:t.surface,border:"1px solid "+t.border,borderRadius:6}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:hasNudges?8:0}}>
-              <div style={{fontSize:10,fontWeight:700,color:hasNudges?t.warn:t.textMuted,fontFamily:t.mono,letterSpacing:"0.08em",textTransform:"uppercase"}}>
-                <span style={{display:"inline-flex",alignItems:"center",gap:6}}>
-                  {hasNudges?<IconAlert size={12}/>:<IconBolt size={12}/>}
-                  {hasNudges ? `${nudges.length} initiative${nudges.length!==1?"s":""} need attention` : "This week's focus"}
+          <div style={{...gCd(t),padding:hasNudges?"18px 20px 6px":"14px 20px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:hasNudges?6:0}}>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:15,fontWeight:600,color:t.text,fontFamily:t.sans,letterSpacing:"-0.01em"}}>
+                  {hasNudges ? "Needs attention" : "This week's focus"}
                 </span>
+                {hasNudges && (
+                  <span style={{fontSize:12,fontWeight:500,color:t.textSub,background:t.borderSoft,borderRadius:t.r.pill,padding:"1px 8px",fontFamily:t.sans}}>{nudges.length}</span>
+                )}
               </div>
-              <button onClick={()=>setShowStandup(true)} style={{...gGh(t),fontSize:11,padding:"3px 10px"}}>Weekly standup</button>
+              <button onClick={()=>setShowStandup(true)} style={gGh(t,"sm")}>Weekly standup</button>
             </div>
             {hasNudges && (
-              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+              <div style={{display:"flex",flexDirection:"column"}}>
                 {nudges.map(({type,item},i)=>{
                   const days = type==="expiring"
                     ? Math.ceil((new Date(item.endDate+"T12:00:00") - today) / 86400000)
                     : Math.ceil((today - new Date(item.startDate+"T12:00:00")) / 86400000);
                   return (
-                    <div key={i} style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-                      <span style={{fontSize:10,fontWeight:600,fontFamily:t.sans,
-                        color:type==="expiring"?t.warn:t.red,
-                        background:type==="expiring"?t.warnBg:t.redBg,
-                        border:"1px solid "+(type==="expiring"?t.warnBorder:t.red),
-                        borderRadius:3,padding:"1px 6px",flexShrink:0}}>
-                        {type==="expiring" ? `ends in ${days}d` : `running ${days}d`}
+                    <div key={i} style={{display:"flex",gap:12,alignItems:"center",padding:"12px 0",borderTop:"1px solid "+t.borderSoft}}>
+                      <span aria-hidden="true" style={{width:8,height:8,borderRadius:"50%",background:t.warn,flexShrink:0}}/>
+                      <span style={{flex:1,minWidth:0,display:"flex",flexDirection:"column",gap:2}}>
+                        <span style={{fontSize:14,fontWeight:500,color:t.text,fontFamily:t.sans,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.title}</span>
+                        {item.owner&&<span style={{fontSize:12.5,color:t.textMuted,fontFamily:t.sans}}>{item.owner}</span>}
                       </span>
-                      <span style={{fontSize:12,color:t.textSub,fontFamily:t.serif,flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.title}</span>
-                      {item.owner&&<span style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,flexShrink:0}}>{item.owner}</span>}
+                      <span style={{fontSize:12,fontWeight:500,fontFamily:t.sans,color:t.warn,background:t.warnBg,
+                        borderRadius:t.r.pill,padding:"2px 9px",flexShrink:0,whiteSpace:"nowrap"}}>
+                        {type==="expiring" ? `Ends in ${days} day${days===1?"":"s"}` : `Running ${days} days`}
+                      </span>
                     </div>
                   );
                 })}
@@ -1069,31 +1083,29 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
         * Health — none of which it governs — and above the ten tiles and six
         * analytical panels, all of which it does. Nothing said so, so a reader
         * could not tell which numbers on the page were scoped and which were
-        * not. It now sits at the head of the section it actually filters, and
-        * says what it filters.
+        * not. It now sits beside the heading of the section it actually
+        * filters, under a rule, so the scope is carried by the layout rather
+        * than by a sentence explaining it.
         *
         * The executive summary button came with it: it was a right-floated
         * control belonging to no section, sitting between two panels, and it is
         * one of the most valuable actions in the product. */}
       <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",gap:12,flexWrap:"wrap",
-        borderTop:"1px solid "+t.border,paddingTop:14,marginTop:2}}>
+        borderTop:"1px solid "+t.border,paddingTop:20,marginTop:6}}>
         <div>
-          <div style={{...gSL(t),marginBottom:6}}>Portfolio results</div>
+          <h2 style={{fontSize:15,fontWeight:600,color:t.text,fontFamily:t.sans,letterSpacing:"-0.01em",margin:"0 0 10px"}}>Results</h2>
           <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-            <div role="group" aria-label="Date range" style={{display:"flex",gap:2,background:t.surfaceAlt,padding:3,borderRadius:t.r.md,border:"1px solid "+t.border}}>
+            <div role="group" aria-label="Date range" style={{display:"flex",gap:2,background:t.borderSoft,padding:3,borderRadius:t.r.md}}>
               {[["thisMonth","This month"],["lastMonth","Last month"],["custom","Custom"]].map(([v,l])=>(
                 <button key={v} onClick={()=>setDRange(v)} aria-pressed={dRange===v}
-                  style={{fontSize:12,padding:"5px 12px",borderRadius:t.r.sm,cursor:"pointer",fontFamily:t.sans,fontWeight:dRange===v?600:500,background:dRange===v?t.gold:"transparent",border:"none",color:dRange===v?t.goldText:t.textSub}}>{l}</button>
+                  style={{fontSize:13,padding:"5px 12px",borderRadius:t.r.sm,cursor:"pointer",fontFamily:t.sans,fontWeight:500,background:dRange===v?t.surface:"transparent",border:"none",color:dRange===v?t.text:t.textSub,boxShadow:dRange===v?t.shadow:"none"}}>{l}</button>
               ))}
             </div>
             {dRange==="custom"&&<>
-              <input type="date" aria-label="Range start" value={cFrom} onChange={e=>setCFrom(e.target.value)} style={{fontSize:12,padding:"6px 9px",borderRadius:t.r.md,border:"1px solid "+t.border,background:t.inputBg,color:t.text,fontFamily:t.mono}}/>
+              <input type="date" aria-label="Range start" value={cFrom} onChange={e=>setCFrom(e.target.value)} style={{fontSize:12,padding:"6px 9px",borderRadius:t.r.md,border:"1px solid "+t.border,background:t.inputBg,color:t.text,fontFamily:t.sans}}/>
               <span style={{color:t.textMuted,fontSize:12}}>to</span>
-              <input type="date" aria-label="Range end" value={cTo} onChange={e=>setCTo(e.target.value)} style={{fontSize:12,padding:"6px 9px",borderRadius:t.r.md,border:"1px solid "+t.border,background:t.inputBg,color:t.text,fontFamily:t.mono}}/>
+              <input type="date" aria-label="Range end" value={cTo} onChange={e=>setCTo(e.target.value)} style={{fontSize:12,padding:"6px 9px",borderRadius:t.r.md,border:"1px solid "+t.border,background:t.inputBg,color:t.text,fontFamily:t.sans}}/>
             </>}
-          </div>
-          <div style={{fontSize:11,color:t.textMuted,fontFamily:t.sans,marginTop:6}}>
-            Scopes everything below this line. The panels above it read the latest logged week.
           </div>
         </div>
         <button style={gGh(t,"sm")}
@@ -1205,15 +1217,15 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
         <div className="gos-grid-3" style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16,alignItems:"center",marginBottom:dash.totalEstCost>0?12:0}}>
           <div>
             <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginBottom:2}}>Total estimated</div>
-            <div style={{fontSize:22,fontWeight:700,color:t.text,fontFamily:t.mono,letterSpacing:"-0.02em"}}>{fmtCur(dash.totalEstimated)}</div>
+            <div style={{fontSize:22,fontWeight:700,color:t.text,fontFamily:t.sans,letterSpacing:"-0.02em"}}>{fmtCur(dash.totalEstimated)}</div>
           </div>
           <div>
             <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginBottom:2}}>Total actual</div>
-            <div style={{fontSize:22,fontWeight:700,color:t.gold,fontFamily:t.mono,letterSpacing:"-0.02em"}}>{fmtCur(dash.totalActual)}</div>
+            <div style={{fontSize:22,fontWeight:600,color:t.text,fontFamily:t.sans,letterSpacing:"-0.02em"}}>{fmtCur(dash.totalActual)}</div>
           </div>
           <div>
             <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginBottom:2}}>Accuracy</div>
-            <div style={{fontSize:24,fontWeight:700,fontFamily:t.mono,color:dash.calibration===null?t.textMuted:dash.calibration>=80?t.gold:dash.calibration>=50?t.warn:t.red}}>
+            <div style={{fontSize:24,fontWeight:700,fontFamily:t.sans,color:dash.calibration===null?t.textMuted:dash.calibration>=80?t.gold:dash.calibration>=50?t.warn:t.red}}>
               {dash.calibration!==null?dash.calibration+"%":"—"}
             </div>
             {dash.calibration!==null&&<div style={{fontSize:11,color:t.textMuted,fontFamily:t.sans,marginTop:2}}>{dash.calibration>=80?"Well calibrated":dash.calibration>=50?"Moderate accuracy":"Overestimating"}</div>}
@@ -1223,15 +1235,15 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
           <div className="gos-grid-3" style={{marginTop:12,paddingTop:12,borderTop:"1px solid "+t.border,display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16}}>
             <div>
               <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginBottom:2}}>Total est. cost</div>
-              <div style={{fontSize:18,fontWeight:700,color:t.text,fontFamily:t.mono}}>{fmtCur(dash.totalEstCost)}</div>
+              <div style={{fontSize:18,fontWeight:700,color:t.text,fontFamily:t.sans}}>{fmtCur(dash.totalEstCost)}</div>
             </div>
             <div>
               <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginBottom:2}}>Total actual cost</div>
-              <div style={{fontSize:18,fontWeight:700,color:t.text,fontFamily:t.mono}}>{dash.totalActualCost>0?fmtCur(dash.totalActualCost):"—"}</div>
+              <div style={{fontSize:18,fontWeight:700,color:t.text,fontFamily:t.sans}}>{dash.totalActualCost>0?fmtCur(dash.totalActualCost):"—"}</div>
             </div>
             <div>
               <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,marginBottom:2}}>Closed ROI</div>
-              <div style={{fontSize:22,fontWeight:700,fontFamily:t.mono,color:dash.closedROI===null?t.textMuted:dash.closedROI>=2?t.gold:dash.closedROI>=1?t.warn:t.red}}>
+              <div style={{fontSize:22,fontWeight:700,fontFamily:t.sans,color:dash.closedROI===null?t.textMuted:dash.closedROI>=2?t.gold:dash.closedROI>=1?t.warn:t.red}}>
                 {dash.closedROI!==null?dash.closedROI+"x":"—"}
               </div>
               {dash.closedROI!==null&&<div style={{fontSize:11,color:t.textMuted,fontFamily:t.sans,marginTop:2}}>{dash.closedROI>=3?"Strong return":dash.closedROI>=1?"Positive":"Negative"}</div>}
@@ -1266,7 +1278,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
                   <div style={{fontSize:11,color:t.textMuted,fontFamily:t.sans,marginBottom:4}}>{row.label}</div>
                   <div style={{display:"flex",alignItems:"center",gap:10}}>
                     <Spark vals={row.vals} color={row.color} w={120} h={26}/>
-                    <span style={{fontSize:20,fontWeight:700,color:t.text,fontFamily:t.mono}}>{row.vals[row.vals.length-1]}</span>
+                    <span style={{fontSize:20,fontWeight:700,color:t.text,fontFamily:t.sans}}>{row.vals[row.vals.length-1]}</span>
                   </div>
                 </div>
               ))}
@@ -1281,7 +1293,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
                   <div key={cat} className="gos-charge" style={{padding:"1px 0"}}>
                     <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
                       <span style={{fontSize:12,color:t.textSub,fontFamily:t.sans}}>{cat}</span>
-                      <span style={{fontSize:12,color:t.textMuted,fontFamily:t.mono}}>{n}</span>
+                      <span style={{fontSize:12,color:t.textMuted,fontFamily:t.sans}}>{n}</span>
                     </div>
                     <ChargeBar t={t} pct={pct} height={5} muted={n===0} index={ci}/>
                   </div>
@@ -1301,7 +1313,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
                 <div key={tp} className="gos-charge" style={{padding:"1px 0"}}>
                   <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
                     <span style={{fontSize:12,color:t.textSub,fontFamily:t.sans}}>{tp}</span>
-                    <span style={{fontSize:12,color:t.textMuted,fontFamily:t.mono}}>{n}</span>
+                    <span style={{fontSize:12,color:t.textMuted,fontFamily:t.sans}}>{n}</span>
                   </div>
                   <ChargeBar t={t} pct={pct} height={5} muted={n===0} index={ti}/>
                 </div>
@@ -1316,7 +1328,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
             {OUTCOMES.map(o=>{const c=(dk?OD:OL)[o]||{};return(
               <div key={o} style={{background:c.bg||t.surfaceAlt,border:"1px solid "+(c.border||t.border),borderRadius:6,padding:"8px 14px",minWidth:80}}>
-                <div style={{fontSize:20,fontWeight:700,color:c.text||t.text,fontFamily:t.mono}}>{dash.outCounts[o]||0}</div>
+                <div style={{fontSize:20,fontWeight:700,color:c.text||t.text,fontFamily:t.sans}}>{dash.outCounts[o]||0}</div>
                 <div style={{fontSize:11,color:c.text||t.textMuted,opacity:0.85,fontFamily:t.sans}}>{o}</div>
               </div>
             );})}

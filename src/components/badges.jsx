@@ -10,10 +10,10 @@ export function OBdg({o,dk})        { const c=(dk?OD:OL)[o]||{};        return <
 // `t` is optional on the two hue-driven badges so existing call sites that only
 // pass `dk` keep working; when it is supplied the chrome comes from the theme
 // instead of the old hardcoded warm-brown pair.
-export function CBdg({cat,cats,dk,t}) { return <Bdg label={cat} color={catColor(cat,cats,dk)} bg={t?t.surfaceAlt:(dk?"#1D2026":"#F7F5EF")} border={t?t.border:(dk?"#2C303A":"#E0DCD2")}/>; }
+export function CBdg({cat,cats,dk,t}) { return <Bdg label={cat} color={catColor(cat,cats,dk)} bg={t?t.surfaceAlt:(dk?"#1C1C21":"#FAFAFB")} border={t?t.border:(dk?"#2A2A31":"#E6E6E9")}/>; }
 export function TBdg({type,dk,t}) {
   const color = (dk?TYPE_D:TYPE_L)[type]||"#888";
-  return <Bdg label={type} color={color} bg={t?t.surfaceAlt:(dk?"#1D2026":"#F7F5EF")} border={t?t.border:(dk?"#2C303A":"#E0DCD2")} small/>;
+  return <Bdg label={type} color={color} bg={t?t.surfaceAlt:(dk?"#1C1C21":"#FAFAFB")} border={t?t.border:(dk?"#2A2A31":"#E6E6E9")} small/>;
 }
 
 // Previously a fixed near-black chip with #ffd700 text and a double border, in
@@ -42,8 +42,8 @@ export function RiskBdg({riskType,t}) {
 
 export function ICEChip({ice,t}) {
   const s = iceScore(ice&&ice.impact, ice&&ice.certainty, ice&&ice.ease);
-  if (s===null) return <span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>No ICE</span>;
-  return <span style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:11,fontWeight:700,color:iceColor(s,t),fontFamily:t.mono,border:"1px solid "+t.border,borderRadius:4,padding:"2px 7px"}}>ICE {s}</span>;
+  if (s===null) return <span style={{fontSize:11,color:t.textMuted,fontFamily:t.sans}}>No ICE</span>;
+  return <span style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:11,fontWeight:700,color:iceColor(s,t),fontFamily:t.sans,border:"1px solid "+t.border,borderRadius:4,padding:"2px 7px"}}>ICE {s}</span>;
 }
 
 // -- Confidence, derived (ROADMAP 5.8) -----------------------------------------

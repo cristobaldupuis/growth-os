@@ -29,7 +29,7 @@ const base = (t, size) => {
   };
 };
 
-/** Primary. Gold fill, dark ink. One per view; two means neither is primary. */
+/** Primary. Accent fill, white ink. One per view; two means neither is primary. */
 export const gG = (t, size = "md") => ({
   ...base(t, size),
   background: t.goldFill, border: "1px solid " + t.goldFill,
@@ -39,7 +39,7 @@ export const gG = (t, size = "md") => ({
 /** Secondary. The default for everything that is not the one primary action. */
 export const gGh = (t, size = "md") => ({
   ...base(t, size),
-  background: t.surfaceAlt, border: "1px solid " + t.border,
+  background: t.surface, border: "1px solid " + t.border,
   color: t.textSub, fontWeight: 500,
 });
 
@@ -66,6 +66,6 @@ export const gOff = { opacity: 0.45, cursor: "not-allowed" };
 export const gI  = (t) => ({width:"100%",padding:"8px 11px",fontSize:13,fontFamily:t.sans,background:t.inputBg,border:"1px solid "+t.inputBorder,borderRadius:t.r.md,color:t.text,boxSizing:"border-box"});
 export const gTA = (t) => ({...gI(t),resize:"vertical"});
 export const gSl = (t) => ({...gI(t),cursor:"pointer"});
-export const gSc = (t) => ({background:t.surface,border:"1px solid "+t.border,borderRadius:t.r.lg,padding:"15px 18px",boxShadow:t.shadow});
-export const gSL = (t) => ({fontSize:t.fs.micro,letterSpacing:"0.11em",textTransform:"uppercase",color:t.textMuted,marginBottom:8,fontFamily:t.mono,fontWeight:600});
-export const gCd = (t) => ({background:t.surface,border:"1px solid "+t.border,borderRadius:t.r.lg,padding:"15px 18px",boxShadow:t.shadow});
+export const gSc = (t) => ({background:t.surface,border:"1px solid "+t.border,borderRadius:t.r.lg,padding:"18px 20px",boxShadow:t.shadow});
+export const gSL = (t) => ({fontSize:13,color:t.textSub,marginBottom:8,fontFamily:t.sans,fontWeight:600});
+export const gCd = (t) => ({background:t.surface,border:"1px solid "+t.border,borderRadius:t.r.lg,padding:"18px 20px",boxShadow:t.shadow});

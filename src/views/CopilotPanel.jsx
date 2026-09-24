@@ -59,9 +59,9 @@ function IdeaCard({idea, idx, results, setResults, added, onAdd, t, dk, cats, ag
           </div>
           {score!==null&&(
             <div style={{textAlign:"center",flexShrink:0,paddingLeft:12,borderLeft:"1px solid "+t.border}}>
-              <div style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:2}}>ICE</div>
-              <div style={{fontSize:22,fontWeight:700,fontFamily:t.mono,color:iceC(score),lineHeight:1}}>{score}</div>
-              <div style={{fontSize:9,color:t.textMuted,fontFamily:t.mono}}>/100</div>
+              <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,marginBottom:2}}>ICE</div>
+              <div style={{fontSize:22,fontWeight:700,fontFamily:t.sans,color:iceC(score),lineHeight:1}}>{score}</div>
+              <div style={{fontSize:9,color:t.textMuted,fontFamily:t.sans}}>/100</div>
             </div>
           )}
         </div>
@@ -71,7 +71,7 @@ function IdeaCard({idea, idx, results, setResults, added, onAdd, t, dk, cats, ag
           {idea.championedBy&&(
             <div style={{padding:"7px 10px",background:champAgent?champAgent.color+"18":t.goldBg,
               border:"1px solid "+(champAgent?champAgent.color+"50":t.goldBorder),borderRadius:5}}>
-              <div style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3,display:"flex",alignItems:"center",gap:5}}>
+              <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,marginBottom:3,display:"flex",alignItems:"center",gap:5}}>
                 {champAgent&&(()=>{const A=iconFor(champAgent.icon);return <span style={{color:champAgent.color,display:"inline-flex"}}><A size={11}/></span>;})()}
                 Championed by</div>
               <div style={{fontSize:11,color:t.textSub,fontFamily:t.serif,lineHeight:1.5}}>{idea.championedBy}</div>
@@ -79,7 +79,7 @@ function IdeaCard({idea, idx, results, setResults, added, onAdd, t, dk, cats, ag
           )}
           {idea.dissentVoice&&(
             <div style={{padding:"7px 10px",background:t.redBg,border:"1px solid "+(t.red),borderRadius:5}}>
-              <div style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3,display:"flex",alignItems:"center",gap:5}}>
+              <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,marginBottom:3,display:"flex",alignItems:"center",gap:5}}>
                 {dissentAgent&&(()=>{const A=iconFor(dissentAgent.icon);return <span style={{color:dissentAgent.color,display:"inline-flex"}}><A size={11}/></span>;})()}
                 Risk / Dissent</div>
               <div style={{fontSize:11,color:t.red,fontFamily:t.serif,lineHeight:1.5}}>{idea.dissentVoice}</div>
@@ -89,7 +89,7 @@ function IdeaCard({idea, idx, results, setResults, added, onAdd, t, dk, cats, ag
 
         {idea.csoRationale&&(
           <div style={{padding:"8px 12px",background:t.surfaceAlt,border:"1px solid "+(t.border),borderRadius:5}}>
-            <div style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>CSO · Why we proceed</div>
+            <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,marginBottom:3}}>CSO · Why we proceed</div>
             <div style={{fontSize:11,color:t.textSub,fontFamily:t.serif,lineHeight:1.5,fontWeight:600}}>{idea.csoRationale}</div>
           </div>
         )}
@@ -104,7 +104,7 @@ function IdeaCard({idea, idx, results, setResults, added, onAdd, t, dk, cats, ag
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           {idea.observation&&(
             <div>
-              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>Observation</div>
+              <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,marginBottom:3}}>Observation</div>
               {isEditing
                 ? <textarea style={{...gTA(t),fontSize:12}} rows={2} value={idea.observation}
                     onChange={e=>{const r=[...results];r[idx]={...r[idx],observation:e.target.value};setResults(r);}}/>
@@ -113,7 +113,7 @@ function IdeaCard({idea, idx, results, setResults, added, onAdd, t, dk, cats, ag
           )}
           {idea.hypothesis&&(
             <div style={{borderLeft:"3px solid "+t.gold,paddingLeft:10}}>
-              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>Hypothesis</div>
+              <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,marginBottom:3}}>Hypothesis</div>
               {isEditing
                 ? <textarea style={{...gTA(t),fontSize:12}} rows={3} value={idea.hypothesis}
                     onChange={e=>{const r=[...results];r[idx]={...r[idx],hypothesis:e.target.value};setResults(r);}}/>
@@ -122,7 +122,7 @@ function IdeaCard({idea, idx, results, setResults, added, onAdd, t, dk, cats, ag
           )}
           {idea.successMetric&&(
             <div>
-              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>Success metric</div>
+              <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,marginBottom:3}}>Success metric</div>
               {isEditing
                 ? <input style={{...gI(t),fontSize:12}} value={idea.successMetric}
                     onChange={e=>{const r=[...results];r[idx]={...r[idx],successMetric:e.target.value};setResults(r);}}/>
@@ -136,13 +136,13 @@ function IdeaCard({idea, idx, results, setResults, added, onAdd, t, dk, cats, ag
           <div style={{display:"flex",gap:10,padding:"8px 10px",background:t.surfaceAlt,borderRadius:5,border:"1px solid "+t.border}}>
             {[["Impact",idea.ice.impact],["Certainty",idea.ice.certainty],["Ease",idea.ice.ease]].map(([l,v])=>(
               <div key={l} style={{flex:1,textAlign:"center"}}>
-                <div style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:2}}>{l}</div>
-                <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.mono}}>{v}<span style={{fontSize:9,color:t.textMuted}}>/10</span></div>
+                <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,marginBottom:2}}>{l}</div>
+                <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.sans}}>{v}<span style={{fontSize:9,color:t.textMuted}}>/10</span></div>
               </div>
             ))}
             <div style={{flex:1,textAlign:"center",borderLeft:"1px solid "+t.border}}>
-              <div style={{fontSize:9,color:t.textMuted,fontFamily:t.mono,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:2}}>Score</div>
-              <div style={{fontSize:16,fontWeight:700,fontFamily:t.mono,color:iceC(score)}}>{score||"—"}</div>
+              <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,marginBottom:2}}>Score</div>
+              <div style={{fontSize:16,fontWeight:700,fontFamily:t.sans,color:iceC(score)}}>{score||"—"}</div>
             </div>
           </div>
         )}
@@ -409,7 +409,7 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
 
             {/* Context input */}
             <div>
-              <div style={{fontSize:10,letterSpacing:"0.10em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,marginBottom:5}}>
+              <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,marginBottom:5}}>
                 Situation context <span style={{fontWeight:400,textTransform:"none",letterSpacing:0}}>(optional, sharper with context)</span>
               </div>
               <textarea style={{...gTA(t),fontSize:12,minHeight:68,opacity:running?0.6:1}}
@@ -473,7 +473,7 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
             {/* Live transcript */}
             {transcript.length>0&&(
               <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                <div style={{fontSize:10,letterSpacing:"0.10em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,display:"flex",justifyContent:"space-between"}}>
+                <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,display:"flex",justifyContent:"space-between"}}>
                   <span>Debate transcript</span>
                   <span>{turnCount}/{MAX_TURNS} turns</span>
                 </div>
@@ -626,7 +626,7 @@ export function CopilotPanel({t, dk, settings, cats, brands, items, activeBrand,
                     </div>
                   </div>
                   <details>
-                    <summary style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,cursor:"pointer"}}>View transcript (<span style={{fontFamily:t.mono}}>{d.transcript?.length||0}</span> turns)</summary>
+                    <summary style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,cursor:"pointer"}}>View transcript (<span style={{fontFamily:t.sans}}>{d.transcript?.length||0}</span> turns)</summary>
                     <div style={{marginTop:8,display:"flex",flexDirection:"column",gap:6,maxHeight:300,overflowY:"auto"}}>
                       {(d.transcript||[]).map((msg,j)=>(
                         <div key={j} style={{borderLeft:"3px solid "+msg.color,paddingLeft:10,paddingTop:4,paddingBottom:4}}>

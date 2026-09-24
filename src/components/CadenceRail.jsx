@@ -67,7 +67,7 @@ export function CadenceLegend({ t }) {
         <span key={k} style={{ display:"inline-flex", alignItems:"center", gap:4 }}>
           <span style={{ width:4, height:Math.max(3, Math.round(12 * CADENCE_STATES[k].weight)),
             borderRadius:1.5, background:colors[k] }}/>
-          <span style={{ fontSize:10, color:t.textMuted, fontFamily:t.mono }}>{label}</span>
+          <span style={{ fontSize:10, color:t.textMuted, fontFamily:t.sans }}>{label}</span>
         </span>
       ))}
     </span>

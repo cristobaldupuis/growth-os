@@ -28,12 +28,12 @@
 :root,
 :root[data-theme="light"] {
   color-scheme: light;
-  background: #EDEAE3;
+  background: #F6F6F7;
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  background: #0E0F12;
+  background: #0F0F12;
 }
 
 :root {
@@ -41,6 +41,9 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Tabular figures everywhere, so a column of numbers lines up in the sans.
+   * This is what the monospace used to be doing for every figure in the app. */
+  font-variant-numeric: tabular-nums;
 }
 
 * {
@@ -184,6 +187,15 @@ textarea {
 .gos-int-flat:focus-visible {
   transform: none;
   background: var(--gos-hover-bg, transparent);
+}
+
+/* Rail and ghost controls: no lift, no charge rail, just a tint on hover. The
+ * rail is chrome, and chrome that animates competes with the content. */
+.gos-nav {
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+.gos-nav:hover {
+  background: var(--gos-hover-bg, transparent) !important;
 }
 
 /* -- Magnitude bars ---------------------------------------------------------- */

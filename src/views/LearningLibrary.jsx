@@ -115,7 +115,7 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
 
   // One micro-label style for every line of a card, so From / Decision /
   // Est / Actual all read as the same rank and none of them needs a container.
-  const cLbl = (t)=>({fontSize:9.5,fontWeight:600,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.09em",textTransform:"uppercase",marginRight:6});
+  const cLbl = (t)=>({fontSize:12,fontWeight:600,color:t.textMuted,fontFamily:t.sans,marginRight:6});
   // Shared body line for the card's supporting rows.
   const cLine = (t)=>({fontSize:11.5,color:t.textSub,fontFamily:t.serif,lineHeight:1.45,marginTop:3});
 
@@ -124,7 +124,7 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
 
       {/* Ask the library: natural-language retrieval over the full closed record */}
       <div style={{...gSc(t),background:t.goldBg,border:"1px solid "+t.goldBorder}}>
-        <div style={{fontSize:11,fontWeight:700,color:t.gold,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:8}}>Ask the library</div>
+        <div style={{fontSize:12,fontWeight:600,color:t.gold,fontFamily:t.sans,marginBottom:8}}>Ask the library</div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"flex-start"}}>
           <input style={{...gI(t),flex:1,minWidth:200}} value={ask} onChange={e=>setAsk(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")runAsk();}} placeholder={String.fromCharCode(34)+"Have we tried creative angles for retention?"+String.fromCharCode(34)+"  ·  "+String.fromCharCode(34)+"What worked for us at BFCM?"+String.fromCharCode(34)}/>
           <button style={{...gG(t),whiteSpace:"nowrap"}} disabled={askLoad||!ask.trim()||citable.length===0} onClick={runAsk}>
@@ -135,7 +135,7 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
         {askVisible&&(
           <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid "+t.goldBorder}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-              <div style={{fontSize:10,fontWeight:700,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Answer from {citable.length} citable learning{citable.length!==1?"s":""}</div>
+              <div style={{fontSize:12,fontWeight:600,color:t.textMuted,fontFamily:t.sans}}>Answer from {citable.length} citable learning{citable.length!==1?"s":""}</div>
               <button onClick={()=>{setAskVisible(false);setAskAnswer("");}} style={{background:"none",border:"none",color:t.textMuted,cursor:"pointer",fontSize:14}}>&#10005;</button>
             </div>
             {askLoad
@@ -162,7 +162,7 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
                 background:active?c.bg:t.surface,cursor:"pointer",textAlign:"center",
                 transition:"background .15s, border-color .15s, color .15s",
                 boxShadow:active?t.shadow:"none"}}>
-              <div style={{fontSize:t.fs.display,fontWeight:700,color:active?c.text:t.textSub,fontFamily:t.mono,lineHeight:1}}>{counts[o]||0}</div>
+              <div style={{fontSize:t.fs.display,fontWeight:700,color:active?c.text:t.textSub,fontFamily:t.sans,lineHeight:1}}>{counts[o]||0}</div>
               <div style={{fontSize:11,fontWeight:600,color:active?c.text:t.textMuted,fontFamily:t.serif,marginTop:4,letterSpacing:"0.04em"}}>{o}</div>
             </button>
           );
@@ -172,20 +172,20 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
       {/* Search + filters */}
       <div className="gos-filters" style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"flex-end"}}>
         <div style={{display:"flex",flexDirection:"column",gap:2,flex:1,minWidth:180}}>
-          <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Search learnings</label>
+          <label style={{fontSize:12,color:t.textMuted,fontFamily:t.sans}}>Search learnings</label>
           <input style={gI2(t)} value={query} onChange={e=>setQuery(e.target.value)} placeholder="Keyword across learnings and titles..."/>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:2}}>
-          <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Category</label>
+          <label style={{fontSize:12,color:t.textMuted,fontFamily:t.sans}}>Category</label>
           <select value={fCat} onChange={e=>setFCat(e.target.value)} style={{...gSl(t),minWidth:130}}>{["All",...cats].map(c=><option key={c}>{c}</option>)}</select>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:2}}>
-          <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Type</label>
+          <label style={{fontSize:12,color:t.textMuted,fontFamily:t.sans}}>Type</label>
           <select value={fType} onChange={e=>setFType(e.target.value)} style={{...gSl(t),minWidth:120}}>{["All",...INIT_TYPES].map(tp=><option key={tp}>{tp}</option>)}</select>
         </div>
         {/* Layout toggle. Same segmented-control pattern as the header nav. */}
         <div style={{display:"flex",flexDirection:"column",gap:2}}>
-          <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>View</label>
+          <label style={{fontSize:12,color:t.textMuted,fontFamily:t.sans}}>View</label>
           <div style={{display:"flex",gap:2,background:t.surfaceAlt,padding:3,borderRadius:9,border:"1px solid "+t.border}}>
             {[["list",IconList,"List view"],["grid",IconGrid,"Two-column grid view"]].map(([v,Icon,title])=>(
               <button key={v} onClick={()=>onView&&onView(v)} title={title} aria-label={title} aria-pressed={view===v}
@@ -202,7 +202,7 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
       {/* Count + Synthesize */}
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
         <div style={{fontSize:12,color:t.textMuted,fontFamily:t.serif}}>
-          <span style={{fontFamily:t.mono}}>{filtered.length}</span> learning{filtered.length!==1?"s":""} {query?"matching":""}
+          <span style={{fontFamily:t.sans}}>{filtered.length}</span> learning{filtered.length!==1?"s":""} {query?"matching":""}
           {filtered.length===0&&closed.length>0&&!showRetracted&&<span style={{color:t.gold}}> · try adjusting filters or clicking more outcome tiles above</span>}
         </div>
         {/* A retraction nobody can see is a second way to be silently wrong
@@ -242,7 +242,7 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
       {synthVisible&&(
         <div style={{...gSc(t),background:t.tealBg,border:"1px solid "+(t.teal)}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-            <div style={{fontSize:11,fontWeight:700,color:t.teal,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>AI Synthesis · {filtered.length} learnings</div>
+            <div style={{fontSize:12,fontWeight:600,color:t.teal,fontFamily:t.sans}}>AI Synthesis · {filtered.length} learnings</div>
             <button onClick={()=>setSynthVisible(false)} style={{background:"none",border:"none",color:t.textMuted,cursor:"pointer",fontSize:14}}>&#10005;</button>
           </div>
           {synthLoad
@@ -285,7 +285,7 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
                     : <Bdg label="Tactical" color={t.textMuted} bg={t.surfaceAlt} border={t.border} small/>}
                   <ConfBdg level={(confOf(item)||{}).level} t={t} small/>
                   {brands&&brands.length>1&&<Bdg label={brandName(item.brandId||"default",brands)} color={brandColor(item.brandId||"default",brands,dk)} bg={t.surfaceAlt} border={t.border} small/>}
-                  {item.endDate&&<span style={{fontSize:10.5,color:t.textMuted,fontFamily:t.mono,marginLeft:"auto"}}>{fmtDate(item.endDate)}</span>}
+                  {item.endDate&&<span style={{fontSize:10.5,color:t.textMuted,fontFamily:t.sans,marginLeft:"auto"}}>{fmtDate(item.endDate)}</span>}
                 </div>
 
                 {/* The learning: hero element. Upright, not italic; the quotation
@@ -305,7 +305,7 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
                   return (
                     <div style={{...cLine(t),color:tone,marginTop:5}}>
                       {CONFIDENCE_NOTE[c.level]}
-                      {refs.length>0 && <span style={{fontFamily:t.mono,fontSize:10.5}}> ({refs.join(", ")})</span>}
+                      {refs.length>0 && <span style={{fontFamily:t.sans,fontSize:10.5}}> ({refs.join(", ")})</span>}
                     </div>
                   );
                 })()}
@@ -330,10 +330,10 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
                   {(item.revenueImpact!==0||isWin)&&(
                     <div style={{...cLine(t),marginTop:0,alignSelf:"stretch",display:"flex",gap:14,flexWrap:"wrap",alignItems:"baseline"}}>
                       {item.revenueImpact!==0&&(
-                        <span><span style={cLbl(t)}>Est</span><strong style={{color:t.text,fontFamily:t.mono,fontWeight:600}}>{fmtCur(item.revenueImpact)}</strong></span>
+                        <span><span style={cLbl(t)}>Est</span><strong style={{color:t.text,fontFamily:t.sans,fontWeight:600}}>{fmtCur(item.revenueImpact)}</strong></span>
                       )}
                       {item.revenueImpact!==0&&item.results.actualRevenueImpact!=null&&(
-                        <span><span style={cLbl(t)}>Actual</span><strong style={{color:t.gold,fontFamily:t.mono,fontWeight:600}}>{fmtCur(item.results.actualRevenueImpact)}</strong></span>
+                        <span><span style={cLbl(t)}>Actual</span><strong style={{color:t.gold,fontFamily:t.sans,fontWeight:600}}>{fmtCur(item.results.actualRevenueImpact)}</strong></span>
                       )}
                     </div>
                   )}

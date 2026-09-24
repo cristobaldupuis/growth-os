@@ -56,7 +56,7 @@ function Field({ t, dim, value, onChange, placeholder, locked, lockNote }) {
         <div style={{ ...gI(t), fontFamily: t.mono, background: t.surfaceAlt, color: isNA ? t.textMuted : t.text,
           display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{value}</span>
-          <span style={{ fontSize: 9.5, letterSpacing: "0.08em", textTransform: "uppercase", color: t.textMuted, flexShrink: 0 }}>
+          <span style={{ fontSize:12, color: t.textMuted, flexShrink: 0 }}>
             stamped
           </span>
         </div>

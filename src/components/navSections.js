@@ -4,54 +4,43 @@
 // component/constant module breaks Fast Refresh, which is the same reason
 // tourSteps.js sits beside GuidedTour.jsx rather than inside it.
 //
-// ## Where the science vocabulary lives, and where it doesn't
+// ## Plain names only
 //
-// This product runs a scientific method against growth, and the interface
-// should say so. The first attempt said it in the wrong place: laboratory names
-// replaced the nav labels outright, so finding the initiative list meant knowing
-// it was called "Register". That is a real cost — wayfinding is the one job a
-// nav label cannot trade away — and it buys character that can be had for free
-// somewhere else.
+// The rail used to carry a second vocabulary: every item had a two-letter code
+// chip and a laboratory subtitle (Observatory, Register, Quarantine…), and the
+// two sections were headed "Signal · Read the system" and "Protocol · Run the
+// method". It was meant as character and it read as decoration: three labels
+// per destination, one of which you had to learn. The science vocabulary now
+// lives only where it carries meaning (kill criteria, pre-registration, the
+// prediction ledger), and the rail says what each view is.
 //
-// So the split is deliberate:
+//   `label`  — what the item is called, everywhere.
+//   `icon`   — the glyph name the rail draws beside it (see Sidebar.jsx).
+//   `blurb`  — what the view answers, in a sentence. The item's tooltip, and
+//              the copy the command palette and the Guide drawer draw on.
 //
-//   `label`  — plain, and the primary thing you read. Unchanged from what
-//              shipped, so nothing anyone already learned stops working.
-//   `lab`    — the laboratory name, rendered underneath as a one-line subtitle.
-//              Carries the flavour, explains the two-letter code, and is never
-//              the only way to find anything.
-//   `blurb`  — what the view answers, in a sentence. Rendered as the item's
-//              tooltip rather than inline: at a 216px rail a sentence wraps to
-//              two lines on every item, which made a seven-item list as tall as
-//              eleven and buried the labels in prose. It is still written for
-//              the reader, and it is still the copy the Guide drawer draws on —
-//              it just costs no height in the rail.
-//
-// The heavier science vocabulary belongs to the mechanics rather than the
-// furniture: kill criteria, pre-registration, what would falsify this, the
-// prediction ledger. Those are terms of art that carry real meaning, and every
-// one of them teaches an operator something about how the method works. A
-// renamed tab teaches nothing.
+// The first section has no heading on purpose: it is the default set of
+// destinations, and a heading over it would only restate that.
 
 export const NAV_SECTIONS = [
   {
-    label: "Signal",
-    hint: "Read the system",
+    id: "overview",
+    label: null,
     items: [
-      { key:"dashboard",   code:"OB", label:"Dashboard",   lab:"Observatory", blurb:"the whole portfolio at a glance" },
-      { key:"agenda",      code:"TH", label:"Agenda",      lab:"Thesis",      blurb:"the questions the portfolio is trying to answer" },
-      { key:"initiatives", code:"RG", label:"Initiatives", lab:"Register",    blurb:"every experiment and its status" },
-      { key:"library",     code:"AR", label:"Library",     lab:"Archive",     blurb:"what closed experiments taught us" },
-      { key:"performance", code:"MS", label:"Performance", lab:"Microscope",  blurb:"what the ad names reveal about spend" },
+      { key:"dashboard",   icon:"dashboard",   label:"Dashboard",   blurb:"The whole portfolio at a glance" },
+      { key:"agenda",      icon:"agenda",      label:"Agenda",      blurb:"The questions the portfolio is trying to answer" },
+      { key:"initiatives", icon:"initiatives", label:"Initiatives", blurb:"Every experiment and its status" },
+      { key:"library",     icon:"library",     label:"Library",     blurb:"What closed experiments taught us" },
+      { key:"performance", icon:"performance", label:"Performance", blurb:"What the ad names reveal about spend" },
     ],
   },
   {
-    label: "Protocol",
-    hint: "Run the method",
+    id: "workflow",
+    label: "Workflow",
     items: [
-      { key:"triage",   code:"QR", label:"Triage",   lab:"Quarantine", blurb:"needs a decision before it proceeds" },
-      { key:"creative", code:"BN", label:"Creative", lab:"Bench",      blurb:"brief and build from a hypothesis" },
-      { key:"readout",  code:"RO", label:"Summary",  lab:"Readout",    blurb:"the week, packaged for stakeholders" },
+      { key:"triage",   icon:"triage",   label:"Triage",   blurb:"Needs a decision before it proceeds" },
+      { key:"creative", icon:"creative", label:"Creative", blurb:"Brief and build from a hypothesis" },
+      { key:"readout",  icon:"readout",  label:"Summary",  blurb:"The week, packaged for stakeholders" },
     ],
   },
 ];
@@ -61,7 +50,7 @@ export const NAV_SECTIONS = [
 // you go occasionally, and a rail item for it would sit next to seven things
 // you go to daily — but it still needs a name for the header and the title.
 export const OFF_RAIL = {
-  settings: { key:"settings", label:"Settings", lab:null, blurb:"workspace, brands, convention, data" },
+  settings: { key:"settings", label:"Settings", blurb:"Workspace, brands, convention, data" },
 };
 
 /** Flat lookup so other code can name a view without knowing its section. */
@@ -74,7 +63,7 @@ export const NAV_INDEX = NAV_SECTIONS.reduce((acc, s) => {
  * The plain label for a nav key, falling back to the key itself for views that
  * are not nav destinations (detail, form). Everything user-facing that has to
  * name a destination — "Back to Initiatives", the view header — uses this, so
- * the laboratory name stays decorative by construction.
+ * a destination is always named the same way.
  */
 export const navName = (key) => NAV_INDEX[key]?.label || key;
 

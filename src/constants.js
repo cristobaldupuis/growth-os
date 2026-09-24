@@ -277,7 +277,7 @@ export const FONT_SERIF = FONT_SANS;
 // `teal` is the success ink (a green now; the name is historical too) and
 // `warn` is amber. Both are for state, never for decoration.
 export const TL = {
-  bg:"#F6F6F7", surface:"#FFFFFF", surfaceAlt:"#FAFAFB",
+  bg:"#F6F6F7", surface:"#FFFFFF", surfaceAlt:"#F8F8F9",
   border:"#E6E6E9", borderSoft:"#EFEFF2",
   text:"#18181B", textSub:"#3F3F46", textMuted:"#62626B", textFaint:"#85858F",
   gold:"#4F46E5", goldFill:"#4F46E5", goldSoft:"#A5B4FC", goldText:"#FFFFFF",
@@ -332,12 +332,16 @@ export const OD = { Jackpot:{bg:"#102520",border:"#277048",text:"#5AD48C"}, Succ
 export const TYPE_L = { "A/B Test":"#20698D", Campaign:"#9A4526", Process:"#4444AC", Research:"#653C8B", Infrastructure:"#1C784A" };
 export const TYPE_D = { "A/B Test":"#5FB4E0", Campaign:"#DC7C5C", Process:"#8E8EEA", Research:"#B27FD8", Infrastructure:"#4ACF8C" };
 
-export const CAT_L = ["#b07818","#187860","#4848b0","#b03838","#a04828","#2878a0","#6a4090","#208050"];
-export const CAT_D = ["#d4a83a","#3acca0","#8080e0","#e08080","#d07050","#50a8d8","#a870d0","#40c880"];
+// Categorical inks for category and brand tags. Led by cool hues so the first
+// few categories (the ones every workspace has) do not read as the old ochre,
+// and the accent's own indigo is left out so a tag never looks like an action.
+// Each clears AA on its theme's surfaces; see scripts/check-contrast.mjs.
+export const CAT_L = ["#1D4ED8","#0F766E","#7C3AED","#BE185D","#C2410C","#15803D","#475569","#155E75"];
+export const CAT_D = ["#93C5FD","#5EEAD4","#C4B5FD","#F9A8D4","#FDBA74","#86EFAC","#CBD5E1","#67E8F9"];
 export const catColor = (cat, cats, dk) => (dk ? CAT_D : CAT_L)[cats.indexOf(cat) % 8] || "#888";
 
-export const BRAND_COLORS_L = ["#b07818","#187860","#4848b0","#b03838","#a04828","#2878a0"];
-export const BRAND_COLORS_D = ["#d4a83a","#3acca0","#8080e0","#e08080","#d07050","#50a8d8"];
+export const BRAND_COLORS_L = ["#1D4ED8","#0F766E","#7C3AED","#BE185D","#C2410C","#15803D"];
+export const BRAND_COLORS_D = ["#93C5FD","#5EEAD4","#C4B5FD","#F9A8D4","#FDBA74","#86EFAC"];
 export const brandColor = (brandId, brands, dk) => {
   const idx = brands.findIndex(b=>b.id===brandId);
   return (dk?BRAND_COLORS_D:BRAND_COLORS_L)[idx%6]||"#888";

@@ -168,7 +168,7 @@ export function TriageView({items, t, brands, activeBrand, onDetail, onLogResult
         ].map(m=>(
           <div key={m.l} {...(()=>{const p=tile(t,m.gold?t.goldFill:t.border,queue.length?0:null);return{className:p.className,style:{...p.style,background:t.surface,border:"1px solid "+t.border,borderRadius:12,padding:"13px 15px",boxShadow:t.shadow}};})()}>
             <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,fontWeight:600,marginBottom:8}}>{m.l}</div>
-            <div style={{fontSize:24,fontWeight:700,color:m.gold?t.gold:t.text,fontFamily:t.sans,letterSpacing:"-0.03em",lineHeight:1}}>{m.v}</div>
+            <div style={{fontSize:24,fontWeight:600,color:t.text,fontFamily:t.sans,letterSpacing:"-0.03em",lineHeight:1}}>{m.v}</div>
           </div>
         ))}
       </div>
@@ -206,7 +206,7 @@ export function TriageView({items, t, brands, activeBrand, onDetail, onLogResult
                   </div>
                   <button type="button" onClick={()=>onDetail(q.id)} style={{background:"none",border:"none",padding:0,textAlign:"left",font:"inherit",fontSize:14.5,fontWeight:600,color:t.text,fontFamily:t.sans,lineHeight:1.3,cursor:"pointer"}}>{q.title}</button>
                 </div>
-                {q.money>0 && <span style={{fontSize:16,fontWeight:700,color:t.gold,fontFamily:t.sans,letterSpacing:"-0.02em",flexShrink:0}}>{fmtCur(q.money)}</span>}
+                {q.money>0 && <span style={{fontSize:16,fontWeight:600,color:t.text,fontFamily:t.sans,letterSpacing:"-0.02em",flexShrink:0}}>{fmtCur(q.money)}</span>}
               </div>
               <div style={{fontSize:12.5,color:t.textSub,fontFamily:t.sans,lineHeight:1.5,marginBottom:11}}>{q.reason}</div>
               <div style={{display:"flex",gap:7,flexWrap:"wrap",alignItems:"center"}}>

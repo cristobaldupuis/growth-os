@@ -1433,7 +1433,7 @@ export default function App() {
           {item.hypothesis&&<div style={{fontSize:12.5,color:t.textSub,lineHeight:1.5,fontFamily:t.sans,textAlign:"left"}}>{item.hypothesis.slice(0,128)}{item.hypothesis.length>128?"…":""}</div>}
         </div>
         <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4,flexShrink:0}}>
-          {item.revenueImpact!==0&&<span style={{fontSize:18,fontWeight:700,color:t.gold,fontFamily:t.sans,letterSpacing:"-0.02em",lineHeight:1}}>{fmtCur(item.revenueImpact)}</span>}
+          {item.revenueImpact!==0&&<span style={{fontSize:18,fontWeight:600,color:t.text,fontFamily:t.sans,letterSpacing:"-0.02em",lineHeight:1}}>{fmtCur(item.revenueImpact)}</span>}
           <ICEChip ice={item.ice} t={t}/>
         </div>
       </div>
@@ -1684,7 +1684,7 @@ export default function App() {
       // Theme values the stylesheet needs. A media query cannot read a JS
       // object, and the button interaction below has to work in both themes
       // without each of 173 buttons opting in by hand.
-      "--gos-shadow":t.shadow, "--gos-shadow-hi":t.shadowHi, "--gos-gold":t.gold}}>
+      "--gos-shadow":t.shadow, "--gos-shadow-hi":t.shadowHi, "--gos-gold":t.gold, "--gos-btn-hover":dk?1.18:0.95}}>
       {/* The Tabler icon webfont used to be @import-ed here from jsdelivr. Nothing
         * in the app ever rendered a `ti ti-*` class, so it was a render-blocking
         * third-party request buying nothing — and one more origin to justify if a
@@ -1732,22 +1732,17 @@ export default function App() {
         //
         // Done here rather than in the style helpers because a helper returns
         // an inline style object and `:hover` cannot be expressed in one. The
-        // selector excludes anything already in the interaction layer, so a nav
-        // item keeps its rail-and-tint and does not also lift.
+        // selector excludes anything already in the interaction layer and the
+        // rail's own controls, which tint instead.
         //
-        // `saturate` rather than `brightness`: a brightness lift reads well on
-        // the gold primary but goes the wrong way on a near-white secondary in
-        // light mode, where hover should feel like the surface coming forward
-        // rather than washing out. Saturation deepens the accent and leaves the
-        // greys alone, and the lift plus shadow is what carries the state in
-        // both themes. The global prefers-reduced-motion block in index.css
-        // collapses the movement and leaves the colour.
-        +"button:not(:disabled):not(.gos-int):not(.gos-tile){transition:transform .13s cubic-bezier(.2,.7,.3,1),box-shadow .16s ease,filter .16s ease}"
-        +"button:not(:disabled):not(.gos-int):not(.gos-tile):hover{transform:translateY(-1px);box-shadow:var(--gos-shadow-hi);filter:saturate(1.14)}"
-        +"button:not(:disabled):not(.gos-int):not(.gos-tile):focus-visible{box-shadow:var(--gos-shadow-hi)}"
-        // The press. Returns to rest and dips a hair below it, so a click reads
-        // as a click rather than as the hover state blinking off.
-        +"button:not(:disabled):not(.gos-int):not(.gos-tile):active{transform:translateY(0.5px);box-shadow:none;filter:saturate(1.04)}"}</style>
+        // A brightness shift and nothing else: no lift, no shadow. Buttons that
+        // jumped and glowed on hover made the product feel busier than it is.
+        // The amount is per theme (`--gos-btn-hover`, set on the root above):
+        // darken a touch in light mode, lighten in dark, so an accent fill and a
+        // plain secondary both visibly respond.
+        +"button:not(:disabled):not(.gos-int):not(.gos-tile):not(.gos-nav){transition:filter .12s ease,background-color .12s ease}"
+        +"button:not(:disabled):not(.gos-int):not(.gos-tile):not(.gos-nav):hover{filter:brightness(var(--gos-btn-hover,0.95))}"
+        +"button:not(:disabled):not(.gos-int):not(.gos-tile):not(.gos-nav):active{filter:brightness(calc(var(--gos-btn-hover,0.95) * 0.97))}"}</style>
 
       {/* Onboarding — first run only */}
       {onboarding&&(
@@ -2231,7 +2226,7 @@ export default function App() {
                     <div style={{display:"flex",alignItems:"baseline",gap:14,fontSize:11,fontFamily:t.sans,color:t.textMuted}}>
                       {roll.winRate!=null&&<span>{roll.winRate}% win rate</span>}
                       {roll.realised!==0&&<span>realised <span style={{color:t.teal,fontWeight:700}}>{fmtCur(roll.realised)}</span></span>}
-                      {roll.atRisk>0&&<span>at risk <span style={{color:t.gold,fontWeight:700}}>{fmtCur(roll.atRisk)}</span></span>}
+                      {roll.atRisk>0&&<span>at risk <span style={{color:t.text,fontWeight:600}}>{fmtCur(roll.atRisk)}</span></span>}
                     </div>
                   </div>
                   {g.items.map(renderInitiativeCard)}
@@ -2453,7 +2448,7 @@ export default function App() {
                 <div style={{display:"flex",gap:18,flexWrap:"wrap",fontSize:11.5,fontFamily:t.serif,color:t.textSub}}>
                   {sel.primaryMetric&&<span><span style={{color:t.textMuted}}>Metric:</span> {sel.primaryMetric}</span>}
                   {sel.measurementScope&&<span><span style={{color:t.textMuted}}>Scope:</span> {sel.measurementScope}</span>}
-                  {sel.revenueImpact>0&&<span><span style={{color:t.textMuted}}>Est. impact:</span> <span style={{color:t.gold,fontWeight:600}}>{fmtCur(sel.revenueImpact)}</span></span>}
+                  {sel.revenueImpact>0&&<span><span style={{color:t.textMuted}}>Est. impact:</span> <span style={{color:t.text,fontWeight:600}}>{fmtCur(sel.revenueImpact)}</span></span>}
                   {sel.killCriteria&&<span style={{flexBasis:"100%",color:t.textMuted,marginTop:2}}>Kill criteria: <span style={{color:t.textSub}}>{sel.killCriteria.slice(0,120)}{sel.killCriteria.length>120?"…":""}</span></span>}
                 </div>
               </div>

@@ -333,7 +333,7 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
                         <span><span style={cLbl(t)}>Est</span><strong style={{color:t.text,fontFamily:t.sans,fontWeight:600}}>{fmtCur(item.revenueImpact)}</strong></span>
                       )}
                       {item.revenueImpact!==0&&item.results.actualRevenueImpact!=null&&(
-                        <span><span style={cLbl(t)}>Actual</span><strong style={{color:t.gold,fontFamily:t.sans,fontWeight:600}}>{fmtCur(item.results.actualRevenueImpact)}</strong></span>
+                        <span><span style={cLbl(t)}>Actual</span><strong style={{color:t.text,fontFamily:t.sans,fontWeight:600}}>{fmtCur(item.results.actualRevenueImpact)}</strong></span>
                       )}
                     </div>
                   )}

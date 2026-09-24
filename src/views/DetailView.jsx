@@ -148,7 +148,7 @@ export function DetailView({item,items,t,dk,cats,settings,onEdit,onDelete,onStat
             </div>}
             {item.revenueImpact!==0&&((item.spendCost||0)+(item.resourceCost||0))>0&&<div>
               <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginBottom:2}}>Est. ROI</div>
-              <div style={{fontSize:16,fontWeight:700,color:t.gold,fontFamily:t.sans}}>{((item.revenueImpact||0)/((item.spendCost||0)+(item.resourceCost||0))).toFixed(1)}x</div>
+              <div style={{fontSize:16,fontWeight:600,color:t.text,fontFamily:t.sans}}>{((item.revenueImpact||0)/((item.spendCost||0)+(item.resourceCost||0))).toFixed(1)}x</div>
             </div>}
           </div>
           {item.results?.actualRevenueImpact!=null&&(
@@ -165,7 +165,7 @@ export function DetailView({item,items,t,dk,cats,settings,onEdit,onDelete,onStat
                 </div>}
                 <div>
                   <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginBottom:2}}>Actual revenue</div>
-                  <div style={{fontSize:16,fontWeight:700,color:t.gold,fontFamily:t.sans}}>{fmtCur(item.results.actualRevenueImpact)}</div>
+                  <div style={{fontSize:16,fontWeight:600,color:t.text,fontFamily:t.sans}}>{fmtCur(item.results.actualRevenueImpact)}</div>
                 </div>
                 {(()=>{
                   const actCost=(item.results.actualSpendCost||0)+(item.results.actualResourceCost||0);

@@ -317,7 +317,7 @@ export function FormView({form,setForm,items,agenda,t,dk,cats,brands,aiLoad,iceL
         {((form.spendCost||0)+(form.resourceCost||0))>0&&(
           <div style={{marginTop:10,padding:"8px 12px",background:t.surfaceAlt,borderRadius:4,fontSize:12,fontFamily:t.serif,color:t.textMuted,display:"flex",gap:16,flexWrap:"wrap"}}>
             <span>Total est. cost: <strong style={{color:t.text}}>{fmtCur((form.spendCost||0)+(form.resourceCost||0))}</strong></span>
-            {(form.revenueImpact||0)>0&&<span>Est. ROI: <strong style={{color:t.gold}}>{((form.revenueImpact||0)/((form.spendCost||0)+(form.resourceCost||0))).toFixed(1)}x</strong></span>}
+            {(form.revenueImpact||0)>0&&<span>Est. ROI: <strong style={{color:t.text}}>{((form.revenueImpact||0)/((form.spendCost||0)+(form.resourceCost||0))).toFixed(1)}x</strong></span>}
           </div>
         )}
       </div>

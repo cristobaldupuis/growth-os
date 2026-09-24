@@ -24,33 +24,30 @@ const STAGGER_CAP = 10;
 export const stagger = (i) => `${Math.min(i || 0, STAGGER_CAP) * STAGGER_MS}ms`;
 
 /**
- * Props for an interactive card: lifts, and charges an accent rail down its
- * leading edge on hover.
+ * Props for an interactive card or row: its surface tints on hover.
  *
- * `accent` is the semantic colour this row means — urgency in Triage, outcome
- * in the Library, gold where the only thing being said is "this is clickable".
- * Omit it and there is simply no rail; the fallback is transparent rather than
- * a guessed colour.
+ * `accent` is accepted and ignored. It used to colour a rail that charged down
+ * the card's leading edge; the rail is gone (see the interaction layer in
+ * index.css) and the parameter stays so the call sites need not change.
+ * `hoverBg` overrides the tint, for rows that already sit on an alt surface.
  */
 export function interactive(t, accent, opts = {}) {
   const { flat = false, index = null, hoverBg = null } = opts;
   return {
     className: "gos-int" + (flat ? " gos-int-flat" : "") + (index != null ? " gos-enter" : ""),
     style: {
-      "--gos-accent": accent || "transparent",
-      "--gos-spark": t.spark,
-      ...(hoverBg ? { "--gos-hover-bg": hoverBg } : {}),
+      "--gos-hover-bg": hoverBg || t.surfaceAlt,
       ...(index != null ? { "--gos-delay": stagger(index) } : {}),
     },
   };
 }
 
-/** Props for a stat tile: lifts, and draws an accent underline in from the left. */
+/** Props for a stat tile: no hover state, only the staggered entry. `accent`
+ *  is accepted and ignored, like `interactive`'s. */
 export function tile(t, accent, index = null) {
   return {
     className: "gos-tile" + (index != null ? " gos-enter" : ""),
     style: {
-      "--gos-accent": accent || t.goldFill,
       ...(index != null ? { "--gos-delay": stagger(index) } : {}),
     },
   };

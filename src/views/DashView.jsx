@@ -209,7 +209,7 @@ function FunnelCoverageMap({t, items, cats, brands, activeBrand}) {
             Where active work and revenue are concentrated across the funnel, and which stages are uncovered.
           </div>
         </div>
-        <span style={{fontSize:12,fontWeight:600,color:t.gold,fontFamily:t.sans}}>{fmtK(totalRevInPlay)} in play</span>
+        <span style={{fontSize:12,fontWeight:600,color:t.text,fontFamily:t.sans}}>{fmtK(totalRevInPlay)} in play</span>
       </div>
 
       {/* A coverage gap is an opportunity, not a failure, and red is reserved
@@ -251,7 +251,7 @@ function FunnelCoverageMap({t, items, cats, brands, activeBrand}) {
               {/* Revenue in play */}
               <div style={{width:74,textAlign:"right",flexShrink:0}}>
                 <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans}}>In play</div>
-                <div style={{fontSize:14,fontWeight:600,color:s.revInPlay>0?t.gold:t.textMuted,fontFamily:t.sans,lineHeight:1.2,letterSpacing:"-0.02em"}}>{fmtK(s.revInPlay)}</div>
+                <div style={{fontSize:14,fontWeight:600,color:s.revInPlay>0?t.text:t.textMuted,fontFamily:t.sans,lineHeight:1.2,letterSpacing:"-0.02em"}}>{fmtK(s.revInPlay)}</div>
               </div>
             </div>
           );
@@ -263,8 +263,7 @@ function FunnelCoverageMap({t, items, cats, brands, activeBrand}) {
 
 
 // -- Business Health Panel -----------------------------------------------------
-function BusinessHealthPanel({ t, settings, weeklyMetrics, activeBrand, brands }) {
-  const [expanded, setExpanded] = useState(true);
+function BusinessHealthPanel({ t, settings, weeklyMetrics, activeBrand, lead }) {
 
   // Scoped to the active brand so the tiles read that brand's own guardrails
   // rather than a portfolio blend when one is selected — same "all" convention
@@ -338,75 +337,90 @@ function BusinessHealthPanel({ t, settings, weeklyMetrics, activeBrand, brands }
     const pos  = d > 0;
     const good = higherIsBetter ? pos : !pos;
     return (
-      <span style={{fontSize:10,fontWeight:600,fontFamily:t.sans,color:good?t.teal:t.red,marginLeft:4}}>
-        {pos?"▲":"▼"}{Math.abs(d).toFixed(1)}%
+      <span style={{fontSize:12,fontWeight:600,fontFamily:t.sans,color:good?t.teal:t.red}}>
+        {pos?"▲":"▼"} {Math.abs(d).toFixed(1)}%
       </span>
     );
   };
 
+  // The trend under each tile: the same calculation run over each logged date,
+  // oldest first, capped at the last eight so a long history stays a sparkline.
+  const dates = [...new Set(allEntries.map(m => m.date))].sort().slice(-8);
+  const seriesFor = (metric) => dates
+    .map(d => calcFor(metric, allEntries.filter(m => m.date === d)))
+    .filter(v => v !== null);
+
   const healthMetrics = (settings.healthMetrics || DEFAULT_SETTINGS.healthMetrics).filter(m => m.enabled);
-  if (healthMetrics.length === 0) return null;
+  const tiles = healthMetrics.map(metric => {
+    const autoVal  = calcCurrent(metric);
+    const val      = autoVal !== null ? autoVal : (metric.manualValue ?? null);
+    return { metric, val, prior: calcPrior(metric), fmtd: fmtVal(metric, val), series: seriesFor(metric) };
+  });
+  // A metric with no value yet is a setup prompt, not a KPI: it moves out of the
+  // row to one line underneath rather than holding a tile open on an em dash.
+  const live = tiles.filter(x => x.fmtd !== null);
+  const unset = tiles.filter(x => x.fmtd === null);
+  if (!lead && live.length === 0) return null;
+
+  // The north star leads the row at double width. Column counts are handed to
+  // the stylesheet (see .gos-kpi in index.css) so the row can reflow: wide, the
+  // lead and every tile share one row; narrower, the lead takes its own row.
+  const n = Math.max(1, Math.min(live.length, 5));
+  const wide = live.length <= 4 && lead ? n + 2 : n;
+  const cols = (k) => "repeat(" + k + ", minmax(0, 1fr))";
 
   return (
-    <div style={{...gCd(t),border:"1px solid "+t.border}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}>
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <button onClick={()=>setExpanded(e=>!e)} aria-expanded={expanded} aria-label={(expanded?"Collapse":"Expand")+" Weekly Pulse"}
-            style={{background:"none",border:"none",cursor:"pointer",color:t.textMuted,padding:0,lineHeight:1,display:"inline-flex"}}>
-            {expanded?<IconChevronDown size={14}/>:<IconChevronRight size={14}/>}
-          </button>
-          <div>
-            <span style={{fontSize:15,fontWeight:600,color:t.text,fontFamily:t.sans,letterSpacing:"-0.01em"}}>Business health</span>
-            <div style={{fontSize:12.5,color:t.textMuted,fontFamily:t.sans,marginTop:2}}>
-              {(!activeBrand||activeBrand==="all")
-                ? "Portfolio-level guardrail metrics: watch these when experiments are running"
-                : brandName(activeBrand,brands)+"'s guardrail metrics: watch these when experiments are running"}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {expanded && (
-        <div style={{marginTop:14,display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:10}}>
-          {healthMetrics.map(metric => {
-            const autoVal  = calcCurrent(metric);
-            const priorVal = calcPrior(metric);
-            const val      = autoVal !== null ? autoVal : (metric.manualValue ?? null);
-            const fmtd     = fmtVal(metric, val);
-            const showTgt  = metric.target != null && val !== null;
-            const tgtPct   = showTgt ? Math.min(
-              metric.higherIsBetter
-                ? (val / metric.target) * 100
-                : (metric.target / val) * 100,
-              100
-            ) : null;
-
-            return (
-              <div key={metric.key} style={{background:t.surfaceAlt,border:"1px solid "+t.borderSoft,borderRadius:t.r.md,padding:"14px 16px",minHeight:96,display:"flex",flexDirection:"column"}}>
-                <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,fontWeight:600,marginBottom:"auto",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>{metric.label}</div>
-                <div style={{marginTop:9,display:"flex",alignItems:"baseline",flexWrap:"wrap",gap:2}}>
-                  {fmtd !== null
-                    ? <span style={{fontSize:t.fs.figure,fontWeight:600,color:t.text,fontFamily:t.sans,lineHeight:1,letterSpacing:"-0.02em"}}>{fmtd}</span>
-                    : <span style={{fontSize:t.fs.figure,fontWeight:600,color:t.textFaint,fontFamily:t.sans,lineHeight:1}}>—</span>}
-                  {fmtd !== null && deltaChip(val, priorVal, metric.higherIsBetter)}
-                </div>
-                {fmtd === null && (
-                  <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,marginTop:6,lineHeight:1.4}}>Configure in Settings</div>
-                )}
-                {showTgt && tgtPct !== null && (
-                  <div style={{marginTop:8}}>
-                    <div style={{fontSize:9.5,color:t.textMuted,fontFamily:t.sans,marginBottom:3}}>Target {fmtVal(metric, metric.target)}</div>
-                    <div style={{height:3,borderRadius:2,background:t.border,overflow:"hidden"}}>
-                      <div style={{width:tgtPct+"%",height:"100%",borderRadius:2,background:tgtPct>=100?t.teal:t.gold,transition:"width .3s"}}/>
-                    </div>
-                  </div>
-                )}
+    <div style={{display:"flex",flexDirection:"column",gap:8}}>
+      <div className="gos-kpi" style={{display:"grid",gap:16,
+        "--kpi-wide":cols(wide),"--kpi-mid":cols(n),
+        "--kpi-lead": live.length <= 4 && lead ? "span 2" : "1 / -1"}}>
+        {lead && <div className="gos-kpi-lead" style={{display:"flex",minWidth:0}}>{lead}</div>}
+        {live.map(({ metric, val, prior, fmtd, series }) => {
+          const showTgt  = metric.target != null && val !== null;
+          const tgtPct   = showTgt ? Math.min(
+            metric.higherIsBetter
+              ? (val / metric.target) * 100
+              : (metric.target / val) * 100,
+            100
+          ) : null;
+          return (
+            <div key={metric.key} style={{...gCd(t),padding:"18px 18px 14px",minWidth:0,display:"flex",flexDirection:"column",gap:8}}>
+              <div title={metric.label} style={{fontSize:13,color:t.textMuted,fontFamily:t.sans,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{metric.label}</div>
+              <div style={{fontSize:t.fs.figure,fontWeight:600,color:t.text,fontFamily:t.sans,lineHeight:1.1,letterSpacing:"-0.02em"}}>{fmtd}</div>
+              <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:t.textMuted,fontFamily:t.sans,whiteSpace:"nowrap"}}>
+                {deltaChip(val, prior, metric.higherIsBetter) || <span>No prior week</span>}
+                {deltaChip(val, prior, metric.higherIsBetter) && <span>vs prior week</span>}
               </div>
-            );
-          })}
+              {showTgt && tgtPct !== null && (
+                <div title={"Target "+fmtVal(metric, metric.target)} style={{height:4,borderRadius:t.r.pill,background:t.borderSoft,overflow:"hidden"}}>
+                  <div style={{width:tgtPct+"%",height:"100%",borderRadius:t.r.pill,background:tgtPct>=100?t.teal:t.goldFill,transition:"width .3s"}}/>
+                </div>
+              )}
+              <div style={{marginTop:"auto"}}><MiniTrend t={t} vals={series}/></div>
+            </div>
+          );
+        })}
+      </div>
+      {unset.length > 0 && (
+        <div style={{fontSize:12.5,color:t.textMuted,fontFamily:t.sans}}>
+          Not configured yet: {unset.map(x => x.metric.label).join(", ")}. Set {unset.length === 1 ? "it" : "them"} up in Settings.
         </div>
       )}
     </div>
+  );
+}
+
+// A sparkline that fills its tile's width. Spark.jsx draws at a fixed pixel
+// width, which a fluid grid cell cannot give it.
+function MiniTrend({ t, vals }) {
+  if (!vals || vals.length < 2) return <div style={{height:32}}/>;
+  const W = 120, H = 32, lo = Math.min(...vals), hi = Math.max(...vals);
+  const span = hi - lo || 1;
+  const pts = vals.map((v, i) => (i / (vals.length - 1) * W).toFixed(1) + "," + (H - 3 - ((v - lo) / span) * (H - 6)).toFixed(1)).join(" ");
+  return (
+    <svg width="100%" height={H} viewBox={"0 0 "+W+" "+H} preserveAspectRatio="none" aria-hidden="true" style={{display:"block"}}>
+      <polyline points={pts} fill="none" stroke={t.goldFill} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke"/>
+    </svg>
   );
 }
 
@@ -938,16 +952,14 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
   // Cross-brand transfer opportunities — top 3, only shown if >= 2 exist.
   const transfers = buildCrossBrandTransfers(items, brands).slice(0, 3);
 
-  return (
-    <div style={{padding:"24px 32px 40px",display:"flex",flexDirection:"column",gap:16}}>
-      {/* North star. A plain card with one progress bar: the figure is the
-        * content, so it is set in ink, and the accent is spent on the bar that
-        * says how far along it is. */}
-      {(()=>{
+  // North star. A plain card with one progress bar: the figure is the content,
+  // so it is set in ink, and the accent is spent on the bar that says how far
+  // along it is. It leads the KPI row rather than sitting above it.
+  const northStarCard = (()=>{
         const pct = (nsCurrentNum !== null && nsTargetNum)
           ? Math.max(0, Math.min(100, Math.round(nsCurrentNum / nsTargetNum * 100))) : null;
         return (
-          <div data-tour="northstar" style={{...gCd(t),padding:"20px 22px",display:"flex",flexDirection:"column",gap:14}}>
+          <div data-tour="northstar" style={{...gCd(t),padding:"20px 22px",display:"flex",flexDirection:"column",justifyContent:"space-between",gap:14,flex:1,minWidth:0}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
               <span style={{fontSize:13,fontWeight:500,color:t.textMuted,fontFamily:t.sans}}>
                 North star · <span style={{color:t.text}}>{ns.metric}</span>
@@ -979,8 +991,17 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
             </div>
           </div>
         );
-      })()}
+      })();
 
+  return (
+    <div style={{padding:"24px 32px 40px",display:"flex",flexDirection:"column",gap:16}}>
+      {/* KPI row — the north star leads, the business-health guardrails follow.
+        * These read the latest logged week, as Weekly Pulse does; the range
+        * control further down governs only the results section under it. */}
+      <BusinessHealthPanel t={t} settings={settings} weeklyMetrics={weeklyMetrics} activeBrand={activeBrand} lead={northStarCard}/>
+
+      {/* What needs a decision this week, beside what to try next. */}
+      <div className="gos-grid-2" style={{display:"grid",gridTemplateColumns:"minmax(0,3fr) minmax(0,2fr)",gap:16,alignItems:"stretch"}}>
       {/* This week's focus — attention nudges + weekly standup entry point.
         * A white card with amber state pills rather than an amber panel: the
         * panel tinted the whole block as an alarm, and red "running 36d" chips
@@ -1003,7 +1024,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
         ].slice(0,3);
         const hasNudges = nudges.length>0;
         return (
-          <div style={{...gCd(t),padding:hasNudges?"18px 20px 6px":"14px 20px"}}>
+          <div style={{...gCd(t),padding:hasNudges?"18px 20px 6px":"18px 20px"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:hasNudges?6:0}}>
               <div style={{display:"flex",alignItems:"center",gap:8}}>
                 <span style={{fontSize:15,fontWeight:600,color:t.text,fontFamily:t.sans,letterSpacing:"-0.01em"}}>
@@ -1041,17 +1062,6 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
         );
       })()}
 
-      {showStandup && (
-        <WeeklyStandupModal
-          t={t} dk={dk}
-          items={items}
-          brands={brands}
-          onCommit={(updated)=>onSaveItems&&onSaveItems(updated)}
-          onClose={()=>setShowStandup(false)}
-          showToast={showToast}
-        />
-      )}
-
       {/* Next Plays — AI-recommended experiments */}
       <NextPlaysCard
         t={t} dk={dk}
@@ -1064,6 +1074,19 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
         onOpenRec={onOpenRec}
       />
 
+      </div>
+
+      {showStandup && (
+        <WeeklyStandupModal
+          t={t} dk={dk}
+          items={items}
+          brands={brands}
+          onCommit={(updated)=>onSaveItems&&onSaveItems(updated)}
+          onClose={()=>setShowStandup(false)}
+          showToast={showToast}
+        />
+      )}
+
       {/* Weekly Pulse */}
       <WeeklyPulseSection
         t={t}
@@ -1073,8 +1096,6 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
         onImport={onImport}
       />
 
-      {/* Business Health */}
-      <BusinessHealthPanel t={t} settings={settings} weeklyMetrics={weeklyMetrics} activeBrand={activeBrand} brands={brands}/>
 
       {/* Scope bar.
         *

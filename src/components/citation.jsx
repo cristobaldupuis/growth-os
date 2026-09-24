@@ -79,7 +79,7 @@ export function CitationModal({ item, t, dk, cats, brands, items, onClose }) {
         {(item.revenueImpact!==0 || r.actualRevenueImpact!=null) && (
           <div style={{display:"flex",gap:18,fontSize:12,fontFamily:t.serif,color:t.textMuted}}>
             {item.revenueImpact!==0 && <span>Est: <strong style={{color:t.text,fontFamily:t.sans}}>{fmtCur(item.revenueImpact)}</strong></span>}
-            {r.actualRevenueImpact!=null && <span>Actual: <strong style={{color:t.gold,fontFamily:t.sans}}>{fmtCur(r.actualRevenueImpact)}</strong></span>}
+            {r.actualRevenueImpact!=null && <span>Actual: <strong style={{color:t.text,fontFamily:t.sans}}>{fmtCur(r.actualRevenueImpact)}</strong></span>}
           </div>
         )}
 

@@ -310,7 +310,7 @@ function RunningSection({ t, dk, running, cats, onCopy }) {
                 </div>
                 <div style={{ textAlign: "right", flexShrink: 0 }}>
                   <div style={{ fontSize:12, color: t.textMuted, fontFamily: t.sans, marginBottom: 3 }}>Est. impact</div>
-                  <div style={{ fontSize: 17, fontWeight: 700, color: t.gold, fontFamily: t.sans, letterSpacing: "-0.01em" }}>{fmtCur(item.revenueImpact)}</div>
+                  <div style={{ fontSize: 17, fontWeight: 600, color: t.text, fontFamily: t.sans, letterSpacing: "-0.01em" }}>{fmtCur(item.revenueImpact)}</div>
                 </div>
               </div>
             );
@@ -351,7 +351,7 @@ function NextSection({ t, dk, next, cats, onCopy }) {
                 </div>
                 <div style={{ textAlign: "right", flexShrink: 0 }}>
                   <div style={{ fontSize:12, color: t.textMuted, fontFamily: t.sans, marginBottom: 3 }}>Est. impact</div>
-                  <div style={{ fontSize: 17, fontWeight: 700, color: t.gold, fontFamily: t.sans, letterSpacing: "-0.01em" }}>{fmtCur(item.revenueImpact)}</div>
+                  <div style={{ fontSize: 17, fontWeight: 600, color: t.text, fontFamily: t.sans, letterSpacing: "-0.01em" }}>{fmtCur(item.revenueImpact)}</div>
                 </div>
               </div>
             );

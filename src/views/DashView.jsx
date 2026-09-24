@@ -3,6 +3,7 @@ import { OUTCOMES, INIT_TYPES, METRIC_SOURCES, OL, OD, DEFAULT_SETTINGS, brandNa
 import { interactive, tile, stagger } from "../components/motion.js";
 import { ChargeBar } from "../components/ChargeBar.jsx";
 import { gG, gGh, gSL, gCd } from "../components/styles.js";
+import { Trend } from "../components/Trend.jsx";
 import { Spark } from "../components/Spark.jsx";
 import { WeeklyStandupModal } from "../components/WeeklyStandupModal.jsx";
 import { buildCrossBrandTransfers } from "../services/portfolio.js";
@@ -12,6 +13,7 @@ import { IconImport, IconPlus, IconChart, IconAlert, IconChevronDown, IconChevro
 // -- Weekly Pulse --------------------------------------------------------------
 function WeeklyPulseSection({t, brands, weeklyMetrics, onLog, onImport}) {
   const [expanded, setExpanded] = useState(true);
+  const [revHi, setRevHi] = useState(null);
 
   const now = new Date();
 
@@ -29,6 +31,8 @@ function WeeklyPulseSection({t, brands, weeklyMetrics, onLog, onImport}) {
   const revenueByWeek = weeks.map(w =>
     weeklyMetrics.filter(m=>m.date===w).reduce((s,m)=>s+(m.metrics.revenue||0),0)
   ).reverse();
+  const revenuePoints = [...weeks].reverse().map((w,i) => ({ label:w, value:revenueByWeek[i] }));
+  const revPoint = revHi != null ? revenuePoints[revHi] : null;
 
   // Build a summary table: brands × latest week metrics (revenue, spend, roas)
   const summaryRows = brands.map(b => {
@@ -117,13 +121,19 @@ function WeeklyPulseSection({t, brands, weeklyMetrics, onLog, onImport}) {
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
               {/* Revenue sparkline strip */}
               {revenueByWeek.some(v=>v>0) && (
-                <div style={{display:"flex",alignItems:"center",gap:14,padding:"12px 14px",background:t.surfaceAlt,borderRadius:t.r.md}}>
-                  <span style={{fontSize:12.5,color:t.textMuted,fontFamily:t.sans}}>Revenue</span>
-                  <Spark vals={revenueByWeek} color={t.gold} w={180} h={32}/>
-                  <span style={{fontSize:16,fontWeight:600,color:t.text,fontFamily:t.sans,letterSpacing:"-0.01em"}}>
-                    {fmtCur(revenueByWeek[revenueByWeek.length-1])}
-                  </span>
-                  <span style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,marginLeft:"auto"}}>last <span style={{fontFamily:t.sans}}>{weeks.length}</span> entries</span>
+                <div style={{display:"flex",alignItems:"center",gap:20,padding:"12px 16px",background:t.surfaceAlt,borderRadius:t.r.md,flexWrap:"wrap"}}>
+                  <div style={{display:"flex",flexDirection:"column",gap:2,minWidth:120}}>
+                    <span style={{fontSize:12.5,color:t.textMuted,fontFamily:t.sans}}>
+                      {revPoint ? "Revenue, week of "+fmtDateShort(revPoint.label) : "Revenue, latest week"}
+                    </span>
+                    <span aria-live="polite" style={{fontSize:18,fontWeight:600,color:t.text,fontFamily:t.sans,letterSpacing:"-0.01em"}}>
+                      {fmtCur(revPoint ? revPoint.value : revenueByWeek[revenueByWeek.length-1])}
+                    </span>
+                  </div>
+                  <div style={{flex:"1 1 200px",maxWidth:320}}>
+                    <Trend t={t} points={revenuePoints} height={36} label="Portfolio revenue" onScrub={setRevHi}/>
+                  </div>
+                  <span style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,marginLeft:"auto"}}>Last {weeks.length} entries</span>
                 </div>
               )}
 
@@ -347,8 +357,8 @@ function BusinessHealthPanel({ t, settings, weeklyMetrics, activeBrand, lead }) 
   // oldest first, capped at the last eight so a long history stays a sparkline.
   const dates = [...new Set(allEntries.map(m => m.date))].sort().slice(-8);
   const seriesFor = (metric) => dates
-    .map(d => calcFor(metric, allEntries.filter(m => m.date === d)))
-    .filter(v => v !== null);
+    .map(d => ({ label: d, value: calcFor(metric, allEntries.filter(m => m.date === d)) }))
+    .filter(p => p.value !== null);
 
   const healthMetrics = (settings.healthMetrics || DEFAULT_SETTINGS.healthMetrics).filter(m => m.enabled);
   const tiles = healthMetrics.map(metric => {
@@ -375,31 +385,10 @@ function BusinessHealthPanel({ t, settings, weeklyMetrics, activeBrand, lead }) 
         "--kpi-wide":cols(wide),"--kpi-mid":cols(n),
         "--kpi-lead": live.length <= 4 && lead ? "span 2" : "1 / -1"}}>
         {lead && <div className="gos-kpi-lead" style={{display:"flex",minWidth:0}}>{lead}</div>}
-        {live.map(({ metric, val, prior, fmtd, series }) => {
-          const showTgt  = metric.target != null && val !== null;
-          const tgtPct   = showTgt ? Math.min(
-            metric.higherIsBetter
-              ? (val / metric.target) * 100
-              : (metric.target / val) * 100,
-            100
-          ) : null;
-          return (
-            <div key={metric.key} style={{...gCd(t),padding:"18px 18px 14px",minWidth:0,display:"flex",flexDirection:"column",gap:8}}>
-              <div title={metric.label} style={{fontSize:13,color:t.textMuted,fontFamily:t.sans,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{metric.label}</div>
-              <div style={{fontSize:t.fs.figure,fontWeight:600,color:t.text,fontFamily:t.sans,lineHeight:1.1,letterSpacing:"-0.02em"}}>{fmtd}</div>
-              <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:t.textMuted,fontFamily:t.sans,whiteSpace:"nowrap"}}>
-                {deltaChip(val, prior, metric.higherIsBetter) || <span>No prior week</span>}
-                {deltaChip(val, prior, metric.higherIsBetter) && <span>vs prior week</span>}
-              </div>
-              {showTgt && tgtPct !== null && (
-                <div title={"Target "+fmtVal(metric, metric.target)} style={{height:4,borderRadius:t.r.pill,background:t.borderSoft,overflow:"hidden"}}>
-                  <div style={{width:tgtPct+"%",height:"100%",borderRadius:t.r.pill,background:tgtPct>=100?t.teal:t.goldFill,transition:"width .3s"}}/>
-                </div>
-              )}
-              <div style={{marginTop:"auto"}}><MiniTrend t={t} vals={series}/></div>
-            </div>
-          );
-        })}
+        {live.map(({ metric, val, prior, fmtd, series }, i) => (
+          <KpiTile key={metric.key} t={t} index={i} metric={metric} val={val} fmtd={fmtd} series={series}
+            delta={deltaChip(val, prior, metric.higherIsBetter)} fmtVal={fmtVal}/>
+        ))}
       </div>
       {unset.length > 0 && (
         <div style={{fontSize:12.5,color:t.textMuted,fontFamily:t.sans}}>
@@ -410,20 +399,37 @@ function BusinessHealthPanel({ t, settings, weeklyMetrics, activeBrand, lead }) 
   );
 }
 
-// A sparkline that fills its tile's width. Spark.jsx draws at a fixed pixel
-// width, which a fluid grid cell cannot give it.
-function MiniTrend({ t, vals }) {
-  if (!vals || vals.length < 2) return <div style={{height:32}}/>;
-  const W = 120, H = 32, lo = Math.min(...vals), hi = Math.max(...vals);
-  const span = hi - lo || 1;
-  const pts = vals.map((v, i) => (i / (vals.length - 1) * W).toFixed(1) + "," + (H - 3 - ((v - lo) / span) * (H - 6)).toFixed(1)).join(" ");
+// One KPI tile. Scrubbing its trend swaps the headline figure for the week
+// under the pointer and says which week that is, so the sparkline answers
+// "what was it then?" instead of only "which way is it going?".
+function KpiTile({ t, index, metric, val, fmtd, series, delta, fmtVal }) {
+  const [hi, setHi] = useState(null);
+  const point = hi != null ? series[hi] : null;
+  const showTgt = metric.target != null && val !== null;
+  const tgtPct = showTgt ? Math.min(
+    metric.higherIsBetter ? (val / metric.target) * 100 : (metric.target / val) * 100,
+    100
+  ) : null;
   return (
-    <svg width="100%" height={H} viewBox={"0 0 "+W+" "+H} preserveAspectRatio="none" aria-hidden="true" style={{display:"block"}}>
-      <polyline points={pts} fill="none" stroke={t.goldFill} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke"/>
-    </svg>
+    <div className="gos-enter" style={{...gCd(t),"--gos-delay":stagger(index + 1),padding:"18px 18px 14px",minWidth:0,display:"flex",flexDirection:"column",gap:8}}>
+      <div title={metric.label} style={{fontSize:13,color:t.textMuted,fontFamily:t.sans,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{metric.label}</div>
+      <div aria-live="polite" style={{fontSize:t.fs.figure,fontWeight:600,color:t.text,fontFamily:t.sans,lineHeight:1.1,letterSpacing:"-0.02em"}}>
+        {point ? fmtVal(metric, point.value) : fmtd}
+      </div>
+      <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:t.textMuted,fontFamily:t.sans,whiteSpace:"nowrap",minHeight:16}}>
+        {point
+          ? <span>Week of {fmtDateShort(point.label)}</span>
+          : (delta ? <>{delta}<span>vs prior week</span></> : <span>No prior week</span>)}
+      </div>
+      {showTgt && tgtPct !== null && (
+        <div title={"Target "+fmtVal(metric, metric.target)} style={{height:4,borderRadius:t.r.pill,background:t.borderSoft,overflow:"hidden"}}>
+          <div style={{width:tgtPct+"%",height:"100%",borderRadius:t.r.pill,background:tgtPct>=100?t.teal:t.goldFill,transition:"width .3s"}}/>
+        </div>
+      )}
+      <div style={{marginTop:"auto"}}><Trend t={t} points={series} label={metric.label} onScrub={setHi}/></div>
+    </div>
   );
 }
-
 
 function ContributionView({t, contribution, totals, dRange, activeBrand, brands, showToast}) {
   const rangeLabel = dRange==="thisMonth"?"this month":dRange==="lastMonth"?"last month":"selected range";
@@ -907,7 +913,7 @@ function StatTile({ t, m, index, big }) {
   );
 }
 
-export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetrics,onLog,onImport,dRange,setDRange,cFrom,cTo,setCFrom,setCTo,onGo,recs,recsLoad,recsErr,items,onGenerateRecs,onOpenRec,showToast,onSaveItems}) {
+export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetrics,onLog,onImport,dRange,setDRange,cFrom,cTo,setCFrom,setCTo,onGo,recs,recsLoad,recsErr,items,onGenerateRecs,onOpenRec,onOpenItem,showToast,onSaveItems}) {
   const maxCat  = Math.max(...Object.values(dash.catCounts),1);
   const maxType = Math.max(...Object.values(dash.typeCounts),1);
   const [showStandup, setShowStandup] = useState(false);
@@ -959,7 +965,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
         const pct = (nsCurrentNum !== null && nsTargetNum)
           ? Math.max(0, Math.min(100, Math.round(nsCurrentNum / nsTargetNum * 100))) : null;
         return (
-          <div data-tour="northstar" style={{...gCd(t),padding:"20px 22px",display:"flex",flexDirection:"column",justifyContent:"space-between",gap:14,flex:1,minWidth:0}}>
+          <div data-tour="northstar" className="gos-enter" style={{...gCd(t),padding:"20px 22px",display:"flex",flexDirection:"column",justifyContent:"space-between",gap:14,flex:1,minWidth:0}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
               <span style={{fontSize:13,fontWeight:500,color:t.textMuted,fontFamily:t.sans}}>
                 North star · <span style={{color:t.text}}>{ns.metric}</span>
@@ -976,7 +982,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
             {pct !== null && (
               <div role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Progress to north star target"
                 style={{height:8,borderRadius:t.r.pill,background:t.borderSoft,overflow:"hidden"}}>
-                <div style={{width:pct+"%",height:"100%",borderRadius:t.r.pill,background:t.goldFill}}/>
+                <div className="gos-grow" style={{width:pct+"%",height:"100%",borderRadius:t.r.pill,background:t.goldFill}}/>
               </div>
             )}
             <div style={{display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap",fontSize:13,color:t.textMuted,fontFamily:t.sans}}>
@@ -1043,7 +1049,9 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
                     ? Math.ceil((new Date(item.endDate+"T12:00:00") - today) / 86400000)
                     : Math.ceil((today - new Date(item.startDate+"T12:00:00")) / 86400000);
                   return (
-                    <div key={i} style={{display:"flex",gap:12,alignItems:"center",padding:"12px 0",borderTop:"1px solid "+t.borderSoft}}>
+                    <button key={i} type="button" onClick={()=>onOpenItem&&onOpenItem(item.id)} disabled={!onOpenItem}
+                      {...(()=>{const p=interactive(t,null,{flat:true});return{className:p.className+" gos-row",style:{...p.style,display:"flex",gap:12,alignItems:"center",width:"calc(100% + 16px)",margin:"0 -8px",padding:"12px 8px",textAlign:"left",border:"none",borderTop:"1px solid "+t.borderSoft,borderRadius:t.r.sm,background:"transparent",cursor:onOpenItem?"pointer":"default",fontFamily:t.sans}};})()}
+                      title={onOpenItem ? "Open "+item.title : undefined}>
                       <span aria-hidden="true" style={{width:8,height:8,borderRadius:"50%",background:t.warn,flexShrink:0}}/>
                       <span style={{flex:1,minWidth:0,display:"flex",flexDirection:"column",gap:2}}>
                         <span style={{fontSize:14,fontWeight:500,color:t.text,fontFamily:t.sans,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.title}</span>
@@ -1053,7 +1061,8 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
                         borderRadius:t.r.pill,padding:"2px 9px",flexShrink:0,whiteSpace:"nowrap"}}>
                         {type==="expiring" ? `Ends in ${days} day${days===1?"":"s"}` : `Running ${days} days`}
                       </span>
-                    </div>
+                      <span className="gos-row-go" aria-hidden="true" style={{color:t.textFaint,display:"flex"}}><IconChevronRight size={14}/></span>
+                    </button>
                   );
                 })}
               </div>
@@ -1116,12 +1125,24 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
         <div>
           <h2 style={{fontSize:15,fontWeight:600,color:t.text,fontFamily:t.sans,letterSpacing:"-0.01em",margin:"0 0 10px"}}>Results</h2>
           <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-            <div role="group" aria-label="Date range" style={{display:"flex",gap:2,background:t.borderSoft,padding:3,borderRadius:t.r.md}}>
-              {[["thisMonth","This month"],["lastMonth","Last month"],["custom","Custom"]].map(([v,l])=>(
-                <button key={v} onClick={()=>setDRange(v)} aria-pressed={dRange===v}
-                  style={{fontSize:13,padding:"5px 12px",borderRadius:t.r.sm,cursor:"pointer",fontFamily:t.sans,fontWeight:500,background:dRange===v?t.surface:"transparent",border:"none",color:dRange===v?t.text:t.textSub,boxShadow:dRange===v?t.shadow:"none"}}>{l}</button>
-              ))}
-            </div>
+            {/* The selected option's surface slides to it rather than jumping,
+              * so the change reads as one control moving, not three repainting.
+              * Equal columns make the indicator's position a simple offset. */}
+            {(()=>{
+              const opts=[["thisMonth","This month"],["lastMonth","Last month"],["custom","Custom"]];
+              const at=Math.max(0,opts.findIndex(([v])=>v===dRange));
+              return (
+                <div role="group" aria-label="Date range" style={{position:"relative",display:"grid",gridTemplateColumns:"repeat("+opts.length+",minmax(0,1fr))",background:t.borderSoft,padding:3,borderRadius:t.r.md}}>
+                  <span aria-hidden="true" style={{position:"absolute",top:3,bottom:3,left:3,width:"calc((100% - 6px) / "+opts.length+")",
+                    transform:"translateX("+(at*100)+"%)",transition:"transform .22s cubic-bezier(.2,.7,.3,1)",
+                    background:t.surface,borderRadius:t.r.sm,boxShadow:t.shadow}}/>
+                  {opts.map(([v,l])=>(
+                    <button key={v} onClick={()=>setDRange(v)} aria-pressed={dRange===v} className="gos-nav"
+                      style={{position:"relative",fontSize:13,padding:"5px 14px",borderRadius:t.r.sm,cursor:"pointer",fontFamily:t.sans,fontWeight:500,background:"transparent",border:"none",color:dRange===v?t.text:t.textSub,transition:"color .15s ease",whiteSpace:"nowrap"}}>{l}</button>
+                  ))}
+                </div>
+              );
+            })()}
             {dRange==="custom"&&<>
               <input type="date" aria-label="Range start" value={cFrom} onChange={e=>setCFrom(e.target.value)} style={{fontSize:12,padding:"6px 9px",borderRadius:t.r.md,border:"1px solid "+t.border,background:t.inputBg,color:t.text,fontFamily:t.sans}}/>
               <span style={{color:t.textMuted,fontSize:12}}>to</span>

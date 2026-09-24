@@ -70,7 +70,7 @@ export function AgendaView({ agenda, items, cats, brands, activeBrand, t, dk, on
           Surfaced here rather than absorbed into a confidence figure. */}
       {contradictions.length>0 && (
         <div style={{...gSc(t),background:t.warnBg,border:"1px solid "+t.warnBorder}}>
-          <div style={{fontSize:11,fontWeight:700,color:t.warn,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:4}}>
+          <div style={{fontSize:12,fontWeight:600,color:t.warn,fontFamily:t.sans,marginBottom:4}}>
             {contradictions.length} contradiction{contradictions.length!==1?"s":""} in the record
           </div>
           <div style={{fontSize:12,color:t.textSub,fontFamily:t.sans,marginBottom:10,lineHeight:1.5,maxWidth:600}}>
@@ -82,9 +82,9 @@ export function AgendaView({ agenda, items, cats, brands, activeBrand, t, dk, on
                 {[c.a, c.b].map((side, i) => (
                   <div key={side.ref} style={{marginBottom:i===0?7:9}}>
                     <div style={{display:"flex",gap:6,alignItems:"baseline",flexWrap:"wrap"}}>
-                      <span style={{fontSize:10,color:t.gold,fontFamily:t.mono}}>{side.ref}</span>
-                      <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>{side.provenance}</span>
-                      {side.closedDate&&<span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono}}>{side.closedDate}</span>}
+                      <span style={{fontSize:10,color:t.gold,fontFamily:t.sans}}>{side.ref}</span>
+                      <span style={{fontSize:12,color:t.textMuted,fontFamily:t.sans}}>{side.provenance}</span>
+                      {side.closedDate&&<span style={{fontSize:10,color:t.textMuted,fontFamily:t.sans}}>{side.closedDate}</span>}
                     </div>
                     <p style={{margin:"3px 0 0",fontSize:12.5,color:t.text,fontFamily:t.serif,lineHeight:1.45,borderLeft:"2px solid "+t.warnBorder,paddingLeft:9}}>
                       "{side.learning}"

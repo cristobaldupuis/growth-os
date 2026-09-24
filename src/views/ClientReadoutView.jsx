@@ -167,10 +167,10 @@ function ScorecardSection({ t, dk, dash, weeklyMetrics, brands, activeBrand, set
       {/* North star strip */}
       {settings.northStarMetric && (
         <div style={{ display: "flex", gap: 20, padding: "10px 14px", background: t.goldBg, border: "1px solid " + t.goldBorder, borderRadius: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <div style={{ fontSize: 11, color: t.gold, fontFamily: t.mono, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", flexShrink: 0 }}>{ns.metric}</div>
+          <div style={{ fontSize:12, color: t.gold, fontFamily: t.sans, fontWeight:600, flexShrink: 0 }}>{ns.metric}</div>
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 11, color: t.textMuted, fontFamily: t.mono }}>Current <strong style={{ color: t.gold }}>{ns.current || "—"}</strong></span>
-            <span style={{ fontSize: 11, color: t.textMuted, fontFamily: t.mono }}>&#8594; Target <strong style={{ color: t.text }}>{ns.target || "—"}</strong></span>
+            <span style={{ fontSize: 11, color: t.textMuted, fontFamily: t.sans }}>Current <strong style={{ color: t.gold }}>{ns.current || "—"}</strong></span>
+            <span style={{ fontSize: 11, color: t.textMuted, fontFamily: t.sans }}>&#8594; Target <strong style={{ color: t.text }}>{ns.target || "—"}</strong></span>
           </div>
         </div>
       )}
@@ -179,8 +179,8 @@ function ScorecardSection({ t, dk, dash, weeklyMetrics, brands, activeBrand, set
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px,1fr))", gap: 8 }}>
         {kpis.map(k => (
           <div key={k.label} style={{ background: k.hero ? t.goldBg : t.surfaceAlt, border: "1px solid " + (k.hero ? t.goldBorder : t.border), borderRadius: 10, padding: "12px 14px" }}>
-            <div style={{ fontSize: 9.5, letterSpacing: "0.1em", textTransform: "uppercase", color: t.textMuted, fontFamily: t.mono, fontWeight: 600, marginBottom: 6 }}>{k.label}</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: k.hero ? t.gold : t.text, fontFamily: t.mono, letterSpacing: "-0.02em", lineHeight: 1 }}>{k.value}</div>
+            <div style={{ fontSize:12, color: t.textMuted, fontFamily: t.sans, fontWeight: 600, marginBottom: 6 }}>{k.label}</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: k.hero ? t.gold : t.text, fontFamily: t.sans, letterSpacing: "-0.02em", lineHeight: 1 }}>{k.value}</div>
             {k.sub && k.sub !== " " && <div style={{ fontSize: 10, color: t.textMuted, fontFamily: t.serif, marginTop: 5 }}>{k.sub}</div>}
           </div>
         ))}
@@ -189,14 +189,14 @@ function ScorecardSection({ t, dk, dash, weeklyMetrics, brands, activeBrand, set
       {/* Weekly metrics */}
       {latestWeek && weekKpis.length > 0 && (
         <div>
-          <div style={{ fontSize: 10, fontFamily: t.mono, color: t.textMuted, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>
+          <div style={{ fontSize:12, fontFamily: t.sans, color: t.textMuted, marginBottom: 8 }}>
             Weekly metrics · {weekLabel}
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {weekKpis.map(k => (
               <div key={k.label} style={{ background: t.surfaceAlt, border: "1px solid " + t.border, borderRadius: 8, padding: "9px 13px", minWidth: 90 }}>
-                <div style={{ fontSize: 9.5, letterSpacing: "0.08em", textTransform: "uppercase", color: t.textMuted, fontFamily: t.mono, marginBottom: 4 }}>{k.label}</div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: t.gold, fontFamily: t.mono, letterSpacing: "-0.01em", lineHeight: 1 }}>{k.value}</div>
+                <div style={{ fontSize:12, color: t.textMuted, fontFamily: t.sans, marginBottom: 4 }}>{k.label}</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: t.gold, fontFamily: t.sans, letterSpacing: "-0.01em", lineHeight: 1 }}>{k.value}</div>
               </div>
             ))}
           </div>
@@ -255,20 +255,20 @@ function LearnedSection({ t, dk, learned, isFallback, rangeLabel, onCopy }) {
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
                 <div style={{ fontSize: 13.5, fontWeight: 600, color: t.text, fontFamily: t.sans, lineHeight: 1.3, flex: 1, minWidth: 0 }}>{item.title}</div>
                 <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
-                  {isFallback && <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: t.warn, fontFamily: t.mono, padding: "2px 6px", border: "1px solid " + t.warnBorder, borderRadius: 4 }}>Prior period</span>}
+                  {isFallback && <span style={{ fontSize:12, fontWeight:600, color: t.warn, fontFamily: t.sans, padding: "2px 6px", border: "1px solid " + t.warnBorder, borderRadius: 4 }}>Prior period</span>}
                   <OBdg o={item.results?.outcomeClassification} dk={dk} />
-                  {item.endDate && <span style={{ fontSize: 10, color: t.textMuted, fontFamily: t.mono }}>{fmtDate(item.endDate)}</span>}
+                  {item.endDate && <span style={{ fontSize: 10, color: t.textMuted, fontFamily: t.sans }}>{fmtDate(item.endDate)}</span>}
                 </div>
               </div>
               {item.results?.keyLearning && (
                 <div style={{ fontSize: 12.5, color: t.textSub, fontFamily: t.sans, lineHeight: 1.55 }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: t.textMuted, fontFamily: t.mono, marginRight: 6 }}>Learning</span>
+                  <span style={{ fontSize:12, fontWeight:600, color: t.textMuted, fontFamily: t.sans, marginRight: 6 }}>Learning</span>
                   {renderProse(item.results.keyLearning)}
                 </div>
               )}
               {item.results?.decisionMade && (
                 <div style={{ fontSize: 12, color: t.textSub, fontFamily: t.sans, lineHeight: 1.5 }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: t.textMuted, fontFamily: t.mono, marginRight: 6 }}>Decision</span>
+                  <span style={{ fontSize:12, fontWeight:600, color: t.textMuted, fontFamily: t.sans, marginRight: 6 }}>Decision</span>
                   {renderProse(item.results.decisionMade)}
                 </div>
               )}
@@ -299,18 +299,18 @@ function RunningSection({ t, dk, running, cats, onCopy }) {
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
                     <CBdg cat={item.category} cats={cats} dk={dk} t={t}/>
                     <ICEChip ice={item.ice} t={t} />
-                    {item.startDate && <span style={{ fontSize: 10, color: t.textMuted, fontFamily: t.mono }}>Started {fmtDate(item.startDate)}</span>}
+                    {item.startDate && <span style={{ fontSize: 10, color: t.textMuted, fontFamily: t.sans }}>Started {fmtDate(item.startDate)}</span>}
                   </div>
                   {item.successMetric && (
                     <div style={{ fontSize: 11.5, color: t.textSub, fontFamily: t.sans, lineHeight: 1.5, marginTop: 5 }}>
-                      <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: t.textMuted, fontFamily: t.mono, marginRight: 5 }}>Success metric</span>
+                      <span style={{ fontSize:12, fontWeight:600, color: t.textMuted, fontFamily: t.sans, marginRight: 5 }}>Success metric</span>
                       {item.successMetric}
                     </div>
                   )}
                 </div>
                 <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontSize: 9.5, color: t.textMuted, fontFamily: t.mono, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 3 }}>Est. impact</div>
-                  <div style={{ fontSize: 17, fontWeight: 700, color: t.gold, fontFamily: t.mono, letterSpacing: "-0.01em" }}>{fmtCur(item.revenueImpact)}</div>
+                  <div style={{ fontSize:12, color: t.textMuted, fontFamily: t.sans, marginBottom: 3 }}>Est. impact</div>
+                  <div style={{ fontSize: 17, fontWeight: 600, color: t.text, fontFamily: t.sans, letterSpacing: "-0.01em" }}>{fmtCur(item.revenueImpact)}</div>
                 </div>
               </div>
             );
@@ -344,14 +344,14 @@ function NextSection({ t, dk, next, cats, onCopy }) {
                   </div>
                   {hyp && (
                     <div style={{ fontSize: 11.5, color: t.textSub, fontFamily: t.sans, lineHeight: 1.5, marginTop: 5 }}>
-                      <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: t.textMuted, fontFamily: t.mono, marginRight: 5 }}>Hypothesis</span>
+                      <span style={{ fontSize:12, fontWeight:600, color: t.textMuted, fontFamily: t.sans, marginRight: 5 }}>Hypothesis</span>
                       {hyp}
                     </div>
                   )}
                 </div>
                 <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontSize: 9.5, color: t.textMuted, fontFamily: t.mono, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 3 }}>Est. impact</div>
-                  <div style={{ fontSize: 17, fontWeight: 700, color: t.gold, fontFamily: t.mono, letterSpacing: "-0.01em" }}>{fmtCur(item.revenueImpact)}</div>
+                  <div style={{ fontSize:12, color: t.textMuted, fontFamily: t.sans, marginBottom: 3 }}>Est. impact</div>
+                  <div style={{ fontSize: 17, fontWeight: 600, color: t.text, fontFamily: t.sans, letterSpacing: "-0.01em" }}>{fmtCur(item.revenueImpact)}</div>
                 </div>
               </div>
             );
@@ -488,7 +488,7 @@ export function ClientReadoutView({ t, dk, dash, items, brands, activeBrand, cat
       {/* Header */}
       <div data-tour="client-readout" style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div>
-          <div style={{ fontSize: 10, letterSpacing: "0.10em", textTransform: "uppercase", color: t.gold, fontFamily: t.mono, fontWeight: 700, marginBottom: 4 }}>Summary</div>
+          <div style={{ fontSize:12, color: t.gold, fontFamily: t.sans, fontWeight:600, marginBottom: 4 }}>Summary</div>
           <div style={{ fontSize: 18, fontWeight: 700, color: t.text, fontFamily: t.sans, lineHeight: 1.2 }}>
             Weekly summary · {activeBrand === "all" ? "All brands" : brandName(activeBrand, brands)}
           </div>
@@ -512,9 +512,9 @@ export function ClientReadoutView({ t, dk, dash, items, brands, activeBrand, cat
             ))}
           </div>
           {dRange === "custom" && <>
-            <input type="date" value={cFrom} onChange={e => setCFrom(e.target.value)} style={{ fontSize: 12, padding: "6px 9px", borderRadius: 9, border: "1px solid " + t.border, background: t.inputBg, color: t.text, fontFamily: t.mono }} />
+            <input type="date" value={cFrom} onChange={e => setCFrom(e.target.value)} style={{ fontSize: 12, padding: "6px 9px", borderRadius: 9, border: "1px solid " + t.border, background: t.inputBg, color: t.text, fontFamily: t.sans }} />
             <span style={{ color: t.textMuted, fontSize: 12 }}>to</span>
-            <input type="date" value={cTo} onChange={e => setCTo(e.target.value)} style={{ fontSize: 12, padding: "6px 9px", borderRadius: 9, border: "1px solid " + t.border, background: t.inputBg, color: t.text, fontFamily: t.mono }} />
+            <input type="date" value={cTo} onChange={e => setCTo(e.target.value)} style={{ fontSize: 12, padding: "6px 9px", borderRadius: 9, border: "1px solid " + t.border, background: t.inputBg, color: t.text, fontFamily: t.sans }} />
           </>}
         </div>
       </div>

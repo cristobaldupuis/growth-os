@@ -27,7 +27,7 @@ export function CitationModal({ item, t, dk, cats, brands, items, onClose }) {
       <div style={{display:"flex",flexDirection:"column",gap:14}}>
         <div>
           <div style={{display:"flex",alignItems:"baseline",gap:8,flexWrap:"wrap",marginBottom:8}}>
-            {item.initId && <span style={{fontSize:11,fontWeight:600,color:t.gold,fontFamily:t.mono}}>{item.initId}</span>}
+            {item.initId && <span style={{fontSize:11,fontWeight:600,color:t.gold,fontFamily:t.sans}}>{item.initId}</span>}
             <span style={{fontSize:18,fontWeight:600,color:t.text,fontFamily:t.serif,lineHeight:1.3}}>{item.title}</span>
           </div>
           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
@@ -39,13 +39,13 @@ export function CitationModal({ item, t, dk, cats, brands, items, onClose }) {
               ? <Bdg label="Structural" color={t.teal} bg={t.tealBg} border={t.teal}/>
               : (r.keyLearning ? <Bdg label="Tactical" color={t.textMuted} bg={t.surfaceAlt} border={t.border}/> : null)}
             {conf && <ConfBdg level={conf.level} t={t}/>}
-            {item.endDate && <span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono,marginLeft:"auto"}}>closed {fmtDate(item.endDate)}</span>}
+            {item.endDate && <span style={{fontSize:11,color:t.textMuted,fontFamily:t.sans,marginLeft:"auto"}}>closed {fmtDate(item.endDate)}</span>}
           </div>
         </div>
 
         {r.keyLearning && (
           <div style={{borderLeft:"3px solid "+(c.border||t.gold),paddingLeft:14}}>
-            <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:6}}>Key learning</div>
+            <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,marginBottom:6}}>Key learning</div>
             <p style={{margin:0,fontSize:15,fontWeight:600,color:t.text,lineHeight:1.6,fontFamily:t.serif}}>"{renderProse(r.keyLearning)}"</p>
             {conf && conf.level!=="provisional" && (()=>{
               const tone = conf.level==="retracted" ? t.red : conf.level==="contested" ? t.warn : t.textMuted;
@@ -55,7 +55,7 @@ export function CitationModal({ item, t, dk, cats, brands, items, onClose }) {
               return (
                 <div style={{fontSize:11.5,color:tone,fontFamily:t.serif,lineHeight:1.5,marginTop:7}}>
                   {CONFIDENCE_NOTE[conf.level]}
-                  {refs.length>0 && <span style={{fontFamily:t.mono,fontSize:10.5}}> ({refs.join(", ")})</span>}
+                  {refs.length>0 && <span style={{fontFamily:t.sans,fontSize:10.5}}> ({refs.join(", ")})</span>}
                 </div>
               );
             })()}
@@ -64,22 +64,22 @@ export function CitationModal({ item, t, dk, cats, brands, items, onClose }) {
 
         {item.hypothesis && (
           <div>
-            <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>Original hypothesis</div>
+            <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,marginBottom:4}}>Original hypothesis</div>
             <p style={{margin:0,fontSize:13,color:t.textSub,lineHeight:1.6,fontFamily:t.sans}}>{item.hypothesis}</p>
           </div>
         )}
 
         {r.decisionMade && (
           <div style={{fontSize:12.5,color:t.textSub,fontFamily:t.serif,lineHeight:1.6,padding:"10px 12px",background:t.surfaceAlt,borderRadius:6}}>
-            <span style={{color:t.textMuted,fontSize:10,textTransform:"uppercase",letterSpacing:"0.06em"}}>Decision: </span>
+            <span style={{color:t.textMuted,fontSize:12}}>Decision: </span>
             {renderProse(r.decisionMade)}
           </div>
         )}
 
         {(item.revenueImpact!==0 || r.actualRevenueImpact!=null) && (
           <div style={{display:"flex",gap:18,fontSize:12,fontFamily:t.serif,color:t.textMuted}}>
-            {item.revenueImpact!==0 && <span>Est: <strong style={{color:t.text,fontFamily:t.mono}}>{fmtCur(item.revenueImpact)}</strong></span>}
-            {r.actualRevenueImpact!=null && <span>Actual: <strong style={{color:t.gold,fontFamily:t.mono}}>{fmtCur(r.actualRevenueImpact)}</strong></span>}
+            {item.revenueImpact!==0 && <span>Est: <strong style={{color:t.text,fontFamily:t.sans}}>{fmtCur(item.revenueImpact)}</strong></span>}
+            {r.actualRevenueImpact!=null && <span>Actual: <strong style={{color:t.text,fontFamily:t.sans}}>{fmtCur(r.actualRevenueImpact)}</strong></span>}
           </div>
         )}
 
@@ -94,13 +94,13 @@ export function CitationModal({ item, t, dk, cats, brands, items, onClose }) {
           const pct = pe.predictedRevenue ? Math.round((pe.revenueDelta / Math.abs(pe.predictedRevenue)) * 100) : null;
           return (
             <div style={{marginTop:4,padding:"10px 12px",borderRadius:6,border:"1px solid "+t.border,background:t.surfaceAlt}}>
-              <div style={{fontSize:9,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:6}}>
+              <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,marginBottom:6}}>
                 Calibration · frozen at launch {pe.snapshotDate ? "("+pe.snapshotDate+")" : ""}
               </div>
               <div style={{display:"flex",gap:18,fontSize:12,fontFamily:t.serif,color:t.textMuted,flexWrap:"wrap"}}>
-                <span>Predicted: <strong style={{color:t.text,fontFamily:t.mono}}>{fmtCur(pe.predictedRevenue)}</strong></span>
-                <span>Actual: <strong style={{color:t.text,fontFamily:t.mono}}>{fmtCur(pe.actualRevenue)}</strong></span>
-                <span>Δ <strong style={{color:deltaColor,fontFamily:t.mono}}>{beat?"+":""}{fmtCur(pe.revenueDelta)}{pct!=null?" ("+(beat?"+":"")+pct+"%)":""}</strong></span>
+                <span>Predicted: <strong style={{color:t.text,fontFamily:t.sans}}>{fmtCur(pe.predictedRevenue)}</strong></span>
+                <span>Actual: <strong style={{color:t.text,fontFamily:t.sans}}>{fmtCur(pe.actualRevenue)}</strong></span>
+                <span>Δ <strong style={{color:deltaColor,fontFamily:t.sans}}>{beat?"+":""}{fmtCur(pe.revenueDelta)}{pct!=null?" ("+(beat?"+":"")+pct+"%)":""}</strong></span>
               </div>
             </div>
           );

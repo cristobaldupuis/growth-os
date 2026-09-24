@@ -106,7 +106,7 @@ export function WeeklyStandupModal({ t, dk, items, brands, onCommit, onClose, sh
                 <div key={e.id} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                   <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
                     <span style={{ fontSize: 12.5, fontWeight:600, color: t.text, fontFamily: t.serif, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.title}</span>
-                    {e.updatedAt && <span style={{ fontSize: 10, color: t.textMuted, fontFamily: t.mono, flexShrink: 0 }}>last update {fmtDate(e.updatedAt)}</span>}
+                    {e.updatedAt && <span style={{ fontSize: 10, color: t.textMuted, fontFamily: t.sans, flexShrink: 0 }}>last update {fmtDate(e.updatedAt)}</span>}
                   </div>
                   <textarea
                     style={{ ...gTA(t), fontSize: 12.5, minHeight: 0 }}

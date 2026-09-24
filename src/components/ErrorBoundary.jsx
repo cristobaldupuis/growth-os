@@ -56,14 +56,14 @@ export class ErrorBoundary extends Component {
 
     return (
       <div role="alert" style={{ padding: "48px 20px", maxWidth: 560, margin: "0 auto", textAlign: "center" }}>
-        <div style={{ color: t.textMuted, fontFamily: t.mono, fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>
+        <div style={{ color: t.textMuted, fontFamily: t.sans, fontSize:12, marginBottom: 12 }}>
           Something went wrong
         </div>
         <div style={{ color: t.text, fontFamily: t.serif, fontSize: 20, fontWeight: 600, marginBottom: 10 }}>
           {label} could not be drawn.
         </div>
         <div style={{ color: t.textSub, fontSize: 14, lineHeight: 1.55, marginBottom: 22 }}>
-          Your workspace is intact — nothing was lost. The error was: <span style={{ fontFamily: t.mono, fontSize: 12 }}>{message}</span>
+          Your workspace is intact — nothing was lost. The error was: <span style={{ fontFamily: t.sans, fontSize: 12 }}>{message}</span>
         </div>
         <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
           <button style={gG(t)} onClick={() => this.setState({ error: null })}>Try again</button>

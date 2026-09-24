@@ -121,18 +121,18 @@ export function TaxonomyEditor({ t, dk, settings, onSaveSettings, showToast }) {
                       <span style={{ fontSize: 13, fontWeight: 600, color: t.text, fontFamily: t.sans }}>{d.label}</span>
                       <span style={{ fontFamily: t.mono, fontSize: 10, color: t.textMuted }}>{d.key}</span>
                       {d.isBridge && (
-                        <span style={{ fontFamily: t.mono, fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase",
+                        <span style={{ fontFamily: t.sans, fontSize:12,
                           color: t.gold, border: "1px solid " + t.goldBorder, borderRadius: 4, padding: "1px 6px" }}>
                           Marketers Lab bridge
                         </span>
                       )}
                       {d.custom && (
-                        <span style={{ fontFamily: t.mono, fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase",
+                        <span style={{ fontFamily: t.sans, fontSize:12,
                           color: t.textSub, border: "1px solid " + t.border, borderRadius: 4, padding: "1px 6px" }}>
                           Custom
                         </span>
                       )}
-                      <span style={{ fontFamily: t.mono, fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: t.textMuted }}>
+                      <span style={{ fontFamily: t.sans, fontSize:12, color: t.textMuted }}>
                         {d.vocab ? `${d.vocab.length} allowed values` : "free text"}
                       </span>
 
@@ -258,13 +258,13 @@ export function TaxonomyEditor({ t, dk, settings, onSaveSettings, showToast }) {
                             <span style={{ fontSize: 12.5, fontWeight: 600, color: t.text, fontFamily: t.sans }}>{d.label}</span>
                             <span style={{ fontFamily: t.mono, fontSize: 10, color: t.textMuted }}>{d.key}</span>
                             {d.key === schema.initiativeDimension && (
-                              <span style={{ fontFamily: t.mono, fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase",
+                              <span style={{ fontFamily: t.sans, fontSize:12,
                                 color: t.gold, border: "1px solid " + t.goldBorder, borderRadius: 4, padding: "1px 6px" }}>
                                 Marketers Lab bridge
                               </span>
                             )}
                             {!d.vocab && (
-                              <span style={{ fontFamily: t.mono, fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: t.textMuted }}>
+                              <span style={{ fontFamily: t.sans, fontSize:12, color: t.textMuted }}>
                                 free text
                               </span>
                             )}

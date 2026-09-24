@@ -223,99 +223,97 @@ export const RADIUS = {
 // figures at the top. The half-steps are gone: 12.5 and 13 were never a
 // deliberate distinction, they were two people picking a number.
 export const FS = {
-  micro:   10,   // uppercase mono labels, badge text
-  small:   11,   // metadata strips, table cells, hints
-  body:    12.5, // default UI text and control labels
+  micro:   11,   // badge text, the smallest label
+  small:   12,   // metadata strips, table cells, hints, field labels
+  body:    13,   // default UI text and control labels
   medium:  14,   // card titles, list item leads
-  large:   17,   // view titles, section heads
-  figure:  22,   // stat tile values, panel figures
-  display: 28,   // hero figures
+  large:   20,   // view titles
+  figure:  24,   // stat tile values, panel figures
+  display: 32,   // hero figures
 };
 
 // Spacing. A 4px base, because every existing value in the app rounds to it.
 export const SP = { xs:4, sm:6, md:10, lg:14, xl:20, xxl:28 };
 
-export const FONT_SANS  = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, system-ui, sans-serif";
-export const FONT_MONO  = "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, 'Liberation Mono', monospace";
-// Reading face: headings, titles, and copy read as sentences. Numerals never
-// use it, and neither does chrome — a label bolted to a control, a table row or
-// a stat tile is sans, however explanatory it sounds. That boundary is the whole
-// discipline: three faces each doing one job reads as one system, and the same
-// three alternating inside a single card reads as three. The nav rail was the
-// worst offender and now carries no serif at all — it is chrome end to end, with
-// no sentence anywhere in it.
-// Weights are capped at 500 (default) / 600 (emphasis). Loaded in index.html.
-export const FONT_SERIF = "'Lora', ui-serif, Georgia, 'Times New Roman', serif";
+// Geist carries everything: chrome, headings, prose and figures. The earlier
+// system ran three faces (a system sans for chrome, Lora for headings and
+// sentences, a monospace for micro-labels and numerals), and three faces
+// alternating inside one card read as three products rather than one. Numerals
+// line up because index.css turns on tabular figures globally, which was the
+// only thing the monospace was ever buying for a number.
+//
+// `serif` survives as a key so the call sites that asked for a "reading face"
+// keep working; it now resolves to the same sans. `mono` is Geist Mono, and is
+// for things that are literally code-like: ad names, naming conventions, IDs,
+// keyboard hints. It is not a label style. Loaded in index.html.
+export const FONT_SANS  = "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, system-ui, sans-serif";
+export const FONT_MONO  = "'Geist Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, 'Liberation Mono', monospace";
+export const FONT_SERIF = FONT_SANS;
 
 // -- Theme tokens --------------------------------------------------------------
-// Two rules govern this palette, and both exist because the first version broke
-// them:
+// A neutral base with one accent. The previous palette tinted every surface
+// warm (a parchment canvas, a gold north-star panel, a peach attention panel)
+// and spent gold on buttons, tabs, figures and the active nav item at once, so
+// nothing stood out because everything was coloured. Surfaces are now plain
+// zinc neutrals and the accent is spent only where it means "this is the
+// action" or "this is where you are".
 //
-// 1. `gold` is an INK value — it is what you set `color:` to. In light mode that
-//    means it has to survive a contrast check against white, so it is a deep
-//    ochre, not the bright brassy gold. `goldFill` is the separate bright value
-//    used ONLY as a background behind `goldText`. Setting `color:t.goldFill` on
-//    a light surface is a bug; that was the old `gold` and it measured 2.4:1.
+// ## The `gold*` names are historical
 //
-// 2. Dark surfaces are cool neutrals, not warm browns. Gold sitting on a warm
-//    brown surface reads as mud because the accent and the surface share a hue;
-//    on a cool charcoal the same gold separates and reads as metal. The old dark
-//    surfaces had R-B of +4 and +11 (brown); these are -7 and -9.
+// The accent used to be gold and the tokens kept its name so four hundred call
+// sites did not have to change in the same commit. Read `gold` as "accent ink"
+// and `goldFill` as "accent fill". The two rules that governed gold still hold:
 //
-// Every pairing below is checked against WCAG AA (4.5:1) — see `npm run
-// check:contrast`, which fails the build if a pairing regresses.
+// 1. `gold` is an INK value, what you set `color:` to, and must clear AA on
+//    every surface it lands on. `goldFill` is a background only, and the text
+//    on it is `goldText`.
+// 2. Dark surfaces are cool neutrals so the accent separates from them.
 //
-// 3. `textMuted` is content, not decoration, and is held to AA like everything
-//    else. It used to be waived to AA Large (3:1) on the stated grounds that it
-//    was "micro-label only", and the code never honoured that: it is the app's
-//    most-used ink — the label colour for every form field, every table header,
-//    half the table cells in Weekly Pulse — at 9–11px in a hundred and ninety
-//    places, where AA Large does not apply at all. The light value measured
-//    4.05:1 on `bg`. It is now #6A675F (4.70:1) and the gate checks it at 4.5.
-//    `textFaint` is the genuinely decorative tier, and the waiver moved to it,
-//    where it names the thing it actually applies to.
+// Every pairing below is checked against WCAG AA (4.5:1) by `npm run
+// check:contrast`, which fails the build if a pairing regresses. `textMuted`
+// is content (labels, headers, table cells) and is held to AA; `textFaint` is
+// the decorative tier and the only one allowed the AA Large waiver.
+//
+// `teal` is the success ink (a green now; the name is historical too) and
+// `warn` is amber. Both are for state, never for decoration.
 export const TL = {
-  bg:"#EDEAE3", surface:"#FFFFFF", surfaceAlt:"#F7F5EF",
-  border:"#E0DCD2", borderSoft:"#EDEAE3",
-  text:"#1A1815", textSub:"#57554E", textMuted:"#6A675F", textFaint:"#807D75",
-  gold:"#856310", goldFill:"#C9A227", goldSoft:"#D8B94E", goldText:"#1A1815",
-  goldBg:"#FBF6E7", goldBorder:"#E3D08F",
-  teal:"#0F7A5A", tealBg:"#E2F2EC", red:"#B23A20", redBg:"#FBEAE5",
-  // The contribution ramp — see ContributionView. Measured is teal because that
-  // is what teal already means in this app (an initiative card shows its actual
-  // in teal, the Initiatives group header renders "realised" in teal); forecast
-  // is gold. Named as one set rather than reused from the ink tokens so the bar
-  // can be tuned for adjacency without dragging a text colour with it.
-  rampMeasured:"#0F7A5A", rampInflight:"#C9A227", rampPipeline:"#E2C77E", rampTrack:"#F2EFE7",
-  warn:"#8A5A0B", warnBg:"#FDF4E3", warnBorder:"#E0C176",
-  headerBg:"#FFFFFF", inputBg:"#FFFFFF", inputBorder:"#D8D4CA",
+  bg:"#F6F6F7", surface:"#FFFFFF", surfaceAlt:"#F8F8F9",
+  border:"#E6E6E9", borderSoft:"#EFEFF2",
+  text:"#18181B", textSub:"#3F3F46", textMuted:"#62626B", textFaint:"#85858F",
+  gold:"#4F46E5", goldFill:"#4F46E5", goldSoft:"#A5B4FC", goldText:"#FFFFFF",
+  goldBg:"#EEF0FE", goldBorder:"#C7CCF7",
+  teal:"#15803D", tealBg:"#E9F7EE", red:"#B91C1C", redBg:"#FDEEEE",
+  // The contribution ramp — see ContributionView. Measured is the success
+  // green, in-flight is the accent, pipeline a pale accent. Measured is held
+  // darker than in-flight so the two segments separate by lightness as well as
+  // hue, which is the separation a colour-blind reader can use.
+  rampMeasured:"#166534", rampInflight:"#6366F1", rampPipeline:"#B3B9F4", rampTrack:"#EFEFF2",
+  warn:"#92400E", warnBg:"#FEF5E4", warnBorder:"#F2D08A",
+  headerBg:"#F6F6F7", inputBg:"#FFFFFF", inputBorder:"#DCDCE1",
   // Specular highlight for the hover charge sweep. Not a palette colour — it is
   // a lighting effect over whatever accent the bar is already painted in, which
   // is why it is an alpha white rather than a hue and why check-contrast has
   // nothing to say about it.
   spark:"rgba(255,255,255,0.62)",
-  shadow:"0 1px 2px rgba(40,38,30,0.04), 0 4px 14px rgba(40,38,30,0.06)",
-  shadowHi:"0 2px 6px rgba(40,38,30,0.06), 0 12px 30px rgba(40,38,30,0.10)",
+  shadow:"0 1px 2px rgba(16,16,20,0.04)",
+  shadowHi:"0 2px 4px rgba(16,16,20,0.05), 0 10px 28px rgba(16,16,20,0.09)",
   mono:FONT_MONO, sans:FONT_SANS, serif:FONT_SERIF,
   r:RADIUS, fs:FS, sp:SP,
 };
 export const TD = {
-  bg:"#0E0F12", surface:"#16181D", surfaceAlt:"#1D2026",
-  border:"#2C303A", borderSoft:"#232730",
-  text:"#F2F3F5", textSub:"#A8ADB8", textMuted:"#868C99", textFaint:"#6E747F",
-  gold:"#E8C765", goldFill:"#E8C765", goldSoft:"#F0D68C", goldText:"#0E0F12",
-  goldBg:"#221E14", goldBorder:"#5C4E28",
-  teal:"#43C79A", tealBg:"#10241E", red:"#E8836B", redBg:"#2A1512",
-  // Dark cannot simply mirror light here. Teal and gold separate by hue but
-  // barely by lightness (#43C79A against #E8C765 is 1.30:1), and hue alone is
-  // not a separation a deuteranopic reader can use — the two most important
-  // segments of the bar would touch and merge. The measured tone is deepened
-  // until the ramp steps in lightness as well as hue.
-  rampMeasured:"#2E9E78", rampInflight:"#E8C765", rampPipeline:"#6B5A2E", rampTrack:"#22252C",
-  warn:"#E0B155", warnBg:"#241D10", warnBorder:"#5A4820",
-  headerBg:"#0E0F12", inputBg:"#16181D", inputBorder:"#2C303A",
+  bg:"#0F0F12", surface:"#17171B", surfaceAlt:"#1C1C21",
+  border:"#2A2A31", borderSoft:"#222228",
+  text:"#F4F4F5", textSub:"#B8B8C1", textMuted:"#8F8F9A", textFaint:"#70707A",
+  gold:"#A5B4FC", goldFill:"#5B55E8", goldSoft:"#C7D2FE", goldText:"#FFFFFF",
+  goldBg:"#1B1C30", goldBorder:"#3D3F7E",
+  teal:"#4CC38A", tealBg:"#0F241A", red:"#F28B82", redBg:"#2A1515",
+  // Dark cannot simply mirror light here: the measured tone is deepened until
+  // the ramp steps in lightness as well as hue.
+  rampMeasured:"#258A5B", rampInflight:"#A3A8F8", rampPipeline:"#3D3F7E", rampTrack:"#232329",
+  warn:"#F0B454", warnBg:"#241C0E", warnBorder:"#5A4820",
+  headerBg:"#0F0F12", inputBg:"#17171B", inputBorder:"#2F2F37",
   spark:"rgba(255,255,255,0.34)",
-  shadow:"0 1px 2px rgba(0,0,0,0.4), 0 4px 16px rgba(0,0,0,0.35)",
+  shadow:"0 1px 2px rgba(0,0,0,0.4)",
   shadowHi:"0 2px 8px rgba(0,0,0,0.5), 0 14px 36px rgba(0,0,0,0.5)",
   mono:FONT_MONO, sans:FONT_SANS, serif:FONT_SERIF,
   r:RADIUS, fs:FS, sp:SP,
@@ -324,7 +322,7 @@ export const TD = {
 // Status / outcome badges. The dark variants use cool-neutral tint bases to sit
 // on the new charcoal surfaces — the previous olive/brown tints read as dirt
 // against anything that isn't itself brown.
-export const SL = { Draft:{bg:"#F1F0EC",border:"#C4C0B4",text:"#5C5A4E"}, Running:{bg:"#E6F5EC",border:"#7ACB9C",text:"#136B41"}, Completed:{bg:"#EDEFFB",border:"#8C8CD8",text:"#35359A"}, Killed:{bg:"#FBEDEB",border:"#DE8C7C",text:"#9B3320"} };
+export const SL = { Draft:{bg:"#F1F1F3",border:"#C9C9CF",text:"#52525B"}, Running:{bg:"#E6F5EC",border:"#7ACB9C",text:"#136B41"}, Completed:{bg:"#EDEFFB",border:"#8C8CD8",text:"#35359A"}, Killed:{bg:"#FBEDEB",border:"#DE8C7C",text:"#9B3320"} };
 export const SD = { Draft:{bg:"#22252C",border:"#3B404B",text:"#A3A9B5"}, Running:{bg:"#102520",border:"#276B4E",text:"#54CE93"}, Completed:{bg:"#191B33",border:"#3E3E8C",text:"#9091EC"}, Killed:{bg:"#2A1512",border:"#6E2E22",text:"#E8836B"} };
 export const OL = { Jackpot:{bg:"#E6F5EC",border:"#7ACB9C",text:"#136B41"}, Success:{bg:"#E5F4EF",border:"#79C9AE",text:"#125F4C"}, Failed:{bg:"#FBEDEB",border:"#DE8C7C",text:"#9B3320"}, Inconclusive:{bg:"#FDF4E3",border:"#E0C176",text:"#8A5A0B"} };
 export const OD = { Jackpot:{bg:"#102520",border:"#277048",text:"#5AD48C"}, Success:{bg:"#102421",border:"#276352",text:"#48CBA0"}, Failed:{bg:"#2A1512",border:"#6E2E22",text:"#E8836B"}, Inconclusive:{bg:"#241D10",border:"#5A4820",text:"#E0B155"} };
@@ -334,12 +332,16 @@ export const OD = { Jackpot:{bg:"#102520",border:"#277048",text:"#5AD48C"}, Succ
 export const TYPE_L = { "A/B Test":"#20698D", Campaign:"#9A4526", Process:"#4444AC", Research:"#653C8B", Infrastructure:"#1C784A" };
 export const TYPE_D = { "A/B Test":"#5FB4E0", Campaign:"#DC7C5C", Process:"#8E8EEA", Research:"#B27FD8", Infrastructure:"#4ACF8C" };
 
-export const CAT_L = ["#b07818","#187860","#4848b0","#b03838","#a04828","#2878a0","#6a4090","#208050"];
-export const CAT_D = ["#d4a83a","#3acca0","#8080e0","#e08080","#d07050","#50a8d8","#a870d0","#40c880"];
+// Categorical inks for category and brand tags. Led by cool hues so the first
+// few categories (the ones every workspace has) do not read as the old ochre,
+// and the accent's own indigo is left out so a tag never looks like an action.
+// Each clears AA on its theme's surfaces; see scripts/check-contrast.mjs.
+export const CAT_L = ["#1D4ED8","#0F766E","#7C3AED","#BE185D","#C2410C","#15803D","#475569","#155E75"];
+export const CAT_D = ["#93C5FD","#5EEAD4","#C4B5FD","#F9A8D4","#FDBA74","#86EFAC","#CBD5E1","#67E8F9"];
 export const catColor = (cat, cats, dk) => (dk ? CAT_D : CAT_L)[cats.indexOf(cat) % 8] || "#888";
 
-export const BRAND_COLORS_L = ["#b07818","#187860","#4848b0","#b03838","#a04828","#2878a0"];
-export const BRAND_COLORS_D = ["#d4a83a","#3acca0","#8080e0","#e08080","#d07050","#50a8d8"];
+export const BRAND_COLORS_L = ["#1D4ED8","#0F766E","#7C3AED","#BE185D","#C2410C","#15803D"];
+export const BRAND_COLORS_D = ["#93C5FD","#5EEAD4","#C4B5FD","#F9A8D4","#FDBA74","#86EFAC"];
 export const brandColor = (brandId, brands, dk) => {
   const idx = brands.findIndex(b=>b.id===brandId);
   return (dk?BRAND_COLORS_D:BRAND_COLORS_L)[idx%6]||"#888";
@@ -452,7 +454,10 @@ export const fmtCurFull = (n) =>
 // raw number. Returns null if unparseable.
 export function parseNorthStarValue(str) {
   if (!str) return null;
-  const s = String(str).replace(/[$,\s]/g, "").toLowerCase();
+  // Any leading currency marker ("$", "US$", "£", "€"), not only "$": the
+  // figure is formatted with the workspace's own symbol, and a parser that only
+  // knew "$" dropped the gap and progress bar for every other currency.
+  const s = String(str).replace(/[,\s]/g, "").replace(/^[^\d.]+/, "").toLowerCase();
   const m = s.match(/^([\d.]+)(m|k)?(?:\/.*)?$/);
   if (!m) return null;
   const num = parseFloat(m[1]);

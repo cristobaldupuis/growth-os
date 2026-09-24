@@ -81,7 +81,7 @@ function BrandReferences({ t, brand, onChange }) {
 
   return (
     <div style={{ borderTop: "1px solid " + t.borderSoft, paddingTop: 9, marginTop: 2 }}>
-      <label style={{ fontSize: 10, color: t.textMuted, fontFamily: t.mono, display: "block", marginBottom: 5, letterSpacing: "0.05em" }}>
+      <label style={{ fontSize: 10, color: t.textMuted, fontFamily: t.sans, display: "block", marginBottom: 5, letterSpacing: "0.05em" }}>
         STYLE REFERENCES ({refs.length}/{MAX_REFERENCE_IMAGES})
       </label>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-start" }}>
@@ -274,7 +274,7 @@ export function SettingsView({t,dk,settings,onSave,onClose,onDownloadBackup,onRe
         </>)}
         {sec==="northstar" && (
         <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
-          <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:10,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>North star metric</div>
+          <div style={{fontSize:12,fontWeight:600,color:t.textSub,marginBottom:10,fontFamily:t.sans}}>North star metric</div>
           <div className="gos-grid-3" style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
             <FR label="Metric name" t={t}><input style={gI(t)} value={local.northStarMetric} onChange={e=>f("northStarMetric",e.target.value)}/></FR>
             <FR label="Current value" t={t}><input style={gI(t)} value={local.northStarCurrent} onChange={e=>f("northStarCurrent",e.target.value)}/></FR>
@@ -284,7 +284,7 @@ export function SettingsView({t,dk,settings,onSave,onClose,onDownloadBackup,onRe
         )}
         {sec==="categories" && (
         <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
-          <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:10,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Categories</div>
+          <div style={{fontSize:12,fontWeight:600,color:t.textSub,marginBottom:10,fontFamily:t.sans}}>Categories</div>
           <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}}>
             {local.categories.map(c=>(
               <span key={c} style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:12,fontWeight:600,color:catColor(c,local.categories,dk),background:t.surfaceAlt,border:"1px solid "+(t.border),borderRadius:4,padding:"3px 8px"}}>
@@ -300,7 +300,7 @@ export function SettingsView({t,dk,settings,onSave,onClose,onDownloadBackup,onRe
         )}
         {sec==="brands" && (
         <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
-          <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:10,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Retailers / Partners</div>
+          <div style={{fontSize:12,fontWeight:600,color:t.textSub,marginBottom:10,fontFamily:t.sans}}>Retailers / Partners</div>
           <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:10}}>
             {(local.brands||[]).map((b,i)=>{
               const upd = (k,v) => { const bs=[...(local.brands||[])]; bs[i]={...bs[i],[k]:v}; setLocal(p=>({...p,brands:bs})); };
@@ -317,39 +317,39 @@ export function SettingsView({t,dk,settings,onSave,onClose,onDownloadBackup,onRe
                 {/* Brief fields */}
                 <div className="gos-grid-2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
                   <div>
-                    <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>WHAT THEY SELL</label>
+                    <label style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,display:"block",marginBottom:3}}>What they sell</label>
                     <input style={{...gI(t),fontSize:11}} value={b.whatTheySell||""} onChange={e=>upd("whatTheySell",e.target.value)}
                       placeholder="e.g. Premium home décor, $80–$300 AOV"/>
                   </div>
                   <div>
-                    <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>CATEGORIES (comma-separated)</label>
+                    <label style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,display:"block",marginBottom:3}}>CATEGORIES (comma-separated)</label>
                     <input style={{...gI(t),fontSize:11}} value={b.categories||""} onChange={e=>upd("categories",e.target.value)}
                       placeholder="e.g. Home decor, Gifting, Candles"/>
                   </div>
                   <div>
-                    <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>ICP (comma-separated)</label>
+                    <label style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,display:"block",marginBottom:3}}>ICP (comma-separated)</label>
                     <input style={{...gI(t),fontSize:11}} value={b.icp||""} onChange={e=>upd("icp",e.target.value)}
                       placeholder="e.g. Women 28–45, gifting buyers, high-intent decorators"/>
                   </div>
                   <div>
-                    <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>WHY THEY WIN</label>
+                    <label style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,display:"block",marginBottom:3}}>Why they win</label>
                     <input style={{...gI(t),fontSize:11}} value={b.whyTheyWin||""} onChange={e=>upd("whyTheyWin",e.target.value)}
                       placeholder="e.g. Visual brand, strong repeat buyer LTV"/>
                   </div>
                   <div>
-                    <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>RELATIONSHIP</label>
+                    <label style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,display:"block",marginBottom:3}}>Relationship</label>
                     <input style={{...gI(t),fontSize:11}} value={b.relationship||""} onChange={e=>upd("relationship",e.target.value)}
                       placeholder="e.g. Own DTC brand, wholesale account, marketplace"/>
                   </div>
                   <div>
-                    <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>CURRENT CONSTRAINT</label>
+                    <label style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,display:"block",marginBottom:3}}>Current constraint</label>
                     <input style={{...gI(t),fontSize:11}} value={b.constraint||""} onChange={e=>upd("constraint",e.target.value)}
                       placeholder="e.g. CAC rising, thin margin on hero SKU"/>
                   </div>
                 </div>
                 <BrandReferences t={t} brand={b} onChange={refs=>upd("referenceImages",refs)} />
                 <div style={{borderTop:"1px solid "+t.borderSoft,paddingTop:9,marginTop:2}}>
-                  <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:5,letterSpacing:"0.05em"}}>
+                  <label style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,display:"block",marginBottom:5}}>
                     AVATAR IMAGE URL (for talking-head video)
                   </label>
                   <input style={{...gI(t),fontSize:11}} value={b.avatarImageUrl||""} onChange={e=>upd("avatarImageUrl",e.target.value)}
@@ -369,7 +369,7 @@ export function SettingsView({t,dk,settings,onSave,onClose,onDownloadBackup,onRe
         )}
         {sec==="agents" && (
         <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
-          <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:4,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>C-Suite Debate Agents</div>
+          <div style={{fontSize:12,fontWeight:600,color:t.textSub,marginBottom:4,fontFamily:t.sans}}>C-Suite Debate Agents</div>
           <p style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,lineHeight:1.5,margin:"0 0 10px"}}>
             Customise the agents that participate in the strategy debate. Edit lenses to match your industry (e.g. "Category Manager" for CPG, "Buyer Relations" for retail).
           </p>
@@ -420,7 +420,7 @@ export function SettingsView({t,dk,settings,onSave,onClose,onDownloadBackup,onRe
         )}
         {sec==="health" && (
         <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
-          <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:4,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Health Metrics</div>
+          <div style={{fontSize:12,fontWeight:600,color:t.textSub,marginBottom:4,fontFamily:t.sans}}>Health Metrics</div>
           <p style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,lineHeight:1.5,margin:"0 0 10px"}}>
             Portfolio-level guardrail metrics surfaced on the dashboard. Calculated metrics pull from weekly pulse data automatically.
           </p>
@@ -449,7 +449,7 @@ export function SettingsView({t,dk,settings,onSave,onClose,onDownloadBackup,onRe
                   )}
                   <div className="gos-grid-2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                     <div>
-                      <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>
+                      <label style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,display:"block",marginBottom:3}}>
                         {metric.isCalculated?"MANUAL FALLBACK":"CURRENT VALUE"}
                       </label>
                       <input style={{...gI(t),fontSize:12}} type="number" step="any"
@@ -457,7 +457,7 @@ export function SettingsView({t,dk,settings,onSave,onClose,onDownloadBackup,onRe
                         onChange={e=>updhm("manualValue",e.target.value===""?null:parseFloat(e.target.value))}/>
                     </div>
                     <div>
-                      <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:3,letterSpacing:"0.05em"}}>TARGET (OPTIONAL)</label>
+                      <label style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,display:"block",marginBottom:3}}>TARGET (OPTIONAL)</label>
                       <input style={{...gI(t),fontSize:12}} type="number" step="any"
                         value={metric.target??""} placeholder="Target value"
                         onChange={e=>updhm("target",e.target.value===""?null:parseFloat(e.target.value))}/>
@@ -490,7 +490,7 @@ export function SettingsView({t,dk,settings,onSave,onClose,onDownloadBackup,onRe
         )}
         {sec==="data" && (
         <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
-          <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:10,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Backup &amp; restore</div>
+          <div style={{fontSize:12,fontWeight:600,color:t.textSub,marginBottom:10,fontFamily:t.sans}}>Backup &amp; restore</div>
           <p style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,lineHeight:1.6,margin:"0 0 10px"}}>Download a full snapshot of your data (initiatives, settings, debates, weekly metrics) as a JSON file. Keep a copy somewhere safe. This is the only off-device record until cloud sync ships.</p>
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
             <button onClick={onDownloadBackup} style={gG(t)}><IconDownload size={13}/> Download backup</button>
@@ -504,7 +504,7 @@ export function SettingsView({t,dk,settings,onSave,onClose,onDownloadBackup,onRe
         )}
         {sec==="data" && (
         <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
-          <div style={{fontSize:12,fontWeight:700,color:t.textSub,marginBottom:8,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Demo data</div>
+          <div style={{fontSize:12,fontWeight:600,color:t.textSub,marginBottom:8,fontFamily:t.sans}}>Demo data</div>
           {/* Unreachable in a live workspace rather than confirmable. A dialog is
               the right guard for a destructive action whose target the operator
               can see; this one replaces a client's entire portfolio with a
@@ -534,8 +534,8 @@ export function SettingsView({t,dk,settings,onSave,onClose,onDownloadBackup,onRe
           <div style={{display:"flex",gap:8,justifyContent:"flex-end",alignItems:"center",paddingTop:4,
             position:"sticky",bottom:0,background:t.bg,paddingBottom:12,borderTop:"1px solid "+t.borderSoft,marginTop:4}}>
             {dirty
-              ? <span style={{marginRight:"auto",fontSize:11,color:t.warn,fontFamily:t.mono}}>unsaved changes</span>
-              : <span style={{marginRight:"auto",fontSize:11,color:t.textMuted,fontFamily:t.mono}}>saved</span>}
+              ? <span style={{marginRight:"auto",fontSize:11,color:t.warn,fontFamily:t.sans}}>unsaved changes</span>
+              : <span style={{marginRight:"auto",fontSize:11,color:t.textMuted,fontFamily:t.sans}}>saved</span>}
             <button style={gGh(t)} onClick={requestClose}>{dirty?"Discard":"Close"}</button>
             <button style={{...gG(t),...(dirty?null:gOff)}} disabled={!dirty} onClick={()=>{ onSave(local); }}>Save settings</button>
           </div>

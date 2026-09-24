@@ -1270,3 +1270,32 @@ Every tool in `api/_mcpTools.js` reads or writes the SAME documents `api/state.j
 **What is not verified.** The protocol implementation was checked against the MCP specification and exercised with hand-written JSON-RPC requests and the pure-function test suite in `api/oauth.test.js` and `api/mcp.test.js`; it has not been clicked through against a live claude.ai custom-connector flow, Claude Desktop's config-file connector, or an org's Slack connector setup, because none of those can be driven from this environment. Verify the full authorize→token→tool-call round trip against a real client before treating this as done, the same discipline `registry.js` already asks of every `unverified` model id in the text catalogue.
 
 **Forcing condition:** none that removes the ledger-only boundary — see 5.6 and the proposal-gate decision above for what it would take to add an execution tool, and it is the same gate, not a lighter one for being MCP-shaped. The Slack connector becoming a real, used surface is the trigger to revisit whether the tool set itself (currently read-heavy, two writes) needs to grow, since a chat surface invites different requests than a Claude Code session does.
+
+---
+
+## One sans, neutral surfaces, one accent
+
+**Decision.** The interface runs on Geist alone (Geist Mono only for literal
+code: ad names, naming conventions, IDs), on zinc-neutral surfaces, with a
+single indigo accent spent on the primary action, the active nav item, focus
+and progress. Lora, the tracked-uppercase monospace micro-label and the warm
+parchment palette are gone. The rail lost its two-letter code chips, laboratory
+subtitles and section taglines and is now an icon and a plain label per view.
+The token names (`gold`, `goldFill`, `teal`…) are kept as they were, so every
+call site re-themed without being touched; read them as "accent ink", "accent
+fill" and "success ink".
+
+**Why.** Three faces alternating inside one card, a tint on every panel and the
+accent on buttons, tabs, figures and nav at once read as generated rather than
+designed: when everything is coloured, nothing is emphasised. Figures now sit
+in ink and the accent marks only what you can act on or where you are, which
+is the convention the SaaS tools our users already live in follow.
+
+**What it does not do.** It does not rename the tokens or restyle every view by
+hand. Views other than the Dashboard inherit the palette, type and label
+changes but still set some money figures in the accent; those move to ink as
+each view is touched.
+
+**Forcing condition.** A brand requirement for a different accent. Change the
+`gold*` values in `TL`/`TD` in `src/constants.js` and run `npm run
+check:contrast`; nothing else needs to move.

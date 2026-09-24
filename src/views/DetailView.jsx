@@ -32,7 +32,7 @@ export function DetailView({item,items,t,dk,cats,settings,onEdit,onDelete,onStat
             <BlockerBadge blocker={item.blocker} t={t}/>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:2}}>
-            {item.initId&&<span style={{fontSize:11,fontWeight:700,color:t.gold,fontFamily:t.mono,background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:3,padding:"2px 8px",flexShrink:0}}>{item.initId}</span>}
+            {item.initId&&<span style={{fontSize:11,fontWeight:700,color:t.gold,fontFamily:t.sans,background:t.goldBg,border:"1px solid "+t.goldBorder,borderRadius:3,padding:"2px 8px",flexShrink:0}}>{item.initId}</span>}
             <h2 style={{margin:0,fontSize:19,fontWeight:600,color:t.text,lineHeight:1.3,letterSpacing:"-0.02em",fontFamily:t.serif}}>{item.title}</h2>
           </div>
           {item.owner&&<div style={{fontSize:13,color:t.textMuted,marginTop:5,fontFamily:t.serif}}>{item.owner}</div>}
@@ -66,7 +66,7 @@ export function DetailView({item,items,t,dk,cats,settings,onEdit,onDelete,onStat
         <div style={{background:t.warnBg,border:"2px solid "+t.warnBorder,borderRadius:6,padding:"10px 16px",display:"flex",alignItems:"center",gap:10}}>
           <span style={{color:t.warn,flexShrink:0,display:"inline-flex"}}><IconAlert size={19}/></span>
           <div>
-            <div style={{fontSize:12,fontWeight:800,color:t.warn,letterSpacing:"0.04em",fontFamily:t.mono,textTransform:"uppercase"}}>BLOCKED</div>
+            <div style={{fontSize:12,fontWeight:800,color:t.warn,fontFamily:t.sans}}>Blocked</div>
             <div style={{fontSize:14,fontWeight:600,color:t.warn,fontFamily:t.serif}}>{item.blocker}</div>
           </div>
         </div>
@@ -79,19 +79,19 @@ export function DetailView({item,items,t,dk,cats,settings,onEdit,onDelete,onStat
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
             {item.observation&&(
               <div>
-                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>Observation · what data prompted this?</div>
+                <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,marginBottom:4}}>Observation · what data prompted this?</div>
                 <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:13}}>{item.observation}</p>
               </div>
             )}
             {item.hypothesis&&(
               <div style={{borderLeft:"3px solid "+t.gold,paddingLeft:12}}>
-                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>Hypothesis · if we do X, then Y…</div>
+                <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,marginBottom:4}}>Hypothesis · if we do X, then Y…</div>
                 <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:14,fontWeight:600}}>{item.hypothesis}</p>
               </div>
             )}
             {item.successMetric&&(
               <div>
-                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>Success metric · what KPI determines a win?</div>
+                <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,marginBottom:4}}>Success metric · what KPI determines a win?</div>
                 <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:13}}>{item.successMetric}</p>
               </div>
             )}
@@ -111,15 +111,15 @@ export function DetailView({item,items,t,dk,cats,settings,onEdit,onDelete,onStat
           <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr) auto",gap:12,alignItems:"center"}}>
             {[["Impact",item.ice.impact],["Certainty",item.ice.certainty],["Ease",item.ice.ease]].map(([l,v])=>(
               <div key={l} style={{textAlign:"center"}}>
-                <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:3,textTransform:"uppercase",letterSpacing:"0.06em"}}>{l}</div>
-                <div style={{fontSize:22,fontWeight:700,color:t.text,fontFamily:t.mono}}>{v}</div>
-                <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono}}>/10</div>
+                <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,marginBottom:3}}>{l}</div>
+                <div style={{fontSize:22,fontWeight:700,color:t.text,fontFamily:t.sans}}>{v}</div>
+                <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans}}>/10</div>
               </div>
             ))}
             <div style={{textAlign:"center",borderLeft:"1px solid "+t.border,paddingLeft:16}}>
-              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:3,textTransform:"uppercase",letterSpacing:"0.06em"}}>Score</div>
-              <div style={{fontSize:22,fontWeight:700,fontFamily:t.mono,color:score!==null?iceColor(score,t):t.textMuted}}>{score!==null?score:"—"}</div>
-              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono}}>/100</div>
+              <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,marginBottom:3}}>Score</div>
+              <div style={{fontSize:22,fontWeight:700,fontFamily:t.sans,color:score!==null?iceColor(score,t):t.textMuted}}>{score!==null?score:"—"}</div>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans}}>/100</div>
             </div>
           </div>
         </div>
@@ -132,40 +132,40 @@ export function DetailView({item,items,t,dk,cats,settings,onEdit,onDelete,onStat
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:12}}>
             {(item.spendCost||0)>0&&<div>
               <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginBottom:2}}>Est. spend cost</div>
-              <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.mono}}>{fmtCur(item.spendCost)}</div>
+              <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.sans}}>{fmtCur(item.spendCost)}</div>
             </div>}
             {(item.resourceCost||0)>0&&<div>
               <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginBottom:2}}>Est. resource cost</div>
-              <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.mono}}>{fmtCur(item.resourceCost)}</div>
+              <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.sans}}>{fmtCur(item.resourceCost)}</div>
             </div>}
             {((item.spendCost||0)+(item.resourceCost||0))>0&&<div>
               <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginBottom:2}}>Total est. cost</div>
-              <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.mono}}>{fmtCur((item.spendCost||0)+(item.resourceCost||0))}</div>
+              <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.sans}}>{fmtCur((item.spendCost||0)+(item.resourceCost||0))}</div>
             </div>}
             {item.revenueImpact!==0&&<div>
               <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginBottom:2}}>Est. revenue</div>
-              <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.mono}}>{fmtCur(item.revenueImpact)}</div>
+              <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.sans}}>{fmtCur(item.revenueImpact)}</div>
             </div>}
             {item.revenueImpact!==0&&((item.spendCost||0)+(item.resourceCost||0))>0&&<div>
               <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginBottom:2}}>Est. ROI</div>
-              <div style={{fontSize:16,fontWeight:700,color:t.gold,fontFamily:t.mono}}>{((item.revenueImpact||0)/((item.spendCost||0)+(item.resourceCost||0))).toFixed(1)}x</div>
+              <div style={{fontSize:16,fontWeight:600,color:t.text,fontFamily:t.sans}}>{((item.revenueImpact||0)/((item.spendCost||0)+(item.resourceCost||0))).toFixed(1)}x</div>
             </div>}
           </div>
           {item.results?.actualRevenueImpact!=null&&(
             <div style={{marginTop:14,paddingTop:12,borderTop:"1px solid "+t.border}}>
-              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:8,letterSpacing:"0.06em",textTransform:"uppercase"}}>Actual results</div>
+              <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,marginBottom:8}}>Actual results</div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:12}}>
                 {item.results.actualSpendCost!=null&&<div>
                   <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginBottom:2}}>Actual spend cost</div>
-                  <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.mono}}>{fmtCur(item.results.actualSpendCost)}</div>
+                  <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.sans}}>{fmtCur(item.results.actualSpendCost)}</div>
                 </div>}
                 {item.results.actualResourceCost!=null&&<div>
                   <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginBottom:2}}>Actual resource cost</div>
-                  <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.mono}}>{fmtCur(item.results.actualResourceCost)}</div>
+                  <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.sans}}>{fmtCur(item.results.actualResourceCost)}</div>
                 </div>}
                 <div>
                   <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginBottom:2}}>Actual revenue</div>
-                  <div style={{fontSize:16,fontWeight:700,color:t.gold,fontFamily:t.mono}}>{fmtCur(item.results.actualRevenueImpact)}</div>
+                  <div style={{fontSize:16,fontWeight:600,color:t.text,fontFamily:t.sans}}>{fmtCur(item.results.actualRevenueImpact)}</div>
                 </div>
                 {(()=>{
                   const actCost=(item.results.actualSpendCost||0)+(item.results.actualResourceCost||0);
@@ -175,7 +175,7 @@ export function DetailView({item,items,t,dk,cats,settings,onEdit,onDelete,onStat
                   const color=parseFloat(roi)>=2?t.gold:parseFloat(roi)>=1?t.warn:t.red;
                   return <div>
                     <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginBottom:2}}>Actual ROI</div>
-                    <div style={{fontSize:20,fontWeight:700,color,fontFamily:t.mono}}>{roi}x</div>
+                    <div style={{fontSize:20,fontWeight:700,color,fontFamily:t.sans}}>{roi}x</div>
                   </div>;
                 })()}
               </div>
@@ -192,25 +192,25 @@ export function DetailView({item,items,t,dk,cats,settings,onEdit,onDelete,onStat
             const certCol = pe.predictedCertainty!=null ? pe.predictedCertainty : null;
             return (
               <div style={{marginTop:14,paddingTop:12,borderTop:"1px solid "+t.border}}>
-                <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:8,letterSpacing:"0.06em",textTransform:"uppercase"}}>
+                <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,marginBottom:8}}>
                   Calibration · prediction frozen {pe.snapshotDate?"at launch ("+pe.snapshotDate+")":"at launch"}
                 </div>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:12}}>
                   <div>
                     <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginBottom:2}}>Predicted revenue</div>
-                    <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.mono}}>{fmtCur(pe.predictedRevenue)}</div>
+                    <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.sans}}>{fmtCur(pe.predictedRevenue)}</div>
                   </div>
                   <div>
                     <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginBottom:2}}>Actual revenue</div>
-                    <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.mono}}>{fmtCur(pe.actualRevenue)}</div>
+                    <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.sans}}>{fmtCur(pe.actualRevenue)}</div>
                   </div>
                   <div>
                     <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginBottom:2}}>Prediction error</div>
-                    <div style={{fontSize:20,fontWeight:700,color:deltaColor,fontFamily:t.mono}}>{beat?"+":""}{fmtCur(pe.revenueDelta)}{pct!=null?" ("+(beat?"+":"")+pct+"%)":""}</div>
+                    <div style={{fontSize:20,fontWeight:700,color:deltaColor,fontFamily:t.sans}}>{beat?"+":""}{fmtCur(pe.revenueDelta)}{pct!=null?" ("+(beat?"+":"")+pct+"%)":""}</div>
                   </div>
                   {certCol!=null&&<div>
                     <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginBottom:2}}>Predicted certainty</div>
-                    <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.mono}}>{certCol}%</div>
+                    <div style={{fontSize:16,fontWeight:700,color:t.text,fontFamily:t.sans}}>{certCol}%</div>
                   </div>}
                 </div>
               </div>
@@ -223,7 +223,7 @@ export function DetailView({item,items,t,dk,cats,settings,onEdit,onDelete,onStat
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:8}}>
           {[{l:"Primary metric",v:item.primaryMetric},{l:"Start date",v:fmtDate(item.startDate)},{l:"End date",v:fmtDate(item.endDate)},{l:"Sample size",v:item.sampleSize||"—"},{l:"Duration",v:item.duration||"—"}].map(m=>(
             <div key={m.l} style={{background:t.surfaceAlt,border:"1px solid "+t.border,borderRadius:6,padding:"10px 12px"}}>
-              <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:3,fontFamily:t.mono}}>{m.l}</div>
+              <div style={{fontSize:12,color:t.textMuted,marginBottom:3,fontFamily:t.sans}}>{m.l}</div>
               <div style={{fontSize:13,color:t.text,fontWeight:600}}>{m.v||"—"}</div>
             </div>
           ))}
@@ -243,7 +243,7 @@ export function DetailView({item,items,t,dk,cats,settings,onEdit,onDelete,onStat
             const pct = Math.round(kl.progress*100);
             return (
               <div style={{marginTop:10}}>
-                <div style={{display:"flex",justifyContent:"space-between",fontSize:10.5,color:kl.overdue?t.red:t.textMuted,fontFamily:t.mono,marginBottom:4}}>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:10.5,color:kl.overdue?t.red:t.textMuted,fontFamily:t.sans,marginBottom:4}}>
                   <span>{pct}% of planned window elapsed</span>
                   <span>{kl.overdue?Math.abs(kl.daysRemaining)+"d past end date":kl.daysRemaining+"d remaining"}</span>
                 </div>
@@ -268,15 +268,15 @@ export function DetailView({item,items,t,dk,cats,settings,onEdit,onDelete,onStat
             <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:12}}>
               <div style={gSL(t)}>Results</div>
               <OBdg o={item.results.outcomeClassification} dk={dk}/>
-              {item.results.outcomeCertainty&&<span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>Certainty: {item.results.outcomeCertainty}%</span>}
+              {item.results.outcomeCertainty&&<span style={{fontSize:11,color:t.textMuted,fontFamily:t.sans}}>Certainty: {item.results.outcomeCertainty}%</span>}
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:12}}>
-              {item.results.actualOutcome&&<div><div style={{fontSize:10,color:c.text,opacity:0.7,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:4,fontFamily:t.mono}}>Actual outcome</div><p style={{margin:0,color:t.textSub,fontSize:13,lineHeight:1.6}}>{item.results.actualOutcome}</p></div>}
+              {item.results.actualOutcome&&<div><div style={{fontSize:12,color:c.text,opacity:0.7,marginBottom:4,fontFamily:t.sans}}>Actual outcome</div><p style={{margin:0,color:t.textSub,fontSize:13,lineHeight:1.6}}>{item.results.actualOutcome}</p></div>}
               <div style={{borderLeft:"3px solid "+t.gold,paddingLeft:12}}>
-                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:3,fontFamily:t.mono}}>Key learning</div>
+                <div style={{fontSize:12,color:t.textMuted,marginBottom:3,fontFamily:t.sans}}>Key learning</div>
                 <p style={{margin:0,color:t.warn,fontSize:14,fontWeight:600}}>"{renderProse(item.results.keyLearning)}"</p>
               </div>
-              {item.results.decisionMade&&<div><div style={{fontSize:10,color:c.text,opacity:0.7,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:4,fontFamily:t.mono}}>Decision made</div><p style={{margin:0,color:t.textSub,fontSize:13,lineHeight:1.6}}>{renderProse(item.results.decisionMade)}</p></div>}
+              {item.results.decisionMade&&<div><div style={{fontSize:12,color:c.text,opacity:0.7,marginBottom:4,fontFamily:t.sans}}>Decision made</div><p style={{margin:0,color:t.textSub,fontSize:13,lineHeight:1.6}}>{renderProse(item.results.decisionMade)}</p></div>}
             </div>
           </div>
         );
@@ -373,8 +373,8 @@ function TestValidityPanel({ item, t, onSaveTestValidity }) {
   const sigBg    = !result ? t.surfaceAlt : result.significant ? t.tealBg : result.overturned ? t.redBg : t.warnBg;
   const sigBorder= !result ? t.border : result.significant ? t.teal : result.overturned ? t.red : t.warnBorder;
 
-  const labelStyle = {fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:3};
-  const numStyle   = {fontSize:20,fontWeight:700,fontFamily:t.mono};
+  const labelStyle = {fontSize:12,color:t.textMuted,fontFamily:t.sans,marginBottom:3};
+  const numStyle   = {fontSize:20,fontWeight:700,fontFamily:t.sans};
   const headStyle  = {fontSize:11,fontWeight:600,color:t.textSub,fontFamily:t.serif,marginBottom:10,letterSpacing:"0.04em"};
 
   return (
@@ -446,7 +446,7 @@ function TestValidityPanel({ item, t, onSaveTestValidity }) {
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:10,flexWrap:"wrap"}}>
           <div style={headStyle}>&#8680; Result</div>
           {reads.length>0&&(
-            <div style={{fontSize:10,fontFamily:t.mono,color:t.textMuted,letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:10}}>
+            <div style={{fontSize:12,fontFamily:t.sans,color:t.textMuted,marginBottom:10}}>
               Read {reads.length}&times; · threshold z &ge; {sequentialThreshold(Math.max(1,reads.length), sigAlpha).threshold.toFixed(2)}
             </div>
           )}

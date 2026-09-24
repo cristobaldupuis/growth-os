@@ -54,7 +54,7 @@ export function DiagnosticEscalationPanel({ item, schema, t, onSaveEvidence }) {
         <button style={gGh(t,"sm")} onClick={()=>setPasting(true)}>Paste breakdown</button>
       ) : (
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          <textarea style={{...gTA(t),fontFamily:t.mono,fontSize:11.5}} rows={5} value={text}
+          <textarea style={{...gTA(t),fontFamily:t.sans,fontSize:11.5}} rows={5} value={text}
             onChange={e=>{setText(e.target.value);setPreview(null);}}
             placeholder={candidate.label+",Amount spent (USD),Purchases conversion value\n18-24,1200,900\n25-34,3400,6800"}/>
           <div style={{display:"flex",gap:8}}>
@@ -69,7 +69,7 @@ export function DiagnosticEscalationPanel({ item, schema, t, onSaveEvidence }) {
           {preview?.entry && (
             <div style={{padding:"10px 12px",borderRadius:t.r.md,background:t.surface,border:"1px solid "+t.border}}>
               <div style={{fontSize:13,color:t.text,fontWeight:600,lineHeight:1.5,marginBottom:8}}>{preview.entry.verdict}</div>
-              <div style={{fontSize:10.5,color:t.textMuted,fontFamily:t.mono,marginBottom:8}}>{preview.rows.length} row{preview.rows.length!==1?"s":""} parsed{preview.errors.length?" · "+preview.errors.length+" skipped":""}</div>
+              <div style={{fontSize:10.5,color:t.textMuted,fontFamily:t.sans,marginBottom:8}}>{preview.rows.length} row{preview.rows.length!==1?"s":""} parsed{preview.errors.length?" · "+preview.errors.length+" skipped":""}</div>
               <button style={gG(t,"sm")} onClick={record}><IconCheck size={12}/> Record to this initiative</button>
             </div>
           )}

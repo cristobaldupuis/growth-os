@@ -222,7 +222,7 @@ export function WorkspacePanel({ t, dk, boot, onClose, onReload, collectLocal })
       {user && (
         <div>
           <div style={gSL(t)}>Signed in as</div>
-          <div style={{fontSize:13,color:t.text,fontFamily:t.mono,marginBottom:16}}>{user.email || user.id}</div>
+          <div style={{fontSize:13,color:t.text,fontFamily:t.sans,marginBottom:16}}>{user.email || user.id}</div>
 
           {/* Offered only when there is a session but this session is still
               reading the browser — which is exactly the "I have just signed in on

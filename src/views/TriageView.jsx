@@ -38,7 +38,7 @@ export function TriageView({items, t, brands, activeBrand, onDetail, onLogResult
     if (dleft!==null && dleft<0) {
       queue.push({
         id:e.id, kind:"overdue", urgency:90+moneyW,
-        accent:t.red, tag:"OVERDUE", title:e.title, brand:brandLabel(e),
+        accent:t.red, tag:"Overdue", title:e.title, brand:brandLabel(e),
         reason:"Ended "+fmtDate(e.endDate)+" ("+Math.abs(dleft)+"d ago) and is still marked running. Decide the outcome or extend the window.",
         metric:e.primaryMetric, money,
         actions:[
@@ -52,7 +52,7 @@ export function TriageView({items, t, brands, activeBrand, onDetail, onLogResult
     if (dleft!==null && dleft<=3) {
       queue.push({
         id:e.id, kind:"ending", urgency:70+moneyW,
-        accent:t.warn, tag:dleft===0?"DUE TODAY":"ENDS IN "+dleft+"D", title:e.title, brand:brandLabel(e),
+        accent:t.warn, tag:dleft===0?"Due today":"Ends in "+dleft+"d", title:e.title, brand:brandLabel(e),
         reason:"Window closes "+fmtDate(e.endDate)+". Prepare to read results, or extend if the test needs more data.",
         metric:e.primaryMetric, money,
         actions:[
@@ -66,7 +66,7 @@ export function TriageView({items, t, brands, activeBrand, onDetail, onLogResult
     if (e.blocker && e.blocker!=="None") {
       queue.push({
         id:e.id, kind:"blocked", urgency:55+moneyW,
-        accent:t.red, tag:"BLOCKED", title:e.title, brand:brandLabel(e),
+        accent:t.red, tag:"Blocked", title:e.title, brand:brandLabel(e),
         reason:e.blocker+". Resolve the dependency or escalate; it's holding up "+(money>0?fmtCur(money)+" of impact.":"a live initiative."),
         metric:e.primaryMetric, money,
         actions:[],
@@ -81,7 +81,7 @@ export function TriageView({items, t, brands, activeBrand, onDetail, onLogResult
     if (missing.length) {
       queue.push({
         id:e.id, kind:"incomplete", urgency:40+moneyW,
-        accent:t.textMuted, tag:"NEEDS SETUP", title:e.title, brand:brandLabel(e),
+        accent:t.textMuted, tag:"Needs setup", title:e.title, brand:brandLabel(e),
         reason:"Running without "+missing.join(", ")+". Without these it can't be cleanly judged or stopped.",
         metric:e.primaryMetric, money,
         actions:[],
@@ -92,7 +92,7 @@ export function TriageView({items, t, brands, activeBrand, onDetail, onLogResult
     if (money>=50000) {
       queue.push({
         id:e.id, kind:"highstake", urgency:20+moneyW/4,
-        accent:t.gold, tag:"HIGH STAKES", title:e.title, brand:brandLabel(e),
+        accent:t.gold, tag:"High stakes", title:e.title, brand:brandLabel(e),
         reason:fmtCur(money)+" of revenue riding on this. On track"+(e.endDate?", ends "+fmtDate(e.endDate)+".":"."),
         metric:e.primaryMetric, money,
         actions:[],
@@ -106,7 +106,7 @@ export function TriageView({items, t, brands, activeBrand, onDetail, onLogResult
     const e=bestDraft.e, money=Math.max(0,e.revenueImpact||0);
     queue.push({
       id:e.id, kind:"activate", urgency:30+(bestDraft.ice/10),
-      accent:t.teal, tag:"READY TO ACTIVATE", title:e.title, brand:brandLabel(e),
+      accent:t.teal, tag:"Ready to activate", title:e.title, brand:brandLabel(e),
       reason:"Highest-leverage idea sitting in draft (ICE "+bestDraft.ice+(money>0?", "+fmtCur(money)+" potential":"")+"). Nothing's blocking it from starting.",
       metric:e.primaryMetric, money,
       actions:[
@@ -130,7 +130,7 @@ export function TriageView({items, t, brands, activeBrand, onDetail, onLogResult
         background: topItem?t.surface:t.tealBg,
         border:"1px solid "+(topItem?t.border:t.teal)}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8,flexWrap:"wrap",marginBottom:topItem?12:4}}>
-          <div style={{fontSize:10,letterSpacing:"0.11em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,fontWeight:600}}>
+          <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,fontWeight:600}}>
             {today.toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"})}
           </div>
           <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>
@@ -139,7 +139,7 @@ export function TriageView({items, t, brands, activeBrand, onDetail, onLogResult
         </div>
         {topItem ? (
           <div>
-            <div style={{fontSize:10,fontWeight:600,color:topItem.accent,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:4}}>
+            <div style={{fontSize:12,fontWeight:600,color:topItem.accent,fontFamily:t.sans,marginBottom:4}}>
               Do this first · {topItem.tag}
             </div>
             <div style={{fontSize:16,fontWeight:600,color:t.text,fontFamily:t.sans,lineHeight:1.3,marginBottom:4}}>{topItem.title}</div>
@@ -167,8 +167,8 @@ export function TriageView({items, t, brands, activeBrand, onDetail, onLogResult
           {l:"Revenue at risk", v:fmtCur(totalAtRisk), gold:true},
         ].map(m=>(
           <div key={m.l} {...(()=>{const p=tile(t,m.gold?t.goldFill:t.border,queue.length?0:null);return{className:p.className,style:{...p.style,background:t.surface,border:"1px solid "+t.border,borderRadius:12,padding:"13px 15px",boxShadow:t.shadow}};})()}>
-            <div style={{fontSize:9.5,letterSpacing:"0.1em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,fontWeight:600,marginBottom:8}}>{m.l}</div>
-            <div style={{fontSize:24,fontWeight:700,color:m.gold?t.gold:t.text,fontFamily:t.mono,letterSpacing:"-0.03em",lineHeight:1}}>{m.v}</div>
+            <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,fontWeight:600,marginBottom:8}}>{m.l}</div>
+            <div style={{fontSize:24,fontWeight:600,color:t.text,fontFamily:t.sans,letterSpacing:"-0.03em",lineHeight:1}}>{m.v}</div>
           </div>
         ))}
       </div>
@@ -201,12 +201,12 @@ export function TriageView({items, t, brands, activeBrand, onDetail, onLogResult
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,marginBottom:6}}>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3,flexWrap:"wrap"}}>
-                    <span style={{fontSize:10,fontWeight:600,color:q.accent,fontFamily:t.serif,letterSpacing:"0.05em"}}>{q.tag}</span>
+                    <span style={{fontSize:12,fontWeight:600,color:q.accent,fontFamily:t.sans}}>{q.tag}</span>
                     {q.brand&&brands.length>1&&<span style={{fontSize:10.5,color:t.textMuted,fontFamily:t.serif}}>{q.brand}</span>}
                   </div>
                   <button type="button" onClick={()=>onDetail(q.id)} style={{background:"none",border:"none",padding:0,textAlign:"left",font:"inherit",fontSize:14.5,fontWeight:600,color:t.text,fontFamily:t.sans,lineHeight:1.3,cursor:"pointer"}}>{q.title}</button>
                 </div>
-                {q.money>0 && <span style={{fontSize:16,fontWeight:700,color:t.gold,fontFamily:t.mono,letterSpacing:"-0.02em",flexShrink:0}}>{fmtCur(q.money)}</span>}
+                {q.money>0 && <span style={{fontSize:16,fontWeight:600,color:t.text,fontFamily:t.sans,letterSpacing:"-0.02em",flexShrink:0}}>{fmtCur(q.money)}</span>}
               </div>
               <div style={{fontSize:12.5,color:t.textSub,fontFamily:t.sans,lineHeight:1.5,marginBottom:11}}>{q.reason}</div>
               <div style={{display:"flex",gap:7,flexWrap:"wrap",alignItems:"center"}}>

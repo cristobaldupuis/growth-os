@@ -68,7 +68,7 @@ export function SupersessionPicker({ items, currentId, selection, onChange, t })
   const set = (ref, kind) => onChange({ ...(selection||{}), [ref]: kind });
   const drop = (ref) => { const next = { ...(selection||{}) }; delete next[ref]; onChange(next); };
 
-  const lbl = {fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.08em",textTransform:"uppercase"};
+  const lbl = {fontSize:12,color:t.textMuted,fontFamily:t.sans};
 
   if (candidates.length === 0) return null;
 
@@ -83,9 +83,9 @@ export function SupersessionPicker({ items, currentId, selection, onChange, t })
               <div key={ref} style={{padding:"9px 11px",borderRadius:6,background:t.surfaceAlt,border:"1px solid "+t.border}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8,marginBottom:6}}>
                   <div style={{flex:1,minWidth:0}}>
-                    <span style={{fontSize:10.5,color:t.gold,fontFamily:t.mono,marginRight:6}}>{ref}</span>
+                    <span style={{fontSize:10.5,color:t.gold,fontFamily:t.sans,marginRight:6}}>{ref}</span>
                     <span style={{fontSize:12.5,color:t.text,fontFamily:t.sans,fontWeight:600}}>{e ? e.title : "(not in this workspace)"}</span>
-                    {e && e.endDate && <span style={{fontSize:10.5,color:t.textMuted,fontFamily:t.mono,marginLeft:8}}>{fmtDate(e.endDate)}</span>}
+                    {e && e.endDate && <span style={{fontSize:10.5,color:t.textMuted,fontFamily:t.sans,marginLeft:8}}>{fmtDate(e.endDate)}</span>}
                   </div>
                   <button onClick={()=>drop(ref)} aria-label={"Remove "+ref}
                     style={{background:"none",border:"none",color:t.textMuted,cursor:"pointer",fontSize:13,lineHeight:1,padding:0}}>&#10005;</button>
@@ -147,7 +147,7 @@ export function SupersessionPicker({ items, currentId, selection, onChange, t })
                 onMouseEnter={ev=>{ev.currentTarget.style.background=t.surfaceAlt;}}
                 onMouseLeave={ev=>{ev.currentTarget.style.background="none";}}>
                 <div style={{fontSize:12,color:t.text,fontFamily:t.sans,fontWeight:600}}>
-                  <span style={{fontSize:10,color:t.gold,fontFamily:t.mono,marginRight:6}}>{learningRef(e)}</span>
+                  <span style={{fontSize:10,color:t.gold,fontFamily:t.sans,marginRight:6}}>{learningRef(e)}</span>
                   {e.title}
                 </div>
                 <div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,lineHeight:1.4,marginTop:2}}>

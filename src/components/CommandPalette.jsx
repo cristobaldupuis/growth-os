@@ -126,7 +126,7 @@ export function CommandPalette({ t, dk, items, onClose, onOpenInitiative, onNavi
             aria-label="Search initiatives and commands"
             placeholder="Search initiatives, learnings, or jump to a view…"
             style={{flex:1,border:"none",outline:"none",background:"transparent",color:t.text,fontSize:15,fontFamily:t.sans}}/>
-          <kbd style={{fontSize:10,fontFamily:t.mono,color:t.textMuted,border:"1px solid "+t.border,borderRadius:t.r.xs,padding:"2px 6px"}}>esc</kbd>
+          <kbd style={{fontSize:10,fontFamily:t.sans,color:t.textMuted,border:"1px solid "+t.border,borderRadius:t.r.xs,padding:"2px 6px"}}>esc</kbd>
         </div>
 
         <div ref={listRef} id={listboxId} role="listbox" aria-label="Results"
@@ -144,7 +144,7 @@ export function CommandPalette({ t, dk, items, onClose, onOpenInitiative, onNavi
                 onMouseMove={() => setActive(i)} onClick={() => run(r)}
                 style={{display:"flex",alignItems:"center",gap:10,padding:"9px 11px",borderRadius:t.r.sm,cursor:"pointer",
                   background:on?t.surfaceAlt:"transparent"}}>
-                <span style={{fontSize:9,fontFamily:t.mono,letterSpacing:"0.08em",textTransform:"uppercase",color:t.textMuted,minWidth:52,flexShrink:0}}>
+                <span style={{fontSize:12,fontFamily:t.sans,color:t.textMuted,minWidth:52,flexShrink:0}}>
                   {r.kind === "initiative" ? (r.sub || "exp") : r.kind === "nav" ? "go to" : "do"}
                 </span>
                 <span style={{flex:1,minWidth:0,fontSize:13,color:t.text,fontFamily:t.sans,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
@@ -164,7 +164,7 @@ export function CommandPalette({ t, dk, items, onClose, onOpenInitiative, onNavi
           })}
         </div>
 
-        <div style={{display:"flex",gap:14,padding:"8px 16px",borderTop:"1px solid "+t.borderSoft,background:t.surfaceAlt,fontSize:10.5,color:t.textMuted,fontFamily:t.mono}}>
+        <div style={{display:"flex",gap:14,padding:"8px 16px",borderTop:"1px solid "+t.borderSoft,background:t.surfaceAlt,fontSize:10.5,color:t.textMuted,fontFamily:t.sans}}>
           <span>↑↓ navigate</span><span>↵ open</span><span>esc close</span>
         </div>
       </div>

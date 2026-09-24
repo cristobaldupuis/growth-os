@@ -112,7 +112,7 @@ import { seedInitiativeFromAgenda } from "./services/learningAgenda.js";
 // space reads as nothing happening at all, which is the truth.
 function ViewLoading({ t }) {
   return (
-    <div style={{padding:"48px 20px",textAlign:"center",color:t.textMuted,fontFamily:t.mono,fontSize:11,letterSpacing:"0.08em",textTransform:"uppercase"}}>
+    <div style={{padding:"48px 20px",textAlign:"center",color:t.textMuted,fontFamily:t.sans,fontSize:12}}>
       Loading…
     </div>
   );
@@ -289,7 +289,7 @@ function GuideDrawer({ t, dk, openSection, onClose, onNavigate, nav }) {
         style={{cursor:"pointer",display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8,marginBottom:8,
           width:"100%",textAlign:"left",background:"transparent",border:"none",padding:0,font:"inherit",color:"inherit"}}>
         <span style={{flex:1}}>
-          <span style={{display:"block",fontSize:10,letterSpacing:"0.09em",textTransform:"uppercase",color:t.gold,fontFamily:t.mono,fontWeight:700,marginBottom:6}}>{s.label}</span>
+          <span style={{display:"block",fontSize:12,color:t.gold,fontFamily:t.sans,fontWeight:600,marginBottom:6}}>{s.label}</span>
           <span style={{display:"block",fontSize:t.fs.medium,fontWeight:600,color:t.text,fontFamily:t.serif}}>{s.feature}</span>
         </span>
         <span style={{color:t.textMuted,flexShrink:0,marginTop:4,display:"inline-flex",transition:"transform 0.18s",transform:expanded[s.id]?"rotate(180deg)":"rotate(0deg)"}}>
@@ -334,12 +334,12 @@ function GuideDrawer({ t, dk, openSection, onClose, onNavigate, nav }) {
           {hasRelevant ? (
             <>
               <div>
-                <div style={{fontSize:9,letterSpacing:"0.12em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,fontWeight:700,paddingBottom:6}}>Relevant to where you are</div>
+                <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,fontWeight:600,paddingBottom:6}}>Relevant to where you are</div>
                 <div style={{height:1,background:t.border}}/>
               </div>
               {relevant.map(renderCard)}
               <div style={{marginTop:4}}>
-                <div style={{fontSize:9,letterSpacing:"0.12em",textTransform:"uppercase",color:t.textMuted,fontFamily:t.mono,fontWeight:700,paddingBottom:6}}>Everything else</div>
+                <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,fontWeight:600,paddingBottom:6}}>Everything else</div>
                 <div style={{height:1,background:t.border}}/>
               </div>
               {rest.map(renderCard)}
@@ -436,27 +436,27 @@ function OnboardingModal({ t, settings, onSave, onSkip }) {
               <div style={{fontSize:12,fontWeight:600,color:t.text,fontFamily:t.serif}}>{b.name}</div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
                 <div>
-                  <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:2}}>WHAT THEY SELL</label>
+                  <label style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,display:"block",marginBottom:2}}>What they sell</label>
                   <input style={{...gI(t),fontSize:11}} value={b.whatTheySell} onChange={e=>fb(i,"whatTheySell",e.target.value)} placeholder="e.g. Premium home décor, $80–$300 AOV"/>
                 </div>
                 <div>
-                  <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:2}}>CATEGORIES</label>
+                  <label style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,display:"block",marginBottom:2}}>Categories</label>
                   <input style={{...gI(t),fontSize:11}} value={b.categories} onChange={e=>fb(i,"categories",e.target.value)} placeholder="e.g. Home decor, Gifting, Candles"/>
                 </div>
                 <div>
-                  <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:2}}>ICP</label>
+                  <label style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,display:"block",marginBottom:2}}>ICP</label>
                   <input style={{...gI(t),fontSize:11}} value={b.icp} onChange={e=>fb(i,"icp",e.target.value)} placeholder="e.g. Women 28–45, gifting buyers"/>
                 </div>
                 <div>
-                  <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:2}}>WHY THEY WIN</label>
+                  <label style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,display:"block",marginBottom:2}}>Why they win</label>
                   <input style={{...gI(t),fontSize:11}} value={b.whyTheyWin} onChange={e=>fb(i,"whyTheyWin",e.target.value)} placeholder="e.g. Visual brand, strong LTV"/>
                 </div>
                 <div>
-                  <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:2}}>RELATIONSHIP</label>
+                  <label style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,display:"block",marginBottom:2}}>Relationship</label>
                   <input style={{...gI(t),fontSize:11}} value={b.relationship} onChange={e=>fb(i,"relationship",e.target.value)} placeholder="e.g. Own DTC, wholesale, marketplace"/>
                 </div>
                 <div>
-                  <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,display:"block",marginBottom:2}}>CURRENT CONSTRAINT</label>
+                  <label style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,display:"block",marginBottom:2}}>Current constraint</label>
                   <input style={{...gI(t),fontSize:11}} value={b.constraint} onChange={e=>fb(i,"constraint",e.target.value)} placeholder="e.g. Rising CAC, thin margin"/>
                 </div>
               </div>
@@ -511,7 +511,7 @@ function OnboardingModal({ t, settings, onSave, onSkip }) {
         {/* Header */}
         <div style={{padding:"20px 24px 0",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
           <div>
-            <div style={{fontSize:10,fontFamily:t.mono,color:t.gold,letterSpacing:"0.10em",textTransform:"uppercase",marginBottom:6}}>
+            <div style={{fontSize:12,fontFamily:t.sans,color:t.gold,marginBottom:6}}>
               Marketers Lab {step < STEPS.length - 1 ? `· Step ${step+1} of ${STEPS.length - 1}` : "· Ready"}
             </div>
             <div style={{fontSize:20,fontWeight:600,color:t.text,fontFamily:t.serif,lineHeight:1.2}}>{currentStep.title}</div>
@@ -724,7 +724,7 @@ export default function App() {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   // Mobile only. The sidebar is a permanent column above 900px and a drawer
   // below it — the previous top strip overflowed a 390px viewport, and a fixed
-  // 216px column would do the same, so on narrow screens it slides over rather
+  // 248px column would do the same, so on narrow screens it slides over rather
   // than taking width from the content.
   const [navOpen, setNavOpen] = useState(false);
   // Desktop rail collapsed to icons. Persisted — see store.js.
@@ -1509,14 +1509,14 @@ export default function App() {
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
         <div style={{flex:"1 1 auto",minWidth:0}}>
           <div style={{display:"flex",alignItems:"baseline",gap:7,marginBottom:item.hypothesis?3:0}}>
-            {item.initId&&<span style={{fontSize:10,fontWeight:600,color:t.textMuted,fontFamily:t.mono,flexShrink:0}}>{item.initId}</span>}
+            {item.initId&&<span style={{fontSize:10,fontWeight:600,color:t.textMuted,fontFamily:t.sans,flexShrink:0}}>{item.initId}</span>}
             <span style={{fontSize:14.5,fontWeight:600,color:t.text,lineHeight:1.3,fontFamily:t.sans,textAlign:"left"}}>{item.title}</span>
             <SBdg s={item.status} dk={dk}/>
           </div>
           {item.hypothesis&&<div style={{fontSize:12.5,color:t.textSub,lineHeight:1.5,fontFamily:t.sans,textAlign:"left"}}>{item.hypothesis.slice(0,128)}{item.hypothesis.length>128?"…":""}</div>}
         </div>
         <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4,flexShrink:0}}>
-          {item.revenueImpact!==0&&<span style={{fontSize:18,fontWeight:700,color:t.gold,fontFamily:t.mono,letterSpacing:"-0.02em",lineHeight:1}}>{fmtCur(item.revenueImpact)}</span>}
+          {item.revenueImpact!==0&&<span style={{fontSize:18,fontWeight:600,color:t.text,fontFamily:t.sans,letterSpacing:"-0.02em",lineHeight:1}}>{fmtCur(item.revenueImpact)}</span>}
           <ICEChip ice={item.ice} t={t}/>
         </div>
       </div>
@@ -1528,7 +1528,7 @@ export default function App() {
         {item.results&&<OBdg o={item.results.outcomeClassification} dk={dk}/>}
         <EAlert endDate={item.endDate} status={item.status} t={t} dk={dk}/>
         <BlockerBadge blocker={item.blocker} t={t}/>
-        <span style={{marginLeft:"auto",display:"flex",gap:13,alignItems:"center",fontSize:11,color:t.textMuted,fontFamily:t.mono,flexWrap:"wrap"}}>
+        <span style={{marginLeft:"auto",display:"flex",gap:13,alignItems:"center",fontSize:11,color:t.textMuted,fontFamily:t.sans,flexWrap:"wrap"}}>
           {item.results&&typeof item.results.actualRevenueImpact==="number"&&<span>actual {fmtCur(item.results.actualRevenueImpact)}</span>}
           {item.status!=="Draft"&&item.endDate&&<span>end {fmtDate(item.endDate)}</span>}
           {item.linkedIds&&item.linkedIds.length>0&&<span>{item.linkedIds.length} linked</span>}
@@ -1767,7 +1767,7 @@ export default function App() {
       // Theme values the stylesheet needs. A media query cannot read a JS
       // object, and the button interaction below has to work in both themes
       // without each of 173 buttons opting in by hand.
-      "--gos-shadow":t.shadow, "--gos-shadow-hi":t.shadowHi, "--gos-gold":t.gold}}>
+      "--gos-shadow":t.shadow, "--gos-shadow-hi":t.shadowHi, "--gos-gold":t.gold, "--gos-btn-hover":dk?1.18:0.95}}>
       {/* The Tabler icon webfont used to be @import-ed here from jsdelivr. Nothing
         * in the app ever rendered a `ti ti-*` class, so it was a render-blocking
         * third-party request buying nothing — and one more origin to justify if a
@@ -1776,7 +1776,7 @@ export default function App() {
       {/* The rail/burger swap is the one piece of layout that cannot be done with
         * inline styles, since it needs a media query. Below 900px the permanent
         * column is removed from flow entirely rather than merely narrowed — a
-        * 216px fixed column on a 390px viewport is the same horizontal-overflow
+        * 248px fixed column on a 390px viewport is the same horizontal-overflow
         * bug the old tab strip had. */}
       {/* The app's entire responsive system used to be the single 900px rail
         * swap on the last line here. Every other style in the product is an
@@ -1815,22 +1815,17 @@ export default function App() {
         //
         // Done here rather than in the style helpers because a helper returns
         // an inline style object and `:hover` cannot be expressed in one. The
-        // selector excludes anything already in the interaction layer, so a nav
-        // item keeps its rail-and-tint and does not also lift.
+        // selector excludes anything already in the interaction layer and the
+        // rail's own controls, which tint instead.
         //
-        // `saturate` rather than `brightness`: a brightness lift reads well on
-        // the gold primary but goes the wrong way on a near-white secondary in
-        // light mode, where hover should feel like the surface coming forward
-        // rather than washing out. Saturation deepens the accent and leaves the
-        // greys alone, and the lift plus shadow is what carries the state in
-        // both themes. The global prefers-reduced-motion block in index.css
-        // collapses the movement and leaves the colour.
-        +"button:not(:disabled):not(.gos-int):not(.gos-tile){transition:transform .13s cubic-bezier(.2,.7,.3,1),box-shadow .16s ease,filter .16s ease}"
-        +"button:not(:disabled):not(.gos-int):not(.gos-tile):hover{transform:translateY(-1px);box-shadow:var(--gos-shadow-hi);filter:saturate(1.14)}"
-        +"button:not(:disabled):not(.gos-int):not(.gos-tile):focus-visible{box-shadow:var(--gos-shadow-hi)}"
-        // The press. Returns to rest and dips a hair below it, so a click reads
-        // as a click rather than as the hover state blinking off.
-        +"button:not(:disabled):not(.gos-int):not(.gos-tile):active{transform:translateY(0.5px);box-shadow:none;filter:saturate(1.04)}"}</style>
+        // A brightness shift and nothing else: no lift, no shadow. Buttons that
+        // jumped and glowed on hover made the product feel busier than it is.
+        // The amount is per theme (`--gos-btn-hover`, set on the root above):
+        // darken a touch in light mode, lighten in dark, so an accent fill and a
+        // plain secondary both visibly respond.
+        +"button:not(:disabled):not(.gos-int):not(.gos-tile):not(.gos-nav){transition:filter .12s ease,background-color .12s ease}"
+        +"button:not(:disabled):not(.gos-int):not(.gos-tile):not(.gos-nav):hover{filter:brightness(var(--gos-btn-hover,0.95))}"
+        +"button:not(:disabled):not(.gos-int):not(.gos-tile):not(.gos-nav):active{filter:brightness(calc(var(--gos-btn-hover,0.95) * 0.97))}"}</style>
 
       {/* Onboarding — first run only */}
       {onboarding&&(
@@ -1925,7 +1920,7 @@ export default function App() {
         <Modal t={t} dk={dk} title="Delete this initiative?" onClose={()=>setPendingDelete(null)}>
           <div style={{padding:"11px 14px",borderRadius:t.r.md,background:t.redBg,border:"1px solid "+t.red,marginBottom:14}}>
             <div style={{display:"flex",alignItems:"baseline",gap:8,flexWrap:"wrap"}}>
-              {pendingDelete.initId&&<span style={{fontSize:10,fontWeight:700,color:t.red,fontFamily:t.mono}}>{pendingDelete.initId}</span>}
+              {pendingDelete.initId&&<span style={{fontSize:10,fontWeight:700,color:t.red,fontFamily:t.sans}}>{pendingDelete.initId}</span>}
               <span style={{fontSize:14,fontWeight:600,color:t.text,fontFamily:t.sans,lineHeight:1.35}}>{pendingDelete.title}</span>
             </div>
           </div>
@@ -1966,7 +1961,7 @@ export default function App() {
         <Modal t={t} dk={dk} onClose={()=>setRestorePayload(null)} title="Restore from backup?">
           <div style={{display:"flex",flexDirection:"column",gap:14}}>
             <div style={{padding:"10px 14px",background:t.warnBg,border:"1px solid "+t.warnBorder,borderRadius:6}}>
-              <div style={{display:"flex",alignItems:"center",gap:7,fontSize:12,fontWeight:700,color:t.warn,fontFamily:t.mono,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.06em"}}><IconAlert size={14}/> This will overwrite your current data</div>
+              <div style={{display:"flex",alignItems:"center",gap:7,fontSize:12,fontWeight:600,color:t.warn,fontFamily:t.sans,marginBottom:8}}><IconAlert size={14}/> This will overwrite your current data</div>
               <div style={{fontSize:12,color:t.textSub,fontFamily:t.serif,lineHeight:1.8}}>
                 <div>Exported: <strong style={{color:t.text}}>{restorePayload.stamp}</strong></div>
                 <div>Initiatives: <strong style={{color:t.text}}>{restorePayload.counts.items}</strong></div>
@@ -2007,13 +2002,13 @@ export default function App() {
       )}
 
       {/* Shell — permanent sidebar column above 900px, slide-over drawer below.
-        * A fixed 216px column on a 390px phone would reproduce exactly the
+        * A fixed 248px column on a 390px phone would reproduce exactly the
         * horizontal overflow the old tab strip had, so the breakpoint is not
         * cosmetic. */}
       <div style={{display:"flex",alignItems:"flex-start",minHeight:"100vh"}}>
 
         {/* Desktop rail */}
-        <aside className="gos-rail" style={{width:railCollapsed?58:216,flexShrink:0,position:"sticky",top:0,height:"100vh",
+        <aside className="gos-rail" style={{width:railCollapsed?60:248,flexShrink:0,position:"sticky",top:0,height:"100vh",
           transition:"width .22s cubic-bezier(.2,.7,.3,1)"}}>
           <Sidebar t={t} dk={dk} nav={nav} onNav={requestNav} counts={navCounts}
             collapsed={railCollapsed} onToggleCollapse={toggleRail}
@@ -2075,7 +2070,7 @@ export default function App() {
                 title="Search initiatives and jump to a view (⌘K)" aria-label="Search (Command K)">
                 <IconSearch size={13}/>
                 <span className="gos-hide-sm">Search</span>
-                <kbd style={{fontFamily:t.mono,fontSize:9.5,border:"1px solid "+t.border,borderRadius:t.r.xs,padding:"1px 4px",marginLeft:2}}>⌘K</kbd>
+                <kbd style={{fontFamily:t.sans,fontSize:9.5,border:"1px solid "+t.border,borderRadius:t.r.xs,padding:"1px 4px",marginLeft:2}}>⌘K</kbd>
               </button>
               {nav==="initiatives"&&(<>
                 <button onClick={()=>setShowCapture(true)} style={gGh(t,"sm")}>
@@ -2188,7 +2183,7 @@ export default function App() {
         // Refused before the call, not at the save: a viewer's recommendations
         // could never be kept, so generating them would be spend for nothing.
         if (!viewOnly()) generateRecommendations();
-      }} onOpenRec={(batchId,recId)=>setShowRecModal({batchId,recId})} showToast={showToast} onSaveItems={saveItems}/>}
+      }} onOpenRec={(batchId,recId)=>setShowRecModal({batchId,recId})} onOpenItem={(id)=>goDetail(id,"dashboard")} showToast={showToast} onSaveItems={saveItems}/>}
       {nav==="triage"&&<TriageView items={items} t={t} dk={dk} cats={cats} brands={brands} activeBrand={activeBrand} onDetail={(id)=>goDetail(id,"triage")}
         onLogResults={(id)=>{const it=items.find(e=>e.id===id); if(it){setSelId(id); setRForm(it.results?{...it.results,actualRevenueImpact:it.results.actualRevenueImpact!=null?it.results.actualRevenueImpact:"",actualSpendCost:it.results.actualSpendCost!=null?it.results.actualSpendCost:"",actualResourceCost:it.results.actualResourceCost!=null?it.results.actualResourceCost:""}:{actualOutcome:"",keyLearning:"",outcomeClassification:"Success",decisionMade:"",outcomeCertainty:75,actualRevenueImpact:"",actualSpendCost:"",actualResourceCost:""}); setShowR(true);}}}
         onExtend={(id,days)=>{saveItems(items.map(e=>{if(e.id!==id)return e; const base=e.endDate?new Date(e.endDate+"T12:00:00"):new Date(); base.setDate(base.getDate()+days); return {...e,endDate:base.toISOString().slice(0,10)};})); showToast("Extended "+days+" days.","success");}}
@@ -2248,19 +2243,19 @@ export default function App() {
             </div>
             <div className="gos-filters" style={{display:"flex",gap:6,flexWrap:"wrap"}}>
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
-                <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Category</label>
+                <label style={{fontSize:12,color:t.textMuted,fontFamily:t.sans}}>Category</label>
                 <select value={fCat} onChange={e=>setFCat(e.target.value)} style={{...gSl(t),minWidth:130}}>{["All",...cats].map(c=><option key={c}>{c}</option>)}</select>
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
-                <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Type</label>
+                <label style={{fontSize:12,color:t.textMuted,fontFamily:t.sans}}>Type</label>
                 <select value={fType} onChange={e=>setFType(e.target.value)} style={{...gSl(t),minWidth:120}}>{["All",...INIT_TYPES].map(tp=><option key={tp}>{tp}</option>)}</select>
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
-                <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Owner</label>
+                <label style={{fontSize:12,color:t.textMuted,fontFamily:t.sans}}>Owner</label>
                 <select value={fOwn} onChange={e=>setFOwn(e.target.value)} style={{...gSl(t),minWidth:120}}>{owners.map(o=><option key={o}>{o}</option>)}</select>
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
-                <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Sort by</label>
+                <label style={{fontSize:12,color:t.textMuted,fontFamily:t.sans}}>Sort by</label>
                 <select value={sort} onChange={e=>setSort(e.target.value)} style={{...gSl(t),minWidth:110}}>
                   <option value="ice">Highest ICE Score</option>
                   <option value="revenue">Highest Rev at Risk</option>
@@ -2269,7 +2264,7 @@ export default function App() {
                 </select>
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
-                <label style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase"}}>Group by</label>
+                <label style={{fontSize:12,color:t.textMuted,fontFamily:t.sans}}>Group by</label>
                 <select value={groupBy} onChange={e=>setGroupBy(e.target.value)} style={{...gSl(t),minWidth:104}}>
                   <option value="category">Category</option>
                   <option value="status">Status</option>
@@ -2313,14 +2308,14 @@ export default function App() {
                     <div style={{display:"flex",alignItems:"baseline",gap:9,minWidth:0}}>
                       <span style={{width:3,height:13,borderRadius:2,background:groupBy==="category"?catColor(g.key,cats,dk):t.gold,flexShrink:0,alignSelf:"center"}}/>
                       <span style={{fontFamily:t.serif,fontSize:14.5,fontWeight:600,color:t.text}}>{g.label}</span>
-                      <span style={{fontSize:11,color:t.textMuted,fontFamily:t.mono}}>
+                      <span style={{fontSize:11,color:t.textMuted,fontFamily:t.sans}}>
                         {roll.total} experiment{roll.total!==1?"s":""}{roll.running>0?" · "+roll.running+" running":""}
                       </span>
                     </div>
-                    <div style={{display:"flex",alignItems:"baseline",gap:14,fontSize:11,fontFamily:t.mono,color:t.textMuted}}>
+                    <div style={{display:"flex",alignItems:"baseline",gap:14,fontSize:11,fontFamily:t.sans,color:t.textMuted}}>
                       {roll.winRate!=null&&<span>{roll.winRate}% win rate</span>}
                       {roll.realised!==0&&<span>realised <span style={{color:t.teal,fontWeight:700}}>{fmtCur(roll.realised)}</span></span>}
-                      {roll.atRisk>0&&<span>at risk <span style={{color:t.gold,fontWeight:700}}>{fmtCur(roll.atRisk)}</span></span>}
+                      {roll.atRisk>0&&<span>at risk <span style={{color:t.text,fontWeight:600}}>{fmtCur(roll.atRisk)}</span></span>}
                     </div>
                   </div>
                   {g.items.map(renderInitiativeCard)}
@@ -2332,7 +2327,7 @@ export default function App() {
             )}
             {filtered.length>0&&(
               <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginTop:14,paddingTop:11,borderTop:"1px solid "+t.borderSoft}}>
-                <span style={{fontSize:10,fontFamily:t.mono,letterSpacing:"0.09em",textTransform:"uppercase",color:t.textMuted}}>Cadence · {cadLabel}</span>
+                <span style={{fontSize:12,fontFamily:t.sans,color:t.textMuted}}>Cadence · {cadLabel}</span>
                 <CadenceLegend t={t}/>
               </div>
             )}
@@ -2374,7 +2369,7 @@ export default function App() {
             <textarea style={{...gTA(t),fontSize:13}} rows={4} value={captureText} onChange={e=>setCaptureText(e.target.value)}
               placeholder={"e.g. We should test removing the discount banner on the homepage for new visitors. I think it's training customers to wait for deals rather than buying at full price. Primary metric would be full-price order rate."}/>
           </FR>
-          {captureText.length>0&&captureText.length<30&&<div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,marginTop:4}}><span style={{fontFamily:t.mono}}>{30-captureText.length}</span> more chars to enable AI</div>}
+          {captureText.length>0&&captureText.length<30&&<div style={{fontSize:11,color:t.textMuted,fontFamily:t.serif,marginTop:4}}><span style={{fontFamily:t.sans}}>{30-captureText.length}</span> more chars to enable AI</div>}
           <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:14}}>
             <button style={gGh(t)} onClick={()=>{setShowCapture(false);setCaptureText("");}}>Cancel</button>
             <button style={{...gG(t),...(captureText.length>=30&&!captureLoad?null:gOff)}} disabled={captureText.length<30||captureLoad}
@@ -2444,7 +2439,7 @@ export default function App() {
             {importDone?(
               <div style={{textAlign:"center",padding:"24px 0"}}>
                 <div style={{display:"flex",justifyContent:"center",marginBottom:8,color:t.teal}}><IconCheck size={26}/></div>
-                <div style={{fontSize:15,fontWeight:600,color:t.text,fontFamily:t.serif,marginBottom:4}}><span style={{fontFamily:t.mono}}>{importRows.length}</span> initiative{importRows.length!==1?"s":""} imported</div>
+                <div style={{fontSize:15,fontWeight:600,color:t.text,fontFamily:t.serif,marginBottom:4}}><span style={{fontFamily:t.sans}}>{importRows.length}</span> initiative{importRows.length!==1?"s":""} imported</div>
                 <div style={{fontSize:12,color:t.textMuted,fontFamily:t.serif}}>Closing…</div>
               </div>
             ) : importRows.length === 0 ? (
@@ -2531,19 +2526,19 @@ export default function App() {
             {sel&&(
               <div style={{padding:"12px 14px",borderRadius:10,background:t.goldBg,border:"1px solid "+t.goldBorder}}>
                 <div style={{display:"flex",alignItems:"baseline",gap:8,flexWrap:"wrap",marginBottom:sel.hypothesis?7:0}}>
-                  {sel.initId&&<span style={{fontSize:10,fontWeight:600,color:t.gold,fontFamily:t.mono}}>{sel.initId}</span>}
+                  {sel.initId&&<span style={{fontSize:10,fontWeight:600,color:t.gold,fontFamily:t.sans}}>{sel.initId}</span>}
                   <span style={{fontSize:14,fontWeight:600,color:t.text,fontFamily:t.sans,lineHeight:1.3}}>{sel.title}</span>
                 </div>
                 {sel.hypothesis&&(
                   <div style={{fontSize:12.5,color:t.textSub,fontFamily:t.sans,lineHeight:1.5,marginBottom:8}}>
-                    <span style={{fontFamily:t.mono,fontSize:10,letterSpacing:"0.06em",textTransform:"uppercase",color:t.textMuted,marginRight:6}}>Hypothesis</span>
+                    <span style={{fontFamily:t.sans,fontSize:12,color:t.textMuted,marginRight:6}}>Hypothesis</span>
                     {sel.hypothesis}
                   </div>
                 )}
                 <div style={{display:"flex",gap:18,flexWrap:"wrap",fontSize:11.5,fontFamily:t.serif,color:t.textSub}}>
                   {sel.primaryMetric&&<span><span style={{color:t.textMuted}}>Metric:</span> {sel.primaryMetric}</span>}
                   {sel.measurementScope&&<span><span style={{color:t.textMuted}}>Scope:</span> {sel.measurementScope}</span>}
-                  {sel.revenueImpact>0&&<span><span style={{color:t.textMuted}}>Est. impact:</span> <span style={{color:t.gold,fontWeight:600}}>{fmtCur(sel.revenueImpact)}</span></span>}
+                  {sel.revenueImpact>0&&<span><span style={{color:t.textMuted}}>Est. impact:</span> <span style={{color:t.text,fontWeight:600}}>{fmtCur(sel.revenueImpact)}</span></span>}
                   {sel.killCriteria&&<span style={{flexBasis:"100%",color:t.textMuted,marginTop:2}}>Kill criteria: <span style={{color:t.textSub}}>{sel.killCriteria.slice(0,120)}{sel.killCriteria.length>120?"…":""}</span></span>}
                 </div>
               </div>

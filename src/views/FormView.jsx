@@ -82,7 +82,7 @@ export function FormView({form,setForm,items,agenda,t,dk,cats,brands,aiLoad,iceL
           style={{padding:"11px 14px",borderRadius:t.r.md,
             background:v.blocking?t.redBg:t.warnBg,
             border:"1px solid "+(v.blocking?t.red:t.warnBorder)}}>
-          <div style={{display:"flex",alignItems:"center",gap:7,fontSize:11,fontWeight:700,fontFamily:t.mono,letterSpacing:"0.06em",textTransform:"uppercase",
+          <div style={{display:"flex",alignItems:"center",gap:7,fontSize:12,fontWeight:600,fontFamily:t.sans,
             color:v.blocking?t.red:t.warn,marginBottom:6}}>
             <IconAlert size={13}/>
             {v.blocking ? "Not ready to save" : "Missing pre-registration"}
@@ -121,10 +121,10 @@ export function FormView({form,setForm,items,agenda,t,dk,cats,brands,aiLoad,iceL
               aria-required="true" aria-invalid={errorFor("hypothesis")?"true":undefined} aria-describedby={errorFor("hypothesis")?"gos-hypothesis-error":undefined}
               value={form.hypothesis} onChange={e=>f("hypothesis",e.target.value)} placeholder="We believe that [specific change] will result in [measurable outcome] for [context], because [evidence-based reason]."/>
             {errorFor("hypothesis")&&<div id="gos-hypothesis-error" role="alert" style={{fontSize:11,color:t.red,fontFamily:t.sans,fontWeight:600,marginTop:5,lineHeight:1.45}}>{errorFor("hypothesis")}</div>}
-            {!canAi&&form.hypothesis&&form.hypothesis.length>0&&form.hypothesis.length<60&&<div style={{fontSize:11,color:t.textMuted,marginTop:3,fontFamily:t.serif}}><span style={{fontFamily:t.mono}}>{60-form.hypothesis.length}</span> more chars to unlock AI expand</div>}
+            {!canAi&&form.hypothesis&&form.hypothesis.length>0&&form.hypothesis.length<60&&<div style={{fontSize:11,color:t.textMuted,marginTop:3,fontFamily:t.serif}}><span style={{fontFamily:t.sans}}>{60-form.hypothesis.length}</span> more chars to unlock AI expand</div>}
             {hypReview&&(
               <div style={{marginTop:10,padding:"12px 14px",borderRadius:6,background:t.tealBg,border:"1px solid "+t.teal}}>
-                <div style={{fontSize:10,color:t.teal,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:8}}>AI suggestion · review before accepting</div>
+                <div style={{fontSize:12,color:t.teal,fontFamily:t.sans,marginBottom:8}}>AI suggestion · review before accepting</div>
                 <p style={{margin:"0 0 12px",fontSize:13,color:t.text,lineHeight:1.7,fontStyle:"italic"}}>"{hypReview.proposed}"</p>
                 <div style={{display:"flex",gap:6}}>
                   <button onClick={onAcceptHyp} style={gG(t,"sm")}><IconCheck size={12}/> Accept</button>
@@ -184,7 +184,7 @@ export function FormView({form,setForm,items,agenda,t,dk,cats,brands,aiLoad,iceL
         </div>
         <div style={{marginTop:10}}>
           <FR label="Tracking tag" t={t}>
-            <input style={{...gI(t),fontFamily:t.mono}} value={form.trackingTag||""} onChange={e=>f("trackingTag",e.target.value)} placeholder="optional: UTM campaign, discount code, or GA4 event for precise auto-match"/>
+            <input style={{...gI(t),fontFamily:t.sans}} value={form.trackingTag||""} onChange={e=>f("trackingTag",e.target.value)} placeholder="optional: UTM campaign, discount code, or GA4 event for precise auto-match"/>
           </FR>
           <div style={{fontSize:11,color:t.textMuted,fontFamily:t.sans,marginTop:5,lineHeight:1.5}}>
             Use this only when the test has a clean identifier (mostly paid campaigns). Most initiatives match on metric + window + scope alone.
@@ -216,7 +216,7 @@ export function FormView({form,setForm,items,agenda,t,dk,cats,brands,aiLoad,iceL
             underneath it. To compose a convention-correct name from scratch, use the builder.
           </p>
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-            <input style={{...gI(t),fontFamily:t.mono,flex:"1 1 260px",width:"auto"}} value={pasteName}
+            <input style={{...gI(t),fontFamily:t.sans,flex:"1 1 260px",width:"auto"}} value={pasteName}
               onChange={e=>setPasteName(e.target.value)}
               onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();addName();}}}
               placeholder="e.g. Meta_Prospect_Pastry_US_Purchase"/>
@@ -228,9 +228,9 @@ export function FormView({form,setForm,items,agenda,t,dk,cats,brands,aiLoad,iceL
               {claimed.map(e=>(
                 <div key={e.name} style={{display:"flex",justifyContent:"space-between",gap:10,alignItems:"baseline",padding:"6px 0",borderBottom:"1px solid "+t.borderSoft,flexWrap:"wrap"}}>
                   <div style={{minWidth:0,flex:"1 1 240px"}}>
-                    <div style={{fontFamily:t.mono,fontSize:11.5,color:t.text,wordBreak:"break-all"}}>{e.name}</div>
+                    <div style={{fontFamily:t.sans,fontSize:11.5,color:t.text,wordBreak:"break-all"}}>{e.name}</div>
                     {[e.channel,e.level,e.addedAt].filter(Boolean).length>0 && (
-                      <div style={{fontFamily:t.mono,fontSize:10,color:t.textMuted,marginTop:2}}>
+                      <div style={{fontFamily:t.sans,fontSize:10,color:t.textMuted,marginTop:2}}>
                         {[e.channel,e.level,e.addedAt].filter(Boolean).join(" · ")}
                       </div>
                     )}
@@ -265,12 +265,12 @@ export function FormView({form,setForm,items,agenda,t,dk,cats,brands,aiLoad,iceL
         </div>
         {iceReview&&(
           <div style={{marginBottom:14,padding:"12px 14px",borderRadius:6,background:t.warnBg,border:"1px solid "+t.warnBorder}}>
-            <div style={{fontSize:10,color:t.warn,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:10}}>AI scoring suggestion · review and adjust before accepting</div>
+            <div style={{fontSize:12,color:t.warn,fontFamily:t.sans,marginBottom:10}}>AI scoring suggestion · review and adjust before accepting</div>
             <div className="gos-grid-2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
               {[{label:"Impact",score:iceReview.impact,rationale:iceReview.impact_rationale},{label:"Certainty",score:iceReview.certainty,rationale:iceReview.certainty_rationale}].map(d=>(
                 <div key={d.label}>
                   <div style={{display:"flex",alignItems:"baseline",gap:6,marginBottom:4}}>
-                    <span style={{fontSize:20,fontWeight:700,color:t.gold,fontFamily:t.mono}}>{d.score}</span>
+                    <span style={{fontSize:20,fontWeight:700,color:t.gold,fontFamily:t.sans}}>{d.score}</span>
                     <span style={{fontSize:12,color:t.textMuted,fontFamily:t.serif}}>/10 {d.label}</span>
                   </div>
                   <div style={{fontSize:12,color:t.textSub,lineHeight:1.5,fontFamily:t.serif}}>{d.rationale}</div>
@@ -317,7 +317,7 @@ export function FormView({form,setForm,items,agenda,t,dk,cats,brands,aiLoad,iceL
         {((form.spendCost||0)+(form.resourceCost||0))>0&&(
           <div style={{marginTop:10,padding:"8px 12px",background:t.surfaceAlt,borderRadius:4,fontSize:12,fontFamily:t.serif,color:t.textMuted,display:"flex",gap:16,flexWrap:"wrap"}}>
             <span>Total est. cost: <strong style={{color:t.text}}>{fmtCur((form.spendCost||0)+(form.resourceCost||0))}</strong></span>
-            {(form.revenueImpact||0)>0&&<span>Est. ROI: <strong style={{color:t.gold}}>{((form.revenueImpact||0)/((form.spendCost||0)+(form.resourceCost||0))).toFixed(1)}x</strong></span>}
+            {(form.revenueImpact||0)>0&&<span>Est. ROI: <strong style={{color:t.text}}>{((form.revenueImpact||0)/((form.spendCost||0)+(form.resourceCost||0))).toFixed(1)}x</strong></span>}
           </div>
         )}
       </div>
@@ -451,7 +451,7 @@ function LinkedInitiativePicker({form, setForm, items, t, dk}) {
                   style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",cursor:"pointer",
                     background:i===active?t.surfaceAlt:(isLinked?t.tealBg:t.surface),
                     borderBottom:"1px solid "+t.borderSoft}}>
-                  <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,minWidth:52,flexShrink:0}}>{e.initId||"—"}</span>
+                  <span style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,minWidth:52,flexShrink:0}}>{e.initId||"—"}</span>
                   <span style={{fontSize:12,color:t.text,flex:1,fontFamily:t.serif}}>{e.title.slice(0,50)}{e.title.length>50?"…":""}</span>
                   <span style={{fontSize:10,fontWeight:600,color:c.text,background:c.bg,border:"1px solid "+c.border,borderRadius:t.r.xs,padding:"1px 5px",flexShrink:0}}>{e.status}</span>
                   {isLinked&&<span style={{color:t.teal,display:"inline-flex"}}><IconCheck size={12}/></span>}

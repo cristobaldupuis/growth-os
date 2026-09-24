@@ -181,8 +181,8 @@ export function MetricsImportModal({t, dk, weeklyMetrics, perfRows, items, setti
               <input id="metrics-csv-input" type="file" accept=".csv" style={{display:"none"}} onChange={handleFile}/>
             </div>
             <div style={{background:t.surfaceAlt,borderRadius:6,padding:"10px 12px",fontSize:11,fontFamily:t.serif,color:t.textMuted,lineHeight:1.7}}>
-              <strong style={{color:t.textSub}}>Weekly numbers</strong> — needs <span style={{fontFamily:t.mono}}>date, brand, source</span>; then any of revenue, spend, roas, cvr, cac, aov, traffic, conversions, impressions, clicks, cpm, ctr, notes.<br/>
-              <strong style={{color:t.textSub}}>Campaign export</strong> — needs an <span style={{fontFamily:t.mono}}>Ad name</span>, <span style={{fontFamily:t.mono}}>Ad set name</span>, <span style={{fontFamily:t.mono}}>Ad group name</span> or <span style={{fontFamily:t.mono}}>Campaign name</span> column. Each name is parsed through your naming convention and joined to an initiative by its tracking tag.<br/>
+              <strong style={{color:t.textSub}}>Weekly numbers</strong> — needs <span style={{fontFamily:t.sans}}>date, brand, source</span>; then any of revenue, spend, roas, cvr, cac, aov, traffic, conversions, impressions, clicks, cpm, ctr, notes.<br/>
+              <strong style={{color:t.textSub}}>Campaign export</strong> — needs an <span style={{fontFamily:t.sans}}>Ad name</span>, <span style={{fontFamily:t.sans}}>Ad set name</span>, <span style={{fontFamily:t.sans}}>Ad group name</span> or <span style={{fontFamily:t.sans}}>Campaign name</span> column. Each name is parsed through your naming convention and joined to an initiative by its tracking tag.<br/>
               Column names are case-insensitive, and platform export headers ("Amount spent (USD)", "Purchases conversion value", "Impr.") are recognised as they come.
             </div>
             {connectors?.klaviyo?.configured && (
@@ -252,7 +252,7 @@ export function MetricsImportModal({t, dk, weeklyMetrics, perfRows, items, setti
               ].map(([l,v])=>(
                 <div key={l}>
                   <div style={gSL(t)}>{l}</div>
-                  <div style={{fontFamily:t.mono,fontSize:15,fontWeight:700,color:t.text,lineHeight:1.1}}>{v}</div>
+                  <div style={{fontFamily:t.sans,fontSize:15,fontWeight:700,color:t.text,lineHeight:1.1}}>{v}</div>
                 </div>
               ))}
             </div>
@@ -274,10 +274,10 @@ export function MetricsImportModal({t, dk, weeklyMetrics, perfRows, items, setti
               {perf.rows.slice(0,120).map((row,i)=>(
                 <div key={i} style={{display:"flex",gap:8,alignItems:"center",padding:"6px 10px",borderRadius:4,
                   background:row.parsed?t.surfaceAlt:t.warnBg,border:"1px solid "+(row.parsed?t.border:t.warnBorder)}}>
-                  <span style={{fontSize:10,fontFamily:t.mono,color:t.textMuted,minWidth:74,flexShrink:0}}>{row.date||"lifetime"}</span>
-                  <span style={{fontSize:10.5,fontFamily:t.mono,color:t.text,flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{row.name}</span>
-                  <span style={{fontSize:10,fontFamily:t.mono,color:t.textMuted,flexShrink:0}}>{fmtCur(Math.round(row.metrics?.spend||0))}</span>
-                  {!row.parsed && <span style={{fontSize:9,color:t.warn,fontFamily:t.mono,flexShrink:0}}>unparsed</span>}
+                  <span style={{fontSize:10,fontFamily:t.sans,color:t.textMuted,minWidth:74,flexShrink:0}}>{row.date||"lifetime"}</span>
+                  <span style={{fontSize:10.5,fontFamily:t.sans,color:t.text,flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{row.name}</span>
+                  <span style={{fontSize:10,fontFamily:t.sans,color:t.textMuted,flexShrink:0}}>{fmtCur(Math.round(row.metrics?.spend||0))}</span>
+                  {!row.parsed && <span style={{fontSize:9,color:t.warn,fontFamily:t.sans,flexShrink:0}}>unparsed</span>}
                 </div>
               ))}
               {perf.rows.length>120 && (
@@ -308,7 +308,7 @@ export function MetricsImportModal({t, dk, weeklyMetrics, perfRows, items, setti
             )}
 
             <div style={{fontSize:12,fontFamily:t.serif,color:t.textSub}}>
-              <span style={{fontFamily:t.mono}}>{parsed.rows.length}</span> row{parsed.rows.length!==1?"s":""} ready to import
+              <span style={{fontFamily:t.sans}}>{parsed.rows.length}</span> row{parsed.rows.length!==1?"s":""} ready to import
               {conflicts.length > 0 && <span style={{color:t.warn}}> · {conflicts.length} conflict{conflicts.length!==1?"s":""} with existing data</span>}
             </div>
 
@@ -332,10 +332,10 @@ export function MetricsImportModal({t, dk, weeklyMetrics, perfRows, items, setti
                   <div key={i} style={{display:"flex",gap:8,alignItems:"center",padding:"6px 10px",
                     background:isConflict?(t.warnBg):t.surfaceAlt,
                     border:"1px solid "+(isConflict?(t.warnBorder):t.border),borderRadius:4}}>
-                    <span style={{fontSize:10,fontFamily:t.mono,color:t.textMuted,minWidth:80,flexShrink:0}}>{row.date}</span>
+                    <span style={{fontSize:10,fontFamily:t.sans,color:t.textMuted,minWidth:80,flexShrink:0}}>{row.date}</span>
                     <span style={{fontSize:11,fontFamily:t.serif,color:t.text,fontWeight:600,minWidth:80,flexShrink:0}}>{row.brand}</span>
                     <span style={{fontSize:10,fontFamily:t.serif,color:t.textMuted,minWidth:60,flexShrink:0}}>{srcDef?.label||row.source}</span>
-                    <span style={{fontSize:10,fontFamily:t.mono,color:t.textMuted,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                    <span style={{fontSize:10,fontFamily:t.sans,color:t.textMuted,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                       {Object.entries(row.metrics).filter(([k])=>k!=="notes").map(([k,v])=>`${k}: ${v}`).join(" · ")}
                     </span>
                     {isConflict&&<span style={{fontSize:9,color:t.warn,fontFamily:t.serif,flexShrink:0}}>conflict</span>}

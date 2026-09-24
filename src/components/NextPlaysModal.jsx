@@ -39,7 +39,7 @@ export function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, cat
         <div>
           <div style={{fontSize:20,fontWeight:600,color:t.text,fontFamily:t.serif,lineHeight:1.3,marginBottom:8}}>{rec.title}</div>
           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-            <span style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,padding:"2px 8px",border:"1px solid "+t.border,borderRadius:3,textTransform:"uppercase",letterSpacing:"0.04em"}}>{rec.category}</span>
+            <span style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,padding:"2px 8px",border:"1px solid "+t.border,borderRadius:3}}>{rec.category}</span>
             <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,padding:"2px 8px",border:"1px solid "+t.border,borderRadius:3}}>{rec.brandTarget}</span>
             <span style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,padding:"2px 8px",border:"1px solid "+t.border,borderRadius:3}}>{rec.initType}</span>
             {isResolved && (
@@ -59,7 +59,7 @@ export function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, cat
             placeholder. */}
         {rec.whyNow && (
           <div style={{fontSize:12,color:t.textMuted,fontFamily:t.serif,lineHeight:1.5,marginTop:-6}}>
-            <span style={{fontWeight:700,letterSpacing:"0.04em",textTransform:"uppercase",marginRight:6}}>Why now</span>
+            <span style={{fontWeight:600,marginRight:6}}>Why now</span>
             {rec.whyNow}
           </div>
         )}
@@ -73,7 +73,7 @@ export function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, cat
               {rec.reasoningTrace}
               {footnotes.map(f => (
                 <button key={f.n} onClick={()=>setCiteItem(f.item)} title={f.item.title}
-                  style={{verticalAlign:"super",fontSize:"0.7em",fontWeight:700,fontFamily:t.mono,color:t.gold,
+                  style={{verticalAlign:"super",fontSize:"0.7em",fontWeight:700,fontFamily:t.sans,color:t.gold,
                     background:"none",border:"none",cursor:"pointer",padding:"0 1px",lineHeight:1}}>
                   {f.n}
                 </button>
@@ -101,25 +101,25 @@ export function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, cat
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
             {rec.observation && (
               <div>
-                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>Observation</div>
+                <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,marginBottom:4}}>Observation</div>
                 <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:13}}>{rec.observation}</p>
               </div>
             )}
             {rec.hypothesis && (
               <div style={{borderLeft:"3px solid "+t.gold,paddingLeft:12}}>
-                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>Hypothesis</div>
+                <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,marginBottom:4}}>Hypothesis</div>
                 <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:14,fontWeight:600}}>{rec.hypothesis}</p>
               </div>
             )}
             {rec.successMetric && (
               <div>
-                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>Success metric</div>
+                <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,marginBottom:4}}>Success metric</div>
                 <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:13}}>{rec.successMetric}</p>
               </div>
             )}
             {rec.killCriteria && (
               <div>
-                <div style={{fontSize:10,color:t.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:t.mono,marginBottom:4}}>— Kill criteria</div>
+                <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,marginBottom:4}}>— Kill criteria</div>
                 <p style={{margin:0,color:t.textSub,lineHeight:1.7,fontSize:13}}>{rec.killCriteria}</p>
               </div>
             )}
@@ -132,22 +132,22 @@ export function NextPlaysModal({ t, dk, batchId, recId, recs, items, brands, cat
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:14,alignItems:"center"}}>
             <div>
               <div style={{display:"flex",alignItems:"baseline",gap:6,marginBottom:4}}>
-                <span style={{fontSize:22,fontWeight:700,color:t.gold,fontFamily:t.mono}}>{rec.ice.impact}</span>
+                <span style={{fontSize:22,fontWeight:700,color:t.gold,fontFamily:t.sans}}>{rec.ice.impact}</span>
                 <span style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>/10 Impact</span>
               </div>
               {rec.impactRationale && <div style={{fontSize:12,color:t.textSub,lineHeight:1.5,fontFamily:t.serif}}>{rec.impactRationale}</div>}
             </div>
             <div>
               <div style={{display:"flex",alignItems:"baseline",gap:6,marginBottom:4}}>
-                <span style={{fontSize:22,fontWeight:700,color:t.gold,fontFamily:t.mono}}>{rec.ice.certainty}</span>
+                <span style={{fontSize:22,fontWeight:700,color:t.gold,fontFamily:t.sans}}>{rec.ice.certainty}</span>
                 <span style={{fontSize:11,color:t.textMuted,fontFamily:t.serif}}>/10 Certainty</span>
               </div>
               {rec.certaintyRationale && <div style={{fontSize:12,color:t.textSub,lineHeight:1.5,fontFamily:t.serif}}>{rec.certaintyRationale}</div>}
             </div>
             <div style={{textAlign:"center",borderLeft:"1px solid "+t.border,paddingLeft:16}}>
-              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono,marginBottom:3,textTransform:"uppercase",letterSpacing:"0.06em"}}>Total</div>
-              <div style={{fontSize:24,fontWeight:700,fontFamily:t.mono,color:iceTotal!==null?iceColor(iceTotal,t):t.textMuted}}>{iceTotal!==null?iceTotal:"—"}</div>
-              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.mono}}>/100</div>
+              <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,marginBottom:3}}>Total</div>
+              <div style={{fontSize:24,fontWeight:700,fontFamily:t.sans,color:iceTotal!==null?iceColor(iceTotal,t):t.textMuted}}>{iceTotal!==null?iceTotal:"—"}</div>
+              <div style={{fontSize:10,color:t.textMuted,fontFamily:t.sans}}>/100</div>
             </div>
           </div>
           <div style={{fontSize:10,color:t.textMuted,fontFamily:t.serif,marginTop:8,fontStyle:"italic"}}>

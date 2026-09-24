@@ -55,8 +55,8 @@ export function AccountAuditPanel({ t, settings, showToast }) {
     e.target.value = "";
   };
 
-  const label = { fontSize: 10, color: t.textMuted, fontFamily: t.mono, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 3 };
-  const num = { fontSize: 22, fontWeight: 700, fontFamily: t.mono, color: t.text };
+  const label = { fontSize:12, color: t.textMuted, fontFamily: t.sans, marginBottom: 3 };
+  const num = { fontSize: 22, fontWeight: 700, fontFamily: t.sans, color: t.text };
   const head = { fontFamily: t.serif, fontSize: 14, fontWeight: 600, color: t.text, marginBottom: 8 };
   const prose = { fontSize: 12.5, color: t.textSub, fontFamily: t.serif, lineHeight: 1.6 };
 
@@ -71,7 +71,7 @@ export function AccountAuditPanel({ t, settings, showToast }) {
           implementation, and it is the number the retrofit is quoted from.
         </div>
         <textarea
-          style={{ ...gTA(t), fontSize: 12.5, fontFamily: t.mono, minHeight: 130 }}
+          style={{ ...gTA(t), fontSize: 12.5, fontFamily: t.sans, minHeight: 130 }}
           value={text}
           onChange={e => setText(e.target.value)}
           placeholder={"Meta_Col_EmmaBrune_R3_F_Fitness_Gym_Pastry_Chocolate_35s-Raw_NA\nMeta_Col_StudioSet_R4_M_Taste_Craving_Donuts_Cinnamon_Video_LP-01\n…"} />
@@ -90,7 +90,7 @@ export function AccountAuditPanel({ t, settings, showToast }) {
             </button>
           )}
           {text.trim() && (
-            <span style={{ fontSize: 11.5, color: t.textMuted, fontFamily: t.mono }}>
+            <span style={{ fontSize: 11.5, color: t.textMuted, fontFamily: t.sans }}>
               {parsed.names.length.toLocaleString()} name{parsed.names.length === 1 ? "" : "s"}
               {parsed.source === "csv" ? ` from "${parsed.column}"` : ""}
               {!parsed.scan.clean ? " · personal columns present and ignored" : ""}
@@ -129,11 +129,11 @@ export function AccountAuditPanel({ t, settings, showToast }) {
             </div>
             {audit.histogram.slice(0, 8).map(h => (
               <div key={h.slots} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 5 }}>
-                <div style={{ width: 74, fontSize: 11.5, fontFamily: t.mono, color: t.textSub, textAlign: "right" }}>{h.slots} slots</div>
+                <div style={{ width: 74, fontSize: 11.5, fontFamily: t.sans, color: t.textSub, textAlign: "right" }}>{h.slots} slots</div>
                 <div style={{ flex: 1, height: 15, background: t.surfaceAlt, borderRadius: 3, overflow: "hidden" }}>
                   <div style={{ width: `${h.share * 100}%`, height: "100%", background: t.gold, opacity: h === audit.dominant ? 1 : 0.45 }} />
                 </div>
-                <div style={{ width: 108, fontSize: 11.5, fontFamily: t.mono, color: t.textMuted }}>{h.count.toLocaleString()} · {pct(h.share)}</div>
+                <div style={{ width: 108, fontSize: 11.5, fontFamily: t.sans, color: t.textMuted }}>{h.count.toLocaleString()} · {pct(h.share)}</div>
               </div>
             ))}
           </div>
@@ -150,7 +150,7 @@ export function AccountAuditPanel({ t, settings, showToast }) {
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                   <thead>
-                    <tr style={{ textAlign: "left", color: t.textMuted, fontFamily: t.mono, fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                    <tr style={{ textAlign: "left", color: t.textMuted, fontFamily: t.sans, fontSize:12}}>
                       <th style={{ padding: "6px 8px" }}>Slot</th>
                       <th style={{ padding: "6px 8px" }}>Distinct</th>
                       <th style={{ padding: "6px 8px" }}>Looks like</th>
@@ -160,12 +160,12 @@ export function AccountAuditPanel({ t, settings, showToast }) {
                   <tbody>
                     {audit.slots.map(s => (
                       <tr key={s.index} style={{ borderTop: "1px solid " + t.border }}>
-                        <td style={{ padding: "7px 8px", fontFamily: t.mono, color: t.textSub }}>{s.index + 1}</td>
-                        <td style={{ padding: "7px 8px", fontFamily: t.mono, color: t.textSub }}>{s.distinct.toLocaleString()}</td>
+                        <td style={{ padding: "7px 8px", fontFamily: t.sans, color: t.textSub }}>{s.index + 1}</td>
+                        <td style={{ padding: "7px 8px", fontFamily: t.sans, color: t.textSub }}>{s.distinct.toLocaleString()}</td>
                         <td style={{ padding: "7px 8px", color: s.freeText ? t.textMuted : t.text }}>
                           {s.freeText ? "free text" : s.suggestions[0] ? `${s.suggestions[0].label} · ${pct(s.suggestions[0].coverage)}` : "no vocabulary match"}
                         </td>
-                        <td style={{ padding: "7px 8px", color: t.textMuted, fontFamily: t.mono, fontSize: 11 }}>
+                        <td style={{ padding: "7px 8px", color: t.textMuted, fontFamily: t.sans, fontSize: 11 }}>
                           {s.top.slice(0, 5).map(v => v.value).join("  ")}
                         </td>
                       </tr>
@@ -189,8 +189,8 @@ export function AccountAuditPanel({ t, settings, showToast }) {
             {audit.fit.slice(0, 6).map(f => (
               <div key={f.channel + f.level} style={{ display: "flex", alignItems: "baseline", gap: 12, padding: "7px 0", borderTop: "1px solid " + t.border, flexWrap: "wrap" }}>
                 <div style={{ minWidth: 170, fontSize: 12.5, color: t.text }}>{f.channelLabel} · {f.levelLabel}</div>
-                <div style={{ fontFamily: t.mono, fontSize: 15, fontWeight: 700, color: f.rate > 0.5 ? t.teal : f.rate > 0 ? t.warn : t.textMuted, minWidth: 60 }}>{pct(f.rate)}</div>
-                <div style={{ fontSize: 11.5, color: t.textMuted, fontFamily: t.mono }}>
+                <div style={{ fontFamily: t.sans, fontSize: 15, fontWeight: 700, color: f.rate > 0.5 ? t.teal : f.rate > 0 ? t.warn : t.textMuted, minWidth: 60 }}>{pct(f.rate)}</div>
+                <div style={{ fontSize: 11.5, color: t.textMuted, fontFamily: t.sans }}>
                   {f.failures.slots.toLocaleString()} wrong slot count · {f.failures.vocab.toLocaleString()} unknown value · {f.failures.illegal.toLocaleString()} illegal character
                 </div>
               </div>
@@ -201,7 +201,7 @@ export function AccountAuditPanel({ t, settings, showToast }) {
                 {audit.best.missingVocab.map(m => (
                   <div key={m.key} style={{ fontSize: 12, marginBottom: 5 }}>
                     <span style={{ color: t.text }}>{m.label}</span>
-                    <span style={{ color: t.textMuted, fontFamily: t.mono, fontSize: 11 }}> — {m.values.join(", ")}{m.total > m.values.length ? ` +${m.total - m.values.length} more` : ""}</span>
+                    <span style={{ color: t.textMuted, fontFamily: t.sans, fontSize: 11 }}> — {m.values.join(", ")}{m.total > m.values.length ? ` +${m.total - m.values.length} more` : ""}</span>
                   </div>
                 ))}
               </div>
@@ -222,7 +222,7 @@ export function AccountAuditPanel({ t, settings, showToast }) {
               at an hourly figure.
             </div>
             {audit.retrofit.sample.length > 0 && (
-              <div style={{ marginTop: 12, maxHeight: 190, overflowY: "auto", fontFamily: t.mono, fontSize: 11, color: t.textMuted, lineHeight: 1.7 }}>
+              <div style={{ marginTop: 12, maxHeight: 190, overflowY: "auto", fontFamily: t.sans, fontSize: 11, color: t.textMuted, lineHeight: 1.7 }}>
                 {audit.retrofit.sample.map((n, i) => <div key={i}>{n}</div>)}
                 {audit.retrofit.count > audit.retrofit.sample.length && (
                   <div style={{ color: t.textSub, marginTop: 6 }}>

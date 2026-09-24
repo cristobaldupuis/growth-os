@@ -7,7 +7,7 @@
 // invisible to a build that only checks that the app compiles.
 //
 // Run via `npm run check:contrast`; CI runs it on every push.
-import { TL, TD, SL, SD, OL, OD, TYPE_L, TYPE_D } from "../src/constants.js";
+import { TL, TD, SL, SD, OL, OD, TYPE_L, TYPE_D, CAT_L, CAT_D } from "../src/constants.js";
 
 const AA = 4.5;
 // AA Large (3:1) is the bar for text at >=24px bold / >=18.66px regular.
@@ -94,6 +94,15 @@ for (const [themeName, S, O] of [["light", SL, OL], ["dark", SD, OD]]) {
 // Type badges render their hue on the alt surface.
 for (const [themeName, TY, T] of [["light", TYPE_L, TL], ["dark", TYPE_D, TD]]) {
   for (const [k, v] of Object.entries(TY)) check(`${themeName}/type ${k}`, v, T.surfaceAlt);
+}
+
+// Category and brand tags are the same inks (BRAND_COLORS_* is a prefix of
+// CAT_*), set as text on the alt surface and on plain cards.
+for (const [themeName, C, T] of [["light", CAT_L, TL], ["dark", CAT_D, TD]]) {
+  C.forEach((v, i) => {
+    check(`${themeName}/category ${i} on surfaceAlt`, v, T.surfaceAlt);
+    check(`${themeName}/category ${i} on surface`, v, T.surface);
+  });
 }
 
 const worst = [...results].sort((a, b) => a.ratio - b.ratio).slice(0, 5);

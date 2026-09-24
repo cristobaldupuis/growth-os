@@ -78,7 +78,10 @@ export function mkUsageRow(fields) {
   } = fields || {};
   seq += 1;
   return {
-    id: "us-" + Date.now() + "-" + seq,
+    // The random tail matters once a workspace has two writers: two tabs each
+    // count `seq` from 1, so a timestamp and a counter alone can collide, and
+    // docMerge.js merges this ledger by id.
+    id: "us-" + Date.now() + "-" + seq + "-" + Math.random().toString(36).slice(2, 8),
     ts: new Date().toISOString(),
     group, fn, model, provider, modality,
     inputTokens, outputTokens,

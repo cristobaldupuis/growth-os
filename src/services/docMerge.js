@@ -38,9 +38,28 @@
 // the remote's order — the person looking at the screen keeps the order they see.
 
 import { deepEqual } from "./items.js";
+import { USAGE_ROW_LIMIT } from "./usage.js";
+
+/**
+ * Per-key finishing applied after a merge. The AI spend ledger is append-only
+ * and newest-first with a cap, so the merged list is re-sorted by timestamp and
+ * trimmed, rather than left in "local order, then theirs".
+ */
+const FINISH = {
+  gos_usage_v1: (rows) => [...rows]
+    .sort((a, b) => String(b.ts || "").localeCompare(String(a.ts || "")))
+    .slice(0, USAGE_ROW_LIMIT),
+};
 
 /** Document keys whose value is an array of `{ id, ... }` records. */
-export const MERGEABLE_KEYS = new Set(["gos_items_v4", "gos_agenda_v1"]);
+export const MERGEABLE_KEYS = new Set(["gos_items_v4", "gos_agenda_v1", "gos_usage_v1"]);
+
+/** `mergeRecordLists` plus the key's own finishing step, if it has one. */
+export function mergeDoc(key, base, local, remote) {
+  const result = mergeRecordLists(base, local, remote);
+  if (!result || !FINISH[key]) return result;
+  return { ...result, value: FINISH[key](result.value) };
+}
 
 const isRecordList = (v) =>
   Array.isArray(v) && v.every(r => r && typeof r === "object" && !Array.isArray(r) && r.id != null);

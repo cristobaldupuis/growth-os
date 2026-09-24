@@ -7,8 +7,8 @@ const b = { id: "b", title: "B", updatedAt: "2026-09-01T00:00:00Z" };
 const c = { id: "c", title: "C", updatedAt: "2026-09-01T00:00:00Z" };
 const ids = (r) => r.value.map(x => x.id);
 
-test("only initiatives and agenda items are merged", () => {
-  assert.deepEqual([...MERGEABLE_KEYS].sort(), ["gos_agenda_v1", "gos_items_v4"]);
+test("only initiatives, agenda items and the spend ledger are merged", () => {
+  assert.deepEqual([...MERGEABLE_KEYS].sort(), ["gos_agenda_v1", "gos_items_v4", "gos_usage_v1"]);
 });
 
 test("edits to different records both survive, with no conflict", () => {
@@ -79,4 +79,25 @@ test("anything that is not a list of id'd records is refused", () => {
   assert.equal(mergeRecordLists([], { theme: "dark" }, []), null);
   assert.equal(mergeRecordLists([], [{ title: "no id" }], []), null);
   assert.equal(mergeRecordLists([], [a], "nope"), null);
+});
+
+test("the spend ledger merges both tabs' calls, newest first, capped", async () => {
+  const { mergeDoc } = await import("./docMerge.js");
+  const { USAGE_ROW_LIMIT } = await import("./usage.js");
+  const row = (id, ts) => ({ id, ts, costUsd: 0.01 });
+  const base = [row("u1", "2026-09-01T00:00:00Z")];
+  const local = [row("mine", "2026-09-01T00:00:02Z"), ...base];
+  const remote = [row("theirs", "2026-09-01T00:00:03Z"), row("theirs-older", "2026-09-01T00:00:01Z"), ...base];
+  const r = mergeDoc("gos_usage_v1", base, local, remote);
+  assert.deepEqual(r.value.map(x => x.id), ["theirs", "mine", "theirs-older", "u1"]);
+  assert.deepEqual(r.conflicts, []);
+
+  const many = Array.from({ length: USAGE_ROW_LIMIT }, (_, i) => row("r" + i, new Date(Date.UTC(2026, 0, 1, 0, 0, i)).toISOString()));
+  assert.equal(mergeDoc("gos_usage_v1", [], many, [row("new", "2027-01-01T00:00:00Z")]).value.length, USAGE_ROW_LIMIT);
+});
+
+test("two ledger rows made in the same millisecond still get distinct ids", async () => {
+  const { mkUsageRow } = await import("./usage.js");
+  const ids = new Set(Array.from({ length: 50 }, () => mkUsageRow({}).id));
+  assert.equal(ids.size, 50);
 });

@@ -23,7 +23,7 @@
 import { perfRowKey } from "./performance.js";
 import { accessToken } from "./auth.js";
 import { KEY_PERF } from "./store.js";
-import { MERGEABLE_KEYS, mergeRecordLists } from "./docMerge.js";
+import { MERGEABLE_KEYS, mergeDoc } from "./docMerge.js";
 
 /**
  * The one key that lives in the rows table rather than as a document.
@@ -157,7 +157,7 @@ export async function saveDoc(key, jsonString, fetchImpl = fetch) {
       return { ok: true, revision: body.revision, merged: mergedAny ? JSON.stringify(value) : null, conflicts };
     } catch (err) {
       if (!err.conflict || !MERGEABLE_KEYS.has(key) || !err.current) throw err;
-      const result = mergeRecordLists(bases.get(key), value, err.current.value);
+      const result = mergeDoc(key, bases.get(key), value, err.current.value);
       if (!result) throw err;
       revisions.set(key, err.current.revision);
       bases.set(key, err.current.value);

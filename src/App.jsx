@@ -716,10 +716,11 @@ export default function App() {
 
     // Another writer — a colleague, or Claude through the MCP connector — changed
     // a document this tab holds. These are how their version reaches React state;
-    // without it the next local save would write their change back out. Usage is
-    // deliberately absent: its ledger is mirrored in a ref and appended from AI
-    // call sites, so it keeps the old conflict behaviour rather than a half-fit.
+    // without it the next local save would write their change back out. The
+    // usage ledger updates its ref as well as its state, because the AI-call
+    // sink appends through the ref.
     onRemoteChange({
+      [KEY_USAGE]:    (v) => { usageRef.current = v; setUsage(v); },
       [KEY_ITEMS]:    setItems,
       [KEY_AGENDA]:   setAgenda,
       [KEY_SETTINGS]: setSettings,

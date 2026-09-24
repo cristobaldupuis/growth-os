@@ -1,4 +1,4 @@
-import { MERGEABLE_KEYS, mergeRecordLists } from "./docMerge.js";
+import { MERGEABLE_KEYS, mergeDoc } from "./docMerge.js";
 import { deepEqual } from "./items.js";
 
 export const KEY_ITEMS    = "gos_items_v4";
@@ -123,7 +123,7 @@ function saveRemoteDoc(key) {
         // newer local edit onto the merged copy and let the next save send it.
         let next = result.merged;
         if (remoteCache[key] !== sent) {
-          const refolded = mergeRecordLists(JSON.parse(sent), JSON.parse(remoteCache[key]), JSON.parse(result.merged));
+          const refolded = mergeDoc(key, JSON.parse(sent), JSON.parse(remoteCache[key]), JSON.parse(result.merged));
           if (refolded) next = JSON.stringify(refolded.value);
         }
         adopt(key, next);
@@ -176,7 +176,7 @@ export async function syncRemote() {
       continue;
     }
     if (!MERGEABLE_KEYS.has(key)) continue;
-    const result = mergeRecordLists(base, local, value);
+    const result = mergeDoc(key, base, local, value);
     if (!result) continue;
     remote.acceptRemote(key, value, revision);
     adopt(key, JSON.stringify(result.value));

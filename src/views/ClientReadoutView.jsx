@@ -486,7 +486,7 @@ export function ClientReadoutView({ t, dk, dash, items, brands, activeBrand, cat
     // is now centred in whatever width it is given.
     <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 14, maxWidth: 900, margin: "0 auto", width: "100%" }}>
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+      <div data-tour="client-readout" style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div>
           <div style={{ fontSize: 10, letterSpacing: "0.10em", textTransform: "uppercase", color: t.gold, fontFamily: t.mono, fontWeight: 700, marginBottom: 4 }}>Summary</div>
           <div style={{ fontSize: 18, fontWeight: 700, color: t.text, fontFamily: t.sans, lineHeight: 1.2 }}>

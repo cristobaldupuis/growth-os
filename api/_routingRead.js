@@ -1,4 +1,6 @@
-// api/routing.js — which model serves which feature group.
+// api/_routingRead.js — which model serves which feature group. Served by
+// api/state.js under GET `?action=routing` (formerly its own function,
+// api/routing.js).
 //
 // The app fetches this once at boot and hands it to applyRouting() in
 // src/services/ai/models.js. Unauthenticated on purpose: it is the deployment's

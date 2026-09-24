@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DOC_KEYS, MAX_ROWS, toRow, fromRow } from "./state.js";
+import { DOC_KEYS, MAX_ROWS, toRow, fromRow, handleDocs, readOnlyRefuses, validBatch, handlePerfStage, handlePerfCommit, BATCH_MAX_AGE_MS } from "./state.js";
 import { bearerToken, resolveWorkspace } from "./_auth.js";
 import { perfRowKey } from "../src/services/performance.js";
 
@@ -136,4 +136,206 @@ test("a workspace the caller does not belong to is a 403, not a 404", () => {
 test("no memberships at all is a 403", () => {
   assert.equal(resolveWorkspace([], null).status, 403);
   assert.equal(resolveWorkspace([], "acme").status, 403);
+});
+
+// -- Polling for other writers' changes ------------------------------------------
+
+test("docs answers only the documents whose revision moved", async () => {
+  process.env.SUPABASE_URL = "https://db.example.test";
+  process.env.SUPABASE_SECRET_KEY = "sk";
+  const realFetch = globalThis.fetch;
+  const urls = [];
+  globalThis.fetch = async (url) => {
+    urls.push(String(url));
+    const body = String(url).includes("key=in.")
+      ? [{ key: "gos_items_v4", value: [{ id: "c" }], revision: 5 }]
+      : [
+          { key: "gos_items_v4", revision: 5 },
+          { key: "gos_settings_v2", revision: 2 },
+          { key: "not_a_doc_key", revision: 9 },
+        ];
+    return { ok: true, status: 200, json: async () => body, text: async () => "" };
+  };
+  const res = { status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
+  try {
+    await handleDocs({ body: { since: { gos_items_v4: 4, gos_settings_v2: 2 } } }, res, { id: WS });
+  } finally {
+    globalThis.fetch = realFetch;
+    delete process.env.SUPABASE_URL;
+    delete process.env.SUPABASE_SECRET_KEY;
+  }
+  assert.equal(res.code, 200);
+  assert.deepEqual(Object.keys(res.body.docs), ["gos_items_v4"]);
+  assert.equal(urls.length, 2);
+  assert.ok(decodeURIComponent(urls[1]).includes('key=in.("gos_items_v4")'), "only the moved key is fetched, and never a non-doc key");
+});
+
+test("an idle poll reads revisions only", async () => {
+  process.env.SUPABASE_URL = "https://db.example.test";
+  process.env.SUPABASE_SECRET_KEY = "sk";
+  const realFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => { calls++; return { ok: true, status: 200, json: async () => [{ key: "gos_items_v4", revision: 3 }] }; };
+  const res = { status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
+  try {
+    await handleDocs({ body: { since: { gos_items_v4: 3 } } }, res, { id: WS });
+  } finally {
+    globalThis.fetch = realFetch;
+    delete process.env.SUPABASE_URL;
+    delete process.env.SUPABASE_SECRET_KEY;
+  }
+  assert.deepEqual(res.body.docs, {});
+  assert.equal(calls, 1);
+});
+
+// -- Viewer role -------------------------------------------------------------------
+
+test("a viewer can read and poll but not write", () => {
+  for (const a of ["load", "docs", "performanceSummary"]) assert.equal(readOnlyRefuses("viewer", a), false, a);
+  for (const a of ["saveDoc", "perfMerge", "perfReplace", "perfStage", "perfCommit"]) assert.equal(readOnlyRefuses("viewer", a), true, a);
+  for (const role of ["owner", "member"]) {
+    for (const a of ["saveDoc", "perfMerge", "perfReplace"]) assert.equal(readOnlyRefuses(role, a), false, `${role} ${a}`);
+  }
+});
+
+// -- Staged performance replace ----------------------------------------------------
+
+async function withPg(handler, fn) {
+  process.env.SUPABASE_URL = "https://db.example.test";
+  process.env.SUPABASE_SECRET_KEY = "sk";
+  const real = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, init = {}) => {
+    calls.push({ url: decodeURIComponent(String(url)), method: init.method || "GET", body: init.body ? JSON.parse(init.body) : null });
+    return { ok: true, status: 200, json: async () => [], text: async () => "", headers: { get: () => "0-0/7" } };
+  };
+  const res = { status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
+  try { await fn(res); } finally {
+    globalThis.fetch = real;
+    delete process.env.SUPABASE_URL;
+    delete process.env.SUPABASE_SECRET_KEY;
+  }
+  return { res, calls };
+}
+
+test("a batch time must be the server's own shape, recent, and not in the future", () => {
+  const now = Date.parse("2026-09-24T10:00:00.000Z");
+  assert.equal(validBatch("2026-09-24T09:59:00.000Z", now), "2026-09-24T09:59:00.000Z");
+  assert.equal(validBatch("2026-09-24T08:59:59.000Z", now), null, "older than an hour");
+  assert.equal(validBatch("2026-09-24T10:05:00.000Z", now), null, "in the future");
+  assert.equal(validBatch("2026-09-24", now), null);
+  assert.equal(validBatch("1970-01-01T00:00:00.000Z", now), null, "cannot be used to delete everything since the epoch");
+  assert.equal(validBatch(undefined, now), null);
+  assert.ok(BATCH_MAX_AGE_MS >= 10 * 60 * 1000);
+});
+
+test("staging upserts with the batch time and deletes nothing", async () => {
+  const { res, calls } = await withPg(null, (res) => handlePerfStage(
+    { body: { rows: [{ ...appRow, rowKey: perfRowKey(appRow) }] } }, res, { id: WS }));
+  assert.equal(res.code, 200);
+  assert.match(res.body.batch, /^\d{4}-\d{2}-\d{2}T/);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].method, "POST");
+  assert.equal(calls[0].body[0].imported_at, res.body.batch);
+  assert.ok(!calls.some(c => c.method === "DELETE"));
+});
+
+test("a later chunk reuses the batch; a stale one is refused before any write", async () => {
+  const batch = new Date(Date.now() - 1000).toISOString();
+  const ok = await withPg(null, (res) => handlePerfStage({ body: { batch, rows: [] } }, res, { id: WS }));
+  assert.equal(ok.res.body.batch, batch);
+  const stale = await withPg(null, (res) => handlePerfStage({ body: { batch: "2020-01-01T00:00:00.000Z", rows: [] } }, res, { id: WS }));
+  assert.equal(stale.res.code, 400);
+  assert.equal(stale.calls.length, 0);
+});
+
+test("commit deletes only rows older than the batch, in this workspace", async () => {
+  const batch = new Date(Date.now() - 1000).toISOString();
+  const { res, calls } = await withPg(null, (res) => handlePerfCommit({ body: { batch } }, res, { id: WS }));
+  const del = calls.find(c => c.method === "DELETE");
+  assert.ok(del.url.includes(`workspace_id=eq.${WS}`));
+  assert.ok(del.url.includes(`imported_at=lt.${batch}`));
+  assert.equal(res.body.total, 7);
+});
+
+// -- Members ---------------------------------------------------------------------
+
+import { handleMembers, lastOwnerBlocked } from "./state.js";
+
+const OWNER = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const OTHER = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+
+async function members(action, body, { role = "owner", roster, lookup = null } = {}) {
+  process.env.SUPABASE_URL = "https://db.example.test";
+  process.env.SUPABASE_SECRET_KEY = "sk";
+  const real = globalThis.fetch;
+  const writes = [];
+  const list = roster || [{ user_id: OWNER, email: "o@x.test", role: "owner" }, { user_id: OTHER, email: "m@x.test", role: "member" }];
+  globalThis.fetch = async (url, init = {}) => {
+    const u = decodeURIComponent(String(url));
+    const reply = (b) => ({ ok: true, status: 200, json: async () => b, text: async () => "" });
+    if (u.includes("/rpc/workspace_member_list")) return reply(list);
+    if (u.includes("/rpc/workspace_user_id_by_email")) return reply(lookup);
+    writes.push({ method: init.method, url: u, body: init.body ? JSON.parse(init.body) : null });
+    return reply(null);
+  };
+  const res = { status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
+  try { await handleMembers({ body }, res, { id: WS, role }, { id: OWNER }, action); }
+  finally { globalThis.fetch = real; delete process.env.SUPABASE_URL; delete process.env.SUPABASE_SECRET_KEY; }
+  return { res, writes };
+}
+
+test("anyone seated can see the members; only an owner is told they can manage", async () => {
+  const asViewer = await members("members", {}, { role: "viewer" });
+  assert.equal(asViewer.res.code, 200);
+  assert.equal(asViewer.res.body.members.length, 2);
+  assert.equal(asViewer.res.body.canManage, false);
+});
+
+test("a member or viewer cannot change who is in the workspace", async () => {
+  for (const role of ["member", "viewer"]) {
+    const { res, writes } = await members("memberRemove", { userId: OTHER }, { role });
+    assert.equal(res.code, 403);
+    assert.equal(writes.length, 0);
+  }
+});
+
+test("adding finds an existing account, and never creates one", async () => {
+  const missing = await members("memberAdd", { email: "new@x.test", role: "viewer" }, { lookup: null });
+  assert.equal(missing.res.code, 404);
+  assert.match(missing.res.body.error, /Supabase/);
+  assert.equal(missing.writes.length, 0);
+
+  const dup = await members("memberAdd", { email: "m@x.test", role: "viewer" }, { lookup: OTHER });
+  assert.equal(dup.res.code, 409);
+
+  const ok = await members("memberAdd", { email: "new@x.test", role: "viewer" }, { lookup: "cccccccc-cccc-4ccc-8ccc-cccccccccccc" });
+  assert.equal(ok.res.code, 200);
+  assert.deepEqual(ok.writes[0].body, { workspace_id: WS, user_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", role: "viewer" });
+
+  assert.equal((await members("memberAdd", { email: "x@y.test", role: "admin" }, { lookup: OTHER })).res.code, 400);
+});
+
+test("the last owner cannot be demoted or removed", async () => {
+  assert.equal(lastOwnerBlocked([{ user_id: OWNER, role: "owner" }], OWNER, "member"), true);
+  assert.equal(lastOwnerBlocked([{ user_id: OWNER, role: "owner" }], OWNER, null), true);
+  assert.equal(lastOwnerBlocked([{ user_id: OWNER, role: "owner" }, { user_id: OTHER, role: "owner" }], OWNER, null), false);
+  assert.equal(lastOwnerBlocked([{ user_id: OWNER, role: "owner" }, { user_id: OTHER, role: "member" }], OTHER, null), false);
+
+  const demote = await members("memberRole", { userId: OWNER, role: "member" });
+  assert.equal(demote.res.code, 409);
+  assert.equal(demote.writes.length, 0);
+});
+
+test("role changes and removals touch only that seat in this workspace", async () => {
+  const change = await members("memberRole", { userId: OTHER, role: "viewer" });
+  assert.equal(change.writes[0].method, "PATCH");
+  assert.ok(change.writes[0].url.includes(`workspace_id=eq.${WS}`) && change.writes[0].url.includes(`user_id=eq.${OTHER}`));
+  assert.deepEqual(change.writes[0].body, { role: "viewer" });
+
+  const remove = await members("memberRemove", { userId: OTHER });
+  assert.equal(remove.writes[0].method, "DELETE");
+
+  assert.equal((await members("memberRemove", { userId: "not-a-uuid" })).res.code, 400);
+  assert.equal((await members("memberRemove", { userId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd" })).res.code, 404);
 });

@@ -1,4 +1,5 @@
-// api/voice.js — ElevenLabs text-to-speech proxy.
+// api/_voice.js — ElevenLabs text-to-speech proxy.
+// Served by api/video.js under `?kind=voice` (formerly its own function).
 //
 // The fourth provider endpoint, and a separate function for the same reason
 // api/image.js is separate from api/proxy.js: the contracts do not overlap. A
@@ -45,7 +46,13 @@
 // go through api/asset.js into the bucket, which is a later change and a
 // deliberate one.
 
-import { guardEntry, guardRateLimit, clientIp, dailyCap } from "./_guard.js";
+import { guardEntry, guardRateLimit, rateLimitIdentity, dailyCap } from "./_guard.js";
+
+// Every upstream call is bounded below the function's own limit (a long script
+// takes ElevenLabs tens of seconds; function maxDuration is 60s), so a provider
+// that hangs becomes this endpoint's error response rather than a platform kill
+// with nothing logged.
+const UPSTREAM_TIMEOUT_MS = 50000;
 
 const ELEVENLABS_API = "https://api.elevenlabs.io/v1";
 
@@ -174,8 +181,13 @@ export default async function handler(req, res) {
   // Own key namespace, like image and video. Auditions are meant to be frequent,
   // and a limit shared with the text proxy would mean a session spent listening
   // to reads locks the operator out of generating the next brief.
+  // Charged to the signed-in person where there is one, like proxy.js and
+  // video.js — see rateLimitIdentity in _guard.js for why an address is the
+  // wrong identity in both directions.
+  const who = await rateLimitIdentity(req);
+  if (who.error) { res.status(401).json({ error: who.error }); return; }
   if (await guardRateLimit(req, res, {
-    key: `gos:voice:${clientIp(req)}`,
+    key: `gos:voice:${who.id}`,
     max: RATE_LIMIT_MAX,
     globalKey: "gos:voice:global",
     globalMax: dailyCap("DAILY_CAP_VOICE", 300),
@@ -197,6 +209,7 @@ export default async function handler(req, res) {
 async function handleVoices(req, res) {
   try {
     const upstream = await fetch(`${ELEVENLABS_API}/voices`, {
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
       headers: { "xi-api-key": apiKey() },
     });
     const data = await upstream.json();
@@ -225,6 +238,7 @@ async function handleSpeak(req, res) {
         method: "POST",
         headers: { "xi-api-key": apiKey(), "Content-Type": "application/json" },
         body: JSON.stringify(buildSpeechBody(req.body)),
+        signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
       },
     );
 

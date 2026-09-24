@@ -28,7 +28,7 @@
  * not guaranteed to survive an edit that spreads an object, so two structurally
  * identical items can serialise differently.
  */
-function deepEqual(a, b) {
+export function deepEqual(a, b) {
   if (a === b) return true;
   if (a === null || b === null || typeof a !== "object" || typeof b !== "object") return false;
   if (Array.isArray(a) !== Array.isArray(b)) return false;

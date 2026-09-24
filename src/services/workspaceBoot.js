@@ -25,7 +25,7 @@
 // assumed here.
 
 import { loadAuthConfig, currentUser } from "./auth.js";
-import { loadWorkspace, savePerfRows, saveDoc, PERF_KEY } from "./remoteState.js";
+import { loadWorkspace, savePerfRows, saveDoc, pullChanges, acceptRemote, baseOf, PERF_KEY } from "./remoteState.js";
 import { attachRemote, detachRemote } from "./store.js";
 
 /**
@@ -40,6 +40,24 @@ import { attachRemote, detachRemote } from "./store.js";
  * come back, when it has a perfectly good local copy and a banner to explain
  * itself with. What it must not do is fail silently — every path here names why.
  */
+// Which workspace this browser opens, for an account seated in several. A
+// per-device choice like the theme — two people in the same account on two
+// machines may well be looking at different clients — so it lives here rather
+// than on the server, and a stale value (removed from that workspace) is
+// dropped rather than trapping the session on a refusal.
+export const WORKSPACE_CHOICE_KEY = "gos_workspace_v1";
+
+export function chosenWorkspace() {
+  try { return localStorage.getItem(WORKSPACE_CHOICE_KEY) || null; } catch { return null; }
+}
+
+export function chooseWorkspace(id) {
+  try {
+    if (id) localStorage.setItem(WORKSPACE_CHOICE_KEY, id);
+    else localStorage.removeItem(WORKSPACE_CHOICE_KEY);
+  } catch { /* storage blocked: the choice lasts this page only */ }
+}
+
 export async function bootWorkspace(deps = {}) {
   const {
     loadConfig = loadAuthConfig,
@@ -47,6 +65,8 @@ export async function bootWorkspace(deps = {}) {
     load = loadWorkspace,
     attach = attachRemote,
     detach = detachRemote,
+    chosen = chosenWorkspace,
+    choose = chooseWorkspace,
   } = deps;
 
   let config;
@@ -68,12 +88,29 @@ export async function bootWorkspace(deps = {}) {
   }
 
   try {
-    const { workspace, docs, perfRows } = await load();
+    let loaded;
+    const pick = chosen();
+    try {
+      loaded = await load(pick);
+    } catch (err) {
+      // The remembered workspace no longer has this account in it. Forget it
+      // and fall through to the account's own answer (its only workspace, or
+      // the list to choose from).
+      if (!pick || err.status !== 403) throw err;
+      choose(null);
+      loaded = await load(null);
+    }
+    const { workspace, workspaces, docs, perfRows } = loaded;
     // Performance rows arrive as objects and go into the cache as the JSON string
     // `store.get` returns, so App.jsx's load effect parses one shape whichever
     // backend answered.
-    attach({ perfKey: PERF_KEY, saveDoc, savePerfRows }, docs, JSON.stringify(perfRows));
-    return { mode: "remote", workspace, docs, perfRows };
+    //
+    // A viewer (0008_viewer_role.sql) gets the same backend marked read-only:
+    // the server would refuse their writes anyway, and refusing them here
+    // instead keeps a routine click from reading as a failed save.
+    const readOnly = workspace?.role === "viewer";
+    attach({ perfKey: PERF_KEY, saveDoc, savePerfRows, pullChanges, acceptRemote, baseOf, readOnly }, docs, JSON.stringify(perfRows));
+    return { mode: "remote", workspace, workspaces: workspaces || [], docs, perfRows };
   } catch (err) {
     detach();
     if (err.signedOut) return { mode: "local", reason: "signed-out", canSignIn: true };

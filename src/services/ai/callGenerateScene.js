@@ -11,7 +11,7 @@ import { AI_HEADERS, proxyError, recordSceneUsage } from "./_shared.js";
 import { modelFor } from "./models.js";
 import { modelById } from "./registry.js";
 
-export const SCENE_PROXY_URL = "/api/scene";
+export const SCENE_PROXY_URL = "/api/video?kind=scene";
 
 // Kept in step with api/scene.js, which refuses anything outside them. Veo
 // renders landscape and portrait only, so the 4:5 and 1:1 the image path offers
@@ -135,7 +135,7 @@ export async function callGenerateScene({
   try {
     resp = await fetch(SCENE_PROXY_URL, {
       method: "POST",
-      headers: AI_HEADERS(),
+      headers: await AI_HEADERS(),
       body: JSON.stringify({
         action: "submit", model: resolved, prompt, aspectRatio, durationSeconds,
         ...(resolution ? { resolution } : {}),
@@ -173,7 +173,7 @@ export async function callGenerateScene({
 export async function pollSceneJob({ operationName, model }) {
   const resp = await fetch(SCENE_PROXY_URL, {
     method: "POST",
-    headers: AI_HEADERS(),
+    headers: await AI_HEADERS(),
     body: JSON.stringify({ action: "poll", model, operationName }),
   });
   if (!resp.ok) throw new Error(await proxyError(resp));

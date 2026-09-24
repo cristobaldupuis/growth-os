@@ -102,3 +102,38 @@ test("every local reason says something specific, and remote says nothing", asyn
   assert.equal(bootMessage({ mode: "remote", workspace: {} }), null);
   assert.equal(bootMessage(null), null);
 });
+
+test("a viewer's workspace attaches read-only, everyone else's does not", async () => {
+  const viewer = spies({ load: async () => ({ workspace: { id: "w1", role: "viewer" }, docs: {}, perfRows: [] }) });
+  await bootWorkspace(viewer.deps);
+  assert.equal(viewer.calls.attached.backend.readOnly, true);
+
+  const member = spies({ load: async () => ({ workspace: { id: "w1", role: "member" }, docs: {}, perfRows: [] }) });
+  await bootWorkspace(member.deps);
+  assert.equal(member.calls.attached.backend.readOnly, false);
+});
+
+test("the remembered workspace is the one loaded", async () => {
+  let asked;
+  const { deps } = spies({ chosen: () => "w2", load: async (name) => { asked = name; return { workspace: { id: "w2" }, docs: {}, perfRows: [] }; } });
+  await bootWorkspace(deps);
+  assert.equal(asked, "w2");
+});
+
+test("a remembered workspace this account was removed from is forgotten, not a dead end", async () => {
+  const asked = [];
+  let cleared = false;
+  const { deps } = spies({
+    chosen: () => "gone",
+    choose: (v) => { if (v === null) cleared = true; },
+    load: async (name) => {
+      asked.push(name);
+      if (name === "gone") throw Object.assign(new Error("Not a member of that workspace."), { status: 403 });
+      return { workspace: { id: "w1" }, docs: {}, perfRows: [] };
+    },
+  });
+  const boot = await bootWorkspace(deps);
+  assert.deepEqual(asked, ["gone", null]);
+  assert.equal(cleared, true);
+  assert.equal(boot.mode, "remote");
+});

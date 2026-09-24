@@ -242,6 +242,25 @@ Log or import weekly metrics per brand and source (manual, Meta, GA4, Google Ads
 
 ---
 
+## Data connectors
+
+Pull performance data from a platform's API instead of exporting a CSV. **Import CSV → Or sync from Klaviyo** fetches the chosen window and drops it into the same preview an uploaded file gets — parsed against the naming convention, counted, attributed — and nothing is saved until you confirm. Synced rows share the importer's identity (`perfRowKey`), so re-syncing, or importing a CSV that overlaps a sync, replaces rows rather than duplicating them.
+
+Served by `api/connectors.js`, one endpoint switched on `provider`; each platform is a module (`api/_klaviyo.js`). A sync always needs a signed-in member or owner of the workspace: the platform key is deployment-wide and reads the client's own data, so there is no anonymous path, and a viewer is refused.
+
+| Platform | Status | What it reads |
+|---|---|---|
+| Klaviyo | Built | Daily **flow message** performance for up to 60 days (Klaviyo's limit for a daily series): delivered → impressions, clicks, conversions and conversion value → revenue against the "Placed Order" metric. One row per message per day on the `klaviyo` channel's `message` level, with the flow as `campaignName`. Campaign sends are **not** read yet — Klaviyo reports them only as a total over the window, not per day. |
+| Shopify | Not yet | Planned: orders attributed by UTM campaign/content. Waiting on a query validated against the Admin GraphQL schema. |
+| Meta, Google Ads | Not yet | Need an OAuth app registration and platform review (ROADMAP 5.5). |
+
+```bash
+KLAVIYO_PRIVATE_KEY=pk_...              # private API key; scopes metrics:read and flows:read
+KLAVIYO_CONVERSION_METRIC_ID=           # optional; defaults to the "Placed Order" metric
+```
+
+---
+
 ## MCP connector
 
 Read and write a workspace from Claude — or any MCP client — instead of only the browser. `api/mcp.js` exposes the same ledger `api/state.js` already serves the app through, behind a standard OAuth 2.1 remote-MCP handshake: `whoami`, `list_initiatives`, `get_initiative`, `create_initiative`, `update_initiative`, `list_agenda`, `list_learnings`, `get_performance_summary`. The two write tools enforce the same pre-registration and kill-criteria gates the form does — an initiative created through Claude cannot skip the discipline one created through the UI can't skip either.
@@ -645,8 +664,9 @@ ALLOWED_ORIGINS=https://your-deployment.vercel.app
 DAILY_CAP_TEXT=3000        # api/proxy.js — text calls (a debate is ~25–48 of these)
 DAILY_CAP_IMAGES=200       # api/image.js
 DAILY_CAP_VIDEO=40         # api/video.js — submits only, polls are free
-DAILY_CAP_SCENES=40        # api/scene.js — submits only
-DAILY_CAP_VOICE=300        # api/voice.js
+DAILY_CAP_SCENES=40        # api/_scene.js (via /api/video?kind=scene) — submits only
+DAILY_CAP_ASSETS=500       # api/asset.js — uploads into the storage bucket
+DAILY_CAP_VOICE=300        # api/_voice.js (via /api/video?kind=voice)
 DAILY_CAP_DEBATES=40       # api/debate.js — debate starts
 
 # Optional. This deployment's own base URL, used by api/debate.js for the
@@ -689,6 +709,7 @@ SUPABASE_ASSET_BUCKET=creative-assets
 - `0005_workspace.sql` — workspaces, membership, documents and performance rows
 - `0006_mcp.sql` — the MCP connector's own OAuth clients, authorization codes and tokens
 - `0007_performance_aggregation.sql` — the `performance_summary` RPC the browser and MCP use to aggregate performance rows server-side
+- `0008_viewer_role.sql` — a read-only `viewer` workspace role: RLS write policies move to `is_workspace_writer`, and the file ends with the SQL to seat a viewer
 
 Paste each into the Supabase SQL editor and run it; all five are idempotent.
 

@@ -83,6 +83,55 @@ export function isAcceptableRedirectUri(uri) {
   return false;
 }
 
+// -- What the consent page shows about the destination -------------------------
+//
+// Dynamic registration is open (RFC 7591 — it has to be, for claude.ai and
+// Claude Desktop to connect without an operator in the loop), and client_name
+// is whatever the registrant typed. So anyone can register "Claude" with a
+// redirect_uri on their own domain, send a person the authorize link, and
+// collect an authorization code for that person's workspace. PKCE does not help:
+// the attacker made the challenge. What does help is showing the person where
+// the code is going, and saying so loudly when the name and the destination
+// disagree.
+
+/** `{ host, loopback }` for display. Loopback is a client on this computer. */
+export function describeRedirect(uri) {
+  let u;
+  try { u = new URL(String(uri)); } catch { return { host: String(uri), loopback: false }; }
+  const loopback = ["localhost", "127.0.0.1", "[::1]", "::1"].includes(u.hostname);
+  return { host: u.host, loopback };
+}
+
+// Names people will trust on sight, and the domains those vendors' own
+// clients actually redirect to. Matched as whole words in client_name.
+const KNOWN_CLIENTS = [
+  { match: /\b(claude|anthropic)\b/i, brand: "Claude", domains: ["claude.ai", "claude.com", "anthropic.com"] },
+  { match: /\b(chatgpt|openai)\b/i, brand: "ChatGPT", domains: ["chatgpt.com", "openai.com"] },
+  { match: /\bcursor\b/i, brand: "Cursor", domains: ["cursor.com", "cursor.sh"] },
+  { match: /\b(github|copilot)\b/i, brand: "GitHub", domains: ["github.com"] },
+  { match: /\b(gemini|google)\b/i, brand: "Google", domains: ["google.com"] },
+  { match: /\bslack\b/i, brand: "Slack", domains: ["slack.com"] },
+];
+
+const onDomain = (host, domain) => host === domain || host.endsWith("." + domain);
+
+/**
+ * A warning when `clientName` claims a known vendor but `redirectUri` is not
+ * on that vendor's domains, or null. A loopback redirect is not flagged: the
+ * desktop and CLI clients genuinely listen on localhost, and a page on the
+ * person's own machine is not a remote attacker's collection point.
+ */
+export function impersonationWarning(clientName, redirectUri) {
+  const name = String(clientName || "");
+  const known = KNOWN_CLIENTS.find((k) => k.match.test(name));
+  if (!known) return null;
+  const { host, loopback } = describeRedirect(redirectUri);
+  if (loopback) return null;
+  const hostname = host.replace(/:\d+$/, "").toLowerCase();
+  if (known.domains.some((d) => onDomain(hostname, d))) return null;
+  return `This client calls itself "${name}", but it will send you to ${host}, which is not a ${known.brand} address. Only continue if you set this connection up yourself and expected that address.`;
+}
+
 // -- Scope -------------------------------------------------------------------
 //
 // Two scopes, space-separated per RFC 6749: `read` and `write`. A client that
@@ -97,6 +146,14 @@ export function normalizeScope(requested) {
 }
 
 export const scopeHas = (scope, needed) => String(scope || "").split(/\s+/).includes(needed);
+
+/**
+ * The scope a membership may actually hold. A `viewer` (0008_viewer_role.sql)
+ * is capped at `read` whatever the client asked for — granting `write` and
+ * refusing it on every call would put a scope on the consent page that means
+ * nothing.
+ */
+export const scopeForRole = (scope, role) => (role === "viewer" ? "read" : scope);
 
 /** This deployment's own origin, from the request rather than a hardcoded
  * value — so the metadata documents below are correct on a preview deployment

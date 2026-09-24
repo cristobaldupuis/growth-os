@@ -10,9 +10,11 @@
 // first four steps on the half of this product that is not differentiated, and
 // arrives at the bridge when the visitor has already decided what they are
 // looking at. So the sequence runs: what you are looking at, what the portfolio
-// is trying to learn, what it has learned, and then three steps on the thing
+// is trying to learn, what it has learned, then three steps on the thing
 // nothing else attempts — the ad account's own names as the join key, including
-// the part where it refuses to guess.
+// the part where it refuses to guess — and then the two ends of the loop that
+// join depends on: creative born with a name that will parse, and the readout
+// the client is actually handed.
 //
 // `nav` switches the view; `tab` addresses a tab inside it, which is what lets
 // the tour reach the attribution split and the account audit rather than telling
@@ -47,7 +49,11 @@ export const TOUR_STEPS = [
   {
     selector: '[data-tour="learning-card"]', nav: "library",
     title: "What actually happened, kept",
-    body: "Every closed test lands here with its real outcome and the specific thing learned, including the failures — especially the failures. Switch brands in the sidebar and the same library answers a harder question: what's proven at one brand and still missing at another.",
+    // This used to promise "what's proven at one brand and still missing at
+    // another". The library only filters by brand, and the Dashboard's transfer
+    // panel (buildCrossBrandTransfers) shows only at two or more — the demo
+    // has one — so neither screen a visitor reaches shows it. Promise what is there.
+    body: "Every closed test lands here with its real outcome and the specific thing learned, including the failures — especially the failures. Switch brands in the sidebar to read one brand's record on its own, or search across all of them before re-running something that has already been tried.",
   },
   {
     selector: '[data-tour="performance-intro"]', nav: "performance", tab: "breakdown",
@@ -63,6 +69,16 @@ export const TOUR_STEPS = [
     selector: '[data-tour="account-audit"]', nav: "performance", tab: "audit",
     title: "Before any of this is installed",
     body: "Paste a prospect's ad names — names only, no spend, no contract — and this reports the convention they already follow, what each slot holds, how much parses today, and how many campaigns need mapping by hand. Load the sample account to watch it run. It reports evidence and stops short of proposing a taxonomy, because that judgement is the work being paid for.",
+  },
+  {
+    selector: '[data-tour="creative-studio"]', nav: "creative",
+    title: "Creative that knows where it came from",
+    body: "Pick a running or draft experiment and the studio writes the brief from its hypothesis and the closed learnings, expands it into scripted variants, and can render a frame or a clip. Every variant's ad name is assembled from the convention rather than typed — so when the next export comes back, its spend finds its way to the hypothesis that ordered it.",
+  },
+  {
+    selector: '[data-tour="client-readout"]', nav: "readout",
+    title: "What the client is handed",
+    body: "The period assembled into something you can read out loud: what was tried, what landed, what it returned, and what the evidence says to do next. It is built from the same records as every other screen, with nothing retyped, so the story in the meeting can't drift from the numbers behind it.",
   },
   {
     selector: '[data-tour="signal-button"]', nav: "dashboard",

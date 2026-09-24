@@ -36,6 +36,11 @@ import {
 } from "../src/services/ai/registry.js";
 import { geminiConfigured, geminiAuthMode, geminiAuthHeaders } from "./_geminiAuth.js";
 
+// Every upstream call is bounded below the function's own limit (function
+// maxDuration is 15s), so a provider that hangs becomes this endpoint's error
+// response rather than a platform kill with nothing logged.
+const UPSTREAM_TIMEOUT_MS = 10000;
+
 const MAX_BODY_BYTES = 32 * 1024;
 // Low on purpose. A human clicking through a console does not need more, and this
 // is what bounds password guessing.
@@ -97,7 +102,10 @@ async function fetchProviderModels(provider) {
     return { status: 400, error: `${spec.keyVar} is not set, so ${provider} models cannot be listed.` };
   }
   try {
-    const upstream = await fetch(spec.url(), { headers: spec.headers ? await spec.headers() : {} });
+    const upstream = await fetch(spec.url(), {
+      headers: spec.headers ? await spec.headers() : {},
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+    });
     const json = await upstream.json();
     if (!upstream.ok) {
       console.error("Model list failed", provider, upstream.status, json?.error?.message);

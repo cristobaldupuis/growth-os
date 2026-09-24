@@ -59,6 +59,12 @@ import {
 import { safeParseJSON } from "../src/services/ai/_shared.js";
 import { unwrap } from "../src/services/ai/schemas.js";
 
+// Every upstream call is bounded below the function's own limit (PostgREST reads
+// and writes; the model call has its own bound in _textCall.js), so a provider
+// that hangs becomes this endpoint's error response rather than a platform kill
+// with nothing logged.
+const UPSTREAM_TIMEOUT_MS = 8000;
+
 // The portfolio snapshot travels with `start`, so this is larger than the other
 // endpoints' ceilings — but still bounded, because it is the one field a caller
 // controls the size of.
@@ -133,6 +139,7 @@ async function dispatchStep(runId) {
 
 async function insertRun(row) {
   const res = await fetch(TABLE(), {
+    signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     method: "POST",
     headers: { ...authHeaders(), "Content-Type": "application/json", Prefer: "return=minimal" },
     body: JSON.stringify(row),
@@ -145,6 +152,7 @@ async function insertRun(row) {
 
 async function patchRun(id, patch) {
   const res = await fetch(`${TABLE()}?id=eq.${encodeURIComponent(id)}`, {
+    signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     method: "PATCH",
     headers: { ...authHeaders(), "Content-Type": "application/json", Prefer: "return=minimal" },
     body: JSON.stringify({ ...patch, updated_at: new Date().toISOString() }),
@@ -155,7 +163,7 @@ async function patchRun(id, patch) {
 async function readRun(id, select = "*") {
   const res = await fetch(
     `${TABLE()}?id=eq.${encodeURIComponent(id)}&select=${encodeURIComponent(select)}`,
-    { headers: authHeaders() },
+    { headers: authHeaders(), signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) },
   );
   if (!res.ok) throw new Error(`could not read the debate run (${res.status})`);
   const rows = await res.json();

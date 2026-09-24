@@ -12,7 +12,7 @@ import {
   DEMO_MODE,
 } from "./activeConfig.js";
 
-import { KEY_ITEMS, KEY_SETTINGS, KEY_DEBATES, KEY_METRICS, KEY_RECS, KEY_CREATIVE, KEY_PERF, KEY_ASSETS, KEY_USAGE, KEY_AGENDA, KEY_THEME, KEY_LIB_VIEW, KEY_RAIL, KEY_TOUR_SEEN, store, onWriteError, onRemoteChange, onSyncNotice, syncRemote, remoteAttached, handleDownloadBackup, handleRestoreBackup } from "./services/store.js";
+import { KEY_ITEMS, KEY_SETTINGS, KEY_DEBATES, KEY_METRICS, KEY_RECS, KEY_CREATIVE, KEY_PERF, KEY_ASSETS, KEY_USAGE, KEY_AGENDA, KEY_THEME, KEY_LIB_VIEW, KEY_RAIL, KEY_TOUR_SEEN, store, onWriteError, onRemoteChange, onSyncNotice, syncRemote, remoteAttached, remoteReadOnly, handleDownloadBackup, handleRestoreBackup } from "./services/store.js";
 import { resolveSchema } from "./services/naming.js";
 import { attachInitiatives, annotateRow } from "./services/performance.js";
 import { isLiveWorkspace, backupStatus } from "./services/dataSafety.js";
@@ -560,6 +560,20 @@ const seedPerfRows = (settings) => {
   return SEED_AD_ACCOUNT.map(r => annotateRow(r, schema));
 };
 
+// True (and says so, at most every few seconds) when the open workspace is
+// view-only for this account. Module-level rather than inside the component:
+// it reads the store's own answer and a throttle clock, neither of which is
+// render state.
+let viewOnlyNoticeAt = 0;
+function refuseIfViewOnly(showToast) {
+  if (!remoteReadOnly()) return false;
+  if (Date.now() - viewOnlyNoticeAt > 4000) {
+    viewOnlyNoticeAt = Date.now();
+    showToast("View only — you can look around, but this workspace can't be changed from your seat.", "info");
+  }
+  return true;
+}
+
 export default function App() {
   const [items,     setItems]     = useState([]);
   const [settings,  setSettings]  = useState(DEFAULT_SETTINGS);
@@ -588,12 +602,12 @@ export default function App() {
   const [showSM,    setShowSM]    = useState(false);
   const [pendS,     setPendS]     = useState(null);
   const [confC,     setConfC]     = useState(75);
-  const [showTpl,   setShowTpl]   = useState(false);
+  const [showTpl,   setShowTplRaw]   = useState(false);
   // Which Settings section is open. Part of the URL, so "#/settings/naming"
   // is a link somebody can send.
   const [settingsSection, setSettingsSection] = useState("workspace");
   const [onboarding, setOnboarding] = useState(false);
-  const [showCapture, setShowCapture] = useState(false);
+  const [showCapture, setShowCaptureRaw] = useState(false);
   const [captureText, setCaptureText] = useState("");
   const [captureLoad, setCaptureLoad] = useState(false);
   const [activeBrand, setActiveBrand] = useState("all");
@@ -606,7 +620,7 @@ export default function App() {
   const [cFrom,     setCFrom]     = useState("");
   const [cTo,       setCTo]       = useState("");
   const [loaded,    setLoaded]    = useState(false);
-  const [showImport,setShowImport]= useState(false);
+  const [showImport,setShowImportRaw]= useState(false);
   const [importRows,setImportRows]= useState([]);
   const [importErrs,setImportErrs]= useState([]);
   const [importDone,setImportDone]= useState(false);
@@ -631,8 +645,8 @@ export default function App() {
   const [usage, setUsage] = useState([]);
   const [agenda, setAgenda] = useState([]); // learning agenda items — see services/learningAgenda.js
   const usageRef = useRef([]);
-  const [showPulse, setShowPulse] = useState(false);
-  const [showMetricsImport, setShowMetricsImport] = useState(false);
+  const [showPulse, setShowPulseRaw] = useState(false);
+  const [showMetricsImport, setShowMetricsImportRaw] = useState(false);
   const [toast, setToast] = useState(null); // {msg, type:"info"|"error"|"success"}
   // Set when a durable write fails. Sticky — it stays until a backup is taken,
   // because the consequence (silent loss of everything since) doesn't go away.
@@ -661,6 +675,19 @@ export default function App() {
     // not enough to notice a mistake and act on it.
     toastTimer.current = setTimeout(()=>{ toastTimer.current = null; setToast(null); }, action ? 9000 : 3500);
   };
+
+  // -- View-only seats (0008_viewer_role.sql) -----------------------------------
+  // A viewer can look at everything and change nothing. Every edit in this app
+  // goes through one of the save* functions below, so refusing there covers all
+  // of them at once: the screen does not pretend a change happened, and one
+  // toast says why. The openers for creating things refuse the same way before
+  // a form opens. See refuseIfViewOnly at the top of this file.
+  const viewOnly = () => refuseIfViewOnly(showToast);
+  const setShowTpl           = (v) => { if (v && viewOnly()) return; setShowTplRaw(v); };
+  const setShowCapture       = (v) => { if (v && viewOnly()) return; setShowCaptureRaw(v); };
+  const setShowImport        = (v) => { if (v && viewOnly()) return; setShowImportRaw(v); };
+  const setShowPulse         = (v) => { if (v && viewOnly()) return; setShowPulseRaw(v); };
+  const setShowMetricsImport = (v) => { if (v && viewOnly()) return; setShowMetricsImportRaw(v); };
   useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
 
   // Restore confirm modal state
@@ -921,9 +948,9 @@ export default function App() {
     if (next && next !== window.location.hash) { lastWrittenHash.current = next; window.location.hash = next; }
   }, [nav, selId, perfTab, settingsSection, loaded]);
 
-  const saveItems    = d => { const stamped = stampUpdatedAt(d, items); setItems(stamped); store.set(KEY_ITEMS,JSON.stringify(stamped)); };
-  const saveSettings = s => { setSettings(s); store.set(KEY_SETTINGS,JSON.stringify(s)); };
-  const saveDebates  = d => { setDebates(d); store.set(KEY_DEBATES,JSON.stringify(d)); };
+  const saveItems    = d => { if (viewOnly()) return; const stamped = stampUpdatedAt(d, items); setItems(stamped); store.set(KEY_ITEMS,JSON.stringify(stamped)); };
+  const saveSettings = s => { if (viewOnly()) return; setSettings(s); store.set(KEY_SETTINGS,JSON.stringify(s)); };
+  const saveDebates  = d => { if (viewOnly()) return; setDebates(d); store.set(KEY_DEBATES,JSON.stringify(d)); };
   // A debate now saves after every turn rather than once at the end, which makes
   // the old `[debate, ...debates]` handler wrong in two ways: it closed over the
   // `debates` array from the render that created it, so a run saving twenty times
@@ -932,18 +959,19 @@ export default function App() {
   // copies. The functional update reads the live list, and upsertRun replaces by
   // id. See services/debateRun.js.
   const saveDebateRun = run => {
+    if (viewOnly()) return;
     setDebates(prev => {
       const next = upsertRun(prev, run);
       store.set(KEY_DEBATES, JSON.stringify(next));
       return next;
     });
   };
-  const saveMetrics  = m => { setWeeklyMetrics(m); store.set(KEY_METRICS,JSON.stringify(m)); };
-  const saveRecs     = r => { setRecs(r); store.set(KEY_RECS,JSON.stringify(r)); };
-  const saveCreative = c => { setCreative(c); store.set(KEY_CREATIVE,JSON.stringify(c)); };
-  const savePerf     = p => { setPerfRows(p); store.set(KEY_PERF,JSON.stringify(p)); };
-  const saveAssets   = a => { setAssets(a); store.set(KEY_ASSETS,JSON.stringify(a)); };
-  const saveAgenda   = g => { setAgenda(g); store.set(KEY_AGENDA,JSON.stringify(g)); };
+  const saveMetrics  = m => { if (viewOnly()) return; setWeeklyMetrics(m); store.set(KEY_METRICS,JSON.stringify(m)); };
+  const saveRecs     = r => { if (viewOnly()) return; setRecs(r); store.set(KEY_RECS,JSON.stringify(r)); };
+  const saveCreative = c => { if (viewOnly()) return; setCreative(c); store.set(KEY_CREATIVE,JSON.stringify(c)); };
+  const savePerf     = p => { if (viewOnly()) return; setPerfRows(p); store.set(KEY_PERF,JSON.stringify(p)); };
+  const saveAssets   = a => { if (viewOnly()) return; setAssets(a); store.set(KEY_ASSETS,JSON.stringify(a)); };
+  const saveAgenda   = g => { if (viewOnly()) return; setAgenda(g); store.set(KEY_AGENDA,JSON.stringify(g)); };
   const toggleDk     = ()=> { setDk(n => { const next=!n; store.set(KEY_THEME,next?"dark":"light"); return next; }); };
   const saveLibView  = v => { setLibView(v); store.set(KEY_LIB_VIEW,v); };
 
@@ -1023,7 +1051,7 @@ export default function App() {
       // earlier generation from the same Monday session.
       const now = new Date();
       const batch = {
-        id: "recbatch-"+Date.now(),
+        id: "recbatch-"+now.getTime(),
         generatedAt: now.toISOString(),
         weekOf: mondayOf(now).toISOString().slice(0,10),
         recommendations,
@@ -1410,7 +1438,7 @@ export default function App() {
 
   const goDetail = (id, origin)=>{ if(origin) setDetailOrigin(origin); setSelId(id); setNav("detail"); };
   const goNew    = ()=>{ setShowTpl(true); };
-  const goEdit   = item=>{setForm({...item});setSelId(item.id);setNav("form");};
+  const goEdit   = item=>{if (viewOnly()) return; setForm({...item});setSelId(item.id);setNav("form");};
 
   // When more than one status is active in the filter (the default Running+Draft,
   // "All", or any other multi-status combination), the flat list is grouped into
@@ -2138,7 +2166,11 @@ export default function App() {
         * a broken view must leave the visitor a way to go somewhere else. */}
       <ErrorBoundary t={t} resetKey={nav} label={navName(nav)||"This view"} onHome={()=>setNav("dashboard")}>
       <Suspense fallback={<ViewLoading t={t}/>}>
-      {nav==="dashboard"&&<DashView t={t} dk={dk} dash={dash} cats={cats} settings={settings} brands={brands} activeBrand={activeBrand} weeklyMetrics={weeklyMetrics} onLog={()=>setShowPulse(true)} onImport={()=>setShowMetricsImport(true)} dRange={dRange} setDRange={setDRange} cFrom={cFrom} cTo={cTo} setCFrom={setCFrom} setCTo={setCTo} onGo={()=>setNav("initiatives")} recs={recs} recsLoad={recsLoad} recsErr={recsErr} items={items} onGenerateRecs={generateRecommendations} onOpenRec={(batchId,recId)=>setShowRecModal({batchId,recId})} showToast={showToast} onSaveItems={saveItems}/>}
+      {nav==="dashboard"&&<DashView t={t} dk={dk} dash={dash} cats={cats} settings={settings} brands={brands} activeBrand={activeBrand} weeklyMetrics={weeklyMetrics} onLog={()=>setShowPulse(true)} onImport={()=>setShowMetricsImport(true)} dRange={dRange} setDRange={setDRange} cFrom={cFrom} cTo={cTo} setCFrom={setCFrom} setCTo={setCTo} onGo={()=>setNav("initiatives")} recs={recs} recsLoad={recsLoad} recsErr={recsErr} items={items} onGenerateRecs={()=>{
+        // Refused before the call, not at the save: a viewer's recommendations
+        // could never be kept, so generating them would be spend for nothing.
+        if (!viewOnly()) generateRecommendations();
+      }} onOpenRec={(batchId,recId)=>setShowRecModal({batchId,recId})} showToast={showToast} onSaveItems={saveItems}/>}
       {nav==="triage"&&<TriageView items={items} t={t} dk={dk} cats={cats} brands={brands} activeBrand={activeBrand} onDetail={(id)=>goDetail(id,"triage")}
         onLogResults={(id)=>{const it=items.find(e=>e.id===id); if(it){setSelId(id); setRForm(it.results?{...it.results,actualRevenueImpact:it.results.actualRevenueImpact!=null?it.results.actualRevenueImpact:"",actualSpendCost:it.results.actualSpendCost!=null?it.results.actualSpendCost:"",actualResourceCost:it.results.actualResourceCost!=null?it.results.actualResourceCost:""}:{actualOutcome:"",keyLearning:"",outcomeClassification:"Success",decisionMade:"",outcomeCertainty:75,actualRevenueImpact:"",actualSpendCost:"",actualResourceCost:""}); setShowR(true);}}}
         onExtend={(id,days)=>{saveItems(items.map(e=>{if(e.id!==id)return e; const base=e.endDate?new Date(e.endDate+"T12:00:00"):new Date(); base.setDate(base.getDate()+days); return {...e,endDate:base.toISOString().slice(0,10)};})); showToast("Extended "+days+" days.","success");}}

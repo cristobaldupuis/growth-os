@@ -61,9 +61,50 @@ create policy performance_rows_write on performance_rows
   using (is_workspace_writer(workspace_id))
   with check (is_workspace_writer(workspace_id));
 
--- ── Adding a viewer ──────────────────────────────────────────────────────
--- There is no invite UI yet. To seat someone read-only, once they have signed
--- up (so they exist in auth.users):
+-- ── Member management helpers ────────────────────────────────────────────
+-- Used by api/state.js's member actions (the Workspace panel's Members list).
+-- Both read auth.users, which PostgREST does not expose, so they are SECURITY
+-- DEFINER — and granted to service_role only, because an email lookup callable
+-- with a user's JWT would let anyone enumerate who has an account. The owner
+-- check lives in api/state.js, before either is called.
+--
+-- The app deliberately does not CREATE accounts (see WorkspacePanel.jsx): these
+-- only find people who already signed up and list the ones already seated.
+
+create or replace function workspace_user_id_by_email(p_email text)
+returns uuid
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select id from auth.users where lower(email) = lower(trim(p_email)) limit 1;
+$$;
+
+revoke all on function workspace_user_id_by_email(text) from public;
+grant execute on function workspace_user_id_by_email(text) to service_role;
+
+create or replace function workspace_member_list(p_workspace uuid)
+returns table (user_id uuid, email text, role text, created_at timestamptz)
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select m.user_id, u.email::text, m.role, m.created_at
+  from workspace_members m
+  join auth.users u on u.id = m.user_id
+  where m.workspace_id = p_workspace
+  order by m.created_at;
+$$;
+
+revoke all on function workspace_member_list(uuid) from public;
+grant execute on function workspace_member_list(uuid) to service_role;
+
+-- ── Adding a viewer by hand ──────────────────────────────────────────────
+-- The Workspace panel's Members list does this for an owner. The SQL, for when
+-- there is no owner session to do it from, once they have signed up (so they
+-- exist in auth.users):
 --
 --   insert into workspace_members (workspace_id, user_id, role)
 --   select w.id, u.id, 'viewer'

@@ -57,7 +57,24 @@ const MAX_BODY_BYTES = 4 * 1024 * 1024;
 export const MAX_ROWS = 2000;
 
 /** Actions that change the workspace — refused for a `viewer` (0008_viewer_role.sql). */
-export const WRITE_ACTIONS = new Set(["saveDoc", "perfMerge", "perfReplace", "perfStage", "perfCommit"]);
+export const WRITE_ACTIONS = new Set([
+  "saveDoc", "perfMerge", "perfReplace", "perfStage", "perfCommit",
+  "memberAdd", "memberRole", "memberRemove",
+]);
+
+export const ROLES = new Set(["owner", "member", "viewer"]);
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * True when changing `userId` to `nextRole` (null for removal) would leave the
+ * workspace with no owner. A workspace nobody can manage is only recoverable
+ * from the SQL editor, so the last owner cannot demote or remove themselves.
+ */
+export function lastOwnerBlocked(members, userId, nextRole) {
+  const target = members.find(m => m.user_id === userId);
+  if (!target || target.role !== "owner" || nextRole === "owner") return false;
+  return members.filter(m => m.role === "owner").length <= 1;
+}
 
 // How old a staged batch may be when it is committed. A save of the largest
 // set this app holds is a few dozen chunk requests; an hour is generous, and a
@@ -157,7 +174,7 @@ async function pgFetch(path, init = {}) {
 
 // -- Actions -------------------------------------------------------------------
 
-async function handleLoad(res, workspace) {
+async function handleLoad(res, workspace, memberships = []) {
   const docRes = await pgFetch(
     `/workspace_docs?workspace_id=eq.${workspace.id}&select=key,value,revision`,
   );
@@ -183,6 +200,9 @@ async function handleLoad(res, workspace) {
 
   res.status(200).json({
     workspace: { id: workspace.id, slug: workspace.slug, name: workspace.name, role: workspace.role },
+    // Every workspace this account is seated in, for the Workspace panel's
+    // switcher. Names and roles only — nothing from inside the others.
+    workspaces: memberships.map(m => ({ id: m.id, slug: m.slug, name: m.name, role: m.role })),
     docs,
     perfRows: rows,
   });
@@ -270,6 +290,74 @@ export async function handlePerfCommit(req, res, workspace) {
   );
   const total = Number(String(countRes.headers.get("content-range") || "").split("/")[1]);
   res.status(200).json({ total: Number.isFinite(total) ? total : null });
+}
+
+/**
+ * The Workspace panel's Members list: read by anyone seated, changed only by an
+ * owner. It manages seats in THIS app's table and nothing else — it finds
+ * people who already have an account and never creates one, which stays with
+ * Supabase Auth (see WorkspacePanel.jsx). The two lookups it needs read
+ * auth.users and are service-role-only RPCs from 0008_viewer_role.sql.
+ */
+export async function handleMembers(req, res, workspace, user, action) {
+  const list = async () => (await rpc("workspace_member_list", { p_workspace: workspace.id })) || [];
+  const answer = async () => res.status(200).json({
+    members: await list(), canManage: workspace.role === "owner", you: user.id,
+  });
+
+  if (action === "members") return answer();
+
+  if (workspace.role !== "owner") {
+    res.status(403).json({ error: "Only a workspace owner can change who is in it." });
+    return;
+  }
+  const members = await list();
+  const role = req.body?.role;
+
+  if (action === "memberAdd") {
+    const email = String(req.body?.email || "").trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { res.status(400).json({ error: "Enter an email address." }); return; }
+    if (!ROLES.has(role)) { res.status(400).json({ error: "Pick a role." }); return; }
+    const userId = await rpc("workspace_user_id_by_email", { p_email: email });
+    if (!userId) {
+      res.status(404).json({ error: "No account uses that email yet. Create one in Supabase under Authentication → Users (or have them sign up), then add them here." });
+      return;
+    }
+    const existing = members.find(m => m.user_id === userId);
+    if (existing) { res.status(409).json({ error: `Already in this workspace as ${existing.role}.` }); return; }
+    await pgFetch("/workspace_members", {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ workspace_id: workspace.id, user_id: userId, role }),
+    });
+    return answer();
+  }
+
+  const userId = String(req.body?.userId || "");
+  if (!UUID.test(userId)) { res.status(400).json({ error: "Unknown member." }); return; }
+  if (!members.some(m => m.user_id === userId)) { res.status(404).json({ error: "That person is not in this workspace." }); return; }
+  const where = `/workspace_members?workspace_id=eq.${workspace.id}&user_id=eq.${userId}`;
+
+  if (action === "memberRole") {
+    if (!ROLES.has(role)) { res.status(400).json({ error: "Pick a role." }); return; }
+    if (lastOwnerBlocked(members, userId, role)) {
+      res.status(409).json({ error: "This is the only owner. Make someone else an owner first." });
+      return;
+    }
+    await pgFetch(where, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ role }) });
+    return answer();
+  }
+
+  if (action === "memberRemove") {
+    if (lastOwnerBlocked(members, userId, null)) {
+      res.status(409).json({ error: "This is the only owner. Make someone else an owner first." });
+      return;
+    }
+    await pgFetch(where, { method: "DELETE" });
+    return answer();
+  }
+
+  res.status(400).json({ error: "Unknown action." });
 }
 
 async function handleSaveDoc(req, res, workspace, user) {
@@ -434,9 +522,9 @@ export default async function handler(req, res) {
     label: "state",
   })) return;
 
-  let workspace;
+  let workspace, memberships;
   try {
-    const memberships = await membershipsFor(user.id);
+    memberships = await membershipsFor(user.id);
     const resolved = resolveWorkspace(memberships, req.body?.workspace || req.query?.workspace || null);
     if (resolved.error) {
       res.status(resolved.status).json({ error: resolved.error, ...(resolved.choices ? { choices: resolved.choices } : {}) });
@@ -455,10 +543,11 @@ export default async function handler(req, res) {
   }
 
   try {
-    if (action === "load")        return await handleLoad(res, workspace);
+    if (action === "load")        return await handleLoad(res, workspace, memberships);
     if (action === "docs")        return await handleDocs(req, res, workspace);
     if (action === "saveDoc")     return await handleSaveDoc(req, res, workspace, user);
     if (action === "performanceSummary") return await handlePerfSummary(req, res, workspace);
+    if (action === "members" || action.startsWith("member")) return await handleMembers(req, res, workspace, user, action);
     if (action === "perfStage")   return await handlePerfStage(req, res, workspace);
     if (action === "perfCommit")  return await handlePerfCommit(req, res, workspace);
     // perfMerge/perfReplace are the pre-staging protocol, kept so a tab still

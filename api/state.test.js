@@ -257,3 +257,85 @@ test("commit deletes only rows older than the batch, in this workspace", async (
   assert.ok(del.url.includes(`imported_at=lt.${batch}`));
   assert.equal(res.body.total, 7);
 });
+
+// -- Members ---------------------------------------------------------------------
+
+import { handleMembers, lastOwnerBlocked } from "./state.js";
+
+const OWNER = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const OTHER = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+
+async function members(action, body, { role = "owner", roster, lookup = null } = {}) {
+  process.env.SUPABASE_URL = "https://db.example.test";
+  process.env.SUPABASE_SECRET_KEY = "sk";
+  const real = globalThis.fetch;
+  const writes = [];
+  const list = roster || [{ user_id: OWNER, email: "o@x.test", role: "owner" }, { user_id: OTHER, email: "m@x.test", role: "member" }];
+  globalThis.fetch = async (url, init = {}) => {
+    const u = decodeURIComponent(String(url));
+    const reply = (b) => ({ ok: true, status: 200, json: async () => b, text: async () => "" });
+    if (u.includes("/rpc/workspace_member_list")) return reply(list);
+    if (u.includes("/rpc/workspace_user_id_by_email")) return reply(lookup);
+    writes.push({ method: init.method, url: u, body: init.body ? JSON.parse(init.body) : null });
+    return reply(null);
+  };
+  const res = { status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
+  try { await handleMembers({ body }, res, { id: WS, role }, { id: OWNER }, action); }
+  finally { globalThis.fetch = real; delete process.env.SUPABASE_URL; delete process.env.SUPABASE_SECRET_KEY; }
+  return { res, writes };
+}
+
+test("anyone seated can see the members; only an owner is told they can manage", async () => {
+  const asViewer = await members("members", {}, { role: "viewer" });
+  assert.equal(asViewer.res.code, 200);
+  assert.equal(asViewer.res.body.members.length, 2);
+  assert.equal(asViewer.res.body.canManage, false);
+});
+
+test("a member or viewer cannot change who is in the workspace", async () => {
+  for (const role of ["member", "viewer"]) {
+    const { res, writes } = await members("memberRemove", { userId: OTHER }, { role });
+    assert.equal(res.code, 403);
+    assert.equal(writes.length, 0);
+  }
+});
+
+test("adding finds an existing account, and never creates one", async () => {
+  const missing = await members("memberAdd", { email: "new@x.test", role: "viewer" }, { lookup: null });
+  assert.equal(missing.res.code, 404);
+  assert.match(missing.res.body.error, /Supabase/);
+  assert.equal(missing.writes.length, 0);
+
+  const dup = await members("memberAdd", { email: "m@x.test", role: "viewer" }, { lookup: OTHER });
+  assert.equal(dup.res.code, 409);
+
+  const ok = await members("memberAdd", { email: "new@x.test", role: "viewer" }, { lookup: "cccccccc-cccc-4ccc-8ccc-cccccccccccc" });
+  assert.equal(ok.res.code, 200);
+  assert.deepEqual(ok.writes[0].body, { workspace_id: WS, user_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", role: "viewer" });
+
+  assert.equal((await members("memberAdd", { email: "x@y.test", role: "admin" }, { lookup: OTHER })).res.code, 400);
+});
+
+test("the last owner cannot be demoted or removed", async () => {
+  assert.equal(lastOwnerBlocked([{ user_id: OWNER, role: "owner" }], OWNER, "member"), true);
+  assert.equal(lastOwnerBlocked([{ user_id: OWNER, role: "owner" }], OWNER, null), true);
+  assert.equal(lastOwnerBlocked([{ user_id: OWNER, role: "owner" }, { user_id: OTHER, role: "owner" }], OWNER, null), false);
+  assert.equal(lastOwnerBlocked([{ user_id: OWNER, role: "owner" }, { user_id: OTHER, role: "member" }], OTHER, null), false);
+
+  const demote = await members("memberRole", { userId: OWNER, role: "member" });
+  assert.equal(demote.res.code, 409);
+  assert.equal(demote.writes.length, 0);
+});
+
+test("role changes and removals touch only that seat in this workspace", async () => {
+  const change = await members("memberRole", { userId: OTHER, role: "viewer" });
+  assert.equal(change.writes[0].method, "PATCH");
+  assert.ok(change.writes[0].url.includes(`workspace_id=eq.${WS}`) && change.writes[0].url.includes(`user_id=eq.${OTHER}`));
+  assert.deepEqual(change.writes[0].body, { role: "viewer" });
+
+  const remove = await members("memberRemove", { userId: OTHER });
+  assert.equal(remove.writes[0].method, "DELETE");
+
+  assert.equal((await members("memberRemove", { userId: "not-a-uuid" })).res.code, 400);
+  assert.equal((await members("memberRemove", { userId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd" })).res.code, 404);
+});

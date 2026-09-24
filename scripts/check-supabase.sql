@@ -46,6 +46,8 @@ from (
     ('0006_mcp.sql',        'table',    'oauth_tokens'),
     ('0007_performance_aggregation.sql', 'function', 'performance_summary'),
     ('0008_viewer_role.sql', 'function', 'is_workspace_writer'),
+    ('0008_viewer_role.sql', 'function', 'workspace_user_id_by_email'),
+    ('0008_viewer_role.sql', 'function', 'workspace_member_list'),
     -- Bonus: the one live piece of 0002_assets.sql. Its tables are proposals
     -- and deliberately not checked here — see that file's header. 'creative-assets'
     -- is the default; if this deployment sets SUPABASE_ASSET_BUCKET to something

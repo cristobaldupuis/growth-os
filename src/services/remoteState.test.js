@@ -236,3 +236,26 @@ test("an unreachable store is reported as a write that did not land", async () =
   assert.match(result.message, /Download a backup/);
   detachRemote();
 });
+
+// -- Several workspaces ------------------------------------------------------------
+
+test("once a workspace is open, every call names it", async () => {
+  setup();
+  const f = mockFetch([
+    { body: { workspace: { id: "w2", slug: "beta" }, workspaces: [{ id: "w1" }, { id: "w2" }], docs: {}, perfRows: [] } },
+    { body: { revision: 1 } },
+  ]);
+  const loaded = await loadWorkspace("w2", f);
+  assert.equal(loaded.workspaces.length, 2);
+  await saveDoc(KEY_ITEMS, "[]", f);
+  assert.equal(f.calls[0].body.workspace, "w2");
+  assert.equal(f.calls[1].body.workspace, "w2", "a save is not ambiguous for an account in two workspaces");
+});
+
+test("a load never inherits the previously open workspace", async () => {
+  setup();
+  const f = mockFetch([{ body: { workspace: { id: "w1" }, docs: {}, perfRows: [] } }]);
+  await loadWorkspace("w1", f);
+  await loadWorkspace(null, f);
+  assert.equal(f.calls[1].body.workspace, undefined);
+});

@@ -72,10 +72,14 @@ async function call(body, fetchImpl = fetch) {
     err.signedOut = true;
     throw err;
   }
+  // Every call after the load names the workspace it is for. Without it, an
+  // account seated in more than one workspace is ambiguous to api/state.js on
+  // every save, and each one is refused with a 400.
+  const scoped = workspace?.id && body.workspace === undefined ? { ...body, workspace: workspace.id } : body;
   const res = await fetchImpl("/api/state", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify(body),
+    body: JSON.stringify(scoped),
   });
   const parsed = await res.json().catch(() => ({}));
   if (res.status === 401) {
@@ -107,7 +111,10 @@ async function call(body, fetchImpl = fetch) {
  * does not have to care which backend answered.
  */
 export async function loadWorkspace(name = null, fetchImpl = fetch) {
-  const body = await call({ action: "load", ...(name ? { workspace: name } : {}) }, fetchImpl);
+  // Explicit `workspace` (possibly null) so a reload never inherits the one
+  // this module happened to have open before.
+  workspace = null;
+  const body = await call({ action: "load", workspace: name || undefined }, fetchImpl);
   workspace = body.workspace || null;
   revisions = new Map();
   bases = new Map();
@@ -122,7 +129,7 @@ export async function loadWorkspace(name = null, fetchImpl = fetch) {
     docs[key] = JSON.stringify(entry.value);
   }
 
-  return { workspace, docs, perfRows: body.perfRows || [] };
+  return { workspace, workspaces: body.workspaces || [], docs, perfRows: body.perfRows || [] };
 }
 
 /**
@@ -180,6 +187,12 @@ export async function pullChanges(fetchImpl = fetch) {
   const body = await call({ action: "docs", since: Object.fromEntries(revisions) }, fetchImpl);
   return body.docs || {};
 }
+
+/** The open workspace's members: `{ members, canManage, you }`. */
+export const listMembers = (fetchImpl = fetch) => call({ action: "members" }, fetchImpl);
+export const addMember = (email, role, fetchImpl = fetch) => call({ action: "memberAdd", email, role }, fetchImpl);
+export const setMemberRole = (userId, role, fetchImpl = fetch) => call({ action: "memberRole", userId, role }, fetchImpl);
+export const removeMember = (userId, fetchImpl = fetch) => call({ action: "memberRemove", userId }, fetchImpl);
 
 /** Record that this client now holds `value` at `revision` for `key`. */
 export function acceptRemote(key, value, revision) {

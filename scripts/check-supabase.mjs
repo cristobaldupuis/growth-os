@@ -110,7 +110,7 @@ const MIGRATIONS = [
   {
     file: "0008_viewer_role.sql",
     tables: [],
-    functions: ["is_workspace_writer"],
+    functions: ["is_workspace_writer", "workspace_user_id_by_email", "workspace_member_list"],
   },
 ];
 

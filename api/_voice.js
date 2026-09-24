@@ -1,4 +1,5 @@
-// api/voice.js — ElevenLabs text-to-speech proxy.
+// api/_voice.js — ElevenLabs text-to-speech proxy.
+// Served by api/video.js under `?kind=voice` (formerly its own function).
 //
 // The fourth provider endpoint, and a separate function for the same reason
 // api/image.js is separate from api/proxy.js: the contracts do not overlap. A

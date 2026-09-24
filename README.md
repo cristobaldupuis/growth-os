@@ -666,7 +666,7 @@ DAILY_CAP_IMAGES=200       # api/image.js
 DAILY_CAP_VIDEO=40         # api/video.js — submits only, polls are free
 DAILY_CAP_SCENES=40        # api/_scene.js (via /api/video?kind=scene) — submits only
 DAILY_CAP_ASSETS=500       # api/asset.js — uploads into the storage bucket
-DAILY_CAP_VOICE=300        # api/voice.js
+DAILY_CAP_VOICE=300        # api/_voice.js (via /api/video?kind=voice)
 DAILY_CAP_DEBATES=40       # api/debate.js — debate starts
 
 # Optional. This deployment's own base URL, used by api/debate.js for the

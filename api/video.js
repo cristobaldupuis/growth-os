@@ -45,6 +45,7 @@
 import { VIDEO_TIERS, estimateVideoCostUsd } from "../src/services/ai/callGenerateVideo.js";
 import { guardEntry, guardRateLimit, rateLimitIdentity, dailyCap } from "./_guard.js";
 import sceneHandler from "./_scene.js";
+import voiceHandler from "./_voice.js";
 
 // Every upstream call is bounded below the function's own limit (each
 // submit/poll is one quick provider call inside a 60s function), so a provider
@@ -344,6 +345,10 @@ export default async function handler(req, res) {
   // path keeps its own validator, buckets and daily cap in api/_scene.js.
   // /api/scene still reaches it through the rewrite in vercel.json.
   if (req.query?.kind === "scene") return sceneHandler(req, res);
+  // ElevenLabs voice, likewise (formerly api/voice.js), with its own validator,
+  // buckets and DAILY_CAP_VOICE in api/_voice.js. /api/voice still reaches it
+  // through the rewrite in vercel.json.
+  if (req.query?.kind === "voice") return voiceHandler(req, res);
 
   if (guardEntry(req, res, { maxBodyBytes: MAX_BODY_BYTES })) return;
 

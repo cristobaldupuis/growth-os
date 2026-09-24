@@ -36,10 +36,6 @@
       "memory": 128,
       "maxDuration": 15
     },
-    "api/voice.js": {
-      "memory": 128,
-      "maxDuration": 60
-    },
     "api/connectors.js": {
       "memory": 256,
       "maxDuration": 30
@@ -49,6 +45,10 @@
     {
       "source": "/admin",
       "destination": "/admin.html"
+    },
+    {
+      "source": "/api/voice",
+      "destination": "/api/video?kind=voice"
     },
     {
       "source": "/api/scene",

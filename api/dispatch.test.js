@@ -50,3 +50,12 @@ test("without ?kind=scene the video handler answers for itself", async () => {
   assert.equal(res.statusCode, 400);
   assert.match(res.body.error, /action must be/);
 });
+
+test("?kind=voice reaches the voice handler", async () => {
+  delete process.env.ELEVENLABS_API_KEY;
+  const res = mockRes();
+  await videoHandler(req({ kind: "voice" }, { action: "speak" }), res);
+  // Only the voice path checks the ElevenLabs key; video would 400 on the action.
+  assert.equal(res.statusCode, 500);
+  assert.equal(res.body.error, "ELEVENLABS_API_KEY is not configured.");
+});

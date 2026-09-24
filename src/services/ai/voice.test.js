@@ -10,7 +10,7 @@ import { test } from "node:test";
 import {
   validateVoiceBody, buildSpeechBody, trimVoices,
   ALLOWED_VOICE_MODELS, ALLOWED_OUTPUT_FORMATS, MAX_SCRIPT_CHARS,
-} from "../../../api/voice.js";
+} from "../../../api/_voice.js";
 import {
   callGenerateVoice, listVoices, estimateVoiceCostUsd,
   VOICE_MODELS, DEFAULT_VOICE_MODEL, CREDIT_USD, CREDITS_PER_CHAR,

@@ -8,7 +8,7 @@
 
 import { AI_HEADERS, proxyError, recordVoiceUsage } from "./_shared.js";
 
-export const VOICE_PROXY_URL = "/api/voice";
+export const VOICE_PROXY_URL = "/api/video?kind=voice";
 
 // Named aliases, the same convention IMAGE_MODELS follows, because the names
 // carry the tradeoff and the raw ids do not.

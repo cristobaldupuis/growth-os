@@ -16,7 +16,7 @@
 // Nothing here touches the network, React, or storage, which is what lets the same
 // file be imported by a serverless function and a Vite bundle.
 
-import { EFFORT, buildRequest, modelFor } from "./models.js";
+import { EFFORT, buildRequest, modelFor, agentToolFields } from "./models.js";
 import { MODERATOR_FORMAT, DEBATE_SYNTHESIS_FORMAT } from "./schemas.js";
 import { INIT_TYPES } from "../../constants.js";
 
@@ -74,13 +74,15 @@ export const agentOpeningMessage = (isFirstTurn, agentLabel) =>
  * The request body for one agent-turn model call.
  *
  * `withTools` is false on the final permitted tool iteration, which is how the
- * loop is terminated: an agent with no tools left to call has to answer. It
+ * loop is terminated: an agent that cannot call a tool has to answer. It
  * replaces a throw that used to fail the entire debate from inside one turn.
+ * How the tools are switched off depends on the model — see agentToolFields.
  */
 export function agentTurnRequest({ agent, portfolioCtx, userContext, messages, tools, withTools = true, model }) {
+  const resolved = model || modelFor("debate");
   return {
     ...buildRequest({
-      model: model || modelFor("debate"),
+      model: resolved,
       maxTokens: 600,
       system: agentSystem(agent, portfolioCtx, userContext),
       effort: EFFORT.LOW,
@@ -91,7 +93,7 @@ export function agentTurnRequest({ agent, portfolioCtx, userContext, messages, t
       cacheSystem: true,
       cacheMessages: true,
     }),
-    ...(withTools && tools ? { tools } : {}),
+    ...agentToolFields(resolved, tools, { final: !withTools }),
     messages,
   };
 }

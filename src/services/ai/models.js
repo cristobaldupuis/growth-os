@@ -235,6 +235,30 @@ export function buildRequest({ model, system, messages, maxTokens, effort, tools
 }
 
 /**
+ * The tool fields for one call inside an agent's tool loop.
+ *
+ * On the final permitted iteration the agent has to answer rather than make
+ * another lookup. The loop used to force that by dropping `tools` from the
+ * request, which newer Anthropic models reject: Opus 5.5 and Fable 5.1 tie each
+ * thinking block to the tool set it was produced under, so removing tools
+ * mid-turn invalidates the earlier blocks and, on accounts created from
+ * 2026-08-31, is a 400. `tool_choice: none` gets the same forced answer with the
+ * tool set unchanged, and it also keeps the system-prompt cache alive, which
+ * dropping `tools` (rendered first) did not.
+ *
+ * Only Anthropic gets it. The other adapters do not translate `tool_choice`, so
+ * a model behind them would be free to call a tool on its last chance; those
+ * keep the old behaviour of withholding the tools.
+ */
+export function agentToolFields(model, tools, { final = false } = {}) {
+  if (!tools) return {};
+  if (!final) return { tools };
+  return modelById(model)?.provider === "anthropic"
+    ? { tools, tool_choice: { type: "none" } }
+    : {};
+}
+
+/**
  * Mark the last content block of the last message as a cache breakpoint.
  *
  * Everything before it — tools, system, and every earlier turn — becomes the

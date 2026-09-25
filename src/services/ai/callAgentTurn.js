@@ -1,5 +1,5 @@
 import { postProxy } from "./_shared.js";
-import { EFFORT, buildRequest, modelFor } from "./models.js";
+import { EFFORT, buildRequest, modelFor, agentToolFields } from "./models.js";
 
 // Single agent turn with tool use — agentic: agent decides what data to fetch
 export async function callAgentTurn(agent, portfolioCtx, userContext, messageHistory, portfolioTools, isFirstTurn, modelOverride) {
@@ -65,8 +65,9 @@ Max 180 words per turn. No filler. Speak like a real boardroom executive who has
   const MAX_TOOL_ITERS = 4;
 
   while (iterations <= MAX_TOOL_ITERS) {
-    // The last permitted iteration withholds the tools entirely, which forces a
-    // text answer because there is nothing left to call.
+    // The last permitted iteration switches the tools off, which forces a text
+    // answer because there is nothing left to call. How they are switched off
+    // depends on the model — see agentToolFields.
     //
     // This replaces a `throw new Error("Agent exceeded tool iteration limit")`,
     // and the throw was worse than it looks: it did not fail one turn, it failed
@@ -80,11 +81,12 @@ Max 180 words per turn. No filler. Speak like a real boardroom executive who has
     // fetches twice before answering cost twice, and a console that showed one
     // row per turn would understate the debate by whatever the tool round-trips
     // came to.
+    const model = modelFor("debate", modelOverride);
     const data = await postProxy({
       group:"debate", fn:"callAgentTurn",
       body: {
         ...buildRequest({
-          model:modelFor("debate", modelOverride), maxTokens:600,
+          model, maxTokens:600,
           system:sys, effort:EFFORT.LOW,
           // Both breakpoints earn their place here and they cache different
           // things. The system one covers the portfolio snapshot, identical
@@ -94,7 +96,7 @@ Max 180 words per turn. No filler. Speak like a real boardroom executive who has
           // round-trips inside this very loop.
           cacheSystem:true, cacheMessages:true,
         }),
-        ...(lastChance ? {} : { tools: portfolioTools.definitions }),
+        ...agentToolFields(model, portfolioTools.definitions, { final: lastChance }),
         messages: currentMessages,
       },
     });

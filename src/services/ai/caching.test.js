@@ -158,6 +158,15 @@ test("cache reads are billed at a fraction of input, not at full input", () => {
   assert.ok(cached < uncached, "if these were equal, caching could never show a saving");
 });
 
+test("a published cache-read rate wins over the default multiplier", () => {
+  // Fable 5.1 reads cache at $0.25/MTok against $10 input — a fortieth, not a
+  // tenth. The multiplier alone would overstate every cached Fable call 4x.
+  const price = { inUsdPerMTok: 10, outUsdPerMTok: 50, cacheReadUsdPerMTok: 0.25 };
+  assert.equal(priceTextCall(price, 0, 0, 1e6, 0), 0.25);
+  // Writes still use the multiplier against input.
+  assert.equal(priceTextCall(price, 0, 0, 0, 1e6), 10 * CACHE_WRITE_MULTIPLIER);
+});
+
 test("cache writes cost more than plain input", () => {
   const price = { inUsdPerMTok: 2, outUsdPerMTok: 10 };
   assert.equal(priceTextCall(price, 0, 0, 0, 1e6), 2 * CACHE_WRITE_MULTIPLIER);

@@ -360,7 +360,7 @@ admin console at `/admin`:
 Each group declares a capability floor that both the picker and the server enforce,
 so the debate group cannot be pointed at a model without tool calling, and a
 whole-portfolio prompt cannot be pointed at a short-context model. Providers wired
-today: Anthropic (Opus 5, Sonnet 5, Haiku 4.5), Google Gemini (3.1 Pro, 3.6 Flash,
+today: Anthropic (Fable 5.1, Opus 5.5, Opus 5, Sonnet 5, Haiku 4.5), Google Gemini (3.1 Pro, 3.6 Flash,
 3.5 Flash Lite), OpenAI (GPT-5.6 Sol, Terra and Luna), and Thinking Machines
 (Inkling, open weights, served first-party through Tinker).
 

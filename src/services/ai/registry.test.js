@@ -109,6 +109,14 @@ test("modelsFor excludes a model that cannot meet a group's requirements", () =>
   assert.ok(ids.includes("claude-sonnet-5"));
 });
 
+test("the newest Anthropic models are offered for every text group", () => {
+  for (const group of ["capture", "analysis", "debate", "creative"]) {
+    const ids = modelsFor(group).map(m => m.id);
+    assert.ok(ids.includes("claude-opus-5-5"), `Opus 5.5 missing from ${group}`);
+    assert.ok(ids.includes("claude-fable-5-1"), `Fable 5.1 missing from ${group}`);
+  }
+});
+
 test("modelsFor returns nothing for an unknown group rather than throwing", () => {
   assert.deepEqual(modelsFor("not-a-group"), []);
 });

@@ -95,13 +95,43 @@
 // than restating a per-call figure that does not exist.
 export const MODEL_CATALOGUE = [
   // -- Anthropic text ---------------------------------------------------------
+  //
+  // Fable 5.1 and Opus 5.5 both keep thinking permanently on and reject forced
+  // `tool_choice` (`any` / `tool`). Neither is a problem here — buildRequest
+  // always sends adaptive thinking with an explicit effort, and no call site
+  // forces a tool — but a future call site that does either will 400 on these
+  // two and nowhere else.
+  //
+  // Both also bill cache reads below the usual tenth of input, hence the
+  // explicit `cacheReadUsdPerMTok`; see priceTextCall in services/usage.js.
+  {
+    id: "claude-fable-5-1",
+    provider: "anthropic",
+    label: "Claude Fable 5.1",
+    modality: "text",
+    // Now the dearest model in the catalogue, which moves the worst-case cost
+    // figure in api/proxy.js. Also requires the org's 30-day data retention:
+    // a zero-data-retention org gets a 400 on every call.
+    price: { inUsdPerMTok: 10, outUsdPerMTok: 50, cacheReadUsdPerMTok: 0.25 },
+    blurb: "Anthropic's most capable model, at twice Opus's rate. Slower per turn — bench it before routing a group.",
+    caps: { tools: true, json: true, adaptiveThinking: true, effort: true, cacheMinTokens: 512, longContext: true, structuredOutputs: true },
+  },
+  {
+    id: "claude-opus-5-5",
+    provider: "anthropic",
+    label: "Claude Opus 5.5",
+    modality: "text",
+    price: { inUsdPerMTok: 4, outUsdPerMTok: 20, cacheReadUsdPerMTok: 0.2 },
+    blurb: "Newest Opus, and cheaper than Opus 5. The reach model for a group whose output is the product.",
+    caps: { tools: true, json: true, adaptiveThinking: true, effort: true, cacheMinTokens: 512, longContext: true, structuredOutputs: true },
+  },
   {
     id: "claude-opus-5",
     provider: "anthropic",
     label: "Claude Opus 5",
     modality: "text",
     price: { inUsdPerMTok: 5, outUsdPerMTok: 25 },
-    blurb: "Strongest reasoning. The reach model for a group whose output is the product.",
+    blurb: "Previous Opus. Superseded by Opus 5.5, which costs less; kept so an existing routing to it keeps working.",
     // 512, not 1024: Opus 5 halved the minimum cacheable prefix. Getting this
     // wrong is silent in both directions — too high and buildRequest declines to
     // mark a breakpoint that would have worked, too low and it marks one the

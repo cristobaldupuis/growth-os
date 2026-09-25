@@ -228,15 +228,18 @@ test("a tool call is one step too, and the partial turn persists to the next", a
   } finally { w.restore(); }
 });
 
-test("the last tool iteration withholds the tools, forcing an answer", async () => {
+test("the last tool iteration switches the tools off, forcing an answer", async () => {
   // This replaces a throw that used to fail the whole debate from inside one turn.
+  // The tool set itself stays: dropping it invalidates Opus 5.5's earlier thinking
+  // blocks. The debate defaults to an Anthropic model, so tool_choice does the job.
   const w = stubWorld({
     rows: { "r1": { id: "r1", status: "running", phase: "agent_turn", snapshot: SNAPSHOT, agents: AGENTS, max_turns: 4, transcript: [], history: [], tool_messages: [{ role: "user", content: "go" }], tool_iters: 4, turn_index: 0, current_agent: AGENTS[0], context: "" } },
     modelReplies: [textReply("Fine, here is my view.")],
   });
   try {
     await step(w, "r1");
-    assert.equal(w.sentBodies[0].tools, undefined, "an agent with no tools left has to speak");
+    assert.ok(w.sentBodies[0].tools?.length > 0, "the tool set must not change mid-turn");
+    assert.deepEqual(w.sentBodies[0].tool_choice, { type: "none" }, "an agent with no tools left has to speak");
     assert.equal(w.rows.r1.transcript.length, 1);
   } finally { w.restore(); }
 });

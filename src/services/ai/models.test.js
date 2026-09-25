@@ -14,7 +14,8 @@
 //
 // Run with: node src/services/ai/models.test.js
 import assert from "node:assert/strict";
-import { MODELS, EFFORT, buildRequest, capabilitiesFor, modelFor, applyRouting, currentRouting } from "./models.js";
+import { MODELS, EFFORT, buildRequest, capabilitiesFor, modelFor, applyRouting, currentRouting, agentToolFields } from "./models.js";
+import { agentTurnRequest } from "./debatePrompts.js";
 import { DEFAULT_ROUTING } from "./registry.js";
 
 let passed = 0, failed = 0;
@@ -161,6 +162,40 @@ test("applyRouting reports and discards an unusable assignment", () => {
 test("applyRouting(null) restores every group to its default", () => {
   applyRouting(null);
   assert.deepEqual(currentRouting(), DEFAULT_ROUTING);
+});
+
+// -- The agent loop's final iteration -------------------------------------------
+//
+// Dropping `tools` to force an answer invalidates Opus 5.5's thinking blocks from
+// earlier in the turn, which is a 400 on newer accounts. Anthropic models keep
+// the tool set and switch it off with tool_choice instead.
+
+const TOOLS = [{ name: "get_portfolio", description: "x", input_schema: { type: "object", properties: {} } }];
+
+test("an ordinary tool iteration sends the tools and no tool_choice", () => {
+  assert.deepEqual(agentToolFields("claude-opus-5-5", TOOLS), { tools: TOOLS });
+});
+
+test("the final iteration keeps the tool set on Anthropic and turns it off with tool_choice", () => {
+  for (const model of ["claude-opus-5-5", "claude-sonnet-5", "claude-haiku-4-5"]) {
+    assert.deepEqual(agentToolFields(model, TOOLS, { final: true }),
+      { tools: TOOLS, tool_choice: { type: "none" } }, model);
+  }
+});
+
+test("the final iteration still withholds tools where the adapter cannot translate tool_choice", () => {
+  assert.deepEqual(agentToolFields("gpt-5.6-sol", TOOLS, { final: true }), {});
+  assert.deepEqual(agentToolFields("gemini-3.1-pro", TOOLS, { final: true }), {});
+});
+
+test("the server-side debate's last-chance request keeps its tools on Opus 5.5", () => {
+  const body = agentTurnRequest({
+    agent: { label: "CFO", icon: "$", lens: "x", blindspot: "y" },
+    portfolioCtx: "ctx", userContext: "", messages: [{ role: "user", content: "go" }],
+    tools: TOOLS, withTools: false, model: "claude-opus-5-5",
+  });
+  assert.deepEqual(body.tools, TOOLS);
+  assert.deepEqual(body.tool_choice, { type: "none" });
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

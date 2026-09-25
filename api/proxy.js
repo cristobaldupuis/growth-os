@@ -85,8 +85,8 @@ const MAX_SYSTEM_CHARS   = 60000;
 // 250 leaves room for four or five debates alongside ordinary Next Plays and
 // Creative Studio use. The worst case it permits is bounded by the same controls
 // that always bounded it: MAX_TOKENS_CEILING caps output per call, so 250 calls
-// at 4,000 output tokens on the dearest model in the catalogue (Opus 5, $25/MTok
-// out) is roughly $25/hour/IP of output plus input — survivable for a
+// at 4,000 output tokens on the dearest model in the catalogue (Fable 5.1,
+// $50/MTok out) is roughly $50/hour/IP of output plus input — survivable for a
 // single-operator deployment, and the figure to revisit before this serves
 // clients directly.
 //

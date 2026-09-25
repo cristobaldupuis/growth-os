@@ -41,6 +41,9 @@ export const USAGE_ROW_LIMIT = 2000;
 //
 // Multipliers rather than a second rate table: they are stable across models in a
 // way absolute rates are not, and the model's own input rate is already here.
+// The exception is a model whose published cache-read rate is not a tenth of its
+// input (Fable 5.1, Opus 5.5): its catalogue entry states `cacheReadUsdPerMTok`,
+// which wins over the multiplier.
 export const CACHE_READ_MULTIPLIER  = 0.1;
 export const CACHE_WRITE_MULTIPLIER = 1.25;
 
@@ -51,9 +54,12 @@ export const CACHE_WRITE_MULTIPLIER = 1.25;
  *  the three counts separately — so these are added rather than netted off. */
 export function priceTextCall(price, inputTokens, outputTokens, cacheReadTokens = 0, cacheWriteTokens = 0) {
   if (!price || typeof price.inUsdPerMTok !== "number" || typeof price.outUsdPerMTok !== "number") return null;
+  const readRate  = typeof price.cacheReadUsdPerMTok === "number"
+    ? price.cacheReadUsdPerMTok
+    : price.inUsdPerMTok * CACHE_READ_MULTIPLIER;
   const inCost    = ((inputTokens  || 0) / 1e6) * price.inUsdPerMTok;
   const outCost   = ((outputTokens || 0) / 1e6) * price.outUsdPerMTok;
-  const readCost  = ((cacheReadTokens  || 0) / 1e6) * price.inUsdPerMTok * CACHE_READ_MULTIPLIER;
+  const readCost  = ((cacheReadTokens  || 0) / 1e6) * readRate;
   const writeCost = ((cacheWriteTokens || 0) / 1e6) * price.inUsdPerMTok * CACHE_WRITE_MULTIPLIER;
   return inCost + outCost + readCost + writeCost;
 }

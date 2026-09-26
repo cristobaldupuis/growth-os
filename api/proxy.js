@@ -60,7 +60,12 @@ const UPSTREAM_TIMEOUT_MS = 55000;
 // model is still rejected here, before any upstream call.
 export const ALLOWED_MODELS = new Set(TEXT_MODEL_IDS);
 
-export const MAX_TOKENS_CEILING = 4000;   // highest max_tokens any feature legitimately needs
+// Highest max_tokens any feature legitimately needs, thinking included. Was 4000
+// when every call was sized for its visible answer alone; adaptive thinking
+// spends from the same ceiling, so buildRequest now adds a thinking allowance
+// (THINKING_HEADROOM in models.js) and the largest body is the debate synthesis:
+// a 3,500-token answer plus the 8,000 `high` effort allowance.
+export const MAX_TOKENS_CEILING = 12000;
 const MAX_BODY_BYTES     = 512 * 1024;
 const MAX_SYSTEM_CHARS   = 60000;
 
@@ -85,10 +90,11 @@ const MAX_SYSTEM_CHARS   = 60000;
 // 250 leaves room for four or five debates alongside ordinary Next Plays and
 // Creative Studio use. The worst case it permits is bounded by the same controls
 // that always bounded it: MAX_TOKENS_CEILING caps output per call, so 250 calls
-// at 4,000 output tokens on the dearest model in the catalogue (Fable 5.1,
-// $50/MTok out) is roughly $50/hour/IP of output plus input — survivable for a
-// single-operator deployment, and the figure to revisit before this serves
-// clients directly.
+// at 12,000 output tokens on the dearest model in the catalogue (Fable 5.1,
+// $50/MTok out) is roughly $150/hour/IP of output plus input. That is a
+// ceiling nothing reaches — a typical call spends a fraction of its allowance,
+// and the daily global cap below binds long before — but it is the figure to
+// revisit before this serves clients directly.
 //
 // Note this is per IP, so a team behind one office NAT shares one budget. That is
 // the honest limit of IP-based limiting and the reason the "Proxy authentication"
@@ -182,6 +188,11 @@ export default async function handler(req, res) {
     return res.status(200).json(adapter.fromResponse(data));
   } catch (err) {
     console.error("Proxy error:", entry.provider, err);
+    // A timeout is not a broken provider, and saying "request failed" sends the
+    // operator hunting for a fault that is not there. Name it.
+    if (err?.name === "TimeoutError") {
+      return res.status(504).json({ error: `The model took longer than ${UPSTREAM_TIMEOUT_MS / 1000}s to answer and the request was stopped. Try again, or route this feature to a faster model in the admin console.` });
+    }
     return res.status(502).json({ error: "Upstream request failed" });
   }
 }

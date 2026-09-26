@@ -6,7 +6,8 @@ import { fmtDate } from "../constants.js";
 import { resolveSchema, buildNameSet, templateFor, listChannels, listLevels, suggestTrackingTag, NA } from "../services/naming.js";
 import { callCreativeBrief } from "../services/ai/callCreativeBrief.js";
 import { callCreativeVariants } from "../services/ai/callCreativeVariants.js";
-import { callGenerateImage, buildImagePrompt, IMAGE_ASPECTS } from "../services/ai/callGenerateImage.js";
+import { callGenerateImage, buildImagePrompt, angleAsVariant, IMAGE_ASPECTS } from "../services/ai/callGenerateImage.js";
+import { modelsFor } from "../services/ai/registry.js";
 import {
   callGenerateVideo, pollVideoJob, buildVideoScript, VIDEO_TIERS, VIDEO_TIER_LIST,
   estimateSpokenSeconds, estimateVideoCostUsd, VIDEO_POLL_INTERVAL_MS, VIDEO_POLL_TIMEOUT_MS,
@@ -20,7 +21,7 @@ import {
   SCENE_ASPECTS, SCENE_DURATIONS, DEFAULT_SCENE_DURATION,
   SCENE_POLL_INTERVAL_MS, SCENE_POLL_TIMEOUT_MS,
 } from "../services/ai/callGenerateScene.js";
-import { mkAssetRecord, currentRoundAssets, imageCostUsd, costForInitiative } from "../services/assets.js";
+import { mkAssetRecord, currentRoundAssets, currentAngleFrames, angleSlot, imageCostUsd, costForInitiative } from "../services/assets.js";
 import { putAsset, getAssetUrl, readAssetBytes, probeDurableStorage, durableUnavailableReason } from "../services/assetStore.js";
 import { buildCreativeEvidence } from "../services/creativeEvidence.js";
 
@@ -29,6 +30,12 @@ import { buildCreativeEvidence } from "../services/creativeEvidence.js";
 const MAX_REFERENCE_IMAGES = 3;
 
 const usd = n => "$" + n.toFixed(2);
+
+// The image models the studio can pick between, straight from the catalogue the
+// image endpoint's allowlist agrees with (see image.test.js). The label drops the
+// parenthesised model name — "Nano Banana Pro" is what the picker needs to say.
+const IMAGE_MODEL_OPTIONS = modelsFor("image");
+const shortModelLabel = m => m.label.replace(/\s*\(.*\)\s*$/, "");
 const mmss = ms => {
   const s = Math.floor(ms / 1000);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -89,6 +96,10 @@ export function CreativeStudio({
   const [imgBusy, setImgBusy]   = useState(null);   // variantIdx currently generating
   const [imgErr, setImgErr]     = useState({});     // {variantIdx: message}
   const [aspect, setAspect]     = useState("4:5");
+  // Per session, not per deployment. The `image` routing group sets the default
+  // for everyone; this lets one operator reach for the Pro tier on the frame
+  // that will actually be shown, without repointing the group for every visitor.
+  const [imgModel, setImgModel] = useState(() => modelFor("image"));
   const [promptPreview, setPromptPreview] = useState(null); // {idx, text}
   const [durableBytes, setDurableBytes] = useState(false);
 
@@ -341,6 +352,11 @@ export function CreativeStudio({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [assets, selId, record?.briefVersion, record?.variantsVersion]
   );
+  const angleFrames = useMemo(
+    () => currentAngleFrames(assets, { initiativeId: selId, briefVersion: round.briefVersion }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [assets, selId, record?.briefVersion]
+  );
 
   /** Brand reference images, resolved to base64 for the image proxy. Absent when
    *  the brand has none, which is the ordinary case before anyone uploads one. */
@@ -360,13 +376,13 @@ export function CreativeStudio({
     try {
       const references = await loadReferences();
       const prompt = buildImagePrompt(brief, variant, brand, { referenceCount: references.length });
-      // No explicit model: the `image` feature group decides, so repointing image
-      // generation in the admin console reaches this button. It defaults to
-      // IMAGE_MODELS.FAST, which is what this call passed before routing existed.
+      // The model is the studio's picker, which starts on whatever the `image`
+      // routing group is pointed at — so repointing the group in the admin
+      // console still reaches this button's default.
       // `initiativeId` is what lands this generation's cost in the spend ledger
       // against the experiment that caused it, so a round of creative can be
       // costed alongside the revenue it is being judged on.
-      const img = await callGenerateImage({ prompt, aspectRatio: aspect, referenceImages: references, initiativeId: selId });
+      const img = await callGenerateImage({ prompt, model: imgModel, aspectRatio: aspect, referenceImages: references, initiativeId: selId });
 
       const name = nameFor(variant, idx);
       const stored = await putAsset({ mimeType: img.mimeType, data: img.data });
@@ -400,13 +416,58 @@ export function CreativeStudio({
     } finally { setImgBusy(null); }
   };
 
+  /**
+   * A concept frame straight from a brief angle — the image, one click after
+   * the brief, without producing variants first.
+   *
+   * Same prompt builder, same hard constraints and the same ledger as a variant
+   * frame; what it has no claim to is an ad name. It is a picture of an angle,
+   * not an asset that will run, so `adName` is recorded empty rather than
+   * invented — the ledger already reads "" as "not attributable".
+   */
+  const genAngleFrame = async (angle, angleIdx) => {
+    const slot = angleSlot(angleIdx);
+    setImgBusy(slot);
+    setImgErr(e => ({ ...e, [slot]: "" }));
+    try {
+      const references = await loadReferences();
+      const prompt = buildImagePrompt(brief, angleAsVariant(angle), brand, { referenceCount: references.length });
+      const img = await callGenerateImage({ prompt, model: imgModel, aspectRatio: aspect, referenceImages: references, initiativeId: selId });
+      const stored = await putAsset({ mimeType: img.mimeType, data: img.data });
+      const rec = mkAssetRecord({
+        kind: "image",
+        initiativeId: selId,
+        initId: sel.initId || sel.id,
+        brandId: sel.brandId || "default",
+        briefVersion: round.briefVersion,
+        variantsVersion: 0,
+        variantIdx: slot,
+        variantLabel: angle.label || "",
+        angleSlug: angle.slug || "",
+        adName: "",
+        channel,
+        model: img.model,
+        prompt,
+        aspect,
+        mimeType: img.mimeType,
+        costUsd: imageCostUsd(img.model),
+        storageKey: stored.storageKey,
+        bytesDurable: stored.durable,
+      });
+      onSaveAssets([rec, ...(assets || [])]);
+      const url = await getAssetUrl(rec);
+      if (url) setImgUrls(u => ({ ...u, [rec.id]: url }));
+    } catch (e) {
+      setImgErr(er => ({ ...er, [slot]: e.message || "Could not generate an image." }));
+    } finally { setImgBusy(null); }
+  };
+
   // Resolve URLs for assets from a previous session. A record whose bytes are
   // gone resolves to null and renders as a record without a picture, which is
   // the honest state rather than a broken image icon.
   useEffect(() => {
     let live = true;
-    const pending = Object.values(roundAssets)
-      .map(slot => slot.image)
+    const pending = [...Object.values(roundAssets).map(slot => slot.image), ...Object.values(angleFrames)]
       .filter(a => a && !imgUrls[a.id]);
     if (!pending.length) return;
     Promise.all(pending.map(async a => [a.id, await getAssetUrl(a)])).then(pairs => {
@@ -417,7 +478,7 @@ export function CreativeStudio({
     });
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roundAssets]);
+  }, [roundAssets, angleFrames]);
 
   // The two params a render submits beyond script/aspect, resolved per provider
   // rather than passed straight through — each provider reads a different id
@@ -639,16 +700,16 @@ export function CreativeStudio({
     }
   };
 
-  const downloadImage = (variant, idx) => {
-    const asset = roundAssets[idx]?.image;
+  const downloadAsset = (asset, label) => {
     const url = asset && imgUrls[asset.id];
     if (!url) return;
     const ext = (asset.mimeType || "image/png").split("/")[1] || "png";
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${(sel.initId || sel.id)}_${(variant.label || "variant").replace(/\s+/g, "-")}_${String(asset.aspect || "").replace(":", "x")}.${ext}`;
+    a.download = `${(sel.initId || sel.id)}_${(label || "variant").replace(/\s+/g, "-")}_${String(asset.aspect || "").replace(":", "x")}.${ext}`;
     a.click();
   };
+  const downloadImage = (variant, idx) => downloadAsset(roundAssets[idx]?.image, variant.label);
 
   const assignTag = () => {
     const suggested = suggestTrackingTag(sel, schema);
@@ -694,6 +755,27 @@ export function CreativeStudio({
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  // Frame and model, shared by concept frames and variant frames. Rendered in
+  // the variants header once variants exist, and above the angles until then,
+  // so there is always exactly one copy on screen.
+  const imageControls = (
+    <>
+      <label style={{ fontSize: 12, color: t.textSub }}>Frame</label>
+      <select value={aspect} onChange={e => setAspect(e.target.value)} style={{ ...gSl(t), width: 132, padding: "6px 8px" }}>
+        {IMAGE_ASPECTS.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}
+      </select>
+      <label style={{ fontSize: 12, color: t.textSub }}>Image model</label>
+      <select value={imgModel} onChange={e => setImgModel(e.target.value)} style={{ ...gSl(t), width: 196, padding: "6px 8px" }}
+        title={IMAGE_MODEL_OPTIONS.find(m => m.id === imgModel)?.blurb}>
+        {IMAGE_MODEL_OPTIONS.map(m => (
+          <option key={m.id} value={m.id}>
+            {shortModelLabel(m)}{m.price?.perImageUsd != null ? ` · ${usd(m.price.perImageUsd)}` : ""}
+          </option>
+        ))}
+      </select>
+    </>
+  );
 
   return (
     <div style={{ maxWidth: 1180, margin: "0 auto", padding: "0 20px 60px" }}>
@@ -791,7 +873,12 @@ export function CreativeStudio({
                 </StatBlock>
               )}
 
-              <div style={{ ...gSL(t), marginTop: 4 }}>Angles to test</div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 4, marginBottom: 8 }}>
+                <div style={{ ...gSL(t), marginBottom: 0 }}>Angles to test</div>
+                {variants.length === 0 && (
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>{imageControls}</div>
+                )}
+              </div>
               <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit,minmax(250px,1fr))", marginBottom: 16 }}>
                 {(brief.angles || []).map((a, i) => (
                   <div key={i} style={{ background: t.surfaceAlt, border: "1px solid " + t.border, borderRadius: 11, padding: "12px 14px" }}>
@@ -804,6 +891,43 @@ export function CreativeStudio({
                         <span style={{ ...gSL(t), display: "inline", marginRight: 6 }}>First 3s</span>{a.openingBeat}
                       </div>
                     )}
+
+                    {/* Concept frame: the image, straight from the brief. */}
+                    {(() => {
+                      const slot = angleSlot(i);
+                      const frame = angleFrames[i] || null;
+                      const url = frame ? imgUrls[frame.id] : null;
+                      return (
+                        <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid " + t.borderSoft }}>
+                          {url && (
+                            <img src={url} alt={"Concept frame for " + (a.label || a.slug)}
+                              style={{ width: "100%", borderRadius: 8, border: "1px solid " + t.border, display: "block", marginBottom: 8 }}/>
+                          )}
+                          {frame && !url && (
+                            <div style={{ fontSize: 11.5, color: t.textMuted, fontFamily: t.serif, lineHeight: 1.5, marginBottom: 8 }}>
+                              Generated {fmtDate(frame.createdAt, settings)}; the image is no longer held. Regenerate to get it back.
+                            </div>
+                          )}
+                          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                            <button onClick={() => genAngleFrame(a, i)} disabled={imgBusy !== null}
+                              style={{ ...(frame ? gGh(t) : gG(t)), padding: "5px 11px", fontSize: 11.5, opacity: imgBusy !== null ? 0.55 : 1 }}>
+                              {imgBusy === slot ? "Generating…" : frame ? "Regenerate frame" : "Generate frame"}
+                            </button>
+                            {url && (
+                              <button onClick={() => downloadAsset(frame, a.slug || a.label)} style={{ ...gGh(t), padding: "5px 9px", fontSize: 11 }}>Download</button>
+                            )}
+                            {frame && (
+                              <span style={{ fontSize: 10.5, color: t.textMuted, fontFamily: t.sans }}>
+                                {frame.aspect} · {frame.costUsd != null ? usd(frame.costUsd) : "cost not recorded"}
+                              </span>
+                            )}
+                          </div>
+                          {imgErr[slot] && (
+                            <div style={{ marginTop: 7, fontSize: 11.5, color: t.red, lineHeight: 1.5 }}>{imgErr[slot]}</div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 ))}
               </div>
@@ -872,10 +996,7 @@ export function CreativeStudio({
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
             <div style={{ ...gSL(t), marginBottom: 0 }}>Variants</div>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-              <label style={{ fontSize: 12, color: t.textSub }}>Frame</label>
-              <select value={aspect} onChange={e => setAspect(e.target.value)} style={{ ...gSl(t), width: 132, padding: "6px 8px" }}>
-                {IMAGE_ASPECTS.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}
-              </select>
+              {variants.length > 0 && imageControls}
               <label style={{ fontSize: 12, color: t.textSub }}>Video</label>
               <select value={tierKey} onChange={e => setTierKey(e.target.value)} style={{ ...gSl(t), width: 178, padding: "6px 8px" }}
                 title={VIDEO_TIERS[tierKey].blurb}>

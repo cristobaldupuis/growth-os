@@ -111,12 +111,19 @@ export async function callCreativeVariants(brief, initiative, brand, schema, opt
     "INITIATIVE: " + (initiative.title || "untitled") + " — " + (initiative.hypothesis || "no hypothesis recorded"),
   ].join("\n");
 
+  // Sized to what was asked for. A fixed 3,400 fit two variants per angle and
+  // truncated at three: a brief carries up to four angles, and each variant
+  // (hook, 3-5 script beats, CTA, rationale, naming segments) runs to roughly
+  // 300 tokens of JSON.
+  const angleCount = Math.min(4, Math.max(1, (brief.angles || []).length));
+  const maxTokens = 800 + angleCount * perAngle * 350;
+
   const data = await postProxy({
     group:"creative", fn:"callCreativeVariants",
     // Attributed to the initiative, so the cost of producing a round of creative
     // lands in the same place as the revenue the round is being judged on.
     initiativeId: initiative?.id || null,
-    body:{ ...buildRequest({ model:modelFor("creative", modelOverride), maxTokens:3400, system:sys, effort:EFFORT.LOW, format:creativeVariantsFormat(fillable.map(d => d.key)) }),
+    body:{ ...buildRequest({ model:modelFor("creative", modelOverride), maxTokens, system:sys, effort:EFFORT.LOW, format:creativeVariantsFormat(fillable.map(d => d.key)) }),
       messages:[{ role:"user", content:user }] },
   });
   return unwrap(parseStructured(data, { label: "Creative variants" }));

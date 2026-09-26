@@ -14,7 +14,8 @@
 //
 // Run with: node src/services/ai/models.test.js
 import assert from "node:assert/strict";
-import { MODELS, EFFORT, buildRequest, capabilitiesFor, modelFor, applyRouting, currentRouting, agentToolFields } from "./models.js";
+import { MODELS, EFFORT, THINKING_HEADROOM, buildRequest, capabilitiesFor, modelFor, applyRouting, currentRouting, agentToolFields } from "./models.js";
+import { MAX_TOKENS_CEILING } from "../../../api/proxy.js";
 import { agentTurnRequest } from "./debatePrompts.js";
 import { DEFAULT_ROUTING } from "./registry.js";
 
@@ -47,6 +48,23 @@ test("reasoning tier keeps adaptive thinking and effort", () => {
 test("reasoning tier defaults to low effort when none is given", () => {
   const body = buildRequest({ model: MODELS.REASONING, maxTokens: 600, system: "s" });
   assert.deepEqual(body.output_config, { effort: "low" });
+});
+
+// -- Thinking headroom ---------------------------------------------------------
+//
+// The creative brief shipped with max_tokens 2600 at effort high and came back
+// cut off every time: thinking spent the ceiling before the JSON finished.
+
+test("a thinking model gets its effort's thinking allowance on top of the answer budget", () => {
+  for (const [key, level] of [["LOW", "low"], ["MEDIUM", "medium"], ["HIGH", "high"]]) {
+    const body = buildRequest({ model: MODELS.REASONING, maxTokens: 2600, system: "s", effort: EFFORT[key] });
+    assert.equal(body.max_tokens, 2600 + THINKING_HEADROOM[level], `effort ${level}`);
+  }
+});
+
+test("a model that does not think keeps exactly the answer budget", () => {
+  const body = buildRequest({ model: MODELS.STRUCTURED, maxTokens: 600, system: "s", effort: EFFORT.HIGH });
+  assert.equal(body.max_tokens, 600);
 });
 
 // -- Guard against adding a model without declaring what it supports ----------
@@ -91,10 +109,11 @@ test("body satisfies the proxy's validation contract", () => {
   // api/proxy.js rejects anything outside these bounds, so a mismatch between the
   // builder and the proxy would break every AI call in production while passing
   // every local check.
-  const MAX_TOKENS_CEILING = 4000;
   for (const model of Object.values(MODELS)) {
+    // The largest answer budget any call site asks for, at the largest thinking
+    // allowance — the debate synthesis.
     const body = buildRequest({
-      model, maxTokens: 3500, system: "s", messages: [{ role: "user", content: "hi" }],
+      model, maxTokens: 3500, effort: EFFORT.HIGH, system: "s", messages: [{ role: "user", content: "hi" }],
     });
     assert.ok(Number.isInteger(body.max_tokens) && body.max_tokens > 0, "max_tokens must be a positive integer");
     assert.ok(body.max_tokens <= MAX_TOKENS_CEILING, `max_tokens must stay under the proxy ceiling for ${model}`);

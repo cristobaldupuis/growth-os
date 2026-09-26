@@ -95,6 +95,22 @@ export function buildImagePrompt(brief, variant, brand, opts = {}) {
 }
 
 /**
+ * A brief angle in the shape buildImagePrompt reads a variant in.
+ *
+ * What lets a frame be made straight from the brief, before any variants exist.
+ * The angle already carries what a variant would: `openingBeat` is literally the
+ * first three seconds, and `execution` is the shooting direction the operator
+ * reviewed. The prompt stays assembled from approved work — no free text enters
+ * it here either.
+ */
+export function angleAsVariant(angle) {
+  return {
+    openingBeat: angle?.openingBeat || angle?.execution || "",
+    varies: [angle?.label, angle?.execution].filter(Boolean).join(" — "),
+  };
+}
+
+/**
  * Generate one image. Resolves to `{ mimeType, data }` where `data` is base64.
  *
  * The caller is responsible for not persisting the result — see the note in

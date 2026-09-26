@@ -152,10 +152,30 @@ export function capabilitiesFor(model) {
 // and candidate generation (which has to find non-obvious plays across the whole
 // portfolio). Everything else runs `low` — enough for a well-specified
 // transformation, and materially cheaper and faster than the default.
+//
+// `medium` sits between them for a call that has to weigh evidence but runs on
+// a request path someone is watching: the creative brief. At `high` its
+// thinking alone could run past what one 60s function can wait for.
 export const EFFORT = {
   HIGH: { effort: "high" },
+  MEDIUM: { effort: "medium" },
   LOW: { effort: "low" },
 };
+
+// ## Thinking spends from the same `max_tokens` as the answer
+//
+// Every call site's `maxTokens` was sized for the visible answer, before
+// adaptive thinking was switched on. But `max_tokens` is one hard ceiling over
+// thinking AND answer together, so a model that reasoned for 2,000 tokens had
+// 600 left for a JSON object that needed 1,800 — and the brief came back cut off
+// at `stop_reason: "max_tokens"`, every time, with the money already spent.
+//
+// So call sites keep stating the size of the ANSWER, which is the number they
+// can actually reason about, and buildRequest adds a thinking allowance on top
+// for a model that thinks. Sized by effort because effort is what sets how much
+// thinking to expect. Unused headroom costs nothing: output is billed on tokens
+// generated, not on the ceiling.
+export const THINKING_HEADROOM = { low: 2000, medium: 4000, high: 8000 };
 
 /**
  * Build a Messages API request body.
@@ -190,9 +210,12 @@ export const EFFORT = {
  */
 export function buildRequest({ model, system, messages, maxTokens, effort, tools, cacheSystem, cacheMessages, format }) {
   const caps = capabilitiesFor(model);
+  const level = (effort || EFFORT.LOW).effort;
   const body = {
     model,
-    max_tokens: maxTokens,
+    // `maxTokens` is the answer's budget; a thinking model gets its reasoning
+    // allowance on top. See THINKING_HEADROOM.
+    max_tokens: caps.adaptiveThinking ? maxTokens + (THINKING_HEADROOM[level] ?? THINKING_HEADROOM.high) : maxTokens,
   };
   // Both of these are gated on the model, not on the caller's intent. A tier that
   // can't think adaptively also shouldn't be asked to — these calls are

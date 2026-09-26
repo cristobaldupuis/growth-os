@@ -83,12 +83,25 @@ export function geminiNotConfiguredError() {
     : "Gemini is not configured. Set GEMINI_API_KEY, or GCP_PROJECT_ID + GCP_LOCATION + GOOGLE_APPLICATION_CREDENTIALS for Vertex.";
 }
 
+/**
+ * The Vertex host for a location.
+ *
+ * Regional endpoints carry the region as a prefix (`us-central1-aiplatform…`);
+ * the global endpoint does not. `global-aiplatform.googleapis.com` does not
+ * resolve, and `global` is not an exotic setting: preview models — Nano Banana
+ * Pro among them — are typically served from the global location only, so a
+ * deployment set up to reach them could reach nothing at all.
+ */
+export function vertexHost(location = process.env.GCP_LOCATION) {
+  return location === "global" ? "aiplatform.googleapis.com" : `${location}-aiplatform.googleapis.com`;
+}
+
 /** The upstream generateContent URL for the active mode. Both shapes end in `models/{id}:generateContent`. */
 export function geminiEndpoint(model, method = "generateContent") {
   if (geminiAuthMode() === "vertex") {
     const project = process.env.GCP_PROJECT_ID;
     const location = process.env.GCP_LOCATION;
-    return `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${model}:${method}`;
+    return `https://${vertexHost(location)}/v1/projects/${project}/locations/${location}/publishers/google/models/${model}:${method}`;
   }
   return `${GEMINI_API}/${model}:${method}`;
 }

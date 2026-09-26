@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   mkAssetRecord, variantKey, currentRoundAssets, costForInitiative,
   costByInitiative, orphanedAssets, assetsForInitiative, imageCostUsd,
+  angleSlot, currentAngleFrames,
 } from "./assets.js";
 
 const base = {
@@ -122,4 +123,23 @@ test("the prompt and model are frozen onto the record", () => {
   assert.equal(a.prompt, "a specific prompt");
   assert.equal(a.model, "gemini-3-pro-image-preview");
   assert.equal(a.costBasis, "estimate");
+});
+
+// -- Concept frames, generated from a brief angle before any variants exist ----
+
+test("a concept frame is found by its angle and never appears as a variant frame", () => {
+  const frame = mkAssetRecord({ ...base, variantsVersion: 0, variantIdx: angleSlot(2), adName: "" });
+  const variant = mkAssetRecord({ ...base, briefVersion: 1, variantsVersion: 1, variantIdx: 2 });
+  const angles = currentAngleFrames([frame, variant], { initiativeId: "e01", briefVersion: 1 });
+  assert.deepEqual(Object.keys(angles), ["2"]);
+  assert.equal(angles[2].id, frame.id);
+  const round = currentRoundAssets([frame, variant], { initiativeId: "e01", briefVersion: 1, variantsVersion: 1 });
+  assert.equal(round[2].image.id, variant.id);
+  assert.equal(round[angleSlot(2)], undefined);
+});
+
+test("a regenerated brief leaves the old concept frames in the ledger but not current", () => {
+  const old = mkAssetRecord({ ...base, briefVersion: 1, variantsVersion: 0, variantIdx: angleSlot(0) });
+  assert.deepEqual(currentAngleFrames([old], { initiativeId: "e01", briefVersion: 2 }), {});
+  assert.equal(costForInitiative([old], "e01").count, 1);
 });

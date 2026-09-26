@@ -15,7 +15,7 @@
 //
 // Run with: node src/services/ai/requests.test.js
 import assert from "node:assert/strict";
-import { validateBody, ALLOWED_MODELS } from "../../../api/proxy.js";
+import { validateBody, ALLOWED_MODELS, MAX_TOKENS_CEILING } from "../../../api/proxy.js";
 import { capabilitiesFor, modelFor } from "./models.js";
 import { GROUP_KEYS, FEATURE_GROUPS, DEFAULT_ROUTING } from "./registry.js";
 
@@ -154,7 +154,7 @@ for (const [label, invoke] of CASES) {
 await test("no call site exceeds the proxy max_tokens ceiling", async () => {
   for (const [label, invoke] of CASES) {
     for (const b of await capture(invoke)) {
-      assert.ok(b.max_tokens <= 4000, `${label} requests ${b.max_tokens} tokens, over the proxy ceiling`);
+      assert.ok(b.max_tokens <= MAX_TOKENS_CEILING, `${label} requests ${b.max_tokens} tokens, over the proxy ceiling`);
     }
   }
 });

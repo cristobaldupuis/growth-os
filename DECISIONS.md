@@ -1299,3 +1299,35 @@ each view is touched.
 **Forcing condition.** A brand requirement for a different accent. Change the
 `gold*` values in `TL`/`TD` in `src/constants.js` and run `npm run
 check:contrast`; nothing else needs to move.
+
+---
+
+## A call site states its answer's size; the builder adds room to think
+
+**Decision.** `maxTokens` at every call site is the budget for the visible
+answer. `buildRequest` adds a thinking allowance on top for any model that
+thinks adaptively (`THINKING_HEADROOM` in `models.js`: 2,000 at `low`, 4,000 at
+`medium`, 8,000 at `high`), and the proxy's `MAX_TOKENS_CEILING` rose from
+4,000 to 12,000 to admit it. The creative brief moved from `high` to a new
+`medium` effort, and the variants call sizes its budget by how many variants it
+was asked for.
+
+**Why.** Every budget was set before adaptive thinking was switched on, and
+`max_tokens` is one ceiling over thinking and answer together. The brief ran at
+`high` with 2,600 tokens and came back `stop_reason: "max_tokens"` on every
+run: the reasoning spent the ceiling before the JSON finished, and the call was
+billed anyway. Fixing it in the builder rather than at each call site reaches
+the server-side debate too, and keeps each call site's number something its
+author can reason about. Unused headroom costs nothing; output is billed on
+tokens generated.
+
+**What it does not do.** It does not change the 55s upstream timeout or the 60s
+function limit. A call that now has room to think can take longer, which is why
+the brief dropped to `medium`; a timeout is reported as a 504 that says so
+rather than as "request failed". Gemini and OpenAI reasoning models also spend
+thinking from their output limit, but their catalogue ids are unverified and do
+not get the allowance until someone confirms them.
+
+**Forcing condition.** A 504 from the proxy on a `high` effort call (the debate
+synthesis or Next Plays) in production. Then either raise `maxDuration` for
+`api/proxy.js` (Fluid compute allows up to 300s) or lower that call's effort.

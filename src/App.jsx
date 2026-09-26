@@ -1794,8 +1794,11 @@ export default function App() {
         +"@media(max-width:900px){.gos-rail{display:none}.gos-burger{display:flex}}"
         // Two-up grids fold to one column on a phone. Applied where a
         // `1fr 1fr` was previously unconditional.
-        +"@media(max-width:640px){.gos-grid-2,.gos-grid-3{grid-template-columns:1fr !important}}"
-        +"@media(min-width:641px) and (max-width:900px){.gos-grid-3{grid-template-columns:1fr 1fr !important}}"
+        // `minmax(0,1fr)`, not `1fr`: a bare 1fr track has an automatic minimum,
+        // so one long unwrapped title (an initiative name in Needs attention)
+        // widened the column past the screen and the card was clipped.
+        +"@media(max-width:640px){.gos-grid-2,.gos-grid-3{grid-template-columns:minmax(0,1fr) !important}}"
+        +"@media(min-width:641px) and (max-width:900px){.gos-grid-3{grid-template-columns:minmax(0,1fr) minmax(0,1fr) !important}}"
         // Filter rows: let every control take a full row rather than wrapping
         // into a ragged stack of half-width selects.
         +"@media(max-width:640px){.gos-filters{flex-direction:column;align-items:stretch !important}.gos-filters>*{width:100%}.gos-filters select,.gos-filters input{min-width:0 !important;width:100% !important}}"
@@ -2183,7 +2186,7 @@ export default function App() {
         // Refused before the call, not at the save: a viewer's recommendations
         // could never be kept, so generating them would be spend for nothing.
         if (!viewOnly()) generateRecommendations();
-      }} onOpenRec={(batchId,recId)=>setShowRecModal({batchId,recId})} onOpenItem={(id)=>goDetail(id,"dashboard")} showToast={showToast} onSaveItems={saveItems}/>}
+      }} onOpenRec={(batchId,recId)=>setShowRecModal({batchId,recId})} onOpenItem={(id)=>goDetail(id,"dashboard")} onNav={requestNav} showToast={showToast} onSaveItems={saveItems}/>}
       {nav==="triage"&&<TriageView items={items} t={t} dk={dk} cats={cats} brands={brands} activeBrand={activeBrand} onDetail={(id)=>goDetail(id,"triage")}
         onLogResults={(id)=>{const it=items.find(e=>e.id===id); if(it){setSelId(id); setRForm(it.results?{...it.results,actualRevenueImpact:it.results.actualRevenueImpact!=null?it.results.actualRevenueImpact:"",actualSpendCost:it.results.actualSpendCost!=null?it.results.actualSpendCost:"",actualResourceCost:it.results.actualResourceCost!=null?it.results.actualResourceCost:""}:{actualOutcome:"",keyLearning:"",outcomeClassification:"Success",decisionMade:"",outcomeCertainty:75,actualRevenueImpact:"",actualSpendCost:"",actualResourceCost:""}); setShowR(true);}}}
         onExtend={(id,days)=>{saveItems(items.map(e=>{if(e.id!==id)return e; const base=e.endDate?new Date(e.endDate+"T12:00:00"):new Date(); base.setDate(base.getDate()+days); return {...e,endDate:base.toISOString().slice(0,10)};})); showToast("Extended "+days+" days.","success");}}
@@ -2228,16 +2231,27 @@ export default function App() {
       )}
 
       {nav==="initiatives"&&(
-        <div style={{padding:"16px 20px"}}>
+        <div style={{padding:"24px 32px 40px"}}>
           <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
-            <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+            {/* Status filter. Several can be on at once, so each active chip
+              * carries a check: the tray reads like a segmented control, and the
+              * check is what says it is not a pick-one. Neutral on purpose, the
+              * accent is for actions, and two filled accent chips used to read
+              * as two primary buttons. */}
+            <div role="group" aria-label="Status" style={{display:"inline-flex",alignSelf:"flex-start",gap:2,flexWrap:"wrap",padding:3,borderRadius:t.r.md,background:t.borderSoft}}>
               {["All",...STATUSES].map(s=>{
                 const active = s==="All" ? fSt.size===STATUSES.length : fSt.has(s);
+                const n = s==="All" ? items.length : items.filter(e=>e.status===s).length;
                 return (
-                  <button key={s} onClick={()=>{
+                  <button key={s} aria-pressed={active} className="gos-nav" onClick={()=>{
                     if(s==="All") setFSt(new Set(STATUSES));
                     else setFSt(prev=>{const next=new Set(prev); if(next.has(s)) next.delete(s); else next.add(s); return next;});
-                  }} style={{fontSize:12,padding:"4px 10px",borderRadius:4,cursor:"pointer",fontFamily:t.serif,background:active?t.gold:"transparent",border:"1px solid "+(active?t.gold:t.border),color:active?t.goldText:t.textMuted}}>{s}</button>
+                  }} style={{"--gos-hover-bg":active?t.surface:t.surfaceAlt,display:"inline-flex",alignItems:"center",gap:6,fontSize:13,fontWeight:500,padding:"5px 12px",borderRadius:t.r.sm,cursor:"pointer",fontFamily:t.sans,border:"none",
+                    background:active?t.surface:"transparent",boxShadow:active?t.shadow:"none",color:active?t.text:t.textMuted,transition:"background-color .15s ease, color .15s ease"}}>
+                    {active && s!=="All" && <IconCheck size={12}/>}
+                    {s}
+                    <span style={{fontSize:12,color:t.textMuted,fontWeight:400}}>{n}</span>
+                  </button>
                 );
               })}
             </div>

@@ -8,12 +8,17 @@ import { Spark } from "../components/Spark.jsx";
 import { WeeklyStandupModal } from "../components/WeeklyStandupModal.jsx";
 import { buildCrossBrandTransfers } from "../services/portfolio.js";
 import { renderProse } from "../components/text.jsx";
+import { navName } from "../components/navSections.js";
 import { IconImport, IconPlus, IconChart, IconAlert, IconChevronDown, IconChevronRight, IconCopy, IconSparkle, IconSpinner, IconDiamond, IconTrendUp, IconTrendDown, IconCheck, IconClose } from "../components/icons.jsx";
 
 // -- Weekly Pulse --------------------------------------------------------------
 function WeeklyPulseSection({t, brands, weeklyMetrics, onLog, onImport}) {
   const [expanded, setExpanded] = useState(true);
   const [revHi, setRevHi] = useState(null);
+  // Column sort. Null keeps the brands in their configured order, which is the
+  // order an operator already knows them in; a header click sorts, a second
+  // reverses, a third returns to that order.
+  const [sort, setSort] = useState(null); // { key, dir: 1 | -1 }
 
   const now = new Date();
 
@@ -60,6 +65,33 @@ function WeeklyPulseSection({t, brands, weeklyMetrics, onLog, onImport}) {
       revDelta: delta("revenue"),
       roasDelta: delta("roas"),
     };
+  });
+
+  const COLS = [
+    { key:"brand",   label:"Brand" },
+    { key:"date",    label:"Date" },
+    { key:"source",  label:"Source" },
+    { key:"revenue", label:"Revenue", num:true },
+    { key:"spend",   label:"Spend",   num:true },
+    { key:"roas",    label:"ROAS",    num:true },
+    { key:"cvr",     label:"CVR",     num:true },
+  ];
+  const cycleSort = (col) => setSort(cur => {
+    // Numbers open largest-first, text A–Z: the first click answers "which is
+    // biggest" or "find by name", whichever the column is for.
+    const first = col.num ? -1 : 1;
+    if (!cur || cur.key !== col.key) return { key: col.key, dir: first };
+    if (cur.dir === first) return { key: col.key, dir: -first };
+    return null;
+  });
+  // Rows with no value for the sorted column sink to the bottom in either
+  // direction, so reversing a sort never floats a row of em dashes to the top.
+  const sortedRows = !sort ? summaryRows : [...summaryRows].sort((a, b) => {
+    const va = a[sort.key], vb = b[sort.key];
+    const ea = va == null || va === "", eb = vb == null || vb === "";
+    if (ea || eb) return ea === eb ? 0 : ea ? 1 : -1;
+    const c = typeof va === "number" ? va - vb : String(va).localeCompare(String(vb));
+    return c * sort.dir;
   });
 
   // A brand with no logged week at all returns `{date:null, metrics:null}` above,
@@ -142,14 +174,27 @@ function WeeklyPulseSection({t, brands, weeklyMetrics, onLog, onImport}) {
                 <table style={{width:"100%",borderCollapse:"collapse",fontSize:13,fontFamily:t.sans}}>
                   <thead>
                     <tr style={{borderBottom:"1px solid "+t.borderSoft}}>
-                      {["Brand","Date","Source","Revenue","Spend","ROAS","CVR"].map(h=>(
-                        <th key={h} style={{textAlign:"left",padding:"8px 8px",color:t.textMuted,fontWeight:500,fontSize:12,whiteSpace:"nowrap"}}>{h}</th>
-                      ))}
+                      {COLS.map(col=>{
+                        const on = sort && sort.key===col.key;
+                        return (
+                          <th key={col.key} scope="col" aria-sort={on?(sort.dir===1?"ascending":"descending"):"none"}
+                            style={{textAlign:"left",padding:"4px 2px",fontWeight:500,fontSize:12,whiteSpace:"nowrap"}}>
+                            <button type="button" onClick={()=>cycleSort(col)} className="gos-nav"
+                              title={"Sort by "+col.label.toLowerCase()}
+                              style={{"--gos-hover-bg":t.borderSoft,display:"inline-flex",alignItems:"center",gap:4,padding:"4px 6px",border:"none",borderRadius:t.r.sm,background:"transparent",cursor:"pointer",fontFamily:t.sans,fontSize:12,fontWeight:500,color:on?t.text:t.textMuted}}>
+                              {col.label}
+                              <span aria-hidden="true" style={{display:"inline-flex",opacity:on?1:0.35,transform:on&&sort.dir===1?"rotate(180deg)":"none",transition:"transform .15s ease, opacity .15s ease"}}>
+                                <IconChevronDown size={11}/>
+                              </span>
+                            </button>
+                          </th>
+                        );
+                      })}
                     </tr>
                   </thead>
                   <tbody>
-                    {summaryRows.map((row,i)=>(
-                      <tr key={i} style={{borderBottom:"1px solid "+t.borderSoft,opacity:row.date?1:0.4}}>
+                    {sortedRows.map((row)=>(
+                      <tr key={row.brand} style={{borderBottom:"1px solid "+t.borderSoft,opacity:row.date?1:0.4}}>
                         <td style={{padding:"11px 8px",color:t.text,fontWeight:500,whiteSpace:"nowrap"}}>{row.brand}</td>
                         <td style={{padding:"11px 8px",color:t.textMuted,whiteSpace:"nowrap"}}>{row.date?fmtDate(row.date):"—"}</td>
                         <td style={{padding:"11px 8px",color:t.textMuted,whiteSpace:"nowrap"}}>
@@ -882,10 +927,12 @@ function NextPlaysCard({ t, recs, recsLoad, recsErr, items, onGenerate, onOpenRe
 // pitch is defensible measurement. It is "Measured impact" everywhere now, and
 // the sublabel says when it still contains an estimate.
 const PRIMARY_TILES = (dash) => [
-  { l:"Measured impact", v:fmtCur(dash.revImpacted), s:dash.revImpactedProjected?"completed · includes estimates":"completed · actuals", hero:true },
-  { l:"Revenue at risk",  v:fmtCur(dash.revAtRisk),  s:"running now" },
-  { l:"Win rate",         v:dash.winRate!==null?dash.winRate+"%":"—", s:dash.wins+"/"+dash.closed+" closed" },
-  { l:"Closed ROI",       v:dash.closedROI!==null?dash.closedROI+"x":"—", s:"actual revenue / cost" },
+  // `to` is the view that holds the work behind the number: closed results live
+  // in the Library, the running work that puts revenue at risk in Triage.
+  { l:"Measured impact", v:fmtCur(dash.revImpacted), s:dash.revImpactedProjected?"completed · includes estimates":"completed · actuals", hero:true, to:"library" },
+  { l:"Revenue at risk",  v:fmtCur(dash.revAtRisk),  s:"running now", to:"triage" },
+  { l:"Win rate",         v:dash.winRate!==null?dash.winRate+"%":"—", s:dash.wins+"/"+dash.closed+" closed", to:"library" },
+  { l:"Closed ROI",       v:dash.closedROI!==null?dash.closedROI+"x":"—", s:"actual revenue / cost", to:"library" },
 ];
 
 const SECONDARY_TILES = (dash) => [
@@ -898,22 +945,32 @@ const SECONDARY_TILES = (dash) => [
   { l:"Loonshots active", v:dash.loonshotShare!==null?dash.loonshotShare+"%":"—", s:dash.classifiedActiveCount+"/"+dash.activeCount+" classified" },
 ];
 
-function StatTile({ t, m, index, big }) {
-  const p = tile(t, t.goldFill, index);
+// A tile with a `to` and an `onNav` is a link to the view behind its number:
+// it renders as a button, tints on hover, and shows where it goes.
+function StatTile({ t, m, index, big, onNav }) {
+  const go = m.to && onNav;
+  const p = go ? interactive(t, null, { index }) : tile(t, t.goldFill, index);
+  const Tag = go ? "button" : "div";
   return (
-    <div className={p.className} style={{...p.style,
+    <Tag type={go ? "button" : undefined} onClick={go ? () => onNav(m.to) : undefined}
+      title={go ? "Open "+navName(m.to) : undefined}
+      className={p.className+(go?" gos-row":"")} style={{...p.style,
       background:t.surface,
       border:"1px solid "+t.border,
       borderRadius:t.r.lg,padding:big?"18px 20px":"14px 16px",boxShadow:t.shadow,
-      minHeight:big?104:96,display:"flex",flexDirection:"column"}}>
-      <div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,fontWeight:600,marginBottom:"auto",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>{m.l}</div>
+      minHeight:big?104:96,display:"flex",flexDirection:"column",
+      textAlign:"left",fontFamily:t.sans,cursor:go?"pointer":"default",width:"100%"}}>
+      <div style={{display:"flex",alignItems:"center",gap:6,width:"100%",marginBottom:"auto"}}>
+        <span style={{flex:1,minWidth:0,fontSize:12,color:t.textMuted,fontFamily:t.sans,fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{m.l}</span>
+        {go && <span className="gos-row-go" aria-hidden="true" style={{display:"flex",alignItems:"center",gap:3,fontSize:12,color:t.textFaint,whiteSpace:"nowrap"}}>{navName(m.to)}<IconChevronRight size={12}/></span>}
+      </div>
       <div style={{fontSize:big?28:t.fs.figure,fontWeight:600,color:m.v==="—"?t.textFaint:t.text,fontFamily:t.sans,lineHeight:1,letterSpacing:"-0.02em",marginTop:10}}>{m.v}</div>
       {m.s&&m.s!==" "&&<div style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,marginTop:8,whiteSpace:"nowrap"}}>{m.s}</div>}
-    </div>
+    </Tag>
   );
 }
 
-export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetrics,onLog,onImport,dRange,setDRange,cFrom,cTo,setCFrom,setCTo,onGo,recs,recsLoad,recsErr,items,onGenerateRecs,onOpenRec,onOpenItem,showToast,onSaveItems}) {
+export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetrics,onLog,onImport,dRange,setDRange,cFrom,cTo,setCFrom,setCTo,onGo,recs,recsLoad,recsErr,items,onGenerateRecs,onOpenRec,onOpenItem,onNav,showToast,onSaveItems}) {
   const maxCat  = Math.max(...Object.values(dash.catCounts),1);
   const maxType = Math.max(...Object.values(dash.typeCounts),1);
   const [showStandup, setShowStandup] = useState(false);
@@ -1196,7 +1253,7 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
         * click away and remembered per session. */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:10}}>
         {PRIMARY_TILES(dash).map((m,mi)=>(
-          <StatTile key={m.l} t={t} m={m} index={mi} big/>
+          <StatTile key={m.l} t={t} m={m} index={mi} big onNav={onNav}/>
         ))}
       </div>
 

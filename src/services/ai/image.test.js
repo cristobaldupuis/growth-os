@@ -12,7 +12,8 @@ import {
   ALLOWED_IMAGE_MODELS, ALLOWED_ASPECTS, MAX_PROMPT_CHARS,
   MAX_REFERENCE_IMAGES, ALLOWED_REFERENCE_MIME,
 } from "../../../api/image.js";
-import { buildImagePrompt, callGenerateImage, IMAGE_MODELS, IMAGE_ASPECTS } from "./callGenerateImage.js";
+import { buildImagePrompt, callGenerateImage, angleAsVariant, IMAGE_MODELS, IMAGE_ASPECTS } from "./callGenerateImage.js";
+import { modelsFor } from "./registry.js";
 
 const BRIEF = {
   insight: "Buyers distrust before-and-after imagery because they have been burned.",
@@ -210,4 +211,21 @@ test("a missing brand or sparse variant still yields a usable prompt", () => {
   const p = buildImagePrompt({ promise:"x" }, { label:"v" }, null);
   assert.ok(p.length > 0);
   assert.match(p, /the product in use/, "falls back rather than emitting an empty scene");
+});
+
+test("every image model the studio's picker offers is allowed by the endpoint", () => {
+  // CreativeStudio builds its model picker from modelsFor("image"); an entry the
+  // endpoint refuses would be selectable and fail on the first click.
+  for (const m of modelsFor("image")) assert.ok(ALLOWED_IMAGE_MODELS.has(m.id), m.id);
+});
+
+test("a frame straight from a brief angle is prompted from the angle's own direction", () => {
+  const brief = { insight: "i", promise: "p", proof: [], claimsToVerify: ["cures colds"] };
+  const angle = { slug: "TimeSaver", label: "Time saver", openingBeat: "Hand drops a pod into a mug", execution: "Handheld, one take" };
+  const prompt = buildImagePrompt(brief, angleAsVariant(angle), null);
+  assert.match(prompt, /Hand drops a pod into a mug/);
+  assert.match(prompt, /Time saver — Handheld, one take/);
+  // The hard constraints travel with it: an angle frame is no looser than a variant's.
+  assert.match(prompt, /No text, words, letters/);
+  assert.match(prompt, /cures colds/);
 });

@@ -69,6 +69,9 @@ export async function proxyError(res) {
   if (res.status === 429) return "Rate limit reached. Wait a few minutes and try again.";
   if (res.status === 403) return "This deployment is not authorised to call the AI proxy.";
   if (res.status === 503) return "AI is temporarily unavailable. Try again shortly.";
+  // The proxy names its own timeout; the platform's (a function killed at its
+  // maxDuration) arrives as a non-JSON body, so it needs saying here.
+  if (res.status === 504) return detail || "The model took too long to answer and the request was stopped. Try again.";
   return detail || `AI request failed (${res.status}).`;
 }
 

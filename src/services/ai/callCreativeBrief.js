@@ -18,6 +18,12 @@ import { selectLearnings, formatEvidenceBlock } from "../creativeEvidence.js";
 // blank template. Run it on the cheap tier and it produces a generic brief that
 // cites nothing, which is exactly the output the operator can already write.
 //
+// Effort is `medium`, not `high`. It ran at `high` with a 2,600-token ceiling and
+// was cut off on every run: thinking spends from the same ceiling as the answer,
+// and at `high` it spent most of it. buildRequest now adds the thinking
+// allowance on top of `maxTokens`; `medium` keeps the reasoning inside what one
+// 60s proxy call can wait for, which `high` with room to think did not reliably.
+//
 // The brief is deliberately structured around what would FALSIFY the creative
 // idea, not just what to make. A brief that can't be wrong can't teach you
 // anything, and the point of running creative through an experiment ledger is
@@ -123,7 +129,7 @@ export async function callCreativeBrief(initiative, brand, learningsIndex, setti
   const data = await postProxy({
     group:"creative", fn:"callCreativeBrief",
     initiativeId: initiative?.id || null,
-    body:{ ...buildRequest({ model:modelFor("creative", modelOverride), maxTokens:2600, system:sys, effort:EFFORT.HIGH, cacheSystem:true, format:CREATIVE_BRIEF_FORMAT }),
+    body:{ ...buildRequest({ model:modelFor("creative", modelOverride), maxTokens:3000, system:sys, effort:EFFORT.MEDIUM, cacheSystem:true, format:CREATIVE_BRIEF_FORMAT }),
       messages:[{ role:"user", content:user }] },
   });
   const parsed = parseStructured(data, { label: "The creative brief" });

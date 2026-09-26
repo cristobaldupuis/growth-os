@@ -1,13 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-  <!-- Marketers Lab. Gold ground, dark flask.
-       Replaces a purple lightning bolt (#863bff) that came in with the Vite
-       starter template — the same residue as the 1126px index.css — and shared
-       no colour with anything in this product. The tab icon is the most
-       persistent brand impression a web app has, and it was another product's. -->
-  <rect width="64" height="64" rx="14" fill="#C9A227"/>
-  <g fill="none" stroke="#1A1815" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M26 15v12L15.5 44.5A4 4 0 0 0 19 50.5h26a4 4 0 0 0 3.5-6L38 27V15"/>
-    <path d="M23 15h18"/>
+  <!-- Marketers Lab. The sidebar wordmark's tile, at tab size: the accent fill
+       (goldFill, #4F46E5) with IconFlask's own glyph in goldText white.
+       The gold-and-charcoal version outlived the palette it was drawn for — the
+       accent moved to indigo and the tab kept the old brand. Drawn from the
+       same path as src/components/icons.jsx so the two cannot drift apart in
+       shape, only in weight: the stroke is heavier here because a 1.6 line on
+       a 16px grid all but disappears when a browser draws the whole tile at
+       16px. -->
+  <rect width="64" height="64" rx="14" fill="#4F46E5"/>
+  <g transform="translate(8.8 8.8) scale(2.9)" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6.4 2.4v4L2.9 12a1.1 1.1 0 00.95 1.7h8.3A1.1 1.1 0 0013.1 12L9.6 6.4v-4"/>
+    <path d="M5.5 2.4h5M4.6 9.4h6.8"/>
   </g>
-  <path d="M20.6 38h22.8l4.9 8.2A3.2 3.2 0 0 1 45.6 51H18.4a3.2 3.2 0 0 1-2.7-4.8z" fill="#1A1815"/>
 </svg>

@@ -14,7 +14,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { generateKeyPairSync, createVerify } from "node:crypto";
 import {
-  geminiAuthMode, geminiConfigured, geminiNotConfiguredError, geminiEndpoint, geminiAuthHeaders, _internal,
+  geminiAuthMode, geminiConfigured, geminiNotConfiguredError, geminiEndpoint, geminiAuthHeaders, vertexHost, _internal,
 } from "./_geminiAuth.js";
 
 const { parseServiceAccount, buildAssertion, resetTokenCache } = _internal;
@@ -100,6 +100,15 @@ test("the vertex endpoint embeds project, location and model", () =>
     assert.equal(
       geminiEndpoint("gemini-3.1-pro"),
       "https://us-central1-aiplatform.googleapis.com/v1/projects/my-proj/locations/us-central1/publishers/google/models/gemini-3.1-pro:generateContent",
+    );
+  }));
+
+test("the vertex global location has no region prefix on its host", () =>
+  withEnv({ GEMINI_AUTH_MODE: "vertex", GCP_PROJECT_ID: "my-proj", GCP_LOCATION: "global" }, () => {
+    assert.equal(vertexHost(), "aiplatform.googleapis.com");
+    assert.equal(
+      geminiEndpoint("gemini-3-pro-image-preview"),
+      "https://aiplatform.googleapis.com/v1/projects/my-proj/locations/global/publishers/google/models/gemini-3-pro-image-preview:generateContent",
     );
   }));
 

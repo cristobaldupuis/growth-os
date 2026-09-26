@@ -34,7 +34,7 @@ import {
 import {
   MODEL_CATALOGUE, FEATURE_GROUPS, DEFAULT_ROUTING, validateRouting, resolveRouting, modelById,
 } from "../src/services/ai/registry.js";
-import { geminiConfigured, geminiAuthMode, geminiAuthHeaders } from "./_geminiAuth.js";
+import { geminiConfigured, geminiAuthMode, geminiAuthHeaders, vertexHost } from "./_geminiAuth.js";
 
 // Every upstream call is bounded below the function's own limit (function
 // maxDuration is 15s), so a provider that hangs becomes this endpoint's error
@@ -56,7 +56,7 @@ const MODEL_LIST_ENDPOINTS = {
     // so both url and headers branch on the active mode — see api/_geminiAuth.js
     // for what decides which side is active.
     url: () => geminiAuthMode() === "vertex"
-      ? `https://${process.env.GCP_LOCATION}-aiplatform.googleapis.com/v1/publishers/google/models`
+      ? `https://${vertexHost()}/v1/publishers/google/models`
       : `https://generativelanguage.googleapis.com/v1beta/models?key=${process.env.GEMINI_API_KEY}`,
     headers: () => geminiAuthMode() === "vertex" ? geminiAuthHeaders() : {},
     keyVar: "GEMINI_API_KEY",

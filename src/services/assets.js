@@ -160,6 +160,29 @@ export function currentRoundAssets(assets, { initiativeId, briefVersion, variant
 }
 
 /**
+ * The slot a concept frame occupies: one per brief angle, generated before any
+ * variants exist. Recorded at `variantsVersion: 0`, which a variant frame never
+ * carries (the first variant set is v1), and under a slot string a variant
+ * index can never equal — so the two kinds share the ledger without sharing keys.
+ */
+export const angleSlot = (angleIdx) => "angle-" + angleIdx;
+
+/** The newest concept frame per angle for one brief version, keyed by angle
+ *  index. The angle counterpart of currentRoundAssets. */
+export function currentAngleFrames(assets, { initiativeId, briefVersion }) {
+  const out = {};
+  (assets || []).forEach(a => {
+    if (a.kind !== "image" || a.initiativeId !== initiativeId) return;
+    if (a.briefVersion !== briefVersion || a.variantsVersion !== 0) return;
+    const m = /^angle-(\d+)$/.exec(String(a.variantIdx));
+    if (!m) return;
+    const i = Number(m[1]);
+    if (!out[i] || String(a.createdAt) > String(out[i].createdAt)) out[i] = a;
+  });
+  return out;
+}
+
+/**
  * Production cost per initiative.
  *
  * Kept separate from the revenue figures the calibration loop already computes,

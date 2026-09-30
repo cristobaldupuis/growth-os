@@ -135,6 +135,10 @@ export const contrastRatio = (a, b) => {
   const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
   return (hi + 0.05) / (lo + 0.05);
 };
+// The button colour when a brand has not set one. White: the button sits on the
+// dark scrim at the bottom of every format, where a dark default disappears.
+export const DEFAULT_ACCENT = "#ffffff";
+
 /** White or near-black, whichever reads better on `hex`. */
 export function textOn(hex) {
   return contrastRatio(hex, "#ffffff") >= contrastRatio(hex, "#111111") ? "#ffffff" : "#111111";
@@ -144,7 +148,7 @@ export function textOn(hex) {
  * Draw one static ad onto a 2D context sized `layout.W`×`layout.H`.
  * `image` and `logo` are anything drawImage accepts, with natural sizes given.
  */
-export function renderStaticAd(ctx, layout, { image, imageW, imageH, logo, logoW, logoH, accent = "#111111" }) {
+export function renderStaticAd(ctx, layout, { image, imageW, imageH, logo, logoW, logoH, accent = DEFAULT_ACCENT }) {
   const { W, H } = layout;
   ctx.fillStyle = "#111111";
   ctx.fillRect(0, 0, W, H);

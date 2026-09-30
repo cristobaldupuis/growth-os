@@ -25,12 +25,13 @@ const IconGrid = ({size=13}) => (
 );
 
 // -- Learning Library ---------------------------------------------------------
-export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onReplicate, onViewInitiative, settings, view="list", onView}) {
+export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onReplicate, onViewInitiative, onSynthesis, settings, view="list", onView}) {
   const [activeOutcomes, setActiveOutcomes] = useState(["Jackpot","Success"]);
   const [fCat,  setFCat]  = useState("All");
   const [fType, setFType] = useState("All");
   const [query, setQuery] = useState("");
   const [synthesis,    setSynthesis]    = useState("");
+  const [ideasSaved,   setIdeasSaved]   = useState(0);
   const [synthLoad,    setSynthLoad]    = useState(false);
   const [synthVisible, setSynthVisible] = useState(false);
   const [ask,        setAsk]        = useState("");
@@ -219,7 +220,7 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
         {filtered.length>=2&&(
           <button style={{...gGh(t),fontSize:11,padding:"4px 10px"}} disabled={synthLoad}
             onClick={async()=>{
-              setSynthLoad(true); setSynthVisible(true); setSynthesis("");
+              setSynthLoad(true); setSynthVisible(true); setSynthesis(""); setIdeasSaved(0);
               try {
                 const payload = filtered.filter(e=>{const c=confOf(e);return !c||c.level!=="retracted";}).map(e=>({
                   outcome: e.results.outcomeClassification,
@@ -230,6 +231,10 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
                 }));
                 const result = await callSynthesizeLearnings(payload, settings||{companyName:COMPANY_NAME,businessModel:BUSINESS_MODEL,northStarMetric:NORTH_STAR_METRIC,northStarCurrent:"n/a",northStarTarget:"n/a"});
                 setSynthesis(result);
+                // Its Do Next joins the dashboard's Test next list, credited to
+                // the library, rather than living only in this panel until the
+                // operator navigates away.
+                setIdeasSaved(onSynthesis ? onSynthesis(result) : 0);
               } catch { setSynthesis("Synthesis failed. Check your API key in Settings."); }
               setSynthLoad(false);
             }}>
@@ -248,7 +253,14 @@ export function LearningLibrary({items, t, dk, cats, brands, activeBrand, onRepl
           {synthLoad
             ?<div style={{fontSize:13,color:t.textMuted,fontFamily:t.serif}}>Analysing learnings…</div>
             :synthesis
-              ?<div style={{fontSize:13,color:t.textSub,lineHeight:1.8,whiteSpace:"pre-wrap",fontFamily:t.serif}}>{renderProse(synthesis)}</div>
+              ?<>
+                <div style={{fontSize:13,color:t.textSub,lineHeight:1.8,whiteSpace:"pre-wrap",fontFamily:t.serif}}>{renderProse(synthesis)}</div>
+                {ideasSaved > 0 && (
+                  <div style={{marginTop:10,fontSize:12,color:t.teal,fontFamily:t.sans}}>
+                    {ideasSaved} Do Next idea{ideasSaved === 1 ? "" : "s"} added to Test next on the Dashboard, alongside Next Plays and Signal AI.
+                  </div>
+                )}
+              </>
               :<div style={{fontSize:12,color:t.red,fontFamily:t.serif}}>Synthesis failed. Check that your API proxy is deployed and the API key is configured.</div>
           }
         </div>

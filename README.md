@@ -62,6 +62,44 @@ today's state: [docs/scope.md](./docs/scope.md).
 
 ## What's new
 
+- **Ads show the real product** — a brand now has products, imported from the
+  product's own page: paste its URL in `Settings → Retailers → Products` and the
+  server reads the structured data the store already publishes (JSON-LD, Open
+  Graph, Shopify's product JSON), then you review every field and pick up to two
+  images before anything is saved. Those images go to the image model *first*,
+  as the product to keep exactly as shown; the name, price and description
+  become the only product claims copy may make. Pick the product per round in
+  Creative Studio. The fetch is written as an SSRF surface — see
+  `api/_productPage.js` and DECISIONS.md
+- **The brief hears customers, the brand, and its own results** — brand voice
+  and customer voice (pasted reviews, survey answers, comments) join the brand
+  brief. Customer voice is scrubbed of names, emails, numbers, handles and links
+  on entry and quoted to the model by id, so a brief's insight cites the words
+  it rests on. And the ads this studio shipped come back: once their performance
+  is imported, the best and worst by ROAS above the $500 evidence floor are fed
+  into the next brief, hook and copy included
+- **Variants a buyer could run** — one call per angle at medium effort, each
+  returning timed beats with on-screen text, Meta's primary text, headline and
+  description, and alternative hooks. A cheaper review pass then scores every
+  variant and suggests a better hook or line; it never rewrites one. Sets are now
+  append-only and freeze the moment their names leave the studio (copy, CSV,
+  creator brief, static ad), so the words behind a live ad name cannot change
+- **Static ads, creator briefs and a fuller CSV** — the approved headline, CTA
+  and brand logo drawn in code over the text-free key frame at 4:5, 1:1 and 9:16,
+  inside each placement's safe zones; a printable brief per variant for a
+  creator, carrying the exact ad name; a CSV with every field. Video tools are
+  behind `Settings → Workspace → Show video tools`, off by default
+- **Opening a client is one form** — `/admin → Clients` creates the workspace,
+  invites the owner by email (or seats an existing account) and rolls back if
+  any step fails; it also sends password resets. The app's sign-in gains
+  "Forgot your password?", and invite and reset links land on a set-password
+  step. One Supabase setting is needed first — see "To open a workspace" below
+- **One "Test next" list** — Next Plays, Signal AI debates and the library
+  synthesis's Do Next land in one list on the dashboard, each idea marked with
+  where it came from; when two of them propose the same idea it appears once,
+  credited to both. The library's ideas used to vanish when you left the page
+- **Claude Sonnet 5.5 is in the model catalogue.** No group's default changed —
+  bench it against the current model on Creative Direction before routing it
 - **A Custom voice video tier, and two renders that were quietly broken** —
   D-ID is promoted from "reachable but not a tier" to a real option in Creative
   Studio, because its `/talks` API takes an ElevenLabs voice id directly: the
@@ -231,8 +269,12 @@ Select a Draft or Running initiative and the studio produces a creative brief gr
 - **Briefs must be falsifiable.** Every brief states what result would prove the direction wrong. One that can't be wrong can't teach anything.
 - **Unsupported claims are quarantined.** Anything the creative wants to say that the brand brief doesn't support goes into `claimsToVerify` for the operator to clear, rather than being asserted in a script.
 - **Names are assembled, not typed.** The model returns segment values; `buildName` validates them against the schema. The initiative segment is stamped from the initiative's own tracking tag — the model is never told it and never asked to invent one.
-- **Key frames.** Each variant can generate its opening beat as an image (Gemini image models, "Nano Banana"). The prompt is composed from the approved brief — insight, promise, proof, the variant's opening beat — and is inspectable before you spend. Two exclusions are hard-coded: no rendered text, and nothing from the brief's `claimsToVerify`, so a generated frame can't launder an unverified claim into something that looks settled.
-- **Output is portable.** Copy the ad names, export the full variant set as CSV, or download a frame. Generated images are held for the session only and are never written to browser storage — a base64 PNG would exhaust the quota and take the portfolio with it.
+- **Grounded in the product and the customer.** A round is about one of the brand's products (imported from its page, reviewed, see `src/services/products.js`), written in the brand's voice, and built on what customers actually say (`src/services/voc.js`). The brief cites customer snippets by id the way it cites learnings.
+- **Evidence from its own ads.** Shipped ads are joined back to their performance rows by name, and the best and worst above the spend floor are quoted to the next brief with the hook and copy they carried (`src/services/variantSets.js`).
+- **Variants, then a review.** One call per angle produces timed beats with on-screen text, Meta copy fields and alternative hooks; a separate low-effort pass scores each variant and suggests fixes the operator can take or ignore. Sets are append-only and freeze when their names are shipped.
+- **Key frames.** Each variant can generate its opening beat as an image (Gemini image models, "Nano Banana"). The prompt is composed from the approved brief — insight, promise, proof, the variant's opening beat — and is inspectable before you spend. The product's own images go first, as the object to reproduce; style references follow. Two exclusions are hard-coded: no rendered text, and nothing from the brief's `claimsToVerify`, so a generated frame can't launder an unverified claim into something that looks settled.
+- **Static ads.** The words a static ad needs — headline, CTA, logo — are drawn in code over the text-free frame, from the variant's reviewed copy, in 4:5, 1:1 and 9:16 with placement safe zones (`src/services/staticAd.js`). Crisp type, and every word on it is one the operator approved.
+- **Output is portable.** Copy the ad names, export the set as CSV with every field, download a creator brief (one printable page per variant, with its exact ad name) or a static ad. Image bytes go to Supabase Storage when the deployment has it and are held for the session when it does not; they are never written to browser storage — a base64 PNG would exhaust the quota and take the portfolio with it.
 
 ### CSV import / export
 Row-by-row preview before writing. Matched on `initId` for non-destructive updates. Handles date format normalisation, case-insensitive brand matching, and ICE clamping. Google Sheets template included.
@@ -360,7 +402,7 @@ admin console at `/admin`:
 Each group declares a capability floor that both the picker and the server enforce,
 so the debate group cannot be pointed at a model without tool calling, and a
 whole-portfolio prompt cannot be pointed at a short-context model. Providers wired
-today: Anthropic (Fable 5.1, Opus 5.5, Opus 5, Sonnet 5, Haiku 4.5), Google Gemini (3.1 Pro, 3.6 Flash,
+today: Anthropic (Fable 5.1, Opus 5.5, Opus 5, Sonnet 5.5, Sonnet 5, Haiku 4.5), Google Gemini (3.1 Pro, 3.6 Flash,
 3.5 Flash Lite), OpenAI (GPT-5.6 Sol, Terra and Luna), and Thinking Machines
 (Inkling, open weights, served first-party through Tinker).
 
@@ -668,6 +710,7 @@ DAILY_CAP_SCENES=40        # api/_scene.js (via /api/video?kind=scene) — submi
 DAILY_CAP_ASSETS=500       # api/asset.js — uploads into the storage bucket
 DAILY_CAP_VOICE=300        # api/_voice.js (via /api/video?kind=voice)
 DAILY_CAP_DEBATES=40       # api/debate.js — debate starts
+DAILY_CAP_PRODUCT_IMPORTS=400  # api/asset.js — product page reads and product image fetches
 
 # Optional. This deployment's own base URL, used by api/debate.js for the
 # server-to-server self-dispatch that drives a debate from step to step. Falls
@@ -733,13 +776,24 @@ pull`). It reads every table and function each live migration creates back out
 of PostgREST's own schema listing, plus the storage bucket, and says exactly
 which migration to run for anything missing.
 
-**To open a workspace** you also need a row to sign in to, which is a one-time
-setup per client rather than anything the app does:
+**To open a workspace** for a client, use `/admin → Clients`: a name, a slug and
+the owner's email. It creates the workspace, invites the owner (or finds their
+existing account) and seats them as owner; if any step fails the workspace is
+deleted again, so a half-created client never shows up in the list. The same tab
+sends password-reset links. Two one-time Supabase settings first:
 
-1. Enable Email auth in the Supabase dashboard and invite the operator.
-2. `insert into workspaces (slug, name) values ('acme', 'Acme');`
-3. `insert into workspace_members (workspace_id, user_id, role)` with that
-   workspace's id, the user's id from `auth.users`, and `'owner'`.
+1. Enable Email auth (Authentication → Sign In / Providers).
+2. Add this app's URL — `PUBLIC_BASE_URL` if set, else the address you open
+   `/admin` from, with a trailing `/` — under Authentication → URL
+   Configuration → Redirect URLs, and set it as the Site URL. Supabase sends
+   invite and reset links only to allow-listed URLs; without it, the email links
+   land on Supabase's default and the owner never reaches the set-password step.
+
+The invite lands on the app, which asks the owner to set a password and signs
+them in. By hand, the equivalent is still: invite the user from Authentication →
+Users, `insert into workspaces (slug, name) values ('acme', 'Acme');`, then
+`insert into workspace_members (workspace_id, user_id, role)` with that
+workspace's id, the user's id from `auth.users`, and `'owner'`.
 
 Signing in is what moves a session onto the workspace store. A deployment with no
 `SUPABASE_PUBLISHABLE_KEY`, or a visitor who never signs in, runs on

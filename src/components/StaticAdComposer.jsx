@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { gG, gGh, gSl } from "./styles.js";
 import { readAssetBytes } from "../services/assetStore.js";
 import {
-  STATIC_FORMATS, staticFormat, layoutStaticAd, renderStaticAd, AD_FONT, AD_WEIGHT,
+  STATIC_FORMATS, staticFormat, layoutStaticAd, renderStaticAd, AD_FONT, AD_WEIGHT, DEFAULT_ACCENT,
 } from "../services/staticAd.js";
 
 const loadImage = (src) => new Promise((resolve, reject) => {
@@ -39,7 +39,7 @@ export function StaticAdComposer({ t, frame, lines, cta, brand, disabled, onExpo
   const options = useMemo(() => (lines || []).filter(l => l && l.text), [lines]);
   const headline = options[Math.min(lineIdx, Math.max(0, options.length - 1))]?.text || "";
   const format = staticFormat(formatId);
-  const accent = brand?.accentColor || "#111111";
+  const accent = brand?.accentColor || DEFAULT_ACCENT;
   const loadKey = (frame?.id || "") + "|" + (brand?.logo?.storageKey || "");
 
   useEffect(() => {

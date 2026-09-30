@@ -11,7 +11,7 @@ import { WORKSPACE_MODES, resolveWorkspaceMode, isLiveWorkspace } from "../servi
 import { putAsset, getAssetUrl, isDurable, durableUnavailableReason } from "../services/assetStore.js";
 import { useEffect } from "react";
 import { BrandProducts } from "../components/BrandProducts.jsx";
-import { splitVoc } from "../services/voc.js";
+import { splitVoc, scrubVocField, withScrubbedVoc } from "../services/voc.js";
 import { downscaleImage } from "../services/imageResize.js";
 
 // Kept in step with api/image.js, which refuses a fourth rather than truncating.
@@ -194,9 +194,9 @@ function BrandLogo({ t, brand, onLogo, onAccent }) {
       <div>
         <label style={{ fontSize: 10, color: t.textMuted, fontFamily: t.sans, display: "block", marginBottom: 5, letterSpacing: "0.05em" }}>ACCENT COLOUR (CTA BUTTON)</label>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          <input type="color" value={brand.accentColor || "#111111"} onChange={e => onAccent(e.target.value)}
+          <input type="color" value={brand.accentColor || "#ffffff"} onChange={e => onAccent(e.target.value)}
             aria-label="Accent colour" style={{ width: 38, height: 28, padding: 0, border: "1px solid " + t.border, borderRadius: 5, background: "none" }} />
-          <code style={{ fontSize: 11, color: t.textSub }}>{brand.accentColor || "#111111"}</code>
+          <code style={{ fontSize: 11, color: t.textSub }}>{brand.accentColor || "#ffffff (default)"}</code>
         </div>
       </div>
       {err && <div style={{ flexBasis: "100%", fontSize: 11, color: t.red, lineHeight: 1.5 }}>{err}</div>}
@@ -209,10 +209,16 @@ function BrandLogo({ t, brand, onLogo, onAccent }) {
  *
  * Two fields the creative prompts had no way to receive. Voice is followed in
  * every line of copy; customer voice is split into snippets the brief cites by
- * id, with identifiers stripped on the way in (services/voc.js).
+ * id. Identifiers are stripped from the field itself when you leave it, so what
+ * is saved is what the note says was kept (services/voc.js).
  */
 function BrandVoice({ t, brand, onVoice, onVoc }) {
   const parsed = useMemo(() => splitVoc(brand.voc || ""), [brand.voc]);
+  const [removed, setRemoved] = useState(0);
+  const scrubOnLeave = (value) => {
+    const out = scrubVocField(value);
+    if (out.removed) { onVoc(out.text); setRemoved(n => n + out.removed); }
+  };
   const lab = { fontSize: 12, color: t.textMuted, fontFamily: t.sans, display: "block", marginBottom: 3 };
   return (
     <div className="gos-grid-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, borderTop: "1px solid " + t.borderSoft, paddingTop: 9, marginTop: 2 }}>
@@ -225,13 +231,13 @@ function BrandVoice({ t, brand, onVoice, onVoc }) {
       <div>
         <label style={lab}>Customer voice — reviews, survey answers, comments</label>
         <textarea style={{ ...gI(t), fontSize: 11, minHeight: 92, resize: "vertical" }} value={brand.voc || ""}
-          onChange={e => onVoc(e.target.value)}
+          onChange={e => onVoc(e.target.value)} onBlur={e => scrubOnLeave(e.target.value)}
           placeholder={"Paste what customers wrote, one per line (or separated by a blank line).\nThe words only — no names or emails."} />
         <div style={{ fontSize: 10.5, color: t.textMuted, fontFamily: t.serif, lineHeight: 1.5, marginTop: 3 }}>
           {parsed.snippets.length
             ? `${parsed.snippets.length} snippet${parsed.snippets.length === 1 ? "" : "s"} the brief can quote by id.`
             : "Briefs ground their buyer insight in these, and hooks borrow customers' own words."}
-          {parsed.scrubbedCount > 0 && ` Names, emails, numbers or handles were removed from ${parsed.scrubbedCount}.`}
+          {(parsed.scrubbedCount > 0 || removed > 0) && ` Names, emails, numbers or handles were removed from ${Math.max(parsed.scrubbedCount, removed)} before saving.`}
           {parsed.droppedCount > 0 && ` ${parsed.droppedCount} too short or repeated, skipped.`}
         </div>
       </div>
@@ -302,6 +308,9 @@ export function SettingsView({t,dk,settings,onSave,onClose,onDownloadBackup,onRe
   // health-metric targets. Reconfiguring five metrics and then mis-clicking the
   // scrim cost ten minutes. Every exit now goes through one guarded path.
   const dirty = useMemo(()=>JSON.stringify(local)!==JSON.stringify(settings),[local,settings]);
+  // App.saveSettings scrubs customer voice before storing it; the form keeps the
+  // same copy so what is on screen is what was saved, and `dirty` settles.
+  const commit = (next)=>{ const clean = withScrubbedVoc(next); if (clean !== next) setLocal(clean); onSave(clean); };
   const requestClose = ()=>{ if(dirty) setConfirmDiscard(true); else onClose(); };
 
   if (confirmDiscard) {
@@ -312,7 +321,7 @@ export function SettingsView({t,dk,settings,onSave,onClose,onDownloadBackup,onRe
         </div>
         <div style={{display:"flex",justifyContent:"flex-end",gap:8}}>
           <button style={gGh(t)} onClick={()=>setConfirmDiscard(false)}>Keep editing</button>
-          <button style={gG(t)} onClick={()=>onSave(local)}>Save and close</button>
+          <button style={gG(t)} onClick={()=>commit(local)}>Save and close</button>
           <button style={{...gGh(t),color:t.red,borderColor:t.red}} onClick={onClose}>Discard</button>
         </div>
       </Modal>
@@ -343,7 +352,7 @@ export function SettingsView({t,dk,settings,onSave,onClose,onDownloadBackup,onRe
       <div style={{flex:1,minWidth:0,display:"flex",flexDirection:"column",gap:14}}>
         {sec==="naming" && (
           <TaxonomyEditor t={t} dk={dk} settings={settings} showToast={showToast}
-            onSaveSettings={(next)=>{ setLocal(next); onSave(next); }}/>
+            onSaveSettings={(next)=>{ setLocal(next); commit(next); }}/>
         )}
         {sec==="workspace" && (<>
         {/* Mode leads the section because it changes what several of the other
@@ -666,7 +675,7 @@ export function SettingsView({t,dk,settings,onSave,onClose,onDownloadBackup,onRe
               ? <span style={{marginRight:"auto",fontSize:11,color:t.warn,fontFamily:t.sans}}>unsaved changes</span>
               : <span style={{marginRight:"auto",fontSize:11,color:t.textMuted,fontFamily:t.sans}}>saved</span>}
             <button style={gGh(t)} onClick={requestClose}>{dirty?"Discard":"Close"}</button>
-            <button style={{...gG(t),...(dirty?null:gOff)}} disabled={!dirty} onClick={()=>{ onSave(local); }}>Save settings</button>
+            <button style={{...gG(t),...(dirty?null:gOff)}} disabled={!dirty} onClick={()=>commit(local)}>Save settings</button>
           </div>
         )}
       </div>

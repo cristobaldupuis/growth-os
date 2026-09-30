@@ -4,7 +4,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { scrubSnippet, splitVoc, selectVoc, formatVocBlock, citedSnippets, formatVoiceBlock, VOC_LIMIT } from "./voc.js";
+import { scrubSnippet, splitVoc, selectVoc, formatVocBlock, citedSnippets, formatVoiceBlock, VOC_LIMIT, scrubVocField, withScrubbedVoc } from "./voc.js";
 import { mkProduct, productForRound, formatProductBlock, priceLabel, MAX_PRODUCT_IMAGES } from "./products.js";
 import { COPY_SPECS, copySpecFor, copyFlags, normalizeVariant, beatsOf, staticHeadline } from "./creativeCopy.js";
 import { fitWithin, base64Bytes } from "./imageResize.js";
@@ -28,6 +28,42 @@ test("identifiers are stripped from a pasted review, and the stripping is counte
 
 test("a capitalised word mid-sentence is not mistaken for a signature", () => {
   assert.equal(scrubSnippet("I switched from Stanley and never looked back").text, "I switched from Stanley and never looked back");
+});
+
+test("the stored field loses its identifiers and keeps everything else exactly as typed", () => {
+  const pasted = "\"Half the bag goes stale by Wednesday.\" — Jane D.\n\nMy kids check the tin first,\nevery morning.\n\nEmail me at sam@example.com about bulk orders";
+  const { text, removed } = scrubVocField(pasted);
+  assert.equal(removed, 2);
+  assert.equal(text, "Half the bag goes stale by Wednesday.\n\nMy kids check the tin first,\nevery morning.\n\nEmail me at [email removed] about bulk orders");
+  assert.ok(!/Jane|sam@/.test(text));
+  // Nothing to remove: byte-for-byte the same, quotes and line breaks included.
+  const clean = "\"Soft on Friday.\"\nKids love it";
+  assert.deepEqual(scrubVocField(clean), { text: clean, removed: 0 });
+  assert.deepEqual(scrubVocField(undefined), { text: "", removed: 0 });
+  // A second pass has nothing left to do, so the stored text is stable.
+  assert.equal(scrubVocField(text).removed, 0);
+});
+
+test("a seven-digit local number is a number, and a year or a price is not", () => {
+  assert.equal(scrubSnippet("Text 555-0100 for a refill").text, "Text [number removed] for a refill");
+  assert.equal(scrubSnippet("Order 1234567 arrived dented").text, "Order [number removed] arrived dented");
+  assert.equal(scrubSnippet("Buying since 2019, $24 a tin, 3 kids").scrubbed, false);
+});
+
+test("every save path scrubs every brand's customer voice, and leaves clean settings untouched", () => {
+  const settings = { companyName: "X", brands: [
+    { id: "a", name: "A", voc: "Call me on 415 555 0100 — Mark" },
+    { id: "b", name: "B", voc: "Great tin" },
+    { id: "c", name: "C" },
+  ] };
+  const out = withScrubbedVoc(settings);
+  assert.notEqual(out, settings);
+  assert.equal(out.brands[0].voc, "Call me on [number removed]");
+  assert.equal(out.brands[1], settings.brands[1]);
+  assert.equal(out.brands[2], settings.brands[2]);
+  assert.equal(withScrubbedVoc(out), out);
+  assert.equal(withScrubbedVoc({ companyName: "X" }).companyName, "X");
+  assert.equal(withScrubbedVoc(null), null);
 });
 
 test("snippets split on blank lines when there are any, and get stable positional ids", () => {

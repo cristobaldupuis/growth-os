@@ -15,10 +15,13 @@
 //
 // docs/data-handling.md says no person enters the workspace. A review's TEXT is
 // not a person, but a pasted review often arrives with one attached — a name
-// sign-off, an email, a handle. Those are stripped here, at the point of entry,
-// and the count of what was stripped is reported rather than silently absorbed.
-// The scrub is a backstop for honest pasting, not a licence to paste a CRM
-// export: the Settings field says to paste the words only.
+// sign-off, an email, a handle. Those are stripped at the point of entry, before
+// the field is stored: the Settings field rewrites itself when you leave it, and
+// `withScrubbedVoc` runs on every settings save whichever path it came by. What
+// was stripped is reported rather than silently absorbed. Splitting scrubs once
+// more, so text that reached the store some other way still cannot reach a
+// prompt. The scrub is a backstop for honest pasting, not a licence to paste a
+// CRM export: the Settings field says to paste the words only.
 
 // Enough snippets to carry the variety of what a brand's customers say; few
 // enough that the block stays small next to the brief it grounds.
@@ -31,7 +34,7 @@ export const VOC_RULE = "most words shared with the initiative and product, then
 const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
 // Seven or more digits once separators are ignored — a phone number, an order
 // number, a card fragment. None of them is something a brief should quote.
-const PHONE_RE = /(?:\+?\d[\s().-]?){7,}\d/g;
+const PHONE_RE = /(?:\+?\d[\s().-]?){6,}\d/g;
 const HANDLE_RE = /(^|[\s(])@[A-Za-z0-9_.]{2,}/g;
 const URL_RE = /\bhttps?:\/\/\S+/gi;
 // A trailing sign-off: "— Jane D.", "- Sarah K., Austin", "~Mike". Only at the
@@ -56,6 +59,42 @@ export function scrubSnippet(raw) {
   }
   text = text.replace(/^["“”'‘’\s]+|["“”'‘’\s]+$/g, "").replace(/\s+/g, " ").trim();
   return { text, scrubbed: text !== before.replace(/^["“”'‘’\s]+|["“”'‘’\s]+$/g, "").replace(/\s+/g, " ").trim() };
+}
+
+/**
+ * The pasted field as it should be stored: every part with an identifier in it
+ * scrubbed, and every other part kept exactly as typed — separators, quotes and
+ * line breaks included — so storing it changes nothing the operator did not need
+ * changed. Returns `{text, removed}`, `removed` counting the parts rewritten.
+ */
+export function scrubVocField(text) {
+  const raw = String(text == null ? "" : text).replace(/\r\n?/g, "\n");
+  // The same rule splitVoc uses: blank lines separate snippets when there are any.
+  const sep = /\n\s*\n/.test(raw.trim()) ? /(\n\s*\n)/ : /(\n)/;
+  let removed = 0;
+  const out = raw.split(sep).map((part, i) => {
+    if (i % 2 === 1 || !part.trim()) return part;
+    const { text: clean, scrubbed } = scrubSnippet(part);
+    if (!scrubbed) return part;
+    removed++;
+    return clean;
+  }).join("");
+  return { text: out, removed };
+}
+
+/** Settings with every brand's customer voice scrubbed; the same object when none needed it. */
+export function withScrubbedVoc(settings) {
+  const brands = settings && Array.isArray(settings.brands) ? settings.brands : null;
+  if (!brands) return settings;
+  let changed = false;
+  const next = brands.map(b => {
+    if (!b || !b.voc) return b;
+    const { text, removed } = scrubVocField(b.voc);
+    if (!removed) return b;
+    changed = true;
+    return { ...b, voc: text };
+  });
+  return changed ? { ...settings, brands: next } : settings;
 }
 
 /**

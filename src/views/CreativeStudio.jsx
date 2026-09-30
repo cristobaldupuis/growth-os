@@ -5,8 +5,18 @@ import { SBdg, CBdg } from "../components/badges.jsx";
 import { fmtDate } from "../constants.js";
 import { resolveSchema, buildNameSet, templateFor, listChannels, listLevels, suggestTrackingTag, NA } from "../services/naming.js";
 import { callCreativeBrief } from "../services/ai/callCreativeBrief.js";
-import { callCreativeVariants } from "../services/ai/callCreativeVariants.js";
+import { produceVariantSet, callCritiqueVariants } from "../services/ai/callCreativeVariants.js";
 import { callGenerateImage, buildImagePrompt, angleAsVariant, IMAGE_ASPECTS } from "../services/ai/callGenerateImage.js";
+import { productsOf, productForRound, priceLabel, MAX_PRODUCT_IMAGES } from "../services/products.js";
+import { splitVoc, selectVoc } from "../services/voc.js";
+import {
+  currentSet, isShipped, withNewSet, withNaming, withVariantChange, withCritique, withShipped,
+  shippedAdIndex, topAdsByReturn,
+} from "../services/variantSets.js";
+import { buildCreatorBriefHtml, buildVariantCSV } from "../services/creatorBrief.js";
+import { downscaleImage } from "../services/imageResize.js";
+import { StaticAdComposer } from "../components/StaticAdComposer.jsx";
+import { BeatsTable, CopyFields, AltHooks, VocQuotes, CritiqueNote, SetHistory } from "../components/creativeParts.jsx";
 import { modelsFor } from "../services/ai/registry.js";
 import {
   callGenerateVideo, pollVideoJob, buildVideoScript, VIDEO_TIERS, VIDEO_TIER_LIST,
@@ -67,6 +77,9 @@ export function CreativeStudio({
   const schema   = resolveSchema(settings);
   const channels = listChannels(schema);
   const initKey  = schema.initiativeDimension;
+  // Talking heads, voice auditions and scenes are a workspace setting, off by
+  // default (see DEFAULT_SETTINGS.creativeVideo).
+  const videoOn  = !!settings.creativeVideo;
 
   const brandFilter = e => activeBrand === "all" || (e.brandId || "default") === activeBrand;
   // Creative is briefed for work that is still ahead of you. A closed initiative
@@ -143,13 +156,15 @@ export function CreativeStudio({
   // no ELEVENLABS_API_KEY is a normal deployment — the endpoint says so plainly
   // when called, but an operator who has not configured voice should not be shown
   // an error for a feature they never asked for. No voices, no control.
+  // Not read at all while video tools are off — nothing on screen could use it.
   useEffect(() => {
+    if (!videoOn) return undefined;
     let live = true;
     listVoices()
       .then(vs => { if (!live) return; setVoices(vs); setVoiceId(cur => cur || vs[0]?.voiceId || ""); })
       .catch(() => { /* unconfigured or unreachable — the audition control stays hidden */ });
     return () => { live = false; };
-  }, []);
+  }, [videoOn]);
 
   // Asked once. The studio says plainly whether a frame will survive a reload
   // BEFORE the operator spends money generating it, rather than after.
@@ -230,16 +245,32 @@ export function CreativeStudio({
     return () => clearInterval(id);
   }, [vidBusy]);
 
-  // Creative is produced at the ad level (message, for a channel with no ad
-  // level), so that is the template the editors render.
-  const adLevelKey = (schema.channels || []).find(c => c.id === channel)?.levels
-    ?.find(l => l.key === "ad" || l.key === "message")?.key || "ad";
-  const adTemplate = templateFor(schema, channel, adLevelKey);
-
   const sel     = items.find(e => e.id === selId) || null;
   const brand   = sel ? (brands.find(b => b.id === (sel.brandId || "default")) || brands[0]) : null;
   const record  = (creative || []).find(c => c.initiativeId === selId) || null;
   const brief   = record?.brief || null;
+  // The product this round is about, and what customers say — the two inputs the
+  // brief, the variants and the key frame now read (services/products.js, voc.js).
+  const product = productForRound(brand, record);
+  const vocSnippets = useMemo(() => splitVoc(brand?.voc || "").snippets, [brand?.voc]);
+  // The set on screen, and whether its names have left the tool. A frozen set's
+  // slots, copy and hooks cannot change — see services/variantSets.js.
+  const set     = currentSet(record);
+  const frozen  = isShipped(set);
+  const variants = set ? set.variants : (record?.variants || []);
+  // A set is named against the channel it was produced for, whatever the picker
+  // now says — the picker chooses the NEXT set's channel. Re-deriving a shipped
+  // set's names against another channel's template would change names that are
+  // already live in an ad account.
+  const viewChannel = set?.channel || channel;
+  // Creative is produced at the ad level (message, for a channel with no ad
+  // level), so that is the template the editors render.
+  const adLevelKey = (schema.channels || []).find(c => c.id === viewChannel)?.levels
+    ?.find(l => l.key === "ad" || l.key === "message")?.key || "ad";
+  const adTemplate = templateFor(schema, viewChannel, adLevelKey);
+  const [failedAngles, setFailedAngles] = useState([]);
+  const [critiqueBusy, setCritiqueBusy] = useState(false);
+  const [critiqueErr, setCritiqueErr] = useState("");
 
   // Closed initiatives are the evidence base the brief reasons from — the same
   // index the learning library and Next Plays build, kept in one shape.
@@ -252,10 +283,26 @@ export function CreativeStudio({
       closedDate: e.endDate || null,
     })), [items]);
 
-  const saveRecord = (patch) => {
-    const rest = (creative || []).filter(c => c.initiativeId !== selId);
-    onSaveCreative([{ ...(record || { initiativeId: selId }), ...patch, generatedAt: new Date().toISOString() }, ...rest]);
+  // The latest records, for writes that land after an await. A closure over
+  // `record` from before a network call would write the record back as it was,
+  // silently dropping whatever was saved in between — the variant set, then the
+  // review of it, then a slot edit made while the review was running.
+  const creativeRef = useRef(creative);
+  useEffect(() => { creativeRef.current = creative; }, [creative]);
+
+  /** Apply `fn(record) → patch` to the newest copy of one initiative's record.
+   *  A null patch (a frozen set refusing a change) writes nothing. */
+  const updateRecord = (initiativeId, fn) => {
+    const all = creativeRef.current || [];
+    const current = all.find(c => c.initiativeId === initiativeId) || { initiativeId };
+    const patch = fn(current);
+    if (!patch) return false;
+    const updated = [{ ...current, ...patch }, ...all.filter(c => c.initiativeId !== initiativeId)];
+    creativeRef.current = updated;
+    onSaveCreative(updated);
+    return true;
   };
+  const saveRecord = (patch) => updateRecord(selId, () => patch);
 
   // Measured returns per creative dimension, from whatever performance has been
   // imported. This is the half of the evidence the brief never used to see: the
@@ -266,11 +313,32 @@ export function CreativeStudio({
     [perfRows, schema]
   );
 
+  // What customers said, ranked for this initiative and product by a stated rule
+  // (services/voc.js). Recomputed per call rather than memoised: it is cheap, and
+  // it has to describe the brief being generated, not the last one.
+  const vocFor = () => selectVoc(vocSnippets, {
+    title: sel?.title, hypothesis: sel?.hypothesis, observation: sel?.observation,
+    category: sel?.category, productName: product?.name,
+  });
+
+  // The studio's own shipped ads that the ad account has judged — the words that
+  // won and lost, not just the angle. Scoped to this initiative's brand.
+  const shippedResults = useMemo(() => {
+    const index = shippedAdIndex(creative);
+    if (!index.size) return { winners: [], losers: [], judged: 0, thin: 0, shipped: 0 };
+    return topAdsByReturn(perfRows, index, {
+      initiativesById: new Map(items.map(e => [e.id, e])),
+      brandId: sel ? (sel.brandId || "default") : null,
+    });
+  }, [creative, perfRows, items, sel]);
+
   const runBrief = async () => {
     if (!sel) return;
     setBusy("brief"); setErr("");
     try {
-      const result = await callCreativeBrief(sel, brand, learningsIndex, settings, schema, undefined, { evidence });
+      const result = await callCreativeBrief(sel, brand, learningsIndex, settings, schema, undefined, {
+        evidence, product, voc: vocFor(), winners: shippedResults,
+      });
       // Briefs are versioned, not overwritten. The previous behaviour replaced
       // `record.brief` in place, which destroyed its `wouldFalsify` — the one
       // field that makes a creative round settle a question. An initiative's
@@ -278,44 +346,69 @@ export function CreativeStudio({
       // brief that justified the creative deserves the same treatment, and
       // without it there is no way to tell whether the brief behind a winning ad
       // said something different from the one currently on file.
-      const nextBriefVersion = (record?.briefVersion || 0) + 1;
-      const history = [
-        ...(record?.briefs || []),
-        ...(record?.brief && !(record?.briefs || []).length
-          // A record written before versioning existed carries only `brief`.
-          // Fold it in as v1 rather than losing it.
-          ? [{ version: record.briefVersion || 1, brief: record.brief, generatedAt: record.generatedAt || null }]
-          : []),
-      ];
-      saveRecord({
-        brief: result,
-        briefVersion: nextBriefVersion,
-        briefs: [...history, { version: nextBriefVersion, brief: result, generatedAt: new Date().toISOString() }],
-        // A new brief invalidates the variants it was going to produce, so the
-        // variant generation resets — but the assets already made against the
-        // old pair keep their key and stay in the ledger.
-        variants: [],
-        variantsVersion: 0,
+      let version = 0;
+      updateRecord(selId, (rec) => {
+        version = (rec.briefVersion || 0) + 1;
+        const history = [
+          ...(rec.briefs || []),
+          ...(rec.brief && !(rec.briefs || []).length
+            // A record written before versioning existed carries only `brief`.
+            // Fold it in as v1 rather than losing it.
+            ? [{ version: rec.briefVersion || 1, brief: rec.brief, generatedAt: rec.generatedAt || null }]
+            : []),
+        ];
+        return {
+          brief: result,
+          briefVersion: version,
+          briefs: [...history, { version, brief: result, generatedAt: new Date().toISOString() }],
+          // A new brief starts a new run of variant sets. The sets made against
+          // earlier briefs stay in `variantSets` — shipped ones are the record of
+          // what went out — and the assets made against them keep their keys.
+          variants: [],
+          variantsVersion: 0,
+          generatedAt: new Date().toISOString(),
+        };
       });
       setEdits({});
+      setFailedAngles([]);
       clearViewState();
-      showToast(`Creative brief v${nextBriefVersion} generated.`, "success");
+      showToast(`Creative brief v${version} generated.`, "success");
     } catch (e) { setErr(e.message || "Could not generate the brief."); }
     finally { setBusy(""); }
   };
 
+  /** The review pass over the set on screen. Suggestions only; never applied. */
+  const runCritique = async (variants, initiativeId = selId) => {
+    if (!variants?.length) return;
+    setCritiqueBusy(true); setCritiqueErr("");
+    try {
+      const byIdx = await callCritiqueVariants(brief, variants, brand, { channel, product, initiativeId });
+      updateRecord(initiativeId, (rec) => withCritique(rec, { byIdx, at: new Date().toISOString() }));
+    } catch (e) {
+      setCritiqueErr(e.message || "The review pass did not run.");
+    } finally { setCritiqueBusy(false); }
+  };
+
   const runVariants = async () => {
     if (!sel || !brief) return;
-    setBusy("variants"); setErr("");
+    const initiativeId = selId;
+    setBusy("variants"); setErr(""); setCritiqueErr("");
     try {
-      const result = await callCreativeVariants(brief, sel, brand, schema, { perAngle, channel });
-      // Bumping the version is what keeps yesterday's frame from reappearing
-      // under a variant that never asked for it — the old assets keep the old
-      // key rather than being deleted to make the indices safe.
-      saveRecord({ brief, variants: result, variantsVersion: (record?.variantsVersion || 0) + 1 });
+      const { variants: result, failedAngles: failed } = await produceVariantSet(brief, sel, brand, schema, {
+        perAngle, channel, product, voc: vocFor(),
+      });
+      // A new set every time, appended — never a replacement. Bumping the version
+      // is what keeps yesterday's frame from reappearing under a variant that
+      // never asked for it, and appending is what keeps a shipped set's words.
+      updateRecord(initiativeId, (rec) => ({
+        ...withNewSet(rec, { variants: result, channel, perAngle, failedAngles: failed }),
+        generatedAt: new Date().toISOString(),
+      }));
       setEdits({});
+      setFailedAngles(failed);
       clearViewState();
-      showToast(result.length + " variants generated.", "success");
+      showToast(result.length + " variants generated" + (failed.length ? `, ${failed.length} angle${failed.length === 1 ? "" : "s"} failed` : "") + ".", failed.length ? "error" : "success");
+      runCritique(result, initiativeId);
     } catch (e) { setErr(e.message || "Could not generate variants."); }
     finally { setBusy(""); }
   };
@@ -335,9 +428,63 @@ export function CreativeStudio({
   // One dimension record projects into every level of the channel at once, so
   // the campaign and ad set names are guaranteed consistent with the ad name
   // rather than being three strings typed on three different days.
-  const nameSetFor = (variant, idx) => buildNameSet(valuesFor(variant, idx), schema, channel);
+  //
+  // A frozen set answers from its snapshot instead: the names it shipped with are
+  // the names, even if the initiative's tracking tag has changed since.
+  const nameSetFor = (variant, idx) => {
+    const shipped = frozen ? set?.names?.[idx] : null;
+    if (shipped?.levels) {
+      return listLevels(schema, viewChannel).map(l => ({ level: l.key, label: l.label, name: shipped.levels[l.key] || "", errors: [] }));
+    }
+    return buildNameSet(valuesFor(variant, idx), schema, viewChannel);
+  };
   const nameFor    = (variant, idx) =>
     nameSetFor(variant, idx).find(n => n.level === adLevelKey) || { name: "", errors: [] };
+
+  /** Persist one naming slot. Refused (and said so) on a frozen set. */
+  const commitNaming = (idx, key, value) => {
+    const ok = updateRecord(selId, rec => withNaming(rec, idx, key, value));
+    setEdits(e => { const cur = { ...(e[idx] || {}) }; delete cur[key]; return { ...e, [idx]: cur }; });
+    if (!ok) showToast("This set has shipped, so its names are frozen. Produce a new set to change them.", "error");
+  };
+
+  /**
+   * Freeze the set on screen as its names leave the studio, and return the names
+   * it froze with. The first ship validates: a set with a broken name is refused
+   * rather than shipped, because a name that does not parse is spend that will
+   * never find its way back. Later ships only record how the set went out again.
+   */
+  const ship = (via) => {
+    if (!set) return null;
+    if (frozen && set.names) {
+      updateRecord(selId, rec => withShipped(rec, set.names, via));
+      return set.names;
+    }
+    const names = {};
+    for (let i = 0; i < variants.length; i++) {
+      const levels = nameSetFor(variants[i], i);
+      const ad = levels.find(n => n.level === adLevelKey);
+      const errors = levels.flatMap(n => n.errors);
+      if (!ad?.name || errors.length) {
+        showToast(`${variants[i].label || "Variant " + (i + 1)} has a naming error — fix its slots before these names leave the studio.`, "error");
+        return null;
+      }
+      names[i] = { ad: ad.name, levels: Object.fromEntries(levels.map(n => [n.level, n.name])) };
+    }
+    updateRecord(selId, rec => withShipped(rec, names, via));
+    showToast("Names frozen for this set. Produce a new set to change anything.", "success");
+    return names;
+  };
+
+  const download = (content, type, filename) => {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
 
   // The round this initiative is currently on. Every asset generated below is
   // stamped with it, which is what lets an old round stay in the ledger without
@@ -358,31 +505,51 @@ export function CreativeStudio({
     [assets, selId, record?.briefVersion]
   );
 
-  /** Brand reference images, resolved to base64 for the image proxy. Absent when
-   *  the brand has none, which is the ordinary case before anyone uploads one. */
+  /**
+   * The images a key frame is conditioned on, as base64 for the image proxy,
+   * downscaled for the wire (services/imageResize.js). Product images first —
+   * buildImagePrompt names them by position — then the brand's style references.
+   *
+   * A product whose image bytes are gone is refused rather than skipped: the
+   * frame would come back showing an invented product, which is the exact thing
+   * the product reference exists to stop, and the generation would still be paid for.
+   */
   const loadReferences = async () => {
-    const refs = (brand?.referenceImages || []).slice(0, MAX_REFERENCE_IMAGES);
-    if (!refs.length) return [];
-    const resolved = await Promise.all(refs.map(readAssetBytes));
-    // A reference whose bytes are gone is skipped rather than failing the
-    // generation — a missing style reference degrades the frame, it does not
-    // invalidate the brief behind it.
-    return resolved.filter(Boolean);
+    const read = async (list) => (await Promise.all(list.map(async r => {
+      const bytes = await readAssetBytes(r);
+      return bytes ? downscaleImage(bytes) : null;
+    }))).filter(Boolean);
+    const productImages = (product?.images || []).slice(0, MAX_PRODUCT_IMAGES);
+    const [productRefs, styleRefs] = await Promise.all([
+      read(productImages),
+      read((brand?.referenceImages || []).slice(0, MAX_REFERENCE_IMAGES)),
+    ]);
+    if (productImages.length && !productRefs.length) {
+      throw new Error(`${product.name}'s images are not held in this tab any more. Fetch them again under Settings → Retailers → Products, or choose "No product" above to generate without it.`);
+    }
+    return { product: productRefs, style: styleRefs };
   };
+
+  /** The prompt a frame is generated from, for a given set of references. */
+  const framePrompt = (variant, refs) => buildImagePrompt(brief, variant, brand, {
+    referenceCount: refs.style.length,
+    productReferenceCount: refs.product.length,
+    product,
+  });
 
   const genImage = async (variant, idx) => {
     setImgBusy(idx);
     setImgErr({ ...imgErr, [idx]: "" });
     try {
-      const references = await loadReferences();
-      const prompt = buildImagePrompt(brief, variant, brand, { referenceCount: references.length });
+      const refs = await loadReferences();
+      const prompt = framePrompt(variant, refs);
       // The model is the studio's picker, which starts on whatever the `image`
       // routing group is pointed at — so repointing the group in the admin
       // console still reaches this button's default.
       // `initiativeId` is what lands this generation's cost in the spend ledger
       // against the experiment that caused it, so a round of creative can be
       // costed alongside the revenue it is being judged on.
-      const img = await callGenerateImage({ prompt, model: imgModel, aspectRatio: aspect, referenceImages: references, initiativeId: selId });
+      const img = await callGenerateImage({ prompt, model: imgModel, aspectRatio: aspect, referenceImages: [...refs.product, ...refs.style], initiativeId: selId });
 
       const name = nameFor(variant, idx);
       const stored = await putAsset({ mimeType: img.mimeType, data: img.data });
@@ -399,7 +566,7 @@ export function CreativeStudio({
         // The join key, captured at the moment of generation. Without it an asset
         // can be traced forward from the brief but never backward from the spend.
         adName: name.name || "",
-        channel,
+        channel: viewChannel,
         model: img.model,
         prompt,
         aspect,
@@ -430,9 +597,9 @@ export function CreativeStudio({
     setImgBusy(slot);
     setImgErr(e => ({ ...e, [slot]: "" }));
     try {
-      const references = await loadReferences();
-      const prompt = buildImagePrompt(brief, angleAsVariant(angle), brand, { referenceCount: references.length });
-      const img = await callGenerateImage({ prompt, model: imgModel, aspectRatio: aspect, referenceImages: references, initiativeId: selId });
+      const refs = await loadReferences();
+      const prompt = framePrompt(angleAsVariant(angle), refs);
+      const img = await callGenerateImage({ prompt, model: imgModel, aspectRatio: aspect, referenceImages: [...refs.product, ...refs.style], initiativeId: selId });
       const stored = await putAsset({ mimeType: img.mimeType, data: img.data });
       const rec = mkAssetRecord({
         kind: "image",
@@ -718,42 +885,86 @@ export function CreativeStudio({
     showToast(`Tracking tag set to ${suggested}. Every ad name here now carries it.`, "success");
   };
 
-  const variants = record?.variants || [];
-
+  // Every way a set's names leave the studio goes through `ship`, which freezes
+  // the set the first time. The buttons say so before they are pressed.
   const copyNames = () => {
-    const lines = variants.map((v, i) => nameFor(v, i).name).join("\n");
+    const names = ship("names");
+    if (!names) return;
+    const lines = variants.map((v, i) => names[i]?.ad).filter(Boolean).join("\n");
     navigator.clipboard?.writeText(lines)
       .then(() => showToast(variants.length + " ad names copied.", "success"))
       .catch(() => showToast("Could not copy to clipboard.", "error"));
   };
 
-  // Exports every level's name, not just the ad's — the campaign and ad set rows
-  // are what someone actually needs when building the structure in the platform.
+  const stamp = () => `${(sel.initId || sel.id)}_b${record?.briefVersion || 0}s${record?.variantsVersion || 0}`;
+
+  // Every field, every level's name — the campaign and ad set rows are what
+  // someone actually needs when building the structure in the platform.
   const exportCSV = () => {
-    const levels = listLevels(schema, channel);
-    const cols = [
-      "label", "angleSlug", "varies", "hook", "cta",
-      ...adTemplate.map(d => d.key),
-      ...levels.map(l => l.key + "Name"),
-    ];
-    const esc = v => `"${String(v == null ? "" : v).replace(/"/g, '""')}"`;
-    const rows = variants.map((v, i) => {
-      const values = valuesFor(v, i);
-      const set = nameSetFor(v, i);
-      return [
-        v.label, v.angleSlug, v.varies, v.hook, v.cta,
-        ...adTemplate.map(d => values[d.key] || ""),
-        ...levels.map(l => set.find(s => s.level === l.key)?.name || ""),
-      ].map(esc).join(",");
+    const names = ship("csv");
+    if (!names) return;
+    const rows = variants.map((v, i) => ({ variant: v, values: valuesFor(v, i), levelNames: names[i]?.levels || {} }));
+    download(buildVariantCSV({ rows, adTemplate, levels: listLevels(schema, viewChannel), channel: viewChannel }),
+      "text/csv", `creative_${stamp()}_${viewChannel}_${new Date().toISOString().slice(0, 10)}.csv`);
+  };
+
+  // The creator's copy: one printable page per variant, with the exact name to
+  // deliver under. See services/creatorBrief.js.
+  const exportCreatorBrief = () => {
+    const names = ship("creator-brief");
+    if (!names) return;
+    const rows = variants.map((v, i) => ({ variant: v, adName: names[i]?.ad, levelNames: names[i]?.levels || {} }));
+    const html = buildCreatorBriefHtml({
+      initiative: sel, brief, set: currentSet(creativeRef.current.find(c => c.initiativeId === selId)) || set,
+      rows, brand, product, channel: viewChannel, vocSnippets,
     });
-    const csv = [cols.join(","), ...rows].join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
+    download(html, "text/html", `creator-brief_${stamp()}.html`);
+  };
+
+  /** Store a composed static ad against its variant, freeze the set, download it. */
+  const exportStatic = async (variant, idx, out) => {
+    const names = ship("static");
+    if (!names) throw new Error("Fix this set's naming slots first — a static ad ships under its ad name.");
+    const adName = names[idx]?.ad || "";
+    const stored = await putAsset({ mimeType: out.mimeType, data: out.data });
+    const rec = mkAssetRecord({
+      kind: "static",
+      initiativeId: selId,
+      initId: sel.initId || sel.id,
+      brandId: sel.brandId || "default",
+      briefVersion: round.briefVersion,
+      variantsVersion: round.variantsVersion,
+      variantIdx: idx,
+      variantLabel: variant.label || "",
+      angleSlug: variant.angleSlug || "",
+      adName,
+      channel: viewChannel,
+      model: "composed",
+      // What was drawn, so the record says which approved words the ad carries.
+      prompt: JSON.stringify({ headline: out.headline, cta: out.cta, format: out.format, frame: roundAssets[idx]?.image?.id || null }),
+      aspect: out.format,
+      mimeType: out.mimeType,
+      costUsd: 0,
+      storageKey: stored.storageKey,
+      bytesDurable: stored.durable,
+    });
+    onSaveAssets([rec, ...(assets || [])]);
     const a = document.createElement("a");
-    a.href = url;
-    a.download = `creative_${(sel.initId || sel.id)}_${channel}_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.href = out.dataUrl;
+    a.download = `${(adName || variant.label || "static").slice(0, 150)}_${out.format.replace(":", "x")}.jpg`;
     a.click();
-    URL.revokeObjectURL(url);
+  };
+
+  /** Take the review pass's suggestion for one variant. Refused on a frozen set. */
+  const applySuggestion = (idx, kind) => {
+    const note = set?.critique?.byIdx?.[idx];
+    if (!note) return;
+    const ok = updateRecord(selId, rec => withVariantChange(rec, idx, v => kind === "hook"
+      // The replaced hook becomes an alternative rather than disappearing: it
+      // was approved once, and it is still a candidate to test.
+      ? { ...v, hook: note.suggestedHook, altHooks: [v.hook, ...(v.altHooks || [])].filter(Boolean).slice(0, 4) }
+      : { ...v, copy: { ...(v.copy || {}), ...note.suggestedCopy } }));
+    if (!ok) showToast("This set has shipped, so it is frozen. Produce a new set to change it.", "error");
   };
 
   // Frame and model, shared by concept frames and variant frames. Rendered in
@@ -853,16 +1064,40 @@ export function CreativeStudio({
       {/* Brief */}
       {sel && (
         <div style={{ ...gCd(t), marginBottom: 18 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: brief ? 16 : 0 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: brief ? 12 : 0 }}>
             <div style={{ ...gSL(t), marginBottom: 0 }}>Creative brief</div>
-            <button onClick={runBrief} disabled={busy === "brief"} style={{ ...(brief ? gGh(t) : gG(t)), opacity: busy === "brief" ? 0.6 : 1 }}>
-              {busy === "brief" ? "Briefing…" : brief ? "Regenerate brief" : "Generate brief"}
-            </button>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              {/* The product this round sells. Its facts are what copy may claim,
+                  and its images are what the key frame must show. */}
+              <label style={{ fontSize: 12, color: t.textSub }} htmlFor="studio-product">Product</label>
+              <select id="studio-product" value={record?.productId || (product ? product.id : "")}
+                onChange={e => saveRecord({ productId: e.target.value || null })}
+                style={{ ...gSl(t), width: 210, padding: "6px 8px" }}>
+                {productsOf(brand).length === 0 && <option value="">None added — Settings → Retailers</option>}
+                {productsOf(brand).length > 0 && <option value="none">No specific product</option>}
+                {productsOf(brand).map(p => (
+                  <option key={p.id} value={p.id}>{p.name}{priceLabel(p) ? " · " + priceLabel(p) : ""}</option>
+                ))}
+              </select>
+              <button onClick={runBrief} disabled={busy === "brief"} style={{ ...(brief ? gGh(t) : gG(t)), opacity: busy === "brief" ? 0.6 : 1 }}>
+                {busy === "brief" ? "Briefing…" : brief ? "Regenerate brief" : "Generate brief"}
+              </button>
+            </div>
+          </div>
+
+          {/* What the next brief will stand on, said before it is generated —
+              an empty input is a weaker brief, and the operator can fix that first. */}
+          <div style={{ fontSize: 11.5, color: t.textMuted, fontFamily: t.sans, marginBottom: brief ? 14 : 0, marginTop: brief ? 0 : 10, lineHeight: 1.55 }}>
+            Grounded in: {product ? product.name : "no product"} · {vocSnippets.length ? `${vocSnippets.length} customer quote${vocSnippets.length === 1 ? "" : "s"}` : "no customer voice"}
+            {" · "}{brand?.voice ? "brand voice" : "no brand voice"}
+            {" · "}{shippedResults.winners.length ? `${shippedResults.winners.length} winning ad${shippedResults.winners.length === 1 ? "" : "s"} from this studio` : shippedResults.shipped ? "shipped ads not yet judged" : "no shipped ads yet"}
+            {(!product || !vocSnippets.length || !brand?.voice) && <> — add what is missing under Settings → Retailers.</>}
           </div>
 
           {brief && (
             <>
               <StatBlock t={t} label="Insight">{renderProse(brief.insight)}</StatBlock>
+              <VocQuotes t={t} snippets={vocSnippets} ids={brief.vocCited} label="Built on" />
               <StatBlock t={t} label="Promise">{renderProse(brief.promise)}</StatBlock>
 
               {(brief.proof || []).length > 0 && (
@@ -997,42 +1232,46 @@ export function CreativeStudio({
             <div style={{ ...gSL(t), marginBottom: 0 }}>Variants</div>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               {variants.length > 0 && imageControls}
-              <label style={{ fontSize: 12, color: t.textSub }}>Video</label>
-              <select value={tierKey} onChange={e => setTierKey(e.target.value)} style={{ ...gSl(t), width: 178, padding: "6px 8px" }}
-                title={VIDEO_TIERS[tierKey].blurb}>
-                {VIDEO_TIER_LIST.map(v => <option key={v.key} value={v.key}>{v.label}</option>)}
-              </select>
-              {voices.length > 0 && (
+              {videoOn && (
                 <>
-                  <label style={{ fontSize: 12, color: t.textSub }}>Voice</label>
-                  <select value={voiceId} onChange={e => setVoiceId(e.target.value)} style={{ ...gSl(t), width: 150, padding: "6px 8px" }}
-                    title={tierKey === "CUSTOM_VOICE"
-                      ? "This ElevenLabs voice reads both the audition and the actual Custom voice render."
-                      : "The voice an audition is read in. Auditions are not renders — nothing is kept, and Standard/Premium renders do not use it."}>
-                    {voices.map(v => (
-                      <option key={v.voiceId} value={v.voiceId}>
-                        {v.name}{v.accent ? ` · ${v.accent}` : ""}
-                      </option>
-                    ))}
+                  <label style={{ fontSize: 12, color: t.textSub }}>Video</label>
+                  <select value={tierKey} onChange={e => setTierKey(e.target.value)} style={{ ...gSl(t), width: 178, padding: "6px 8px" }}
+                    title={VIDEO_TIERS[tierKey].blurb}>
+                    {VIDEO_TIER_LIST.map(v => <option key={v.key} value={v.key}>{v.label}</option>)}
                   </select>
+                  {voices.length > 0 && (
+                    <>
+                      <label style={{ fontSize: 12, color: t.textSub }}>Voice</label>
+                      <select value={voiceId} onChange={e => setVoiceId(e.target.value)} style={{ ...gSl(t), width: 150, padding: "6px 8px" }}
+                        title={tierKey === "CUSTOM_VOICE"
+                          ? "This ElevenLabs voice reads both the audition and the actual Custom voice render."
+                          : "The voice an audition is read in. Auditions are not renders — nothing is kept, and Standard/Premium renders do not use it."}>
+                        {voices.map(v => (
+                          <option key={v.voiceId} value={v.voiceId}>
+                            {v.name}{v.accent ? ` · ${v.accent}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </>
+                  )}
+                  {/* HeyGen's own voice catalogue is a different id space from the
+                      ElevenLabs picker above — an ElevenLabs voice only reaches HeyGen
+                      if it was imported as a third-party voice in HeyGen's own
+                      dashboard, which mints a HeyGen-native id. There is no API this
+                      app can call to list those, so it is a free-text field rather
+                      than a select: paste the id HeyGen's Studio shows you. Empty
+                      means HeyGen's default voice, same as before this existed. */}
+                  {tierKey === "STANDARD" && (
+                    <>
+                      <label style={{ fontSize: 12, color: t.textSub }}>HeyGen voice ID</label>
+                      <input value={heygenVoiceId} onChange={e => setHeygenVoiceId(e.target.value)}
+                        placeholder="optional" style={{ ...gSl(t), width: 130, padding: "6px 8px" }}
+                        title="A voice id from HeyGen's own catalogue — including any ElevenLabs voice you've imported there under Integrate 3rd Party Voice. Leave blank for HeyGen's default." />
+                    </>
+                  )}
                 </>
               )}
-              {/* HeyGen's own voice catalogue is a different id space from the
-                  ElevenLabs picker above — an ElevenLabs voice only reaches HeyGen
-                  if it was imported as a third-party voice in HeyGen's own
-                  dashboard, which mints a HeyGen-native id. There is no API this
-                  app can call to list those, so it is a free-text field rather
-                  than a select: paste the id HeyGen's Studio shows you. Empty
-                  means HeyGen's default voice, same as before this existed. */}
-              {tierKey === "STANDARD" && (
-                <>
-                  <label style={{ fontSize: 12, color: t.textSub }}>HeyGen voice ID</label>
-                  <input value={heygenVoiceId} onChange={e => setHeygenVoiceId(e.target.value)}
-                    placeholder="optional" style={{ ...gSl(t), width: 130, padding: "6px 8px" }}
-                    title="A voice id from HeyGen's own catalogue — including any ElevenLabs voice you've imported there under Integrate 3rd Party Voice. Leave blank for HeyGen's default." />
-                </>
-              )}
-              <label style={{ fontSize: 12, color: t.textSub }}>Channel</label>
+              <label style={{ fontSize: 12, color: t.textSub }} title="The channel the next set is written and named for. A set already produced keeps its own.">Channel</label>
               <select value={channel} onChange={e => { setChannel(e.target.value); setEdits({}); }} style={{ ...gSl(t), width: 118, padding: "6px 8px" }}>
                 {channels.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
               </select>
@@ -1040,17 +1279,52 @@ export function CreativeStudio({
               <select value={perAngle} onChange={e => setPerAngle(Number(e.target.value))} style={{ ...gSl(t), width: 62, padding: "6px 8px" }}>
                 {[1, 2, 3].map(n => <option key={n} value={n}>{n}</option>)}
               </select>
-              {variants.length > 0 && <button onClick={copyNames} style={gGh(t)}>Copy names</button>}
-              {variants.length > 0 && <button onClick={exportCSV} style={gGh(t)}>Export CSV</button>}
+              {variants.length > 0 && <button onClick={copyNames} style={gGh(t)} title="Copies every ad name and freezes this set.">Copy names</button>}
+              {variants.length > 0 && <button onClick={exportCSV} style={gGh(t)} title="Every field and every level's name. Freezes this set.">Export CSV</button>}
+              {variants.length > 0 && <button onClick={exportCreatorBrief} style={gGh(t)} title="One printable page per variant, with the exact ad name to deliver under. Freezes this set.">Creator brief</button>}
               <button onClick={runVariants} disabled={busy === "variants"} style={{ ...(variants.length ? gGh(t) : gG(t)), opacity: busy === "variants" ? 0.6 : 1 }}>
-                {busy === "variants" ? "Producing…" : variants.length ? "Regenerate" : "Produce variants"}
+                {busy === "variants" ? "Producing…" : variants.length ? "New set" : "Produce variants"}
               </button>
             </div>
           </div>
 
           {variants.length === 0 && (
             <div style={{ fontSize: 13, color: t.textMuted, fontFamily: t.serif }}>
-              No variants yet. Producing them turns each angle above into named, shootable assets.
+              No variants yet. Producing them turns each angle above into named, shootable assets — hooks, beats with
+              on-screen text, and the platform's ad copy — and a review pass scores each one before anything ships.
+            </div>
+          )}
+
+          {/* The set's state, before its contents. */}
+          {variants.length > 0 && (
+            <div style={{ display: "grid", gap: 8, marginBottom: 14 }}>
+              {frozen ? (
+                <div style={{ padding: "9px 12px", borderRadius: 10, background: t.tealBg, border: "1px solid " + t.teal, fontSize: 12.5, color: t.text, lineHeight: 1.55 }}>
+                  <strong>Shipped {fmtDate(String(set.shippedAt).slice(0, 10), settings)}.</strong> This set's names, hooks and copy are frozen — they are
+                  what went out, and the record of what each ad said. Produce a new set to change anything.
+                </div>
+              ) : (
+                <div style={{ fontSize: 11.5, color: t.textMuted, fontFamily: t.serif, lineHeight: 1.55 }}>
+                  Set v{set?.version || record?.variantsVersion || 1} for {viewChannel}. Edit slots and take review suggestions freely until the
+                  names leave the studio — copying, exporting, a creator brief or a static ad freezes the set, so the ad name and
+                  the words behind it can never drift apart.
+                </div>
+              )}
+              {(set?.failedAngles || failedAngles).length > 0 && (
+                <div style={{ fontSize: 12, color: t.warn, lineHeight: 1.5 }}>
+                  No variants for {(set?.failedAngles || failedAngles).map(f => f.label || f.slug).join(", ")} — {(set?.failedAngles || failedAngles)[0].error} Produce a new set to try again.
+                </div>
+              )}
+              {critiqueBusy && <div style={{ fontSize: 12, color: t.textSub }}>Reviewing the set…</div>}
+              {critiqueErr && (
+                <div style={{ fontSize: 12, color: t.textSub, lineHeight: 1.5 }}>
+                  {critiqueErr}{" "}
+                  {!frozen && <button onClick={() => runCritique(variants)} style={{ ...gGh(t), padding: "2px 8px", fontSize: 11 }}>Review again</button>}
+                </div>
+              )}
+              {!critiqueBusy && !critiqueErr && !set?.critique && !frozen && (
+                <div><button onClick={() => runCritique(variants)} style={{ ...gGh(t), padding: "4px 10px", fontSize: 11.5 }}>Review this set</button></div>
+              )}
             </div>
           )}
 
@@ -1074,14 +1348,16 @@ export function CreativeStudio({
                       <div style={{ fontSize: 13.5, color: t.text, fontFamily: t.serif, lineHeight: 1.5 }}>“{v.hook}”</div>
                     </div>
                   )}
+                  <AltHooks t={t} variant={v} />
 
-                  {(v.script || []).length > 0 && (
-                    <ol style={{ margin: "0 0 10px", paddingLeft: 20, fontSize: 12.5, color: t.textSub, lineHeight: 1.6 }}>
-                      {v.script.map((b, j) => <li key={j} style={{ marginBottom: 2 }}>{b}</li>)}
-                    </ol>
-                  )}
+                  <CritiqueNote t={t} note={set?.critique?.byIdx?.[i]} frozen={frozen}
+                    onUseHook={() => applySuggestion(i, "hook")} onUseCopy={() => applySuggestion(i, "copy")} />
+
+                  <BeatsTable t={t} variant={v} />
+                  <CopyFields t={t} variant={v} channel={viewChannel} />
 
                   {v.cta && <div style={{ fontSize: 12.5, color: t.textSub, marginBottom: 4 }}><strong style={{ color: t.text }}>CTA.</strong> {v.cta}</div>}
+                  <VocQuotes t={t} snippets={vocSnippets} ids={v.vocCited} />
                   {v.rationale && <div style={{ fontSize: 12, color: t.textMuted, lineHeight: 1.55, marginBottom: 12 }}>{v.rationale}</div>}
 
                   {/* Key frame. The prompt is assembled from the approved brief
@@ -1091,12 +1367,13 @@ export function CreativeStudio({
                     const shot = roundAssets[i]?.image || null;
                     const shotUrl = shot ? imgUrls[shot.id] : null;
                     const refCount = Math.min((brand?.referenceImages || []).length, MAX_REFERENCE_IMAGES);
+                    const productCount = Math.min((product?.images || []).length, MAX_PRODUCT_IMAGES);
                     return (
                   <div style={{ margin:"12px 0", padding:"11px 12px", background:t.surface, border:"1px solid "+t.borderSoft, borderRadius:10 }}>
                     <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:9, flexWrap:"wrap" }}>
                       <div style={{ ...gSL(t), marginBottom:0 }}>Key frame</div>
                       <div style={{ display:"flex", gap:7, alignItems:"center", flexWrap:"wrap" }}>
-                        <button onClick={() => setPromptPreview(promptPreview?.idx === i ? null : { idx:i, text:buildImagePrompt(brief, v, brand, { referenceCount: refCount }) })}
+                        <button onClick={() => setPromptPreview(promptPreview?.idx === i ? null : { idx:i, text:buildImagePrompt(brief, v, brand, { referenceCount: refCount, productReferenceCount: productCount, product }) })}
                           style={{ ...gGh(t), padding:"5px 9px", fontSize:11 }}>
                           {promptPreview?.idx === i ? "Hide prompt" : "See prompt"}
                         </button>
@@ -1149,10 +1426,25 @@ export function CreativeStudio({
                       </div>
                     ) : !imgErr[i] && (
                       <div style={{ marginTop:8, fontSize:11.5, color:t.textMuted, fontFamily:t.serif, lineHeight:1.5 }}>
-                        Generates the opening beat as a single frame, grounded in this brief. Text and unverified claims are
-                        excluded from the image by construction — copy belongs in the ad tool, where it gets reviewed.
-                        {refCount > 0 && ` ${refCount} brand reference image${refCount === 1 ? "" : "s"} will be attached, so the frame matches the rest of the campaign.`}
+                        Generates the opening beat as a single frame, grounded in this brief.
+                        {productCount > 0 && ` ${product.name}'s ${productCount === 1 ? "image is" : productCount + " images are"} attached as the product itself, so the frame shows the real item.`}
+                        {refCount > 0 && ` ${refCount} brand style reference${refCount === 1 ? "" : "s"} will be attached, so the frame matches the rest of the campaign.`}
+                        {" "}Invented text and unverified claims are excluded by construction — a static ad's words are drawn over the
+                        frame afterwards, from this variant's approved copy.
                       </div>
+                    )}
+
+                    {/* The finished static ad: this frame, the variant's approved
+                        words and the brand's logo, drawn in code. */}
+                    {shot && shotUrl && (
+                      <StaticAdComposer t={t} frame={shot} brand={brand} cta={v.cta}
+                        lines={[
+                          { label: "Headline", text: v.copy?.headline || "" },
+                          { label: "Hook", text: v.hook || "" },
+                          ...(v.altHooks || []).map((h, k) => ({ label: "Alt hook " + (k + 1), text: h })),
+                        ].filter(l => l.text)}
+                        disabled={!frozen && nameFor(v, i).errors.length > 0}
+                        onExport={out => exportStatic(v, i, out)} />
                     )}
                   </div>
                     );
@@ -1163,7 +1455,7 @@ export function CreativeStudio({
                       to say — so both tiers are priced here before the button is
                       pressed. That comparison is the whole reason the tier
                       picker is a choice rather than a setting. */}
-                  {(() => {
+                  {videoOn && (() => {
                     const vidScript = buildVideoScript(v);
                     const seconds   = estimateSpokenSeconds(vidScript);
                     const job       = roundAssets[i]?.video || null;
@@ -1305,7 +1597,7 @@ export function CreativeStudio({
                       script sound like from a person". Priced per clip because
                       the duration is asked for rather than implied by a script,
                       which is exactly why it is not a third video tier. */}
-                  {(() => {
+                  {videoOn && (() => {
                     const scenePrompt = buildScenePrompt(brief, v, brand, { durationSeconds: sceneDur });
                     const sceneModel  = modelFor("scene");
                     const sceneCost   = estimateSceneCostUsd(sceneModel, sceneDur);
@@ -1418,14 +1710,19 @@ export function CreativeStudio({
                               {value}
                             </div>
                           ) : seg.vocab ? (
-                            <select value={value} onChange={e => setEdits({ ...edits, [i]: { ...(edits[i] || {}), [seg.key]: e.target.value } })}
-                              style={{ ...gSl(t), fontSize: 12, padding: "6px 8px" }}>
+                            // Saved on change: an edited slot is part of the name
+                            // the moment it renders, so it has to survive a reload.
+                            <select value={value} disabled={frozen} onChange={e => commitNaming(i, seg.key, e.target.value)}
+                              style={{ ...gSl(t), fontSize: 12, padding: "6px 8px", opacity: frozen ? 0.7 : 1 }}>
                               {!seg.vocab.includes(value) && <option value={value}>{value || "—"}</option>}
                               {seg.vocab.map(o => <option key={o} value={o}>{o}</option>)}
                             </select>
                           ) : (
-                            <input value={value} onChange={e => setEdits({ ...edits, [i]: { ...(edits[i] || {}), [seg.key]: e.target.value } })}
-                              style={{ ...gI(t), fontSize: 12, padding: "6px 8px", fontFamily: t.sans }} />
+                            // Free text is saved when the field is left, not per keystroke.
+                            <input value={value} disabled={frozen}
+                              onChange={e => setEdits({ ...edits, [i]: { ...(edits[i] || {}), [seg.key]: e.target.value } })}
+                              onBlur={() => { if (edits[i] && seg.key in edits[i]) commitNaming(i, seg.key, edits[i][seg.key]); }}
+                              style={{ ...gI(t), fontSize: 12, padding: "6px 8px", fontFamily: t.sans, opacity: frozen ? 0.7 : 1 }} />
                           )}
                         </div>
                       );
@@ -1463,9 +1760,11 @@ export function CreativeStudio({
             })}
           </div>
 
+          <SetHistory t={t} record={record} settings={settings} current={set} />
+
           {record?.generatedAt && (
             <div style={{ fontSize: 11, color: t.textMuted, fontFamily: t.sans, marginTop: 14 }}>
-              Last generated {fmtDate(record.generatedAt.slice(0, 10))}
+              Last generated {fmtDate(record.generatedAt.slice(0, 10), settings)}
             </div>
           )}
         </div>

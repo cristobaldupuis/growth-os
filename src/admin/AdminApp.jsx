@@ -4,6 +4,7 @@ import * as api from "./adminApi.js";
 import { BenchPanel } from "./BenchPanel.jsx";
 import { SpendPanel } from "./SpendPanel.jsx";
 import { CostModelPanel } from "./CostModelPanel.jsx";
+import { ClientsPanel } from "./ClientsPanel.jsx";
 
 // The admin console.
 //
@@ -313,7 +314,7 @@ export default function AdminApp() {
           </div>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {[["routing", "Routing"], ["bench", "Test bench"], ["spend", "Spend"], ["cost", "Cost model"]].map(([key, name]) => (
+          {[["clients", "Clients"], ["routing", "Routing"], ["bench", "Test bench"], ["spend", "Spend"], ["cost", "Cost model"]].map(([key, name]) => (
             <button key={key} onClick={() => setTab(key)}
               style={{ ...button(tab === key ? "primary" : "quiet") }}>
               {name}
@@ -327,7 +328,8 @@ export default function AdminApp() {
       </header>
 
       <main style={{ maxWidth: 780, margin: "0 auto", padding: "18px 20px" }}>
-        {tab === "routing" ? <RoutingPanel config={config} reload={reload} />
+        {tab === "clients" ? <ClientsPanel />
+          : tab === "routing" ? <RoutingPanel config={config} reload={reload} />
           : tab === "bench" ? <BenchPanel config={config} />
           : tab === "spend" ? <SpendPanel />
           : <CostModelPanel />}

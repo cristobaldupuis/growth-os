@@ -147,3 +147,47 @@ test("signed out returns no token and makes no request", async () => {
   assert.equal(await accessToken(f), null);
   assert.equal(f.calls.length, 0);
 });
+
+// -- Invitation and reset links ------------------------------------------------------
+
+import { parseAuthFragment, consumeAuthRedirect, requestPasswordReset, updatePassword } from "./auth.js";
+
+test("an auth fragment is told apart from a route, and its failure is readable", () => {
+  assert.equal(parseAuthFragment("#/dashboard"), null);
+  assert.equal(parseAuthFragment("#/i/e-123/edit"), null);
+  assert.equal(parseAuthFragment(""), null);
+  const ok = parseAuthFragment("#access_token=AT&expires_in=3600&refresh_token=RT&token_type=bearer&type=invite");
+  assert.deepEqual(ok, { type: "invite", tokens: { access_token: "AT", refresh_token: "RT", expires_in: 3600 } });
+  const dead = parseAuthFragment("#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired");
+  assert.match(dead.error, /expired or was already used/);
+});
+
+test("a reset link's session is adopted, named, and the tokens leave the address bar", async () => {
+  reset();
+  const replaced = [];
+  globalThis.window = { location: { pathname: "/", search: "", hash: "" }, history: { replaceState: (...a) => replaced.push(a) } };
+  const fetchImpl = mockFetch([{ body: { id: "u9", email: "lead@acme.com" } }]);
+  const out = await consumeAuthRedirect(fetchImpl, "#access_token=AT&refresh_token=RT&expires_in=3600&type=recovery");
+  assert.deepEqual(out, { type: "recovery", user: { id: "u9", email: "lead@acme.com" } });
+  assert.equal(currentUser().email, "lead@acme.com");
+  assert.equal(replaced[0][2], "/#/", "the fragment is replaced, not left in history");
+  assert.match(fetchImpl.calls[0].url, /\/user$/);
+  assert.equal(fetchImpl.calls[0].headers.Authorization, "Bearer AT");
+  assert.equal(await consumeAuthRedirect(fetchImpl, "#access_token=AT&refresh_token=RT"), null, "consumed once");
+  delete globalThis.window;
+});
+
+test("a password reset request goes to Supabase with a return address, and setting one uses the session", async () => {
+  reset();
+  const send = mockFetch([{ body: {} }]);
+  await requestPasswordReset("lead@acme.com", "https://app.example/", send);
+  assert.match(send.calls[0].url, /\/recover\?redirect_to=https%3A%2F%2Fapp\.example%2F$/);
+  assert.deepEqual(send.calls[0].body, { email: "lead@acme.com" });
+
+  await signIn("lead@acme.com", "pw", mockFetch([{ body: session(3600) }]));
+  const put = mockFetch([{ body: { id: "u1" } }]);
+  await updatePassword("a-long-password", put);
+  assert.match(put.calls[0].url, /\/user$/);
+  assert.deepEqual(put.calls[0].body, { password: "a-long-password" });
+  assert.equal(put.calls[0].headers.Authorization, "Bearer at.3600");
+});

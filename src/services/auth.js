@@ -206,3 +206,96 @@ export async function accessToken(fetchImpl = fetch) {
     return null;
   }
 }
+
+// -- Invitations and password resets ---------------------------------------------
+//
+// Both arrive the same way: Supabase emails a link, the link verifies itself on
+// Supabase's side and redirects back here with the new session in the URL
+// FRAGMENT — `#access_token=…&refresh_token=…&type=invite` (or `type=recovery`).
+// The fragment never reaches a server, which is why this is the implicit form.
+//
+// The app's router also lives in the fragment, so the auth fragment is captured
+// once, at module load, before anything routes on it — and is removed from the
+// address bar as soon as it has been read, so a token is never left sitting in
+// the URL for a screenshot, a shared link or the browser history.
+
+const INITIAL_HASH = typeof window !== "undefined" ? String(window.location.hash || "") : "";
+
+/**
+ * Read an auth redirect fragment. Returns null when `hash` is not one, `{error}`
+ * when Supabase redirected with a failure (an expired or reused link), and
+ * `{type, tokens}` when it carries a session.
+ */
+export function parseAuthFragment(hash) {
+  const raw = String(hash || "").replace(/^#\/?/, "");
+  if (!/(^|&)(access_token|error_description|error_code|error)=/.test(raw)) return null;
+  const p = new URLSearchParams(raw);
+  if (p.get("error") || p.get("error_code") || p.get("error_description")) {
+    const code = p.get("error_code") || p.get("error") || null;
+    const expired = /expired|otp_expired/i.test(code || "") || /expired/i.test(p.get("error_description") || "");
+    return {
+      error: expired
+        ? "That link has expired or was already used. Ask for a new one from the sign-in form."
+        : (p.get("error_description") || "That sign-in link could not be used.").replace(/\+/g, " "),
+      code,
+    };
+  }
+  const access_token = p.get("access_token");
+  const refresh_token = p.get("refresh_token");
+  if (!access_token || !refresh_token) return null;
+  return { type: p.get("type") || "", tokens: { access_token, refresh_token, expires_in: Number(p.get("expires_in")) || 3600 } };
+}
+
+/**
+ * If this page was opened from an invitation or reset link, adopt the session it
+ * carried and clean the address bar. Resolves `{type, user}`, `{error}`, or null
+ * when the page was opened normally. Safe to call more than once: the fragment is
+ * consumed the first time.
+ */
+let redirectHandled = false;
+export async function consumeAuthRedirect(fetchImpl = fetch, hash = INITIAL_HASH) {
+  if (redirectHandled) return null;
+  const parsed = parseAuthFragment(hash);
+  if (!parsed) return null;
+  redirectHandled = true;
+  if (typeof window !== "undefined" && window.history?.replaceState) {
+    window.history.replaceState(null, "", window.location.pathname + window.location.search + "#/");
+  }
+  if (parsed.error) return { error: parsed.error };
+
+  await loadAuthConfig(fetchImpl);
+  if (!config) return { error: "Sign-in is not configured on this deployment." };
+  // The fragment carries tokens but not who they belong to; one read of /user
+  // both names the account and proves the token is live before it is stored.
+  const res = await fetchImpl(`${config.url}/user`, {
+    headers: { apikey: config.key, Authorization: `Bearer ${parsed.tokens.access_token}` },
+  });
+  if (!res.ok) return { error: "That link has expired or was already used. Ask for a new one from the sign-in form." };
+  const user = await res.json().catch(() => ({}));
+  writeSession(toSession({ ...parsed.tokens, user }));
+  return { type: parsed.type, user: { id: user.id, email: user.email || null } };
+}
+
+/**
+ * Email a password-reset link that lands back on this app. Deliberately says
+ * nothing about whether the address has an account — the caller shows the same
+ * message either way, so the form cannot be used to find out who is a client.
+ */
+export async function requestPasswordReset(email, redirectTo, fetchImpl = fetch) {
+  await loadAuthConfig(fetchImpl);
+  const qs = redirectTo ? `?redirect_to=${encodeURIComponent(redirectTo)}` : "";
+  await authFetch(`/recover${qs}`, { email }, fetchImpl);
+}
+
+/** Set the signed-in user's password — the last step of an invite or a reset. */
+export async function updatePassword(password, fetchImpl = fetch) {
+  const token = await accessToken(fetchImpl);
+  if (!token || !config) throw new Error("The link's session has expired. Ask for a new link from the sign-in form.");
+  const res = await fetchImpl(`${config.url}/user`, {
+    method: "PUT",
+    headers: { apikey: config.key, Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ password }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.msg || body.message || body.error_description || `Could not set the password (${res.status}).`);
+}

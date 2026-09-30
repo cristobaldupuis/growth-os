@@ -229,3 +229,35 @@ test("a frame straight from a brief angle is prompted from the angle's own direc
   assert.match(prompt, /No text, words, letters/);
   assert.match(prompt, /cures colds/);
 });
+
+// -- Product references ----------------------------------------------------------
+//
+// The product image is what turns a mood-board frame into an ad. These hold the
+// three things the prompt must say once one is attached: which images are the
+// product, that it must not be redesigned, and that its own label is the only
+// text allowed in.
+
+test("product images are named by position and must be shown exactly", () => {
+  const p = buildImagePrompt(BRIEF, VARIANT, BRAND, { productReferenceCount: 2, referenceCount: 1, product: { name: "Airtight Canister" } });
+  assert.match(p, /THE PRODUCT: Airtight Canister/);
+  assert.match(p, /the first 2 attached images show the actual product/);
+  assert.match(p, /Do not redesign it/);
+  assert.match(p, /the 1 image after the product reference is a style reference/, "style references are told apart from the product");
+  assert.match(p, /Do NOT reproduce their composition/);
+});
+
+test("the product's own label is the one text allowed, and everything else stays banned", () => {
+  const p = buildImagePrompt(BRIEF, VARIANT, BRAND, { productReferenceCount: 1 });
+  assert.match(p, /No text, words, letters, numbers, logos, watermarks or packaging copy anywhere in the image, other than the product's own printed label exactly as it appears/);
+  BRIEF.claimsToVerify.forEach(c => assert.ok(p.includes(c), `unverified claim still excluded with a product attached: ${c}`));
+  const without = buildImagePrompt(BRIEF, VARIANT, BRAND);
+  assert.ok(!/PRODUCT REFERENCE/.test(without), "no product language when no product image is attached");
+  assert.ok(!/printed label/.test(without));
+});
+
+test("five references — two product, three style — fit the endpoint's cap", () => {
+  const five = Array.from({ length: 5 }, () => REF);
+  assert.equal(validateImageBody({ model: IMAGE_MODELS.FAST, prompt: "x", referenceImages: five }), null);
+  const p = buildImagePrompt(BRIEF, VARIANT, BRAND, { productReferenceCount: 2, referenceCount: 3, product: { name: "x" } });
+  assert.ok(p.length <= MAX_PROMPT_CHARS, `prompt was ${p.length} chars`);
+});

@@ -139,6 +139,28 @@ export const MODEL_CATALOGUE = [
     caps: { tools: true, json: true, adaptiveThinking: true, effort: true, cacheMinTokens: 512, longContext: true, structuredOutputs: true },
   },
   {
+    // The current Sonnet, at Sonnet 5's price. Added to the catalogue rather than
+    // swapped into DEFAULT_ROUTING: its effort levels are recalibrated from
+    // Sonnet 5's, so the same `medium` does a different amount of work, and a
+    // group moves to it after the bench says so — not because it is newer.
+    //
+    // Its request surface is stricter in three ways, none of which this app
+    // triggers today: `thinking: {type:"disabled"}` is a 400 (buildRequest only
+    // ever sends adaptive), forced `tool_choice` any/tool is a 400 (the debate's
+    // last-chance turn uses `none`, which is allowed), and non-default sampling
+    // parameters are a 400 (no call site sets any).
+    id: "claude-sonnet-5-5",
+    provider: "anthropic",
+    label: "Claude Sonnet 5.5",
+    modality: "text",
+    price: { inUsdPerMTok: 2, outUsdPerMTok: 10 },
+    blurb: "The current Sonnet, same price as Sonnet 5. Bench it on a group before routing — effort levels were recalibrated.",
+    // 512 per the prompt-caching docs at the time of writing, which flag this
+    // model's value as one to re-check; too high and a working breakpoint is
+    // skipped, too low and an ignored one is marked — neither errors.
+    caps: { tools: true, json: true, adaptiveThinking: true, effort: true, cacheMinTokens: 512, longContext: true, structuredOutputs: true },
+  },
+  {
     id: "claude-sonnet-5",
     provider: "anthropic",
     label: "Claude Sonnet 5",
@@ -493,7 +515,8 @@ export const FEATURE_GROUPS = {
     requires: { json: true },
     calls: [
       { fn: "callCreativeBrief",    surface: "Creative brief from an initiative" },
-      { fn: "callCreativeVariants", surface: "Ad variants from an approved brief" },
+      { fn: "callCreativeVariants", surface: "Ad variants from an approved brief, one call per angle" },
+      { fn: "callCritiqueVariants", surface: "Review pass: rubric scores and suggested rewrites for a variant set" },
     ],
   },
   image: {

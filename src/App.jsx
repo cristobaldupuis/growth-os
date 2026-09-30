@@ -91,7 +91,8 @@ import { TOUR_STEPS } from "./components/tourSteps.js";
 import { CBar } from "./components/CBar.jsx";
 import { interactive } from "./components/motion.js";
 import { EAlert } from "./components/EAlert.jsx";
-import { WorkspacePanel } from "./components/WorkspacePanel.jsx";
+import { WorkspacePanel, SetPasswordModal } from "./components/WorkspacePanel.jsx";
+import { consumeAuthRedirect } from "./services/auth.js";
 import { bootWorkspace, bootMessage } from "./services/workspaceBoot.js";
 import { FR } from "./components/FR.jsx";
 import { ErrorBoundary } from "./components/ErrorBoundary.jsx";
@@ -620,6 +621,9 @@ export default function App() {
   // is a link somebody can send.
   const [settingsSection, setSettingsSection] = useState("workspace");
   const [onboarding, setOnboarding] = useState(false);
+  // Set when this page was opened from an invitation or password-reset link:
+  // `{type, user}` to finish choosing a password, or `{error}` for a dead link.
+  const [authLanding, setAuthLanding] = useState(null);
   const [showCapture, setShowCaptureRaw] = useState(false);
   const [captureText, setCaptureText] = useState("");
   const [captureLoad, setCaptureLoad] = useState(false);
@@ -820,6 +824,11 @@ export default function App() {
       // Attaching the workspace backend after the reads would load the browser
       // copy and then save it over the server's, which is the one ordering bug
       // in this file that would cost a client their history.
+      // An invitation or reset link signs the person in through the URL fragment.
+      // Adopted BEFORE the workspace boot, so the boot sees the session and opens
+      // their workspace rather than the browser store.
+      const landing = await consumeAuthRedirect().catch(() => null);
+      if (landing) setAuthLanding(landing);
       setBoot(await bootWorkspace());
       // Hoisted out of the try so the backup nudge below can still see what was
       // loaded even when parsing part of it threw.
@@ -2137,6 +2146,18 @@ export default function App() {
             </button>
           </div>
         </div>
+      )}
+
+      {authLanding && !authLanding.error && (authLanding.type === "invite" || authLanding.type === "recovery") && (
+        <SetPasswordModal t={t} dk={dk} type={authLanding.type} email={authLanding.user?.email}
+          onDone={()=>{ setAuthLanding(null); showToast("Password set — you're signed in.", "success"); }}
+          onClose={()=>setAuthLanding(null)} />
+      )}
+      {authLanding?.error && (
+        <Modal t={t} dk={dk} onClose={()=>setAuthLanding(null)} title="That link didn't work">
+          <div style={{fontSize:13,color:t.textSub,fontFamily:t.sans,lineHeight:1.55,marginBottom:16}}>{authLanding.error}</div>
+          <button style={gG(t)} onClick={()=>{ setAuthLanding(null); setShowWorkspace(true); }}>Open sign-in</button>
+        </Modal>
       )}
 
       {showWorkspace && (

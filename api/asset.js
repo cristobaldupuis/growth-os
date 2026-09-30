@@ -35,8 +35,15 @@
 // blob the operator explicitly chooses to preserve.
 
 import { guardEntry, guardRateLimit, rateLimitIdentity, dailyCap } from "./_guard.js";
+import { importProductFromPage, fetchProductImage, ImportError } from "./_productPage.js";
 
 export const BUCKET = process.env.SUPABASE_ASSET_BUCKET || "creative-assets";
+
+// Product page imports fetch a URL the caller chose, so they are bounded on their
+// own bucket rather than sharing the upload one: a page read plus one request per
+// image an operator keeps, which is a handful per product. See api/_productPage.js
+// for the address screening, which is the control that actually matters here.
+const PRODUCT_RATE_MAX = 40;
 
 // A 4:5 PNG from the Pro image model runs a few megabytes base64-encoded. 12MB
 // of body allows that with headroom while staying well under what a serverless
@@ -151,6 +158,38 @@ export default async function handler(req, res) {
       // this up" and "your project is paused" need different fixes.
       ...(reachable.ok ? {} : { reason: reachable.reason }),
     });
+    return;
+  }
+
+  // Product page import: read a product's own page into facts and images the
+  // operator reviews before anything is saved. Answered before the storage check,
+  // because a deployment without durable storage still needs to be able to put a
+  // product in front of the image model — the bytes then live for the session,
+  // exactly like a reference image uploaded by hand.
+  if (action === "importProduct" || action === "productImage") {
+    if (req.method !== "POST") { res.status(405).json({ error: "Method not allowed" }); return; }
+    const url = String(req.body?.url || "");
+    if (!url || url.length > 2048) { res.status(400).json({ error: "Paste a product page URL." }); return; }
+
+    const who = await rateLimitIdentity(req);
+    if (who.error) { res.status(401).json({ error: who.error }); return; }
+    if (await guardRateLimit(req, res, {
+      key: `gos:product:${who.id}`,
+      max: PRODUCT_RATE_MAX,
+      globalKey: "gos:product:global",
+      globalMax: dailyCap("DAILY_CAP_PRODUCT_IMPORTS", 400),
+      limitMessage: "Too many product imports. Wait a while and try again.",
+      label: "Product import",
+    })) return;
+
+    try {
+      if (action === "importProduct") res.status(200).json({ product: await importProductFromPage(url) });
+      else res.status(200).json(await fetchProductImage(url));
+    } catch (err) {
+      if (err instanceof ImportError) { res.status(err.status).json({ error: err.message }); return; }
+      console.error("product import failed:", err);
+      res.status(502).json({ error: "Could not read that page." });
+    }
     return;
   }
 

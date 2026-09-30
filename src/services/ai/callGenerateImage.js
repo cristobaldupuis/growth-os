@@ -47,6 +47,10 @@ export const IMAGE_ASPECTS = [
  */
 export function buildImagePrompt(brief, variant, brand, opts = {}) {
   const refCount = opts.referenceCount || 0;
+  // Product images travel FIRST and style references after them — the order
+  // api/image.js sends parts in — so the prompt can name each by position.
+  const productCount = opts.productReferenceCount || 0;
+  const product = opts.product || null;
   const lines = [
     "Photorealistic advertising key frame for a direct-to-consumer brand. Single still image.",
     "",
@@ -57,10 +61,24 @@ export function buildImagePrompt(brief, variant, brand, opts = {}) {
     "GROUNDED IN: " + (brief.insight || "everyday use of the product"),
   ];
 
+  if (product?.name)       lines.push("THE PRODUCT: " + product.name);
   if (brand?.whatTheySell) lines.push("PRODUCT CONTEXT: " + brand.whatTheySell);
   if (brand?.icp)          lines.push("WHO IT IS FOR: " + brand.icp);
   if ((brief.proof || []).length) lines.push("VISIBLE PROOF: " + brief.proof.join("; "));
   if (variant.varies)      lines.push("THIS VARIANT EMPHASISES: " + variant.varies);
+
+  // The reason the frame can be an ad rather than a mood board. Without it the
+  // model draws a plausible product that is not the one the customer receives —
+  // and an ad showing a different bottle is worse than no ad.
+  if (productCount > 0) {
+    lines.push(
+      "",
+      `PRODUCT REFERENCE: the first ${productCount === 1 ? "attached image shows" : productCount + " attached images show"} the actual product. ` +
+      "Show this exact product in the scene — the same shape, proportions, colours, materials and label artwork. " +
+      "Do not redesign it, restyle its packaging, change its label, or invent a variant that is not in the reference. " +
+      "It must be recognisable as the same item a customer receives."
+    );
+  }
 
   // When references are attached, the prompt must say what to take from them.
   // Left unsaid, the model treats leading images as things to reproduce and
@@ -69,9 +87,13 @@ export function buildImagePrompt(brief, variant, brand, opts = {}) {
   if (refCount > 0) {
     lines.push(
       "",
-      `STYLE REFERENCE: ${refCount} reference image${refCount === 1 ? " is" : "s are"} attached above. ` +
-      "Match their lighting, colour grade, framing and overall visual language so this frame reads as part of the same campaign. " +
-      "Do NOT reproduce their composition or subject matter — this is a new scene in the same house style."
+      productCount > 0
+        ? `STYLE REFERENCE: the ${refCount} image${refCount === 1 ? "" : "s"} after the product reference ${refCount === 1 ? "is a style reference" : "are style references"}. ` +
+          "Match their lighting, colour grade, framing and overall visual language so this frame reads as part of the same campaign. " +
+          "Do NOT reproduce their composition or subject matter — this is a new scene in the same house style."
+        : `STYLE REFERENCE: ${refCount} reference image${refCount === 1 ? " is" : "s are"} attached above. ` +
+          "Match their lighting, colour grade, framing and overall visual language so this frame reads as part of the same campaign. " +
+          "Do NOT reproduce their composition or subject matter — this is a new scene in the same house style."
     );
   }
 
@@ -82,7 +104,13 @@ export function buildImagePrompt(brief, variant, brand, opts = {}) {
       : "STYLE: naturalistic lighting, believable domestic or real-world setting, shallow depth of field, no studio sterility, no stock-photo posing.",
     "",
     "HARD CONSTRAINTS:",
-    "  • No text, words, letters, numbers, logos, watermarks or packaging copy anywhere in the image.",
+    // The product's own printed label is the one text allowed in: it is what the
+    // customer will see on the shelf, and it is copied from the reference rather
+    // than written by the model. Everything else stays banned — invented words
+    // are an unreviewed claim on an asset that looks finished.
+    productCount > 0
+      ? "  • No text, words, letters, numbers, logos, watermarks or packaging copy anywhere in the image, other than the product's own printed label exactly as it appears in the product reference."
+      : "  • No text, words, letters, numbers, logos, watermarks or packaging copy anywhere in the image.",
     "  • No user-interface elements, no phone screens showing content, no infographic overlays.",
     "  • Do not depict results, before/after states, or any health, performance or outcome claim."
   );

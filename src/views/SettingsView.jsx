@@ -10,6 +10,9 @@ import { DEMO_MODE } from "../activeConfig.js";
 import { WORKSPACE_MODES, resolveWorkspaceMode, isLiveWorkspace } from "../services/dataSafety.js";
 import { putAsset, getAssetUrl, isDurable, durableUnavailableReason } from "../services/assetStore.js";
 import { useEffect } from "react";
+import { BrandProducts } from "../components/BrandProducts.jsx";
+import { splitVoc } from "../services/voc.js";
+import { downscaleImage } from "../services/imageResize.js";
 
 // Kept in step with api/image.js, which refuses a fourth rather than truncating.
 const MAX_REFERENCE_IMAGES = 3;
@@ -120,6 +123,117 @@ function BrandReferences({ t, brand, onChange }) {
         Attached to every key frame generated for this brand so a round of creative shares one visual language. The model
         matches their lighting, grade and framing — it is told explicitly not to reproduce their composition or subject.
         {!isDurable() && ` Held for this tab only and will need re-adding after a reload — ${durableUnavailableReason()}.`}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The brand's logo and accent colour, for static ads.
+ *
+ * A static ad's words and logo are drawn in code over a text-free frame (see
+ * services/staticAd.js), so the brand's mark has to come from the brand rather
+ * than from the image model, which is forbidden from drawing one. Stored through
+ * assetStore like a reference image; only the key lives in settings.
+ */
+function BrandLogo({ t, brand, onLogo, onAccent }) {
+  const [resolved, setResolved] = useState({ key: null, url: null });
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const logo = brand.logo || null;
+  const url = logo && resolved.key === logo.storageKey ? resolved.url : null;
+
+  useEffect(() => {
+    if (!logo) return undefined;
+    let live = true;
+    getAssetUrl(logo).then(u => { if (live) setResolved({ key: logo.storageKey, url: u }); });
+    return () => { live = false; };
+  }, [logo?.storageKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const add = async (file) => {
+    setErr("");
+    if (!file) return;
+    if (!REFERENCE_TYPES.includes(file.type)) { setErr("The logo must be PNG, JPEG or WebP — a PNG with a transparent background works best."); return; }
+    if (file.size > MAX_REFERENCE_BYTES) { setErr("That logo is over 1.5MB; export it smaller."); return; }
+    setBusy(true);
+    try {
+      const data = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(",")[1] || "");
+        reader.onerror = () => reject(new Error("Could not read that file."));
+        reader.readAsDataURL(file);
+      });
+      // A PNG keeps its transparency: the logo sits over a photograph, and a
+      // white box around it would be the first thing anyone noticed.
+      const sized = file.type === "image/png" ? { mimeType: file.type, data } : await downscaleImage({ mimeType: file.type, data }, { maxEdge: 800 });
+      const stored = await putAsset({ mimeType: sized.mimeType, data: sized.data });
+      onLogo({ storageKey: stored.storageKey, bytesDurable: stored.durable, mimeType: sized.mimeType, name: file.name, addedAt: new Date().toISOString() });
+    } catch (e) {
+      setErr(e.message || "Could not add that logo.");
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div style={{ borderTop: "1px solid " + t.borderSoft, paddingTop: 9, marginTop: 2, display: "flex", gap: 14, alignItems: "flex-start", flexWrap: "wrap" }}>
+      <div>
+        <label style={{ fontSize: 10, color: t.textMuted, fontFamily: t.sans, display: "block", marginBottom: 5, letterSpacing: "0.05em" }}>LOGO (FOR STATIC ADS)</label>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {logo && (url ? (
+            <img src={url} alt={brand.name + " logo"} style={{ height: 40, maxWidth: 120, objectFit: "contain", borderRadius: 5, border: "1px solid " + t.border, background: "repeating-conic-gradient(#ddd 0% 25%, #fff 0% 50%) 50% / 10px 10px", padding: 3 }} />
+          ) : (
+            <span style={{ fontSize: 10.5, color: t.textMuted }}>logo bytes not held — add it again</span>
+          ))}
+          <label style={{ ...gGh(t), padding: "4px 9px", fontSize: 11, cursor: busy ? "wait" : "pointer" }}>
+            {busy ? "Adding…" : logo ? "Replace" : "Upload logo"}
+            <input type="file" accept={REFERENCE_TYPES.join(",")} disabled={busy} style={{ display: "none" }}
+              onChange={e => { add(e.target.files?.[0]); e.target.value = ""; }} />
+          </label>
+          {logo && <button onClick={() => onLogo(null)} style={{ ...gGh(t), padding: "4px 8px", fontSize: 11 }}>Remove</button>}
+        </div>
+      </div>
+      <div>
+        <label style={{ fontSize: 10, color: t.textMuted, fontFamily: t.sans, display: "block", marginBottom: 5, letterSpacing: "0.05em" }}>ACCENT COLOUR (CTA BUTTON)</label>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <input type="color" value={brand.accentColor || "#111111"} onChange={e => onAccent(e.target.value)}
+            aria-label="Accent colour" style={{ width: 38, height: 28, padding: 0, border: "1px solid " + t.border, borderRadius: 5, background: "none" }} />
+          <code style={{ fontSize: 11, color: t.textSub }}>{brand.accentColor || "#111111"}</code>
+        </div>
+      </div>
+      {err && <div style={{ flexBasis: "100%", fontSize: 11, color: t.red, lineHeight: 1.5 }}>{err}</div>}
+    </div>
+  );
+}
+
+/**
+ * How the brand sounds, and what its customers actually say.
+ *
+ * Two fields the creative prompts had no way to receive. Voice is followed in
+ * every line of copy; customer voice is split into snippets the brief cites by
+ * id, with identifiers stripped on the way in (services/voc.js).
+ */
+function BrandVoice({ t, brand, onVoice, onVoc }) {
+  const parsed = useMemo(() => splitVoc(brand.voc || ""), [brand.voc]);
+  const lab = { fontSize: 12, color: t.textMuted, fontFamily: t.sans, display: "block", marginBottom: 3 };
+  return (
+    <div className="gos-grid-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, borderTop: "1px solid " + t.borderSoft, paddingTop: 9, marginTop: 2 }}>
+      <div>
+        <label style={lab}>Brand voice</label>
+        <textarea style={{ ...gI(t), fontSize: 11, minHeight: 92, resize: "vertical" }} value={brand.voice || ""}
+          onChange={e => onVoice(e.target.value)}
+          placeholder={"How the brand talks, and what it never says.\ne.g. Warm, dry, specific. Short sentences. Talks like a friend who cooks.\nAvoid: 'elevate', 'game-changer', exclamation marks, health claims.\nSounds like: 'Dinner, minus the maths.'"} />
+      </div>
+      <div>
+        <label style={lab}>Customer voice — reviews, survey answers, comments</label>
+        <textarea style={{ ...gI(t), fontSize: 11, minHeight: 92, resize: "vertical" }} value={brand.voc || ""}
+          onChange={e => onVoc(e.target.value)}
+          placeholder={"Paste what customers wrote, one per line (or separated by a blank line).\nThe words only — no names or emails."} />
+        <div style={{ fontSize: 10.5, color: t.textMuted, fontFamily: t.serif, lineHeight: 1.5, marginTop: 3 }}>
+          {parsed.snippets.length
+            ? `${parsed.snippets.length} snippet${parsed.snippets.length === 1 ? "" : "s"} the brief can quote by id.`
+            : "Briefs ground their buyer insight in these, and hooks borrow customers' own words."}
+          {parsed.scrubbedCount > 0 && ` Names, emails, numbers or handles were removed from ${parsed.scrubbedCount}.`}
+          {parsed.droppedCount > 0 && ` ${parsed.droppedCount} too short or repeated, skipped.`}
+        </div>
       </div>
     </div>
   );
@@ -271,6 +385,16 @@ export function SettingsView({t,dk,settings,onSave,onClose,onDownloadBackup,onRe
             </select>
           </FR>
         </div>
+        {/* Off by default. Talking heads, voice auditions and generated scenes
+            are three paid integrations most rounds of creative never use, and
+            they were half of the studio's surface. */}
+        <FR label="Video tools in Creative Studio" t={t}
+            hint="Talking-head renders, voice auditions and generated scenes. Each is billed per render by its provider.">
+          <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,color:t.text,cursor:"pointer"}}>
+            <input type="checkbox" checked={!!local.creativeVideo} onChange={e=>f("creativeVideo",e.target.checked)} />
+            Show video tools
+          </label>
+        </FR>
         </>)}
         {sec==="northstar" && (
         <div style={{borderTop:"1px solid "+t.border,paddingTop:14}}>
@@ -347,7 +471,11 @@ export function SettingsView({t,dk,settings,onSave,onClose,onDownloadBackup,onRe
                       placeholder="e.g. CAC rising, thin margin on hero SKU"/>
                   </div>
                 </div>
+                <BrandVoice t={t} brand={b} onVoice={v=>upd("voice",v)} onVoc={v=>upd("voc",v)} />
+                <BrandProducts t={t} brand={b} onChange={ps=>upd("products",ps)} />
                 <BrandReferences t={t} brand={b} onChange={refs=>upd("referenceImages",refs)} />
+                <BrandLogo t={t} brand={b} onLogo={l=>upd("logo",l)} onAccent={c=>upd("accentColor",c)} />
+                {local.creativeVideo && (
                 <div style={{borderTop:"1px solid "+t.borderSoft,paddingTop:9,marginTop:2}}>
                   <label style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,display:"block",marginBottom:5}}>
                     AVATAR IMAGE URL (for talking-head video)
@@ -360,6 +488,7 @@ export function SettingsView({t,dk,settings,onSave,onClose,onDownloadBackup,onRe
                     Creative Studio's Custom voice and Premium video tiers; HeyGen does not need this.
                   </div>
                 </div>
+                )}
               </div>
             );})}
           </div>

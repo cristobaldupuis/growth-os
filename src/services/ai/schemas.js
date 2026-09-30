@@ -173,16 +173,20 @@ export const CREATIVE_BRIEF_FORMAT = format(obj({
   wouldFalsify: str,
   claimsToVerify: strList,
   evidenceCited: strList,
+  vocCited: strList,
   evidenceGaps: str,
 }));
 
+/** An object of required string fields named by `keys` — the per-channel copy. */
+const stringFields = (keys) => obj(Object.fromEntries((keys || []).map(k => [k, str])));
+
 /**
  * Variants carry a `naming` object whose keys are the schema's own dimension
- * slots, which vary per deployment — so this one is built at the call site from
- * the live naming schema rather than being a constant here. Everything else
- * about it is fixed.
+ * slots, which vary per deployment, and a `copy` object whose keys are the
+ * channel's ad-copy fields (services/creativeCopy.js) — so this one is built at
+ * the call site rather than being a constant here. Everything else is fixed.
  */
-export function creativeVariantsFormat(segmentKeys) {
+export function creativeVariantsFormat(segmentKeys, copyKeys = []) {
   const naming = {
     type: "object",
     properties: Object.fromEntries((segmentKeys || []).map(k => [k, str])),
@@ -194,9 +198,28 @@ export function creativeVariantsFormat(segmentKeys) {
     label: str,
     varies: str,
     hook: str,
-    script: strList,
+    altHooks: strList,
+    beats: { type: "array", items: obj({ time: str, visual: str, voiceover: str, onScreen: str }) },
+    copy: stringFields(copyKeys),
     cta: str,
     rationale: str,
+    vocCited: strList,
     naming,
+  })));
+}
+
+/**
+ * The review pass. `index` points into the list it was shown; a suggestion field
+ * left empty means "keep what is there", which is why every field is required
+ * rather than optional — an absent key and a deliberate "no change" read the same.
+ */
+export function creativeCritiqueFormat(copyKeys = []) {
+  return format(listOf(obj({
+    index: { type: "integer" },
+    score: { type: "integer", minimum: 1, maximum: 10 },
+    issues: strList,
+    claimRisk: str,
+    suggestedHook: str,
+    suggestedCopy: stringFields(copyKeys),
   })));
 }

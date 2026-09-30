@@ -48,11 +48,18 @@ export const ALLOWED_ASPECTS = new Set(["1:1", "4:5", "9:16", "16:9", "3:2", "2:
 // most common reason a generated frame is unusable in a real account is not
 // quality, it is that yesterday's frame and today's share no visual language.
 //
-// Capped at three because the cap is a cost control, not a quality one: every
-// reference image is billed as input on every generation, so an uncapped
-// reference set makes each frame progressively more expensive for a diminishing
-// return. Three is enough to carry a palette, a product and a setting.
-export const MAX_REFERENCE_IMAGES = 3;
+// Two kinds now, sent in a fixed order the prompt names: up to two PRODUCT
+// images first (the packshot the frame must show exactly — see
+// buildImagePrompt), then up to three STYLE references. The cap is a cost
+// control, not a quality one: every reference image is billed as input on every
+// generation. It was three when only style existed; the product needed its own
+// two rather than taking the style slots, because a frame that gets the product
+// right in the wrong visual language is as unusable as the reverse.
+//
+// The studio downscales every reference to ~1024px JPEG before sending, which is
+// what keeps five of them far below the platform's 4.5MB function payload limit
+// — the body cap below is this endpoint's own ceiling, not the platform's.
+export const MAX_REFERENCE_IMAGES = 5;
 export const ALLOWED_REFERENCE_MIME = new Set(["image/png", "image/jpeg", "image/webp"]);
 
 // Raised from 64KB to carry the reference images inline. Three 1MB references

@@ -28,7 +28,7 @@ import { callGenerateCandidates } from "./callGenerateCandidates.js";
 import { callExpandRecommendation } from "./callExpandRecommendation.js";
 import { callDebateSynthesis } from "./callDebateSynthesis.js";
 import { callCreativeBrief } from "./callCreativeBrief.js";
-import { callCreativeVariants } from "./callCreativeVariants.js";
+import { callCreativeVariants, callCritiqueVariants } from "./callCreativeVariants.js";
 import { DEFAULT_NAMING_SCHEMA } from "../naming.js";
 
 let passed = 0, failed = 0;
@@ -78,6 +78,15 @@ const BRIEF = {
     { slug:"MacroMath", label:"Macro math", theory:"They buy the numbers.", execution:"On-screen macro overlay.", openingBeat:"Label held to camera." },
   ],
 };
+
+// Twelve variants — four angles at three each — is the most the review pass is
+// ever shown, so it is the size its request has to fit.
+const VARIANTS = Array.from({ length: 12 }, (_, i) => ({
+  angleSlug: BRIEF.angles[i % 2].slug, label: "v" + i, varies: "hook", hook: "A hook " + i,
+  altHooks: ["Alt one", "Alt two"], cta: "Shop now",
+  beats: [{ time: "0-2s", visual: "Jar on a counter", voiceover: "Line", onScreen: "Text" }],
+  copy: { primaryText: "Primary", headline: "Headline", description: "Desc" },
+}));
 
 /** Stub fetch, run `fn`, return every request body it attempted to send. */
 async function capture(fn) {
@@ -139,6 +148,10 @@ const CASES = [
   ["Debate synthesis",        () => callDebateSynthesis("portfolio ctx", "user ctx", TRANSCRIPT, SETTINGS.categories, SETTINGS, PORTFOLIO_TOOLS)],
   ["Creative brief",          () => callCreativeBrief(ITEM, BRAND, [{ id:"e1", title:"t", learning:"l", outcome:"Success", category:"Conversion" }], SETTINGS, DEFAULT_NAMING_SCHEMA)],
   ["Creative variants",       () => callCreativeVariants(BRIEF, ITEM, BRAND, DEFAULT_NAMING_SCHEMA, { perAngle: 2 })],
+  // The largest variant request: three per angle, on the channel with the most
+  // copy fields. One body per angle, and every one of them has to fit.
+  ["Creative variants (max)", () => callCreativeVariants(BRIEF, ITEM, BRAND, DEFAULT_NAMING_SCHEMA, { perAngle: 3, channel: "meta" })],
+  ["Creative review pass",    () => callCritiqueVariants(BRIEF, VARIANTS, BRAND, { channel: "meta" })],
 ];
 
 console.log("Request shapes accepted by the proxy:\n");
@@ -178,6 +191,8 @@ const GROUP_OF = {
   "Debate synthesis": "debate",
   "Creative brief": "creative",
   "Creative variants": "creative",
+  "Creative variants (max)": "creative",
+  "Creative review pass": "creative",
 };
 
 await test("every call site sends its own group's routed model", async () => {
@@ -219,6 +234,7 @@ await test("an explicit override reaches the wire", async () => {
     ["Debate synthesis",     (m) => callDebateSynthesis("ctx", "user ctx", TRANSCRIPT, SETTINGS.categories, SETTINGS, PORTFOLIO_TOOLS, m)],
     ["Creative brief",       (m) => callCreativeBrief(ITEM, BRAND, [], SETTINGS, DEFAULT_NAMING_SCHEMA, m)],
     ["Creative variants",    (m) => callCreativeVariants(BRIEF, ITEM, BRAND, DEFAULT_NAMING_SCHEMA, { perAngle: 2 }, m)],
+    ["Creative review pass", (m) => callCritiqueVariants(BRIEF, VARIANTS, BRAND, { channel: "meta" }, m)],
   ];
 
   for (const [label, invoke] of OVERRIDING_CASES) {

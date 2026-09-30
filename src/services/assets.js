@@ -40,7 +40,13 @@
 // would make the newer silently replace the older on screen while both still
 // billed. They are also priced on different axes — a render costs what its
 // script takes to say, a scene costs the duration you asked for.
-export const ASSET_KINDS = new Set(["image", "video", "scene"]);
+//
+// "static" is the finished static ad: a key frame with the variant's approved
+// headline, CTA and the brand's logo drawn over it in code (services/staticAd.js).
+// Its own kind for the same slotting reason, and because it is the asset that
+// actually ships — its `adName` is the frozen one — where the frame it was drawn
+// on is storyboard material. It costs nothing to compose, and says so.
+export const ASSET_KINDS = new Set(["image", "video", "scene", "static"]);
 
 // Per-generation cost, in USD, for the image models this app calls. These are
 // list rates at the time of writing and are recorded as ESTIMATES — the record

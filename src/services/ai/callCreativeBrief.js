@@ -2,6 +2,9 @@ import { postProxy, parseStructured } from "./_shared.js";
 import { CREATIVE_BRIEF_FORMAT } from "./schemas.js";
 import { EFFORT, buildRequest, modelFor } from "./models.js";
 import { selectLearnings, formatEvidenceBlock } from "../creativeEvidence.js";
+import { formatProductBlock } from "../products.js";
+import { formatVocBlock, formatVoiceBlock } from "../voc.js";
+import { formatWinnersBlock } from "../variantSets.js";
 
 // -- Creative brief ------------------------------------------------------------
 //
@@ -28,6 +31,24 @@ import { selectLearnings, formatEvidenceBlock } from "../creativeEvidence.js";
 // idea, not just what to make. A brief that can't be wrong can't teach you
 // anything, and the point of running creative through an experiment ledger is
 // that each round of assets settles a question.
+//
+// ## Four inputs the brief did not used to have
+//
+// Each one closes a gap between what the model was asked to do and what it was
+// given to do it with (see DECISIONS.md, "The brief is given the product, the
+// customer and the ads that won"):
+//
+//   - PRODUCT — the product's own facts, from its page. The only product claims
+//     copy may make besides the brand brief's.
+//   - BRAND VOICE — how the brand sounds and what it never says.
+//   - CUSTOMER VOICE — reviews and survey answers as cited snippets, because an
+//     `insight` about the buyer with no buyer data in the prompt is invention.
+//   - SHIPPED ADS — the studio's own ads the account has judged, with the words
+//     they carried. Measured ROAS per angle says an angle won; this says what the
+//     winning ad actually said.
+//
+// All four are optional (`opts`), and each block says plainly when it is empty
+// so the model can report the gap rather than paper over it.
 
 export async function callCreativeBrief(initiative, brand, learningsIndex, settings, schema, modelOverride, opts = {}) {
   // Ranked and capped by a stated rule rather than by array position, and the
@@ -90,19 +111,23 @@ export async function callCreativeBrief(initiative, brand, learningsIndex, setti
     "  • `angles` are the competing creative bets this round will settle between. They must be genuinely different theories of why someone buys, not three phrasings of one idea.",
     "  • `wouldFalsify` states what result would tell the team this creative direction is wrong. If you cannot name one, the brief is not testable and you should say so there.",
     "  • Be concrete about execution. 'UGC video' is not direction. 'Handheld, single unbroken take, presenter eats on camera within the first three seconds, no on-screen text before second 4' is.",
-    "  • Do not invent product claims, ingredients, certifications, prices or results that are not in the brand brief. If a claim would strengthen the creative but is not supported, put it in `claimsToVerify` instead of asserting it.",
+    "  • Do not invent product claims, ingredients, certifications, prices or results that are not in the brand brief or the PRODUCT block. If a claim would strengthen the creative but is not supported, put it in `claimsToVerify` instead of asserting it.",
+    "  • CUSTOMER VOICE is the strongest evidence about the buyer you have. When snippets are supplied, the insight must be built on what they say and cite their ids in `vocCited`; the promise and angles should use customers' own words where they are sharper than yours. Never present words as a customer's unless they are a snippet, verbatim. With no snippets, `vocCited` is empty and `evidenceGaps` says what customer evidence would change the brief.",
+    "  • SHIPPED ADS that WON are proof of what this audience responds to. Unless the hypothesis rules it out, one angle should iterate on a winner — same theory, new execution — and its theory should name the ad it builds on. Do not bring back what LOST without saying why this time is different.",
+    "  • Write the promise, the proof and every opening beat in the BRAND VOICE.",
     "",
     angleRule,
     "",
     "Return ONLY a JSON object with these keys exactly:",
     "  insight (string, 1-2 sentences — the buyer truth this round is built on),",
     "  promise (string, one sentence — what the ad promises the viewer),",
-    "  proof (array of strings — the specific things on screen that make the promise believable; only what the brand brief supports),",
+    "  proof (array of strings — the specific things on screen that make the promise believable; only what the brand brief and PRODUCT block support),",
     "  angles (array of 3-4 objects, each: {slug (string, CamelCase segment-legal), label (string, human-readable), theory (string, one sentence — why someone buys under this angle), execution (string, 2-3 sentences of concrete shooting/design direction), openingBeat (string — literally what happens in the first 3 seconds)}),",
     "  formatGuidance (string, 1-2 sentences — length, aspect, captions, and why),",
     "  wouldFalsify (string — the result that would prove this direction wrong),",
-    "  claimsToVerify (array of strings — anything the creative wants to say that the brand brief does not support; empty array if none),",
+    "  claimsToVerify (array of strings — anything the creative wants to say that the brand brief and PRODUCT block do not support; empty array if none),",
     "  evidenceCited (array of strings — learning ids that informed this brief; empty array if none),",
+    "  vocCited (array of strings — customer snippet ids (V1, V2, …) the insight and angles rest on; empty array if none were supplied or none applied),",
     "  evidenceGaps (string — what you would want to know that the portfolio cannot currently tell you).",
     "No markdown, no preamble, just the JSON object.",
   ].join("\n");
@@ -119,17 +144,27 @@ export async function callCreativeBrief(initiative, brand, learningsIndex, setti
     "",
     brandBlock,
     "",
+    formatProductBlock(opts.product),
+    "",
+    formatVoiceBlock(brand?.voice),
+    "",
+    "CUSTOMER VOICE — what customers wrote, verbatim (id | words):",
+    formatVocBlock(opts.voc),
+    "",
     "CLOSED LEARNINGS (id | outcome|category|actual revenue|closed date | title — learning):",
     learningsBlock + selectionNote,
     "",
     "MEASURED PERFORMANCE — what this account's own ad names actually returned, by creative dimension:",
     evidenceBlock,
+    "",
+    "SHIPPED ADS — this studio's own ads that the ad account has judged, with the words they carried:",
+    formatWinnersBlock(opts.winners),
   ].join("\n");
 
   const data = await postProxy({
     group:"creative", fn:"callCreativeBrief",
     initiativeId: initiative?.id || null,
-    body:{ ...buildRequest({ model:modelFor("creative", modelOverride), maxTokens:3000, system:sys, effort:EFFORT.MEDIUM, cacheSystem:true, format:CREATIVE_BRIEF_FORMAT }),
+    body:{ ...buildRequest({ model:modelFor("creative", modelOverride), maxTokens:3400, system:sys, effort:EFFORT.MEDIUM, cacheSystem:true, format:CREATIVE_BRIEF_FORMAT }),
       messages:[{ role:"user", content:user }] },
   });
   const parsed = parseStructured(data, { label: "The creative brief" });
@@ -139,6 +174,8 @@ export async function callCreativeBrief(initiative, brand, learningsIndex, setti
   // against a corpus that has since grown would describe a brief that never ran.
   return {
     ...parsed,
+    vocCited: Array.isArray(parsed.vocCited) ? parsed.vocCited : [],
+    productId: opts.product?.id || null,
     evidenceConsidered: {
       learningsShown: selection.shown.length,
       learningsTotal: selection.total,
@@ -146,6 +183,11 @@ export async function callCreativeBrief(initiative, brand, learningsIndex, setti
       rule: selection.rule,
       performanceRows: opts.evidence?.rowCount || 0,
       performanceSpend: opts.evidence?.totalSpend || 0,
+      vocShown: opts.voc?.shown?.length || 0,
+      vocTotal: opts.voc?.total || 0,
+      winnersShown: opts.winners?.winners?.length || 0,
+      losersShown: opts.winners?.losers?.length || 0,
+      productName: opts.product?.name || null,
     },
   };
 }

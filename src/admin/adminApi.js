@@ -56,3 +56,6 @@ export const setRouting   = (routing)  => call("setRouting", { routing });
 export const resetRouting = ()         => call("resetRouting");
 export const verifyModel  = (model)    => call("verifyModel", { model });
 export const listModels   = (provider) => call("listModels", { provider });
+export const listClients  = ()         => call("listClients");
+export const createClient = (client)   => call("createClient", client);
+export const sendPasswordReset = (email) => call("sendPasswordReset", { email });

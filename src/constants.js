@@ -62,6 +62,12 @@ export const DEFAULT_SETTINGS = {
   // operator states it — see services/dataSafety.js for why the two are
   // separate questions.
   workspaceMode:    undefined,
+  // Talking-head renders, voice auditions and generated scenes in Creative
+  // Studio. Off unless an operator turns it on: three renderer integrations and a
+  // voice library were half of the studio's surface, and a spokesperson render is
+  // not the product (ROADMAP 5.7). A workspace saved before the flag existed has
+  // no key and reads as off, which is the point.
+  creativeVideo:    false,
   categories:       CATEGORIES,
   dataSources:      [],
   brands:           (CONFIG_BRANDS||[]).map(applyBrandBriefDefaults),

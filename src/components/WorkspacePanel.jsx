@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Modal } from "./Modal.jsx";
 import { gG, gGh, gI, gSL } from "./styles.js";
-import { signIn, signOut, currentUser } from "../services/auth.js";
+import { signIn, signOut, currentUser, requestPasswordReset, updatePassword } from "../services/auth.js";
 import { uploadInitial, listMembers, addMember, setMemberRole, removeMember } from "../services/remoteState.js";
 import { chooseWorkspace } from "../services/workspaceBoot.js";
 
@@ -25,9 +25,14 @@ import { chooseWorkspace } from "../services/workspaceBoot.js";
 //
 // ## What this panel will not do
 //
-// Sign anyone up, reset a password, or send an invitation. Those are Supabase's
-// dashboard, and putting them here would mean this app holding a flow it does not
-// own for a user table it does not manage.
+// Sign anyone up or send an invitation. Opening a client's workspace and inviting
+// its owner is the operator's job and lives in the admin console (api/_clients.js),
+// behind the operator's own password, rather than in a panel every user can open.
+//
+// It does offer "Forgot your password?", which it used to refuse: that flow is the
+// user's own, Supabase runs it end to end, and without it the only way back into a
+// client's workspace was an email to the operator. The link lands on this app,
+// where SetPasswordModal below finishes it.
 //
 // What it does manage is SEATS — who is in this workspace and in which role —
 // because that table is this app's own (0005_workspace.sql). An owner adds
@@ -114,11 +119,55 @@ function Members({ t, onError }) {
   );
 }
 
+/**
+ * The last step of an invitation or a password reset: the link has already signed
+ * the person in (src/services/auth.js, consumeAuthRedirect), and they choose the
+ * password they will use from now on.
+ */
+export function SetPasswordModal({ t, dk, type, email, onDone, onClose }) {
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const invited = type === "invite";
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (password.length < 8) { setError("Use at least 8 characters."); return; }
+    if (password !== confirm) { setError("The two passwords do not match."); return; }
+    setBusy(true); setError(null);
+    try { await updatePassword(password); onDone(); }
+    catch (err) { setError(err.message || "Could not set the password."); setBusy(false); }
+  };
+
+  return (
+    <Modal t={t} dk={dk} onClose={onClose} title={invited ? "Welcome — choose a password" : "Choose a new password"}>
+      <form onSubmit={submit}>
+        <div style={{fontSize:13,color:t.textSub,fontFamily:t.sans,lineHeight:1.55,marginBottom:14}}>
+          {invited
+            ? <>You have been invited to a workspace{email ? <> as <strong style={{color:t.text}}>{email}</strong></> : null}. Choose the password you will sign in with.</>
+            : <>Signed in{email ? <> as <strong style={{color:t.text}}>{email}</strong></> : null} from your reset link. Choose a new password.</>}
+        </div>
+        {error && <div role="alert" style={{marginBottom:12,fontSize:12.5,color:t.red,lineHeight:1.5}}>{error}</div>}
+        <div style={gSL(t)}>New password</div>
+        <input type="password" required minLength={8} autoComplete="new-password" value={password}
+          onChange={e=>setPassword(e.target.value)} style={{...gI(t),marginBottom:12}} />
+        <div style={gSL(t)}>Confirm</div>
+        <input type="password" required minLength={8} autoComplete="new-password" value={confirm}
+          onChange={e=>setConfirm(e.target.value)} style={{...gI(t),marginBottom:16}} />
+        <button type="submit" disabled={busy} style={gG(t)}>{busy ? "Saving…" : "Set password"}</button>
+      </form>
+    </Modal>
+  );
+}
+
 export function WorkspacePanel({ t, dk, boot, onClose, onReload, collectLocal }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [forgot, setForgot] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
   const user = currentUser();
   const remote = boot && boot.mode === "remote";
   const choices = boot?.reason === "ambiguous-workspace" ? (boot.choices || [])
@@ -139,6 +188,23 @@ export function WorkspacePanel({ t, dk, boot, onClose, onReload, collectLocal })
       await onReload();
     } catch (err) {
       setError(err.message || "Sign-in failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Same message whether or not the address has an account, so this form cannot
+  // be used to find out who is a client.
+  const sendReset = async (e) => {
+    e.preventDefault();
+    setBusy(true); setError(null);
+    try {
+      await requestPasswordReset(email.trim(), window.location.origin + window.location.pathname);
+      setResetSent(true);
+    } catch (err) {
+      // Rate limits and misconfiguration are worth showing; "no such user" is
+      // never reported by Supabase here, so nothing leaks through this path.
+      setError(err.message || "Could not send the reset email.");
     } finally {
       setBusy(false);
     }
@@ -205,7 +271,7 @@ export function WorkspacePanel({ t, dk, boot, onClose, onReload, collectLocal })
 
       {user && remote && <Members t={t} onError={setError} />}
 
-      {!user && (
+      {!user && !forgot && (
         <form onSubmit={submit}>
           <div style={gSL(t)}>Email</div>
           <input type="email" required autoComplete="username" value={email}
@@ -213,9 +279,42 @@ export function WorkspacePanel({ t, dk, boot, onClose, onReload, collectLocal })
           <div style={gSL(t)}>Password</div>
           <input type="password" required autoComplete="current-password" value={password}
             onChange={e=>setPassword(e.target.value)} style={{...gI(t),marginBottom:16}} />
-          <button type="submit" disabled={busy} style={gG(t)} onMouseOver={e=>Object.assign(e.currentTarget.style,gGh(t))} onMouseOut={e=>Object.assign(e.currentTarget.style,gG(t))}>
-            {busy ? "Signing in…" : "Sign in"}
-          </button>
+          <div style={{display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}}>
+            <button type="submit" disabled={busy} style={gG(t)} onMouseOver={e=>Object.assign(e.currentTarget.style,gGh(t))} onMouseOut={e=>Object.assign(e.currentTarget.style,gG(t))}>
+              {busy ? "Signing in…" : "Sign in"}
+            </button>
+            <button type="button" onClick={()=>{ setForgot(true); setError(null); setResetSent(false); }}
+              style={{background:"none",border:"none",padding:0,color:t.textSub,fontSize:12.5,cursor:"pointer",textDecoration:"underline"}}>
+              Forgot your password?
+            </button>
+          </div>
+        </form>
+      )}
+
+      {!user && forgot && (
+        <form onSubmit={sendReset}>
+          {resetSent ? (
+            <div style={{fontSize:13,color:t.text,fontFamily:t.sans,lineHeight:1.55,marginBottom:14}}>
+              If <strong>{email.trim()}</strong> has an account here, a reset link is on its way. It brings you back to this
+              page to choose a new password.
+            </div>
+          ) : (
+            <>
+              <div style={{fontSize:12.5,color:t.textSub,fontFamily:t.sans,lineHeight:1.55,marginBottom:12}}>
+                We will email a link that brings you back here to choose a new password.
+              </div>
+              <div style={gSL(t)}>Email</div>
+              <input type="email" required autoComplete="username" value={email}
+                onChange={e=>setEmail(e.target.value)} style={{...gI(t),marginBottom:16}} />
+            </>
+          )}
+          <div style={{display:"flex",gap:12,alignItems:"center"}}>
+            {!resetSent && <button type="submit" disabled={busy} style={gG(t)}>{busy ? "Sending…" : "Send reset link"}</button>}
+            <button type="button" onClick={()=>{ setForgot(false); setError(null); }}
+              style={{background:"none",border:"none",padding:0,color:t.textSub,fontSize:12.5,cursor:"pointer",textDecoration:"underline"}}>
+              Back to sign in
+            </button>
+          </div>
         </form>
       )}
 

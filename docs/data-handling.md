@@ -6,7 +6,7 @@ This document exists to be handed to a prospect. It is written to be checkable
 against the source rather than believed — every claim below names the file that
 enforces it.
 
-Last reviewed: August 2026.
+Last reviewed: September 2026.
 
 ---
 
@@ -70,7 +70,8 @@ say so rather than to widen the contract.
 | Initiatives, settings, learnings, weekly metrics, performance rows | Supabase Postgres when the workspace is signed in — documents per `gos_*` key, performance facts as rows, both scoped by RLS to workspace membership. `localStorage` otherwise, under the same keys | Signed in: encrypted at rest by the provider, reachable from any machine a member signs in from. Signed out: single device, unencrypted beyond OS disk encryption. The app states which of the two applies. |
 | JSON backups | Wherever the operator saves the download | The only off-device copy today. |
 | AI prompts and responses | Sent to the configured model provider through `api/proxy.js` | Not retained by this application. Retention is the provider's, under their terms. |
-| Generated images | In memory, session only | Deliberately not persisted — see DECISIONS.md. |
+| Generated images, product images, brand logos and style references | The deployment's private Supabase Storage bucket when one is configured; in memory for the session otherwise | Never in browser storage. Product images are the brand's own published product photography, fetched from its product page at the operator's request. |
+| Customer voice (pasted reviews, survey answers, comments) | With the brand, in workspace settings | Scrubbed before it is stored — see below. |
 | Nothing else | — | There is no application database, no analytics on portfolio content, no server-side copy of workspace data. |
 
 The proxy is a transport. It forwards a request to a model provider and returns
@@ -80,16 +81,47 @@ the response; it does not read, log or store workspace content.
 
 ## What leaves the browser
 
-Only two things:
+Only three things:
 
 1. **Model calls.** The debate, Next Plays, creative briefs, hypothesis
    expansion, the library search. Each sends the portfolio context that call
    needs — initiative titles, hypotheses, learnings, aggregate metrics, brand
-   briefs. All of it is business content and none of it is personal data.
-2. **What the operator exports.** CSV exports, JSON backups, the client readout.
-   These are actions, not background behaviour.
+   briefs, the chosen product's facts and images, scrubbed customer voice. All
+   of it is business content and none of it is personal data.
+2. **What the operator exports.** CSV exports, JSON backups, the client readout,
+   static ads and creator briefs. These are actions, not background behaviour.
+3. **A product page address, when the operator imports one.** The server
+   fetches that public page and the images the operator picks from it, and
+   nothing else (`api/_productPage.js`). No workspace content goes with it.
+
+Outside the workspace, the admin console sends a client owner's email address to
+Supabase Auth to invite them or reset their password. That is account data held
+by the auth provider — the same place every member's sign-in already lives — and
+never enters the workspace store.
 
 Nothing is transmitted on a schedule. Nothing is transmitted on load.
+
+---
+
+## Customer voice
+
+The creative brief grounds its buyer insight in what customers wrote, so a brand
+can hold pasted reviews, survey answers and comments. Their text is business
+content; the people who wrote them are not, and a pasted review often arrives
+with one attached. Emails, links, phone and order numbers (any run of seven or
+more digits), @handles, trailing sign-offs ("— Jane D.") and leading
+attributions ("Review by Mark:") are removed **before the field is stored** —
+when the operator leaves the field, and again on every settings save, whichever
+path it came by — and the field says how many snippets were changed. Splitting
+the text for a prompt runs the same scrub once more.
+[`src/services/voc.js`](../src/services/voc.js), tested in
+`creativeInputs.test.js`.
+
+It is a pattern backstop, not a detector: a first name written mid-sentence
+("my sister Anna loves it") is kept, because a capitalised word mid-sentence is
+far more often a product than a person. The field asks for the words only.
+Pasting a customer list or a CRM export is outside this contract whatever the
+scrub catches.
 
 ---
 

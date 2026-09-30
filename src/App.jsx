@@ -91,7 +91,10 @@ import { TOUR_STEPS } from "./components/tourSteps.js";
 import { CBar } from "./components/CBar.jsx";
 import { interactive } from "./components/motion.js";
 import { EAlert } from "./components/EAlert.jsx";
-import { WorkspacePanel } from "./components/WorkspacePanel.jsx";
+import { WorkspacePanel, SetPasswordModal } from "./components/WorkspacePanel.jsx";
+import { consumeAuthRedirect } from "./services/auth.js";
+import { libraryBatch, addBatch, matchBrand } from "./services/testNext.js";
+import { withScrubbedVoc } from "./services/voc.js";
 import { bootWorkspace, bootMessage } from "./services/workspaceBoot.js";
 import { FR } from "./components/FR.jsx";
 import { ErrorBoundary } from "./components/ErrorBoundary.jsx";
@@ -587,6 +590,11 @@ function refuseIfViewOnly(showToast) {
   return true;
 }
 
+// Ids for initiatives drafted from a debate. Module scope because the handler that
+// uses it is passed down as a prop, and the compiler cannot tell a prop handler
+// from a render-time call.
+const mkDebateItemId = () => "cop-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7);
+
 export default function App() {
   const [items,     setItems]     = useState([]);
   const [settings,  setSettings]  = useState(DEFAULT_SETTINGS);
@@ -620,6 +628,9 @@ export default function App() {
   // is a link somebody can send.
   const [settingsSection, setSettingsSection] = useState("workspace");
   const [onboarding, setOnboarding] = useState(false);
+  // Set when this page was opened from an invitation or password-reset link:
+  // `{type, user}` to finish choosing a password, or `{error}` for a dead link.
+  const [authLanding, setAuthLanding] = useState(null);
   const [showCapture, setShowCaptureRaw] = useState(false);
   const [captureText, setCaptureText] = useState("");
   const [captureLoad, setCaptureLoad] = useState(false);
@@ -820,6 +831,11 @@ export default function App() {
       // Attaching the workspace backend after the reads would load the browser
       // copy and then save it over the server's, which is the one ordering bug
       // in this file that would cost a client their history.
+      // An invitation or reset link signs the person in through the URL fragment.
+      // Adopted BEFORE the workspace boot, so the boot sees the session and opens
+      // their workspace rather than the browser store.
+      const landing = await consumeAuthRedirect().catch(() => null);
+      if (landing) setAuthLanding(landing);
       setBoot(await bootWorkspace());
       // Hoisted out of the try so the backup nudge below can still see what was
       // loaded even when parsing part of it threw.
@@ -967,7 +983,9 @@ export default function App() {
   }, [nav, selId, perfTab, settingsSection, loaded]);
 
   const saveItems    = d => { if (viewOnly()) return; const stamped = stampUpdatedAt(d, items); setItems(stamped); store.set(KEY_ITEMS,JSON.stringify(stamped)); };
-  const saveSettings = s => { if (viewOnly()) return; setSettings(s); store.set(KEY_SETTINGS,JSON.stringify(s)); };
+  // Customer voice is scrubbed of names, emails and numbers before it is stored,
+  // on every path into settings (services/voc.js).
+  const saveSettings = s => { if (viewOnly()) return; s = withScrubbedVoc(s); setSettings(s); store.set(KEY_SETTINGS,JSON.stringify(s)); };
   const saveDebates  = d => { if (viewOnly()) return; setDebates(d); store.set(KEY_DEBATES,JSON.stringify(d)); };
   // A debate now saves after every turn rather than once at the end, which makes
   // the old `[debate, ...debates]` handler wrong in two ways: it closed over the
@@ -1075,9 +1093,8 @@ export default function App() {
         recommendations,
       };
 
-      // Keep the last 10 batches
-      const next = [batch, ...(recs||[])].slice(0, 10);
-      saveRecs(next);
+      // The last 10 slates, alongside the library's batches (services/testNext.js).
+      saveRecs(addBatch(recs, batch));
       showToast("Generated "+recommendations.length+" next plays.", "success");
     } catch (err) {
       console.error("Next Plays error:", err);
@@ -1098,23 +1115,29 @@ export default function App() {
 
     const base = mkDefault(cats, activeBrand);
     // Resolve brand target → brandId if it matches a known brand name
-    const matchedBrand = brands.find(b => b.name === rec.brandTarget);
+    const matchedBrand = matchBrand(brands, rec.brandTarget);
     const brandId = matchedBrand ? matchedBrand.id : base.brandId;
 
+    // A library idea arrives as a title and the evidence line behind it — no
+    // hypothesis or ICE yet — so the form starts from those and the operator
+    // pre-registers the rest, exactly as they would for any new initiative.
+    const fromLibrary = rec.source === "library";
     setForm({
       ...base,
       title: rec.title,
-      observation: rec.observation,
-      hypothesis: rec.hypothesis,
-      successMetric: rec.successMetric,
-      primaryMetric: rec.primaryMetric,
-      killCriteria: rec.killCriteria,
+      observation: rec.observation || (fromLibrary ? rec.rationale || "" : ""),
+      hypothesis: rec.hypothesis || "",
+      successMetric: rec.successMetric || "",
+      primaryMetric: rec.primaryMetric || "",
+      killCriteria: rec.killCriteria || "",
       category: rec.category || base.category,
       initType: rec.initType || base.initType,
       brandId,
-      ice: { ...rec.ice },
+      ice: rec.ice ? { ...rec.ice } : base.ice,
       linkedIds: rec.sourceLearningIds || [],
-      notes: rec.reasoningTrace
+      notes: fromLibrary
+        ? "From the library synthesis (Do Next)."
+        : rec.reasoningTrace
         ? "From Next Plays. Reasoning: "+rec.reasoningTrace
         : "From Next Plays",
     });
@@ -1125,6 +1148,45 @@ export default function App() {
     setPendingRecAccept({ batchId, recId });
     setShowRecModal(null);
     setNav("form");
+  };
+
+  // A Signal AI idea goes straight to the backlog as a Draft — it arrives fully
+  // formed from the debate's synthesis. Shared by the debate panel and the
+  // dashboard's Test next list, so both paths make the same record.
+  const addDebateIdea = (initiative) => {
+    const base = mkDefault(cats, activeBrand);
+    const newItem = {
+      ...base,
+      ...initiative,
+      _new: undefined,
+      id: mkDebateItemId(),
+      initId: generateInitId(base.brandId, brands, items),
+      status: "Draft",
+      createdAt: new Date().toISOString().slice(0,10),
+      blocker: "None",
+      results: null,
+      linkedIds: [],
+    };
+    saveItems([newItem, ...items]);
+  };
+
+  // The dashboard's Test next list (services/testNext.js). Next Plays and library
+  // ideas open the pre-filled form; a debate idea is drafted directly.
+  const draftIdea = (idea) => {
+    if (idea.source === "debate") {
+      addDebateIdea(idea.ref.idea);
+      showToast(`"${idea.title}" added to Initiatives as a draft.`, "success");
+      return;
+    }
+    acceptRecommendation(idea.ref.batchId, idea.ref.recId);
+  };
+  const dismissIdea = (idea) => {
+    if (idea.source === "debate") {
+      saveDebates(debates.map(d => d.id !== idea.ref.debateId ? d
+        : { ...d, dismissedIdeas: [...new Set([...(d.dismissedIdeas || []), idea.ref.idx])] }));
+      return;
+    }
+    dismissRecommendation(idea.ref.batchId, idea.ref.recId);
   };
 
   const dismissRecommendation = (batchId, recId) => {
@@ -2139,6 +2201,18 @@ export default function App() {
         </div>
       )}
 
+      {authLanding && !authLanding.error && (authLanding.type === "invite" || authLanding.type === "recovery") && (
+        <SetPasswordModal t={t} dk={dk} type={authLanding.type} email={authLanding.user?.email}
+          onDone={()=>{ setAuthLanding(null); showToast("Password set — you're signed in.", "success"); }}
+          onClose={()=>setAuthLanding(null)} />
+      )}
+      {authLanding?.error && (
+        <Modal t={t} dk={dk} onClose={()=>setAuthLanding(null)} title="That link didn't work">
+          <div style={{fontSize:13,color:t.textSub,fontFamily:t.sans,lineHeight:1.55,marginBottom:16}}>{authLanding.error}</div>
+          <button style={gG(t)} onClick={()=>{ setAuthLanding(null); setShowWorkspace(true); }}>Open sign-in</button>
+        </Modal>
+      )}
+
       {showWorkspace && (
         <WorkspacePanel
           t={t} dk={dk} boot={boot}
@@ -2182,7 +2256,7 @@ export default function App() {
         * a broken view must leave the visitor a way to go somewhere else. */}
       <ErrorBoundary t={t} resetKey={nav} label={navName(nav)||"This view"} onHome={()=>setNav("dashboard")}>
       <Suspense fallback={<ViewLoading t={t}/>}>
-      {nav==="dashboard"&&<DashView t={t} dk={dk} dash={dash} cats={cats} settings={settings} brands={brands} activeBrand={activeBrand} weeklyMetrics={weeklyMetrics} onLog={()=>setShowPulse(true)} onImport={()=>setShowMetricsImport(true)} dRange={dRange} setDRange={setDRange} cFrom={cFrom} cTo={cTo} setCFrom={setCFrom} setCTo={setCTo} onGo={()=>setNav("initiatives")} recs={recs} recsLoad={recsLoad} recsErr={recsErr} items={items} onGenerateRecs={()=>{
+      {nav==="dashboard"&&<DashView t={t} dk={dk} dash={dash} cats={cats} settings={settings} brands={brands} activeBrand={activeBrand} weeklyMetrics={weeklyMetrics} onLog={()=>setShowPulse(true)} onImport={()=>setShowMetricsImport(true)} dRange={dRange} setDRange={setDRange} cFrom={cFrom} cTo={cTo} setCFrom={setCFrom} setCTo={setCTo} onGo={()=>setNav("initiatives")} recs={recs} recsLoad={recsLoad} recsErr={recsErr} items={items} debates={debates} onDraftIdea={draftIdea} onDismissIdea={dismissIdea} onRunDebate={()=>setShowCopilot(true)} onOpenLibrary={()=>setNav("library")} onGenerateRecs={()=>{
         // Refused before the call, not at the save: a viewer's recommendations
         // could never be kept, so generating them would be spend for nothing.
         if (!viewOnly()) generateRecommendations();
@@ -2200,7 +2274,9 @@ export default function App() {
           saveItems(items.map(e=>e.id===id?withRunningSnapshot({...e,status:"Running",startDate:e.startDate||new Date().toISOString().slice(0,10)},"Running"):e)); showToast("Initiative activated. Now running.","success");
         }}
       />}
-      {nav==="library"&&<LearningLibrary items={items} t={t} dk={dk} cats={cats} brands={brands} activeBrand={activeBrand} settings={settings} view={libView} onView={saveLibView} onViewInitiative={(id)=>goDetail(id,"library")} onReplicate={(item)=>{const base=mkDefault(cats,activeBrand);setForm({...base,title:"[Replicate] "+item.title,hypothesis:"Based on learning from: "+item.title+". Original: "+item.hypothesis,category:item.category,initType:item.initType,ice:{...item.ice},revenueImpact:item.revenueImpact,notes:"Replicated from initiative "+item.id+". Original learning: "+item.results.keyLearning});setNav("form");}}/>}
+      {nav==="library"&&<LearningLibrary items={items} t={t} dk={dk} cats={cats} brands={brands} activeBrand={activeBrand} settings={settings} view={libView} onView={saveLibView} onViewInitiative={(id)=>goDetail(id,"library")}
+        onSynthesis={(text)=>{ const batch = libraryBatch(text); if (!batch) return 0; saveRecs(addBatch(recs, batch)); return batch.recommendations.length; }}
+        onReplicate={(item)=>{const base=mkDefault(cats,activeBrand);setForm({...base,title:"[Replicate] "+item.title,hypothesis:"Based on learning from: "+item.title+". Original: "+item.hypothesis,category:item.category,initType:item.initType,ice:{...item.ice},revenueImpact:item.revenueImpact,notes:"Replicated from initiative "+item.id+". Original learning: "+item.results.keyLearning});setNav("form");}}/>}
       {nav==="agenda"&&<AgendaView agenda={agenda} items={items} cats={cats} brands={brands} activeBrand={activeBrand} t={t} dk={dk}
         onSaveAgenda={saveAgenda}
         onViewInitiative={(id)=>goDetail(id,"agenda")}
@@ -2627,22 +2703,7 @@ export default function App() {
           debates={debates}
           weeklyMetrics={weeklyMetrics}
           onSaveDebate={saveDebateRun}
-          onAddToBacklog={(initiative) => {
-            const base = mkDefault(cats, activeBrand);
-            const newItem = {
-              ...base,
-              ...initiative,
-              _new: undefined,
-              id: "cop-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),
-              initId: generateInitId(base.brandId, brands, items),
-              status: "Draft",
-              createdAt: new Date().toISOString().slice(0,10),
-              blocker: "None",
-              results: null,
-              linkedIds: [],
-            };
-            saveItems([newItem, ...items]);
-          }}
+          onAddToBacklog={addDebateIdea}
           onClose={() => setShowCopilot(false)}
         />
         </Suspense>

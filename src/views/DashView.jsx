@@ -10,6 +10,7 @@ import { buildCrossBrandTransfers } from "../services/portfolio.js";
 import { renderProse } from "../components/text.jsx";
 import { navName } from "../components/navSections.js";
 import { IconImport, IconPlus, IconChart, IconAlert, IconChevronDown, IconChevronRight, IconCopy, IconSparkle, IconSpinner, IconDiamond, IconTrendUp, IconTrendDown, IconCheck, IconClose } from "../components/icons.jsx";
+import { IDEA_SOURCES, mergeIdeas, countBySource, nextPlaysBatches } from "../services/testNext.js";
 
 // -- Weekly Pulse --------------------------------------------------------------
 function WeeklyPulseSection({t, brands, weeklyMetrics, onLog, onImport}) {
@@ -690,20 +691,26 @@ function recWeekState(recs, today) {
   return batchMonday === thisMonday ? "current" : "stale";
 }
 
-// Card that lives on the Dashboard. Shows the latest batch of recommendations
-// or a generate CTA if none exist yet. Clicking a rec opens the detail modal.
-function NextPlaysCard({ t, recs, recsLoad, recsErr, items, onGenerate, onOpenRec }) {
+// Card that lives on the Dashboard: every open idea for what to test next, from
+// all three places that propose one — the Next Plays slate, Signal AI debates and
+// the library synthesis — with where each came from (services/testNext.js). The
+// Next Plays slate machinery (week state, regenerate, changes from last week)
+// still reads Next Plays batches only.
+function NextPlaysCard({ t, recs, recsLoad, recsErr, items, debates, onGenerate, onOpenRec, onDraftIdea, onDismissIdea, onRunDebate, onOpenLibrary }) {
   const [diffExpanded, setDiffExpanded] = useState(false);
 
-  const latest   = recs && recs.length > 0 ? recs[0] : null;
+  const plays    = nextPlaysBatches(recs);
+  const latest   = plays.length > 0 ? plays[0] : null;
   // If latest carries weekOf, find the most recent batch from a prior week so
   // same-week regenerations don't clobber the prior-week reference point.
-  // Falls back to recs[1] for batches generated before weekOf was stamped.
+  // Falls back to plays[1] for batches generated before weekOf was stamped.
   const prev = latest
     ? (latest.weekOf
-        ? (recs.find(b => b.weekOf && b.weekOf < latest.weekOf) || null)
-        : (recs.length > 1 ? recs[1] : null))
+        ? (plays.find(b => b.weekOf && b.weekOf < latest.weekOf) || null)
+        : (plays.length > 1 ? plays[1] : null))
     : null;
+  const ideas    = mergeIdeas({ recs, debates, items });
+  const bySource = countBySource(ideas);
   const pending  = latest ? latest.recommendations.filter(r => r.status === "pending")  : [];
   const accepted = latest ? latest.recommendations.filter(r => r.status === "accepted") : [];
   const dismissed = latest ? latest.recommendations.filter(r => r.status === "dismissed") : [];
@@ -715,7 +722,7 @@ function NextPlaysCard({ t, recs, recsLoad, recsErr, items, onGenerate, onOpenRe
     (e.status==="Completed"||e.status==="Killed") && e.results && e.results.keyLearning
   ).length;
 
-  const weekState = recWeekState(recs, new Date());
+  const weekState = recWeekState(plays, new Date());
   // Derive the Monday date string for labelling — use weekOf if present, fall back to generatedAt.
   const batchWeekOf = latest
     ? (latest.weekOf || mondayOf(new Date(latest.generatedAt)).toISOString().slice(0, 10))
@@ -727,7 +734,7 @@ function NextPlaysCard({ t, recs, recsLoad, recsErr, items, onGenerate, onOpenRe
   // -- COMPACT MODE — recs exist and not currently loading -------------------
   // One header strip + one row per pending recommendation. Clicking any row
   // opens the detail modal directly (Option 2 — skip the intermediate list).
-  if (latest && !recsLoad) {
+  if ((latest || ideas.length > 0) && !recsLoad) {
     return (
       <div style={{...gCd(t),display:"flex",flexDirection:"column",gap:10}}>
         {/* Staleness nudge — shown when the current week has no slate yet */}
@@ -746,9 +753,12 @@ function NextPlaysCard({ t, recs, recsLoad, recsErr, items, onGenerate, onOpenRe
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             <span style={{color:t.gold,display:"inline-flex"}}><IconDiamond size={13}/></span>
-            <span style={{fontSize:15,fontWeight:600,color:t.text,fontFamily:t.sans,letterSpacing:"-0.01em"}}>Next plays</span>
-            <span style={{fontSize:10,color:t.textMuted,fontFamily:t.sans}}>
-              {renderProse(pending.length > 0 ? pending.length+" ready" : "all resolved")}
+            <span style={{fontSize:15,fontWeight:600,color:t.text,fontFamily:t.sans,letterSpacing:"-0.01em"}}>Test next</span>
+            <span style={{fontSize:10,color:t.textMuted,fontFamily:t.sans}}
+              title={Object.values(IDEA_SOURCES).map(v => `${v.label}: ${v.blurb}`).join("\n")}>
+              {ideas.length > 0
+                ? Object.entries(bySource).filter(([, n]) => n > 0).map(([k, n]) => `${n} from ${IDEA_SOURCES[k].label}`).join(" · ")
+                : "all resolved"}
             </span>
             {weekLabel && (
               <span style={{fontSize:10,color:t.textMuted,fontFamily:t.sans,opacity:0.7}}>
@@ -766,9 +776,19 @@ function NextPlaysCard({ t, recs, recsLoad, recsErr, items, onGenerate, onOpenRe
             )}
             <button onClick={onGenerate}
               style={{...(weekState==="stale"?gG(t):gGh(t)),fontSize:10,padding:"3px 8px"}}
-              title="Regenerate from current portfolio state">
-              — Regenerate
+              title="A new Next Plays slate from the current portfolio">
+              {latest ? "New slate" : "Generate plays"}
             </button>
+            {onRunDebate && (
+              <button onClick={onRunDebate} style={{...gGh(t),fontSize:10,padding:"3px 8px"}} title="Run a Signal AI debate; its three ideas land here">
+                Debate
+              </button>
+            )}
+            {onOpenLibrary && (
+              <button onClick={onOpenLibrary} style={{...gGh(t),fontSize:10,padding:"3px 8px"}} title="Synthesise the library; its Do Next lands here">
+                Library
+              </button>
+            )}
           </div>
         </div>
 
@@ -779,38 +799,56 @@ function NextPlaysCard({ t, recs, recsLoad, recsErr, items, onGenerate, onOpenRe
           </div>
         )}
 
-        {/* Pending rows — tight one-line entries */}
-        {pending.length > 0 && (
+        {/* Open ideas from every source, newest first. A Next Plays idea opens
+            its detail (hypothesis, ICE, reasoning); a debate or library idea is
+            drafted or dismissed from the row. */}
+        {ideas.length > 0 && (
           <div style={{display:"flex",flexDirection:"column",gap:4}}>
-            {pending.map(rec => {
-              const iceTotal = iceScore(rec.ice.impact, rec.ice.certainty, rec.ice.ease);
+            {ideas.slice(0, 8).map(idea => {
+              const iceTotal = idea.ice ? iceScore(idea.ice.impact, idea.ice.certainty, idea.ice.ease) : null;
+              const opensModal = idea.source === "next-plays";
               return (
-                <button key={rec.id} onClick={()=>onOpenRec(latest.id, rec.id)}
-                  style={{textAlign:"left",padding:"7px 10px",background:t.surface,border:"1px solid "+t.border,borderRadius:4,cursor:"pointer",display:"flex",alignItems:"center",gap:10,fontFamily:t.serif,transition:"border-color 0.15s, background 0.15s"}}
-                  onMouseEnter={e=>{e.currentTarget.style.borderColor=t.gold;e.currentTarget.style.background=t.goldBg;}}
-                  onMouseLeave={e=>{e.currentTarget.style.borderColor=t.border;e.currentTarget.style.background=t.surface;}}>
-                  {/* Title — flexes to fill, truncates if needed */}
-                  <span style={{fontSize:12,fontWeight:600,color:t.text,fontFamily:t.serif,flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                    {rec.title}
+                <div key={idea.key}
+                  style={{padding:"7px 10px",background:t.surface,border:"1px solid "+t.border,borderRadius:4,display:"flex",alignItems:"center",gap:10,fontFamily:t.serif}}>
+                  <span title={IDEA_SOURCES[idea.source].blurb}
+                    style={{fontSize:9.5,color:t.textMuted,fontFamily:t.sans,padding:"1px 5px",border:"1px solid "+t.border,borderRadius:3,flexShrink:0,whiteSpace:"nowrap"}}>
+                    {IDEA_SOURCES[idea.source].label}{idea.alsoFrom.length ? " + " + idea.alsoFrom.map(s => IDEA_SOURCES[s].label).join(" + ") : ""}
                   </span>
-                  {/* Meta chips — hide on narrow screens via flexShrink */}
-                  <span style={{fontSize:12,color:t.textMuted,fontFamily:t.sans,padding:"1px 5px",border:"1px solid "+t.border,borderRadius:3,flexShrink:0}}>{rec.category}</span>
-                  <span style={{fontSize:9,color:t.textMuted,fontFamily:t.sans,flexShrink:0,display:"none"}} className="np-brand">{rec.brandTarget}</span>
-                  {/* ICE — always visible, the most important signal at a glance */}
-                  <span style={{display:"flex",gap:3,alignItems:"baseline",flexShrink:0}}>
-                    <span style={{fontSize:9,color:t.textMuted,fontFamily:t.sans}}>ICE</span>
-                    <span style={{fontSize:13,fontWeight:700,color:iceColor(iceTotal,t),fontFamily:t.sans,minWidth:18,textAlign:"right"}}>
-                      {iceTotal!==null?iceTotal:"—"}
+                  <button onClick={opensModal ? ()=>onOpenRec(idea.ref.batchId, idea.ref.recId) : undefined}
+                    disabled={!opensModal} title={idea.why || idea.title}
+                    style={{textAlign:"left",background:"none",border:"none",padding:0,cursor:opensModal?"pointer":"default",flex:1,minWidth:0,
+                      fontSize:12,fontWeight:600,color:t.text,fontFamily:t.serif,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                    {idea.title}
+                    {idea.brand && <span style={{fontWeight:400,color:t.textMuted,fontFamily:t.sans,fontSize:11}}> · {idea.brand}</span>}
+                  </button>
+                  {iceTotal !== null && (
+                    <span style={{display:"flex",gap:3,alignItems:"baseline",flexShrink:0}}>
+                      <span style={{fontSize:9,color:t.textMuted,fontFamily:t.sans}}>ICE</span>
+                      <span style={{fontSize:13,fontWeight:700,color:iceColor(iceTotal,t),fontFamily:t.sans,minWidth:18,textAlign:"right"}}>{iceTotal}</span>
                     </span>
-                  </span>
-                </button>
+                  )}
+                  {!opensModal && (
+                    <>
+                      <button onClick={()=>onDraftIdea(idea)} style={{...gGh(t),fontSize:10,padding:"2px 8px",flexShrink:0}}>Draft</button>
+                      <button onClick={()=>onDismissIdea(idea)} aria-label={"Dismiss " + idea.title}
+                        style={{background:"none",border:"none",color:t.textMuted,cursor:"pointer",padding:"0 2px",flexShrink:0,display:"inline-flex"}}>
+                        <IconClose size={11}/>
+                      </button>
+                    </>
+                  )}
+                </div>
               );
             })}
+            {ideas.length > 8 && (
+              <div style={{fontSize:10.5,color:t.textMuted,fontFamily:t.sans,paddingLeft:2}}>
+                {ideas.length - 8} more — draft or dismiss the ones above to see them.
+              </div>
+            )}
           </div>
         )}
 
         {/* All-resolved nudge — encourages a regenerate when the slate is exhausted */}
-        {pending.length === 0 && (accepted.length > 0 || dismissed.length > 0) && (
+        {ideas.length === 0 && pending.length === 0 && (accepted.length > 0 || dismissed.length > 0) && (
           <div style={{fontSize:11,color:t.textMuted,fontFamily:t.sans,fontStyle:"italic",padding:"4px 2px"}}>
             All recommendations from this batch have been resolved. Regenerate when you're ready for the next slate.
           </div>
@@ -868,23 +906,28 @@ function NextPlaysCard({ t, recs, recsLoad, recsErr, items, onGenerate, onOpenRe
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           <span style={{color:t.gold,display:"inline-flex"}}><IconDiamond size={15}/></span>
-          <span style={{fontSize:15,fontWeight:600,color:t.text,fontFamily:t.sans,letterSpacing:"-0.01em"}}>Next plays</span>
+          <span style={{fontSize:15,fontWeight:600,color:t.text,fontFamily:t.sans,letterSpacing:"-0.01em"}}>Test next</span>
           <span style={{fontSize:11,fontWeight:600,color:t.gold,background:t.goldBg,borderRadius:t.r.sm,padding:"2px 6px",fontFamily:t.sans}}>AI</span>
         </div>
-        <button onClick={onGenerate} disabled={recsLoad}
-          style={{...gGh(t,"sm"),opacity:recsLoad?0.6:1}}>
-          {recsLoad
-            ? <><IconSpinner size={12}/> Generating…</>
-            : <><span style={{color:t.gold,display:"inline-flex"}}><IconSparkle size={13}/></span> Generate plays</>}
-        </button>
+        <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+          <button onClick={onGenerate} disabled={recsLoad}
+            style={{...gGh(t,"sm"),opacity:recsLoad?0.6:1}}>
+            {recsLoad
+              ? <><IconSpinner size={12}/> Generating…</>
+              : <><span style={{color:t.gold,display:"inline-flex"}}><IconSparkle size={13}/></span> Generate plays</>}
+          </button>
+          {onRunDebate && !recsLoad && <button onClick={onRunDebate} style={gGh(t,"sm")}>Run a debate</button>}
+          {onOpenLibrary && !recsLoad && <button onClick={onOpenLibrary} style={gGh(t,"sm")}>Synthesise the library</button>}
+        </div>
       </div>
 
       {/* Empty state — first run */}
       {!recsLoad && !recsErr && (
         <div style={{padding:"16px 18px",background:t.surfaceAlt,borderRadius:t.r.md,fontSize:13,color:t.textSub,fontFamily:t.sans,lineHeight:1.6}}>
-          {renderProse(closedCount === 0
-            ? "No experiments closed yet. Plays get sharper once you have a few logged learnings, but you can still generate from the current portfolio."
-            : "Get three experiment ideas from your "+closedCount+" closed initiative"+(closedCount===1?"":"s")+". Each comes with a hypothesis, an ICE score and the reasoning behind it.")}
+          {renderProse((closedCount === 0
+            ? "No experiments closed yet. Ideas get sharper once you have a few logged learnings, but you can still generate from the current portfolio."
+            : "Get experiment ideas from your "+closedCount+" closed initiative"+(closedCount===1?"":"s")+".")
+            + " Next Plays, a Signal AI debate and the library synthesis all land in this one list, each idea marked with where it came from — and when two of them propose the same thing, it shows once, credited to both.")}
         </div>
       )}
 
@@ -970,7 +1013,7 @@ function StatTile({ t, m, index, big, onNav }) {
   );
 }
 
-export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetrics,onLog,onImport,dRange,setDRange,cFrom,cTo,setCFrom,setCTo,onGo,recs,recsLoad,recsErr,items,onGenerateRecs,onOpenRec,onOpenItem,onNav,showToast,onSaveItems}) {
+export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetrics,onLog,onImport,dRange,setDRange,cFrom,cTo,setCFrom,setCTo,onGo,recs,recsLoad,recsErr,items,debates,onGenerateRecs,onOpenRec,onDraftIdea,onDismissIdea,onRunDebate,onOpenLibrary,onOpenItem,onNav,showToast,onSaveItems}) {
   const maxCat  = Math.max(...Object.values(dash.catCounts),1);
   const maxType = Math.max(...Object.values(dash.typeCounts),1);
   const [showStandup, setShowStandup] = useState(false);
@@ -1136,8 +1179,13 @@ export function DashView({t,dk,dash,cats,settings,brands,activeBrand,weeklyMetri
         recsErr={recsErr}
         brands={brands}
         items={items}
+        debates={debates}
         onGenerate={onGenerateRecs}
         onOpenRec={onOpenRec}
+        onDraftIdea={onDraftIdea}
+        onDismissIdea={onDismissIdea}
+        onRunDebate={onRunDebate}
+        onOpenLibrary={onOpenLibrary}
       />
 
       </div>

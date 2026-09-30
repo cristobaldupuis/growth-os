@@ -333,6 +333,48 @@ shipped, plus two that are decisions rather than code.
   cheapest half; the rest is a lawyer, not a sprint, and it is needed before the
   first invoice rather than after it.
 
+### Phase 1.9 — Ads worth running, and a client you can open (September 2026)
+
+A fifth pass, aimed at the first client's first week: what they will look at
+(the ads), and what has to work before they can look at anything (getting in).
+Reasoning for each in DECISIONS.md.
+
+- [x] **The product is real.** Brands carry products imported from their own
+  page and reviewed before they are kept; the product's images reach the image
+  model first as the object to reproduce, and its facts are the only product
+  claims copy may make. `api/_productPage.js`, `src/services/products.js`.
+- [x] **The brief hears the brand and its customers.** Brand voice, and
+  customer voice scrubbed of identifiers before it is stored and cited by id.
+  `src/services/voc.js`.
+- [x] **Shipped ads teach the next brief.** Variant sets are append-only and
+  freeze when their names ship; ad names join back to the words they carried
+  and the best and worst by ROAS go into the next brief.
+  `src/services/variantSets.js`.
+- [x] **Variants a buyer could run, and a review pass.** Per-angle calls at
+  medium effort with timed beats, on-screen text, Meta copy fields and
+  alternative hooks; a low-effort review that scores and suggests, never
+  rewrites.
+- [x] **Static ads, creator briefs, full CSV.** Words drawn in code over the
+  text-free frame; one printable brief per variant with its exact ad name.
+  `src/services/staticAd.js`, `src/services/creatorBrief.js`.
+- [x] **Opening a client is one form.** `/admin → Clients` creates the
+  workspace, invites the owner and rolls back on failure; sign-in has password
+  reset; invite and reset links land on a set-password step.
+- [x] **One "Test next" list** from Next Plays, Signal AI and the library
+  synthesis, credited by source. `src/services/testNext.js`.
+- [x] **Video tools off by default**, behind `Settings → Workspace`.
+
+#### Next in this slice
+
+- [ ] **Bench Sonnet 5.5 and Opus 5.5 on Creative Direction.** The variant call
+  now does more per call; the admin bench runs the real prompt on a real
+  portfolio. Route from the output, not the price.
+- [ ] **Product import against the client's actual store.** JSON-LD coverage
+  varies by theme; a store that renders product data only in JavaScript imports
+  partially. The first real import will say which case the client is.
+- [ ] **A static ad template the brand chooses.** One layout ships. Position of
+  the logo, headline placement and a second typeface are the likely first asks.
+
 ---
 
 ## Phase 2 — The Data Moat
@@ -868,7 +910,9 @@ commodity, and it is the fastest way to be mistaken for one.
 (HeyGen, VEED Fabric via fal.ai). Useful, and worth keeping wired since it costs
 nothing to leave in place — but a spokesperson render is a different product from
 product video, and the roadmap should not let the presence of the first imply
-progress on the second.
+progress on the second. Since Phase 1.9 those tools are hidden unless a workspace
+turns them on (`Settings → Workspace → Show video tools`), so the studio a client
+first sees is the evidence-to-static-ad path rather than the avatar one.
 
 **What was pulled out of this item and shipped early.** Asset provenance — the
 record carrying the initiative, brief version, prompt, model, cost and ad name —

@@ -35,6 +35,16 @@ import {
   MODEL_CATALOGUE, FEATURE_GROUPS, DEFAULT_ROUTING, validateRouting, resolveRouting, modelById,
 } from "../src/services/ai/registry.js";
 import { geminiConfigured, geminiAuthMode, geminiAuthHeaders, vertexHost } from "./_geminiAuth.js";
+import { supabaseConfigured } from "./_supabase.js";
+import { listClients, createClient, sendPasswordReset } from "./_clients.js";
+
+// Where an invitation or reset link lands: this deployment's own app. The
+// configured base URL when there is one (so links use the domain clients know),
+// else the origin the console was opened from.
+const appUrl = (req) => {
+  const base = process.env.PUBLIC_BASE_URL || req.headers.origin || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
+  return base ? base.replace(/\/+$/, "") + "/" : undefined;
+};
 
 // Every upstream call is bounded below the function's own limit (function
 // maxDuration is 15s), so a provider that hangs becomes this endpoint's error
@@ -221,6 +231,31 @@ export default async function handler(req, res) {
         present: out.models.includes(entry.id),
         available: out.models,
       });
+    }
+
+    // -- Clients: workspaces and their owners (see api/_clients.js) ---------------
+    case "listClients":
+    case "createClient":
+    case "sendPasswordReset": {
+      if (!supabaseConfigured()) {
+        return res.status(503).json({ error: "Client workspaces need SUPABASE_URL and SUPABASE_SECRET_KEY set, and migrations 0005 and 0008 applied." });
+      }
+      try {
+        if (action === "listClients") return res.status(200).json({ clients: await listClients() });
+        if (action === "createClient") {
+          const out = await createClient({
+            name: req.body?.name, slug: req.body?.slug, ownerEmail: req.body?.ownerEmail, redirectTo: appUrl(req),
+          });
+          return res.status(200).json(out);
+        }
+        const email = String(req.body?.email || "").trim();
+        if (!email) return res.status(400).json({ error: "Enter an email address." });
+        await sendPasswordReset(email, appUrl(req));
+        return res.status(200).json({ ok: true });
+      } catch (err) {
+        console.error(`${action} failed:`, err);
+        return res.status(err.status || 502).json({ error: err.message || "The workspace store did not answer." });
+      }
     }
 
     default:

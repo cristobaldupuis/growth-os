@@ -4,6 +4,209 @@ Architecture decisions worth remembering. The bar for this file is a real tradeo
 
 ---
 
+## A product is read from its own page, by the server, and reviewed before it is kept
+
+**Decision.** A brand has products (`brand.products`, at most 12, two images
+each). The usual way in is the product's page: `api/asset.js`
+(`action: "importProduct"`) fetches it server-side and reads, in order of
+trust, JSON-LD `Product`, Open Graph/product meta tags, and — only when those
+left a gap — Shopify's `/products/<handle>.json`. Nothing is inferred and
+nothing is saved until the operator has reviewed every field and picked the
+images. "Add by hand" produces the same record.
+
+**Why the page and not an integration.** Shopify, WooCommerce and BigCommerce
+themes already publish this data for search engines; reading it needs no app
+install, no OAuth and no client credentials, which is the difference between
+setup in a first meeting and setup after a contract. An API connector would
+also give us the catalogue, which we do not want — a round is about one product.
+
+**Why the server and not the browser.** Store CDNs do not answer cross-origin
+reads. That makes this a function that fetches URLs a caller chose, from inside
+a cloud network — the textbook SSRF surface — so it is written as one:
+http/https on 80/443 only, no credentials in URLs, no internal hostnames, every
+resolved address checked at connect time (checking before the fetch is the
+DNS-rebinding hole), redirects followed by hand and re-checked, sizes capped
+while streaming, one shared deadline, and a per-person and per-deployment rate
+limit (`DAILY_CAP_PRODUCT_IMPORTS`).
+
+**What it does not do.** It does not follow a page's JavaScript, so a store that
+renders its product data client-side only imports partially; the review form
+shows what is missing and the operator types it. It does not re-sync: a price
+change on the site is not seen until someone re-imports.
+
+**Forcing condition.** A client whose catalogue changes weekly, or whose
+creative is about many SKUs at once. That is the point to add a real catalogue
+connector (Shopify Admin API, 2.1) and keep page import as the zero-setup path.
+
+---
+
+## Customer voice is scrubbed on entry and cited by id
+
+**Decision.** Brands carry pasted customer voice — reviews, survey answers,
+comments — split into snippets (up to 30 reach a brief), each quoted to the
+model with an id (`V1`…), and the brief returns the ids its insight rests on
+(`vocCited`). Emails, links, long digit runs, handles, trailing sign-offs
+("— Jane D.") and leading attributions ("Review by Mark:") are removed before
+the field is stored — when the operator leaves the field, and again on every
+settings save — and the count removed is shown under it. Splitting for a prompt
+scrubs once more (`src/services/voc.js`).
+
+**Why.** The brief was told its insight must be a claim about the buyer and was
+given no buyer data, so it wrote a plausible one — the one thing a brief must
+not be. Pasted reviews are the cheapest evidence a brand has. But
+docs/data-handling.md promises no person enters the workspace, and a pasted
+review often arrives with one attached. Scrubbing only at prompt time would
+have kept the model clean and left the email sitting in the workspace store,
+so the scrub runs before storage; parts with nothing to remove are stored
+exactly as typed.
+
+**What it does not do.** The scrub is a pattern backstop for honest pasting, not
+a PII detector: a name written mid-sentence ("my sister Anna loves it") is kept,
+because a capitalised word mid-sentence is far more often a product than a
+person. The field says to paste the words only. A CRM export is out of contract
+whatever the scrub catches.
+
+**Forcing condition.** A client who wants reviews pulled automatically (a
+reviews platform or Shopify connector). That path must go through the same
+scrub and `dataSafety.js`, and at that volume a proper entity detector earns its
+cost.
+
+---
+
+## Variant sets are append-only and freeze when their names leave the studio
+
+**Decision.** Every variant generation is a new set on the creative record
+(`variantSets`), numbered within its brief version; nothing is overwritten. A
+set freezes the first time its names leave the tool — copied, exported to CSV,
+put in a creator brief, drawn onto a static ad — and from then its naming slots
+and copy are read-only and `names` snapshots exactly what shipped. Iterating
+means generating a new set.
+
+**Why.** The ad name is the join key from the ad account back to the
+initiative. Regenerating used to replace the set in place and naming edits were
+never saved, so the words behind a name already live in Ads Manager could
+change or vanish — and every performance row for that name would then describe
+an ad nobody could see any more. Frozen sets are also what make the brief's
+"won / lost" block possible: `shippedAdIndex` maps a name to the words it
+carried and `topAdsByReturn` ranks those by the ad account's own ROAS, above
+the same $500 floor the per-dimension evidence uses.
+
+**What it costs.** A typo spotted after export needs a new set and a new name.
+That is deliberate — a quietly edited shipped ad is worse than a visible
+second version.
+
+**Forcing condition.** Operators routinely exporting to look at a set rather
+than to ship it, and so freezing sets they meant to keep editing. Then split
+"preview" from "ship" as separate actions.
+
+---
+
+## Variants run one call per angle, and a second pass reviews but never rewrites
+
+**Decision.** `callCreativeVariants` makes one medium-effort call per brief
+angle, in parallel, instead of one call for the whole set; each returns timed
+beats with on-screen text, Meta's three copy fields and alternative hooks. A
+separate low-effort call then scores every variant against a fixed rubric and
+returns issues, claim risks and, where it has one, a better hook or line. The
+operator applies a suggestion with one click; the review never edits a variant
+itself.
+
+**Why per angle.** The richer output roughly doubled tokens per variant, and a
+single call for a four-angle set ran past the proxy's 55-second upstream
+timeout at the effort the copy needs. Per-angle calls also fail independently —
+one bad angle no longer costs the set.
+
+**Why suggestions only.** A reviewer that rewrites is a second author whose
+changes nobody approved, on copy that will carry a claim. A score and a proposed
+line keep the operator as the one who decides, and the rubric's output is a
+record of why a variant was changed.
+
+**Forcing condition.** If the suggested hook is taken most of the time, the
+producer prompt is under-specified — fold the rubric into it rather than paying
+for two calls.
+
+---
+
+## Static ads draw their words in code; the image model still never renders text
+
+**Decision.** A static ad is the text-free key frame with the variant's
+headline, CTA and the brand's logo drawn over it on a canvas
+(`src/services/staticAd.js`), at 4:5, 1:1 and 9:16, inside each placement's safe
+zones, with the CTA's text colour chosen by WCAG contrast against the brand's
+accent (white when none is set).
+
+**Why.** The image prompt forbids rendered text because image models mangle
+typography and any words they invent are an unreviewed claim on an asset that
+looks finished. That rule meant the studio could not produce the format most
+DTC brands spend the most on. Drawing the words in code keeps the rule and gets
+the format: real type, and every word on the ad is one the operator approved.
+
+**What it does not do.** No layout choice beyond the one template, no second
+font, no price badge. It is a production-grade default, not a design tool; a
+brand with a design team exports the frame and lays it out itself.
+
+---
+
+## Clients are opened from the admin console, not the app
+
+**Decision.** `/admin → Clients` creates the workspace, invites the owner
+through Supabase Auth (or finds their existing account) and seats them as
+owner, deleting the workspace again if a later step fails. The app handles the
+invite and password-recovery links and asks for a new password.
+
+**Why the console.** Opening a client is the operator's job, and the console is
+the operator's surface behind its own password; putting workspace creation in
+the app would mean any signed-in user could create one. Inside a workspace,
+owners still manage their own team from the app.
+
+**Why roll back instead of retry.** A workspace with no owner looks like a real
+client in every list and nobody can sign in to it. Deleting it on failure and
+showing the error is recoverable by running the form again; a half-created row
+is recoverable only by someone noticing it.
+
+**Forcing condition.** Self-serve sign-up. Then workspace creation moves behind
+billing, not behind the operator.
+
+---
+
+## Three idea engines, one list — merged on read, not rebuilt
+
+**Decision.** Next Plays, Signal AI debate syntheses and the library's
+"Do Next" all feed one "Test next" list on the dashboard, each idea labelled with
+its source; ideas with the same title are shown once and credited to every
+source that proposed them. The engines are unchanged. The library's ideas are
+now stored as a `recs` batch with `source: "library"`, and each kind of batch is
+capped separately (ten slates, three syntheses) so one can never evict the
+other (`src/services/testNext.js`).
+
+**Why.** A client shown three lists of experiments asks which one to trust, and
+the honest answer is that they are three readings of the same evidence. When two
+readings agree, that is the strongest signal the three produce, and it was
+invisible while they lived apart.
+
+**Why not one engine.** They run at different cadences and costs — a weekly
+slate, an on-demand debate, a synthesis on request — and each is useful alone.
+Merging what they already stored cost nothing and changed no prompt.
+
+**Forcing condition.** Title matching misses ideas that agree in different
+words often enough to matter. Then match on meaning, not text.
+
+---
+
+## Video tools are off by default
+
+**Decision.** Talking-head rendering, voices and the avatar field are hidden
+behind `Settings → Workspace → Show video tools` (`settings.creativeVideo`),
+off for new and existing workspaces.
+
+**Why.** They are the most expensive calls in the product, the least connected
+to the evidence loop, and what 5.7 warns about: a spokesperson render is not
+product video, and showing it first makes the studio look like an asset
+generator. A client who wants it turns it on; one who does not never sees the
+cost.
+
+---
+
 ## The deployment has a daily ceiling as well as an hourly one per caller
 
 **Decision.** Every metered endpoint now checks two buckets, not one: the

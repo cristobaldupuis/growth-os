@@ -30,7 +30,9 @@ Where data enters, that is enforced as follows:
   ([`src/services/performance.js`](../src/services/performance.js)).
 - **Weekly-metrics files** keep unrecognised columns as custom metrics, except
   any column the personal-data classifier flags, which is left out
-  (`parseMetricsCSV` in [`src/constants.js`](../src/constants.js)).
+  (`parseMetricsCSV` in [`src/constants.js`](../src/constants.js)). A column
+  whose name also names a count, rate or amount — `email_revenue`,
+  `mobile_sessions`, `Mobile %` — is an aggregate and is kept.
 - **Connector syncs** pass every row, and every key inside its metrics, through
   `stripPersonalFields` on the server before the rows reach a browser
   ([`api/connectors.js`](../api/connectors.js)). The one connector built so far,
@@ -218,8 +220,8 @@ scrub catches.
 ## What the importers refuse
 
 The performance-export and weekly-metrics importers both leave out any column
-carrying personal data, and name it to the operator before the import is
-confirmed. The initiative importer reads a fixed list of fields and nothing
+the classifier flags as personal data, and name every one of them to the
+operator before the import is confirmed. The initiative importer reads a fixed list of fields and nothing
 else, so it has no personal column to refuse, but it does not scan the file
 either.
 

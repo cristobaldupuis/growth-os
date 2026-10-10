@@ -150,19 +150,11 @@ export function inferDelimiter(names, preferred = "_") {
   const candidates = CANDIDATE_DELIMITERS.map(delimiter => {
     const hist = slotHistogram(names, delimiter);
     const top = hist[0] || { slots: 1, count: 0, share: 0 };
-    // The most common shape that actually splits, whether or not it is the
-    // mode. An account where 45% of names follow a convention and 55% are free
-    // text has a mode of one slot, and "no convention" would be the wrong
-    // summary of it.
-    const split = hist.find(h => h.slots >= MIN_SLOTS) || null;
     return {
       delimiter,
       dominantSlots: top.slots,
       consistency: top.slots >= MIN_SLOTS ? top.share : 0,
       shapes: hist.filter(h => h.slots >= MIN_SLOTS).length,
-      splitSlots: split ? split.slots : 0,
-      splitCount: split ? split.count : 0,
-      splitShare: split ? split.share : 0,
     };
   }).sort((a, b) =>
     b.consistency - a.consistency ||
@@ -176,9 +168,12 @@ export function inferDelimiter(names, preferred = "_") {
     CANDIDATE_DELIMITERS.indexOf(a.delimiter) - CANDIDATE_DELIMITERS.indexOf(b.delimiter)
   );
   const best = candidates[0];
-  // No delimiter produced more than one slot in a majority of names. The
-  // account is using free-text names and the finding is that, not a winner.
+  // Under every candidate delimiter the most common shape is a name that does
+  // not split at all, so no delimiter gives the account a dominant shape. That
+  // is the finding, not a winner — and it says nothing about how many names are
+  // free text, which `split.unsplit` counts.
   const unstructured = !best || best.consistency === 0;
+  const split = unstructured ? splitGroups(names, preferred) : null;
   return {
     candidates,
     // The delimiter to compute with. When the account is unstructured this is
@@ -186,23 +181,51 @@ export function inferDelimiter(names, preferred = "_") {
     // `auditAccount` reports `using: null` in that case.
     chosen: best && best.consistency > 0 ? best.delimiter : preferred,
     unstructured,
-    // The largest minority that does follow a convention, reported as evidence
-    // alongside "unstructured" rather than instead of it. Ranked the same way
-    // as the main choice: share, then the split that carries more slots, then
-    // the schema's delimiter, then the candidate order.
-    partial: unstructured ? largestSplit(candidates, preferred) : null,
+    // The largest group that does follow a convention, reported as evidence
+    // alongside "unstructured" rather than instead of it.
+    partial: split ? split.partial : null,
+    // Names no candidate delimiter splits: the account's actual free text.
+    unsplit: split ? split.unsplit : null,
   };
 }
 
-function largestSplit(candidates, preferred) {
-  const top = candidates
-    .filter(c => c.splitCount > 0)
-    .sort((a, b) =>
-      b.splitShare - a.splitShare ||
-      b.splitSlots - a.splitSlots ||
-      (a.delimiter === preferred ? -1 : b.delimiter === preferred ? 1 : 0) ||
-      CANDIDATE_DELIMITERS.indexOf(a.delimiter) - CANDIDATE_DELIMITERS.indexOf(b.delimiter))[0];
-  return top ? { delimiter: top.delimiter, slots: top.splitSlots, count: top.splitCount, share: top.splitShare } : null;
+/**
+ * For an account with no dominant shape: which convention the largest group of
+ * names follows, and how many names follow none.
+ *
+ * Each name is counted under the delimiter that splits it into the most slots,
+ * then names are grouped by (delimiter, slot count). Counting a name once, under
+ * its richest split, is what stops a character inside a value from out-voting
+ * the delimiter it sits inside: "…_Chocolate_35s-Raw_NA" splits in two on the
+ * hyphen and in eleven on the underscore, so it counts toward the underscore,
+ * and one dashed free-text name beside ten of them cannot make "-" the finding.
+ * Ties go to the schema's delimiter, then the candidate order.
+ */
+function splitGroups(names, preferred) {
+  const order = [preferred, ...CANDIDATE_DELIMITERS.filter(d => d !== preferred)];
+  const groups = new Map();
+  let unsplit = 0;
+  (names || []).forEach(n => {
+    let pick = null;
+    order.forEach(delimiter => {
+      const slots = String(n).split(delimiter).length;
+      if (slots >= MIN_SLOTS && (!pick || slots > pick.slots)) pick = { delimiter, slots };
+    });
+    if (!pick) { unsplit += 1; return; }
+    const key = `${pick.delimiter}\u0000${pick.slots}`;
+    const g = groups.get(key) || { ...pick, count: 0 };
+    g.count += 1;
+    groups.set(key, g);
+  });
+  const total = (names || []).length || 1;
+  const top = [...groups.values()].sort((a, b) =>
+    b.count - a.count ||
+    b.slots - a.slots ||
+    order.indexOf(a.delimiter) - order.indexOf(b.delimiter))[0];
+  return {
+    partial: top ? { delimiter: top.delimiter, slots: top.slots, count: top.count, share: top.count / total } : null,
+    unsplit: { count: unsplit, share: unsplit / total },
+  };
 }
 
 /**
@@ -338,17 +361,18 @@ export function auditAccount(rawNames, settings, options = {}) {
   const unique = distinct.map(d => d.name);
 
   const delimiter = inferDelimiter(unique, schema.delimiter);
-  // The delimiter the account uses, or null when most of its names use none.
-  // Never the schema's own as a stand-in: an export that says "delimiter: _,
-  // matches schema: yes" about names containing no underscore is the guess this
-  // module exists to refuse, and the CSV is the part of the audit that is
-  // quoted a week later by somebody who was not in the meeting.
+  // The delimiter the account uses, or null when no delimiter gives its names a
+  // dominant shape. Never the schema's own as a stand-in: an export that says
+  // "delimiter: _, matches schema: yes" about names containing no underscore is
+  // the guess this module exists to refuse, and the CSV is the part of the
+  // audit that is quoted a week later by somebody who was not in the meeting.
   const using = options.delimiter || (delimiter.unstructured ? null : delimiter.chosen);
   // What the shape histogram is split on. For an unstructured account that is
-  // the largest minority's delimiter, so the histogram shows the structure that
-  // does exist rather than every name at one slot.
-  const splitOn = using || (delimiter.partial ? delimiter.partial.delimiter : delimiter.chosen);
-  const histogram = slotHistogram(unique, splitOn);
+  // the largest group's delimiter, so the histogram shows the structure that
+  // does exist; null when no name splits on anything, and then the stand-in is
+  // used to compute (every name is one slot under it) but never reported.
+  const splitOn = using || (delimiter.partial ? delimiter.partial.delimiter : null);
+  const histogram = slotHistogram(unique, splitOn || delimiter.chosen);
   const dominant = histogram[0] || { slots: 0, count: 0, share: 0 };
   const slots = dominant.slots >= MIN_SLOTS ? profileSlots(unique, splitOn, dominant.slots, schema) : [];
   const fit = schemaFit(unique, schema);
@@ -383,7 +407,7 @@ function parsesUnder(name, schema, template) {
 }
 
 /**
- * A slot suggestion as one line: "Age 81%", with the value it rests on named
+ * A slot suggestion as one line: "Age (81%)", with the value it rests on named
  * when there is only one. Shared by the panel and the export so the two never
  * describe the same evidence differently.
  */
@@ -410,13 +434,16 @@ export function auditToCSV(audit) {
   push("corpus", "rows", audit.corpus.rows, "");
   push("corpus", "distinct names", audit.corpus.distinct, "");
   const d = audit.delimiter;
-  push("delimiter", "inferred", d.using || "none", d.unstructured ? "no delimiter splits most names consistently" : "");
+  push("delimiter", "inferred", d.using || "none", d.unstructured ? "no delimiter gives these names a dominant shape" : "");
   push("delimiter", "matches schema", d.matchesSchema == null ? "n/a" : d.matchesSchema ? "yes" : "no", "");
-  if (d.unstructured && d.partial) {
-    push("delimiter", "largest split shape", `${d.partial.slots} slots on ${d.partial.delimiter}`,
-      `${d.partial.count} names (${(d.partial.share * 100).toFixed(1)}% of distinct names)`);
+  if (d.unstructured) {
+    push("delimiter", "names with no delimiter", d.unsplit.count, `${(d.unsplit.share * 100).toFixed(1)}% of distinct names`);
+    if (d.partial) {
+      push("delimiter", "largest split shape", `${d.partial.slots} slots on ${d.partial.delimiter}`,
+        `${d.partial.count} names (${(d.partial.share * 100).toFixed(1)}% of distinct names)`);
+    }
   }
-  push("shape", "split on", d.splitOn, "");
+  push("shape", "split on", d.splitOn || "none", "");
   audit.histogram.forEach(h => push("shape", `${h.slots} slots`, h.count, `${(h.share * 100).toFixed(1)}% of distinct names`));
   audit.slots.forEach(s => push("slot", `position ${s.index + 1}`, s.distinct,
     s.freeText ? "free text" : (s.suggestions[0] ? `looks like ${suggestionText(s.suggestions[0])}` : "no vocabulary match")));

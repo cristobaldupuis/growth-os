@@ -25,19 +25,24 @@ const pct = (n) => `${(n * 100).toFixed(n >= 0.995 || n === 0 ? 0 : 1)}%`;
 const slotsLabel = (n) => `${n} slot${n === 1 ? "" : "s"}`;
 
 // The unstructured verdict, built from what was counted rather than asserted:
-// a minority that does follow a convention is named, and the hand-claim figure
-// is the retrofit count, which is "every name" only when it actually is.
+// how many names split on nothing, the largest group that does follow a
+// convention, and the hand-claim figure, which is "every name" only when the
+// retrofit count says so.
 function unstructuredProse(audit) {
-  const { partial } = audit.delimiter;
+  const { partial, unsplit } = audit.delimiter;
   const { distinct } = audit.corpus;
-  const n = audit.retrofit.count;
+  const of = (count) => `${count.toLocaleString()} of ${distinct.toLocaleString()} name${distinct === 1 ? "" : "s"}`;
+  const freeText = unsplit.count === distinct
+    ? "None of these names split on a common delimiter: this account is free-text names."
+    : `${of(unsplit.count)} (${pct(unsplit.share)}) split on no common delimiter.`;
   const minority = partial
-    ? ` The largest group that does follow one: ${partial.count.toLocaleString()} of ${distinct.toLocaleString()} names (${pct(partial.share)}) split on "${partial.delimiter}" into ${partial.slots} slots.`
+    ? ` The largest group that follows a convention is ${of(partial.count)} (${pct(partial.share)}), split on "${partial.delimiter}" into ${partial.slots} slots.`
     : "";
+  const n = audit.retrofit.count;
   const claims = n === distinct
     ? "Every name currently running has to be claimed by hand"
     : `${n.toLocaleString()} of the ${distinct.toLocaleString()} names currently running ${n === 1 ? "has" : "have"} to be claimed by hand`;
-  return `No delimiter splits most of these names consistently, so most of this account is free-text names and the taxonomy is installed rather than mapped.${minority} ${claims}, and the convention applies to new campaigns from here on.`;
+  return `No delimiter gives these names a dominant shape. ${freeText}${minority} ${claims}, and the convention applies to new campaigns from here on.`;
 }
 
 export function AccountAuditPanel({ t, settings, showToast }) {
@@ -141,9 +146,11 @@ export function AccountAuditPanel({ t, settings, showToast }) {
           <div style={gCd(t)}>
             <div style={head}>Shape</div>
             <div style={{ ...prose, marginBottom: 12, maxWidth: 660 }}>
-              Names split on "{audit.delimiter.splitOn}". One dominant row is a convention somebody has been following.
-              Four rows of similar weight is several conventions layered over time, and the implementation includes
-              deciding which survives.
+              {audit.delimiter.unstructured
+                ? (audit.delimiter.splitOn
+                    ? `Names split on "${audit.delimiter.splitOn}", the delimiter the largest group uses. The 1-slot row is names it does not split.`
+                    : "No name splits on a common delimiter, so every name is one slot.")
+                : `Names split on "${audit.delimiter.splitOn}". One dominant row is a convention somebody has been following. Four rows of similar weight is several conventions layered over time, and the implementation includes deciding which survives.`}
             </div>
             {audit.histogram.slice(0, 8).map(h => (
               <div key={h.slots} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 5 }}>

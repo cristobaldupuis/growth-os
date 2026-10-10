@@ -94,7 +94,7 @@ export function MetricsImportModal({t, dk, weeklyMetrics, perfRows, items, setti
       const rows = (res.rows || []).map(r => annotateRow(r, schema));
       const errors = [];
       if (!rows.length) errors.push(`Nothing to import: no sends with activity in the last ${res.days} days.`);
-      if (res.removed?.length) errors.push(`${res.removed.length} field${res.removed.length!==1?"s":""} carrying personal data ${res.removed.length!==1?"were":"was"} left out on the server: ${res.removed.join(", ")}. This workspace holds aggregates about ad entities, not customers.`);
+      if (res.removed?.length) errors.push(`${res.removed.length} field${res.removed.length!==1?"s":""} carrying personal data ${res.removed.length!==1?"were":"was"} left out on the server: ${res.removed.join(", ")}. This workspace holds aggregates about ad entities, not customers or audiences.`);
       if (res.renamed) errors.push(`${res.renamed} message name${res.renamed!==1?"s are":" is"} shared by more than one flow, so ${res.renamed!==1?"they were":"it was"} prefixed with the flow name to keep rows apart. Those will not parse against your naming convention.`);
       setPerf({ rows, errors, stats: statsFor(rows), identityLevel: "message" });
       setShape("performance");

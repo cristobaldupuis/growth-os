@@ -43,6 +43,14 @@ test("ordinary metric columns are untouched", () => {
     .forEach(h => assert.equal(classifyHeader(h), null, `${h} should pass`));
 });
 
+test("a column naming a count, rate or amount is an aggregate, whatever else it mentions", () => {
+  // The weekly importer keeps custom columns, so a false positive here drops a
+  // real metric rather than costing a line in the summary.
+  ["email_revenue", "Email Signups", "email_open_rate", "mobile_sessions", "Mobile %",
+   "phone_calls", "ip_traffic", "user_id_count", "zip_code_count", "birthday_campaign_revenue"]
+    .forEach(h => assert.equal(classifyHeader(h), null, `${h} should pass`));
+});
+
 // -- Scanning ------------------------------------------------------------------
 
 test("a scan reports position as well as kind", () => {
@@ -87,20 +95,27 @@ test("a weekly-metrics export carrying personal columns imports without them", (
   // The weekly shape keeps unrecognised columns as custom metrics, which is how
   // a personal one used to reach the store while the dialog said it had not.
   const csv = [
-    "date,brand,source,revenue,Email,First name,IP Address,Customer ID,promo_code",
-    "2026-03-02,default,manual,1200,someone@example.com,Someone,203.0.113.7,cus_123,SPRING",
+    "date,brand,source,revenue,Email,First name,IP Address,Customer ID,Phone,promo_code,email_revenue,mobile_sessions",
+    "2026-03-02,default,manual,1200,someone@example.com,Someone,203.0.113.7,cus_123,5551234567,SPRING,300,4100",
   ].join("\n");
   const { rows } = parseMetricsCSV(csv);
   assert.equal(rows.length, 1);
   const serialised = JSON.stringify(rows[0]);
-  for (const leaked of ["example.com", "Someone", "203.0.113.7", "cus_123"]) {
+  for (const leaked of ["example.com", "Someone", "203.0.113.7", "cus_123", "5551234567"]) {
     assert.equal(serialised.includes(leaked), false, leaked);
   }
   assert.equal(rows[0].metrics.revenue, 1200);
   assert.equal(rows[0].metrics.promo_code, "SPRING", "a custom column that is not personal still comes through");
-  // And the dialog's notice names exactly the columns the parser left out.
-  const scan = scanHeaders(csv.split("\n")[0].split(","));
-  assert.deepEqual(scan.blocked.map(b => b.header), ["Email", "First name", "IP Address", "Customer ID"]);
+  assert.equal(rows[0].metrics.email_revenue, "300", "an aggregate that mentions email is still an aggregate");
+  assert.equal(rows[0].metrics.mobile_sessions, "4100");
+  // And the dialog's notice names every column the parser left out — all five,
+  // not three and a count.
+  const notice = piiNotice(scanHeaders(csv.split("\n")[0].split(",")));
+  for (const header of ["Email", "First name", "IP Address", "Customer ID", "Phone"]) {
+    assert.match(notice, new RegExp(`"${header}"`), header);
+  }
+  assert.doesNotMatch(notice, /more/);
+  assert.doesNotMatch(notice, /email_revenue|mobile_sessions/);
 });
 
 // -- Connector rows ------------------------------------------------------------

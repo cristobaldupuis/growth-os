@@ -104,11 +104,43 @@ test("free-text names are never reported as using the schema's delimiter", () =>
   assert.equal(a.delimiter.unstructured, true);
   assert.equal(a.delimiter.using, null, "no delimiter is in use, and none is named");
   assert.equal(a.delimiter.matchesSchema, null, "there is nothing to match, so neither yes nor no");
+  assert.equal(a.delimiter.splitOn, null, "nothing splits, so nothing is named as the split");
+  assert.deepEqual(a.delimiter.unsplit, { count: PROSE.length, share: 1 });
   const csv = auditToCSV(a);
-  assert.match(csv, /^delimiter,inferred,none,no delimiter splits most names consistently$/m);
+  assert.match(csv, /^delimiter,inferred,none,no delimiter gives these names a dominant shape$/m);
   assert.match(csv, /^delimiter,matches schema,n\/a,$/m);
+  assert.match(csv, /^delimiter,names with no delimiter,12,100\.0% of distinct names$/m);
+  assert.match(csv, /^shape,split on,none,$/m);
   assert.doesNotMatch(csv, /^delimiter,inferred,_/m);
   assert.doesNotMatch(csv, /^delimiter,matches schema,yes/m);
+});
+
+test("free text is counted, not assumed to be the majority of an unstructured account", () => {
+  // Four free-text names and six underscore names in two shapes: one slot is
+  // the most common shape under every delimiter, so no delimiter dominates, but
+  // free text is 40% of the account, not "most" of it.
+  const a = auditAccount([
+    "Welcome Series", "Abandoned Checkout", "Browse Abandonment", "Spring Sale",
+    "holiday_2023_prospecting", "holiday_2023_retargeting", "holiday_2024_prospecting",
+    "bf_us_broad_video", "bf_ca_broad_video", "bf_uk_broad_static",
+  ], S);
+  assert.equal(a.delimiter.unstructured, true);
+  assert.deepEqual(a.delimiter.unsplit, { count: 4, share: 0.4 });
+  assert.match(auditToCSV(a), /^delimiter,names with no delimiter,4,40\.0% of distinct names$/m);
+});
+
+test("a hyphen inside values cannot out-vote the delimiter it sits inside", () => {
+  // Every compliant name splits in two on the hyphen in "35s-Raw" and in eleven
+  // on the underscore. One dashed free-text name used to tip the count to "-".
+  const compliant = Array.from({ length: 10 }, (_, i) =>
+    `Meta_Col_Asset${i}_R3_F_Fitness_Gym_Pastry_Chocolate_35s-Raw_NA`);
+  const a = auditAccount([...PROSE, ...compliant, "Summer Sale - final"], S);
+  assert.equal(a.delimiter.unstructured, true);
+  assert.deepEqual(
+    { delimiter: a.delimiter.partial.delimiter, slots: a.delimiter.partial.slots, count: a.delimiter.partial.count },
+    { delimiter: "_", slots: 11, count: 10 });
+  assert.equal(a.delimiter.splitOn, "_");
+  assert.ok(a.histogram.some(h => h.slots === 11 && h.count === 10));
 });
 
 test("a structured minority is reported alongside the unstructured verdict, not hidden by it", () => {

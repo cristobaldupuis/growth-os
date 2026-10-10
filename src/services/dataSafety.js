@@ -10,13 +10,16 @@
 //
 // ## The contract
 //
-// **This workspace holds aggregates about ad entities. It does not hold people.**
+// **This workspace holds aggregates about ad entities. It does not hold
+// customers or audiences.**
 //
 // A row may describe a campaign, an ad set, an ad, a brand-week or an initiative.
 // It may carry spend, impressions, clicks, conversions, revenue, dates and the
-// dimensions parsed out of a name. It may not carry an email address, a phone
-// number, a person's name, a street address, a customer or profile id, a device
-// or advertising id, an IP address, or a date of birth.
+// dimensions parsed out of a name. It may not carry a customer's email address,
+// phone number, name, street address, customer or profile id, device or
+// advertising id, IP address, or date of birth. The people it does name — the
+// team as initiative owners, creators in ad names, members — are listed in
+// docs/data-handling.md.
 //
 // The contract is not a preference. It is what makes three separate things true:
 //
@@ -83,6 +86,14 @@ const ALLOWED = new Set([
 /** True when this header is an aggregate dimension despite matching a rule. */
 export const isAllowedDimension = (header) => ALLOWED.has(norm(header));
 
+// A header that names a count, a rate or an amount describes an aggregate, even
+// when it also contains a word a rule looks for: "email revenue", "mobile
+// sessions", "phone calls", "Mobile %". Matching only the trigger word dropped
+// those columns from the weekly import, which keeps custom columns, and told
+// the operator they were personal data. Listed rather than inferred, like
+// ALLOWED, so the exception is visible and reviewable.
+const AGGREGATE = /\b(revenue|sales|sessions|clicks|opens|sends|sent|delivered|signups|sign ups|subscribers|subscriptions|orders|calls|traffic|visits|views|impressions|conversions|count|total|rate|ratio|share|percent|pct|ctr|cvr|aov|roas|spend|cost|value|volume|bounces|unsubscribes)\b|%/;
+
 /**
  * Classify one header. Returns null when it carries no personal data.
  *
@@ -91,7 +102,7 @@ export const isAllowedDimension = (header) => ALLOWED.has(norm(header));
  */
 export function classifyHeader(header) {
   const h = norm(header);
-  if (!h || isAllowedDimension(h)) return null;
+  if (!h || isAllowedDimension(h) || AGGREGATE.test(h)) return null;
   for (const rule of RULES) {
     if (rule.re.test(h)) return { header: String(header), kind: rule.kind, label: rule.label };
   }
@@ -130,9 +141,11 @@ export function scanHeaders(headers) {
  */
 export function piiNotice(scan) {
   if (!scan || scan.clean) return "";
+  // Every name, never "and 3 more": the weekly importer drops each of these
+  // columns, and a dropped column the operator was not told about is a silent
+  // loss whichever way the classifier was wrong.
   const names = scan.blocked.map(b => `"${b.header}"`);
-  const list = names.length > 3 ? `${names.slice(0, 3).join(", ")} and ${names.length - 3} more` : names.join(", ");
-  return `${names.length} column${names.length > 1 ? "s were" : " was"} not imported because ${names.length > 1 ? "they carry" : "it carries"} personal data: ${list}. This workspace holds aggregates about ad entities, never people. The export file itself still contains those columns — delete it when you are done.`;
+  return `${names.length} column${names.length > 1 ? "s were" : " was"} not imported because ${names.length > 1 ? "they look" : "it looks"} like personal data: ${names.join(", ")}. This workspace holds aggregates about ad entities, not customers or audiences. The export file itself still contains those columns — delete it when you are done.`;
 }
 
 /**

@@ -120,7 +120,7 @@ test("Klaviyo's refusals become messages an operator can act on", async () => {
 // -- The endpoint ----------------------------------------------------------------
 
 process.env.ALLOWED_ORIGINS = "https://example.test";
-const { default: handler, stripConnectorRows } = await import("./connectors.js");
+const { default: handler, stripConnectorRows, PROVIDERS } = await import("./connectors.js");
 
 function mockRes() {
   return {
@@ -183,6 +183,22 @@ test("a viewer cannot sync; a member gets rows", async () => {
 test("synced rows pass the personal-data guard on the server, and say what it removed", async () => {
   const ok = await call("POST", { provider: "klaviyo", days: 7 }, { token: "a.b.c" });
   assert.deepEqual(ok.body.removed, [], "today's Klaviyo rows carry nothing personal");
+
+  // Through the handler, with a provider that returns what a careless one
+  // might: the response must carry the stripped rows, not the provider's.
+  const realSync = PROVIDERS.klaviyo.sync;
+  PROVIDERS.klaviyo.sync = async () => ({
+    days: 7,
+    rows: [{ name: "Welcome_1", level: "message", channel: "klaviyo", date: "2026-09-01",
+             email: "someone@example.com", metrics: { impressions: 5, profile_id: "01ABC" } }],
+  });
+  let leaky;
+  try { leaky = await call("POST", { provider: "klaviyo", days: 7 }, { token: "a.b.c" }); }
+  finally { PROVIDERS.klaviyo.sync = realSync; }
+  assert.equal(leaky.statusCode, 200);
+  assert.equal(JSON.stringify(leaky.body.rows).includes("example.com"), false);
+  assert.equal(JSON.stringify(leaky.body.rows).includes("01ABC"), false);
+  assert.deepEqual(leaky.body.removed.sort(), ["email", "profile_id"]);
 
   const { rows, removed } = stripConnectorRows([
     { name: "Welcome_1", level: "message", channel: "klaviyo", date: "2026-09-01",

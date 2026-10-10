@@ -34,8 +34,10 @@ Where data enters, that is enforced as follows:
 - **Connector syncs** pass every row, and every key inside its metrics, through
   `stripPersonalFields` on the server before the rows reach a browser
   ([`api/connectors.js`](../api/connectors.js)). The one connector built so far,
-  Klaviyo, requests only flow and message names and four statistics
-  ([`api/_klaviyo.js`](../api/_klaviyo.js)).
+  Klaviyo, requests flow and message names and ids (the grouping Klaviyo
+  requires), four daily statistics, and the account's metric names to find the
+  conversion metric ([`api/_klaviyo.js`](../api/_klaviyo.js)). No profile or
+  event is read.
 - **Customer voice** — pasted reviews and survey answers — is scrubbed of
   identifiers before it is stored ([see below](#customer-voice)).
 

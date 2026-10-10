@@ -167,6 +167,21 @@ export function stripPersonalFields(record) {
   return { record: out, removed };
 }
 
+/**
+ * Weekly-metric rows with any personal key removed from their metrics.
+ *
+ * Applied where weekly metrics are saved rather than only where a CSV is
+ * parsed, because a backup restore writes rows that never passed the parser —
+ * including rows saved by the importer before it skipped personal columns.
+ */
+export function stripPersonalMetrics(rows) {
+  return (rows || []).map(r => {
+    if (!r || !r.metrics || typeof r.metrics !== "object") return r;
+    const { record, removed } = stripPersonalFields(r.metrics);
+    return removed.length ? { ...r, metrics: record } : r;
+  });
+}
+
 // -- Workspace mode ------------------------------------------------------------
 //
 // `DEMO_MODE` is a build-time constant in the config, and it answers "should a

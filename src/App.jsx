@@ -15,7 +15,7 @@ import {
 import { KEY_ITEMS, KEY_SETTINGS, KEY_DEBATES, KEY_METRICS, KEY_RECS, KEY_CREATIVE, KEY_PERF, KEY_ASSETS, KEY_USAGE, KEY_AGENDA, KEY_THEME, KEY_LIB_VIEW, KEY_RAIL, KEY_TOUR_SEEN, store, onWriteError, onRemoteChange, onSyncNotice, syncRemote, remoteAttached, remoteReadOnly, handleDownloadBackup, handleRestoreBackup } from "./services/store.js";
 import { resolveSchema } from "./services/naming.js";
 import { attachInitiatives, annotateRow } from "./services/performance.js";
-import { isLiveWorkspace, backupStatus } from "./services/dataSafety.js";
+import { isLiveWorkspace, backupStatus, stripPersonalMetrics } from "./services/dataSafety.js";
 import { Sidebar } from "./components/Sidebar.jsx";
 import { CadenceRail, CadenceLegend } from "./components/CadenceRail.jsx";
 import { cadenceWindow, cadenceFor, windowLabel, groupRollup } from "./services/cadence.js";
@@ -1002,7 +1002,10 @@ export default function App() {
       return next;
     });
   };
-  const saveMetrics  = m => { if (viewOnly()) return; setWeeklyMetrics(m); store.set(KEY_METRICS,JSON.stringify(m)); };
+  // Every weekly-metrics write passes the personal-data filter here — import,
+  // manual log and backup restore alike — so a restored file cannot put back
+  // a column the importer would have refused.
+  const saveMetrics  = m => { if (viewOnly()) return; m = stripPersonalMetrics(m); setWeeklyMetrics(m); store.set(KEY_METRICS,JSON.stringify(m)); };
   const saveRecs     = r => { if (viewOnly()) return; setRecs(r); store.set(KEY_RECS,JSON.stringify(r)); };
   const saveCreative = c => { if (viewOnly()) return; setCreative(c); store.set(KEY_CREATIVE,JSON.stringify(c)); };
   const savePerf     = p => { if (viewOnly()) return; setPerfRows(p); store.set(KEY_PERF,JSON.stringify(p)); };

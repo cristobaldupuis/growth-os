@@ -9,7 +9,6 @@ import { ChargeBar } from "../components/ChargeBar.jsx";
 import { NameBuilder } from "../components/NameBuilder.jsx";
 import { AccountAuditPanel } from "../components/AccountAuditPanel.jsx";
 import { availableDimensions, defaultDimension, rollupByInitiative, deriveRatios, ADDITIVE_METRICS, PERF_ROW_LIMIT } from "../services/performance.js";
-import { remoteAttached } from "../services/store.js";
 import { IconArrowRight } from "../components/icons.jsx";
 
 // -- Performance -----------------------------------------------------------------
@@ -168,10 +167,10 @@ export function PerformanceView({ t, items, settings, perfRows, onImport, onClea
               <div style={{ fontFamily: t.mono, fontSize: 15, fontWeight: 700, color: t.text, lineHeight: 1.1 }}>{value}</div>
             </div>
           ))}
-          {rows.length >= PERF_ROW_LIMIT && !remoteAttached() && (
+          {rows.length >= PERF_ROW_LIMIT && (
             <div style={{ fontSize: 11.5, color: t.warn, fontFamily: t.sans, flexBasis: "100%", lineHeight: 1.5 }}>
-              At the {PERF_ROW_LIMIT.toLocaleString()}-row browser storage ceiling. The oldest rows are dropped as new
-              ones import — narrow the export's date range. A workspace stored in Postgres, when signed in, has no cap.
+              At the {PERF_ROW_LIMIT.toLocaleString()}-row storage ceiling. The oldest rows are dropped as new
+              ones import — narrow the export's date range.
             </div>
           )}
         </div>

@@ -161,19 +161,6 @@ test("the row cap drops the oldest and says how many", () => {
   assert.equal(rows.length, PERF_ROW_LIMIT);
   assert.equal(dropped, 10);
 });
-
-test("an uncapped merge keeps every row, which is what a signed-in import relies on", () => {
-  // The import dialog passes Infinity when the workspace store is Postgres. A
-  // capped merge there would be staged and committed, deleting the excess.
-  const many = Array.from({ length: PERF_ROW_LIMIT + 10 }, (_, i) => ({
-    date: "2020-01-" + String((i % 28) + 1).padStart(2, "0"),
-    channel: "meta", level: "ad", name: "n" + i, metrics: {},
-  }));
-  const { rows, dropped } = mergePerformanceRows([], many, Infinity);
-  assert.equal(rows.length, PERF_ROW_LIMIT + 10);
-  assert.equal(dropped, 0);
-});
-
 // -- The initiative bridge -----------------------------------------------------
 
 test("untagged spend and a broken tag are counted separately", () => {

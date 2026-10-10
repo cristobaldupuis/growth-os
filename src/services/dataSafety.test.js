@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  classifyHeader, scanHeaders, piiNotice, stripPersonalFields, isAllowedDimension,
+  classifyHeader, scanHeaders, piiNotice, stripPersonalFields, stripPersonalMetrics, isAllowedDimension,
   resolveWorkspaceMode, isLiveWorkspace, backupStatus, BACKUP_STALE_DAYS,
 } from "./dataSafety.js";
 import { parsePerformanceCSV } from "./performance.js";
@@ -116,6 +116,17 @@ test("a weekly-metrics export carrying personal columns imports without them", (
   }
   assert.doesNotMatch(notice, /more/);
   assert.doesNotMatch(notice, /email_revenue|mobile_sessions/);
+});
+
+test("weekly metrics restored from a backup lose personal keys on save", () => {
+  // A backup can carry rows the old importer stored with an Email column.
+  const restored = [
+    { date: "2026-03-02", brand: "default", source: "manual", metrics: { revenue: 1200, email: "someone@example.com", email_revenue: 300 } },
+    { date: "2026-03-09", brand: "default", source: "manual", metrics: { revenue: 900 } },
+  ];
+  const clean = stripPersonalMetrics(restored);
+  assert.deepEqual(clean[0].metrics, { revenue: 1200, email_revenue: 300 });
+  assert.equal(clean[1], restored[1], "a clean row is passed through untouched");
 });
 
 // -- Connector rows ------------------------------------------------------------

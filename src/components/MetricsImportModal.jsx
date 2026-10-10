@@ -3,8 +3,7 @@ import { Modal } from "./Modal.jsx";
 import { gG, gGh, gSL, gSl } from "./styles.js";
 import { METRIC_SOURCES, fmtCur, parseMetricsCSV } from "../constants.js";
 import { splitCSVLine } from "../services/csvLine.js";
-import { detectCsvShape, parsePerformanceCSV, mergePerformanceRows, attachInitiatives, annotateRow, statsFor, PERF_ROW_LIMIT } from "../services/performance.js";
-import { remoteAttached } from "../services/store.js";
+import { detectCsvShape, parsePerformanceCSV, mergePerformanceRows, attachInitiatives, annotateRow, statsFor } from "../services/performance.js";
 import { connectorStatus, syncConnector } from "../services/connectors.js";
 import { resolveSchema, listChannels } from "../services/naming.js";
 import { scanHeaders, piiNotice } from "../services/dataSafety.js";
@@ -126,12 +125,12 @@ export function MetricsImportModal({t, dk, weeklyMetrics, perfRows, items, setti
   };
 
   const handleConfirmPerf = () => {
-    // The cap exists to keep browser storage under quota. A signed-in workspace
-    // stores rows in Postgres instead, and a capped merge there was worse than
-    // pointless: the save stages the merged set and then deletes every row it
-    // did not stage, so the oldest rows were deleted from the database.
-    const limit = remoteAttached() ? Infinity : PERF_ROW_LIMIT;
-    const { rows, dropped } = mergePerformanceRows(perfRows || [], perf.rows, limit);
+    // Capped in both stores, and the drop is reported below. A signed-in
+    // workspace is not uncapped yet: its load returns every performance row in
+    // one response, which has a size limit, so an uncapped table would grow
+    // until the workspace could not be opened at all. Lifting this needs paged
+    // loading first.
+    const { rows, dropped } = mergePerformanceRows(perfRows || [], perf.rows);
     onSavePerf(rows);
     const { counts } = attachInitiatives(perf.rows, items, schema);
     const bits = [`${perf.rows.length} row${perf.rows.length!==1?"s":""} imported`];

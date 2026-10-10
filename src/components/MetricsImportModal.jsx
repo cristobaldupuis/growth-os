@@ -3,7 +3,8 @@ import { Modal } from "./Modal.jsx";
 import { gG, gGh, gSL, gSl } from "./styles.js";
 import { METRIC_SOURCES, fmtCur, parseMetricsCSV } from "../constants.js";
 import { splitCSVLine } from "../services/csvLine.js";
-import { detectCsvShape, parsePerformanceCSV, mergePerformanceRows, attachInitiatives, annotateRow, statsFor } from "../services/performance.js";
+import { detectCsvShape, parsePerformanceCSV, mergePerformanceRows, attachInitiatives, annotateRow, statsFor, PERF_ROW_LIMIT } from "../services/performance.js";
+import { remoteAttached } from "../services/store.js";
 import { connectorStatus, syncConnector } from "../services/connectors.js";
 import { resolveSchema, listChannels } from "../services/naming.js";
 import { scanHeaders, piiNotice } from "../services/dataSafety.js";
@@ -62,11 +63,10 @@ export function MetricsImportModal({t, dk, weeklyMetrics, perfRows, items, setti
   const ingest = (text) => {
     setRawText(text);
     const headers = splitCSVLine((text.split(/\r?\n/)[0] || ""));
-    // Scanned on both shapes, before either parser runs. Both parsers read only
-    // the columns they recognise, so a personal column has never actually been
-    // written to the store — but "never happened to be read" is a property of
-    // how they were written, not a promise anybody made, and the operator has
-    // no way to tell the difference from outside. Saying it is the difference.
+    // Scanned on both shapes, before either parser runs, so the operator is told
+    // which columns were left out. The performance parser reads only the columns
+    // it recognises; the weekly parser keeps unrecognised ones as custom metrics
+    // and skips the same personal columns this scan names (parseMetricsCSV).
     setPii(scanHeaders(headers));
     const detected = detectCsvShape(headers);
     setShape(detected.shape);
@@ -94,6 +94,7 @@ export function MetricsImportModal({t, dk, weeklyMetrics, perfRows, items, setti
       const rows = (res.rows || []).map(r => annotateRow(r, schema));
       const errors = [];
       if (!rows.length) errors.push(`Nothing to import: no sends with activity in the last ${res.days} days.`);
+      if (res.removed?.length) errors.push(`${res.removed.length} field${res.removed.length!==1?"s":""} carrying personal data ${res.removed.length!==1?"were":"was"} left out on the server: ${res.removed.join(", ")}. This workspace holds aggregates about ad entities, not customers.`);
       if (res.renamed) errors.push(`${res.renamed} message name${res.renamed!==1?"s are":" is"} shared by more than one flow, so ${res.renamed!==1?"they were":"it was"} prefixed with the flow name to keep rows apart. Those will not parse against your naming convention.`);
       setPerf({ rows, errors, stats: statsFor(rows), identityLevel: "message" });
       setShape("performance");
@@ -125,7 +126,12 @@ export function MetricsImportModal({t, dk, weeklyMetrics, perfRows, items, setti
   };
 
   const handleConfirmPerf = () => {
-    const { rows, dropped } = mergePerformanceRows(perfRows || [], perf.rows);
+    // The cap exists to keep browser storage under quota. A signed-in workspace
+    // stores rows in Postgres instead, and a capped merge there was worse than
+    // pointless: the save stages the merged set and then deletes every row it
+    // did not stage, so the oldest rows were deleted from the database.
+    const limit = remoteAttached() ? Infinity : PERF_ROW_LIMIT;
+    const { rows, dropped } = mergePerformanceRows(perfRows || [], perf.rows, limit);
     onSavePerf(rows);
     const { counts } = attachInitiatives(perf.rows, items, schema);
     const bits = [`${perf.rows.length} row${perf.rows.length!==1?"s":""} imported`];

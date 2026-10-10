@@ -32,6 +32,7 @@ import { guardEntry, guardRateLimit } from "./_guard.js";
 import { authenticate, membershipsFor, resolveWorkspace } from "./_auth.js";
 import { supabaseConfigured } from "./_supabase.js";
 import { klaviyoConfigured, syncKlaviyo, ConnectorError, MAX_DAYS as KLAVIYO_MAX_DAYS } from "./_klaviyo.js";
+import { stripPersonalFields } from "../src/services/dataSafety.js";
 
 const MAX_BODY_BYTES = 8 * 1024;
 // Klaviyo's reporting endpoints allow a few requests a minute and a couple of
@@ -43,6 +44,28 @@ const UPSTREAM_TIMEOUT_MS = 20000;
 export const PROVIDERS = {
   klaviyo: { label: "Klaviyo", configured: klaviyoConfigured, maxDays: KLAVIYO_MAX_DAYS, sync: syncKlaviyo },
 };
+
+/**
+ * Every row a provider returns passes the personal-data guard here, on the
+ * server, before it reaches a browser — the row's own keys and its metrics'.
+ *
+ * Each provider module already selects only aggregate fields, so on today's
+ * Klaviyo rows this removes nothing. It is here because "the module happens to
+ * select the right fields" is a property of one file, and this is the one place
+ * every present and future provider's rows pass through. What is removed is
+ * named back to the operator, never dropped silently.
+ */
+export function stripConnectorRows(rows) {
+  const removed = new Set();
+  const out = (rows || []).map(row => {
+    const top = stripPersonalFields(row);
+    top.removed.forEach(r => removed.add(r.header));
+    const metrics = row && row.metrics && typeof row.metrics === "object" ? stripPersonalFields(row.metrics) : null;
+    if (metrics) metrics.removed.forEach(r => removed.add(r.header));
+    return metrics ? { ...top.record, metrics: metrics.record } : top.record;
+  });
+  return { rows: out, removed: [...removed] };
+}
 
 /** What the Settings/import UI shows: which connectors exist and are set up. */
 export function connectorStatus() {
@@ -98,7 +121,8 @@ export default async function handler(req, res) {
 
   try {
     const result = await provider.sync({ days: req.body?.days, timeoutMs: UPSTREAM_TIMEOUT_MS });
-    res.status(200).json(result);
+    const { rows, removed } = stripConnectorRows(result.rows);
+    res.status(200).json({ ...result, rows, removed });
   } catch (err) {
     if (err instanceof ConnectorError) { res.status(err.status).json({ error: err.message }); return; }
     if (err?.name === "TimeoutError") { res.status(504).json({ error: `${provider.label} did not answer in time. Try a shorter range.` }); return; }

@@ -7,6 +7,7 @@ import {
   resolveWorkspaceMode, isLiveWorkspace, backupStatus, BACKUP_STALE_DAYS,
 } from "./dataSafety.js";
 import { parsePerformanceCSV } from "./performance.js";
+import { parseMetricsCSV } from "../constants.js";
 import { DEFAULT_NAMING_SCHEMA } from "./naming.js";
 
 // -- Classification ------------------------------------------------------------
@@ -80,6 +81,26 @@ test("a performance export carrying personal columns imports without them", () =
   assert.equal(serialised.includes("example.com"), false);
   assert.equal(serialised.includes("Someone"), false);
   assert.equal(rows[0].metrics.spend, 100);
+});
+
+test("a weekly-metrics export carrying personal columns imports without them", () => {
+  // The weekly shape keeps unrecognised columns as custom metrics, which is how
+  // a personal one used to reach the store while the dialog said it had not.
+  const csv = [
+    "date,brand,source,revenue,Email,First name,IP Address,Customer ID,promo_code",
+    "2026-03-02,default,manual,1200,someone@example.com,Someone,203.0.113.7,cus_123,SPRING",
+  ].join("\n");
+  const { rows } = parseMetricsCSV(csv);
+  assert.equal(rows.length, 1);
+  const serialised = JSON.stringify(rows[0]);
+  for (const leaked of ["example.com", "Someone", "203.0.113.7", "cus_123"]) {
+    assert.equal(serialised.includes(leaked), false, leaked);
+  }
+  assert.equal(rows[0].metrics.revenue, 1200);
+  assert.equal(rows[0].metrics.promo_code, "SPRING", "a custom column that is not personal still comes through");
+  // And the dialog's notice names exactly the columns the parser left out.
+  const scan = scanHeaders(csv.split("\n")[0].split(","));
+  assert.deepEqual(scan.blocked.map(b => b.header), ["Email", "First name", "IP Address", "Customer ID"]);
 });
 
 // -- Connector rows ------------------------------------------------------------

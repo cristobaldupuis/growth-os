@@ -35,16 +35,19 @@
 //
 // ## Why this is a guard and not a filter
 //
-// As it happens, both CSV importers already read only the columns they recognise
-// — `PERF_METRIC_ALIASES` and `NAME_COLUMNS` in performance.js, a fixed field
-// list in csv.js — so an export containing an email column has never actually
-// written one into the store. That is an accident of how they were written, not
-// a property anybody stated, and it is exactly the kind of accident that a
-// future connector written in a hurry does not inherit.
+// The performance importer reads only the columns it recognises
+// (`PERF_METRIC_ALIASES` and `NAME_COLUMNS` in performance.js) and the initiative
+// importer reads a fixed field list (csv.js). The weekly-metrics importer keeps
+// unrecognised columns as custom metrics, and for a while that included personal
+// ones while the import dialog said they had not been imported — which is how
+// "it happens to read only what it knows" turns out not to be a property at all.
+// It now skips any column `classifyHeader` flags.
 //
-// So: the scan reports what a file contains, the assertion is the chokepoint any
-// producer of rows must pass, and both are tested. What was implicit becomes
-// something the operator is told and a reviewer can verify.
+// So: the scan reports what a file contains, `classifyHeader` is what the
+// weekly parser and `stripPersonalFields` both consult, and the connector
+// endpoint runs every row through `stripPersonalFields` before returning it.
+// What was implicit becomes something the operator is told and a reviewer can
+// verify.
 
 const norm = (h) => String(h == null ? "" : h).trim().toLowerCase().replace(/[\s_.-]+/g, " ");
 

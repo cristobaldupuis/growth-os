@@ -8,6 +8,7 @@ import {
 } from "./activeConfig.js";
 import { DEFAULT_NAMING_SCHEMA, emptyCustomVariables } from "./services/naming.js";
 import { splitCSVLine } from "./services/csvLine.js";
+import { classifyHeader } from "./services/dataSafety.js";
 
 export const DEFAULT_AGENTS = CONFIG_AGENTS;
 
@@ -587,9 +588,13 @@ export function parseMetricsCSV(text) {
       }
     });
     if (obj.notes) metrics.notes = obj.notes;
-    // Carry through any unmapped custom columns
+    // Carry through any unmapped custom columns, except a personal one. The
+    // import dialog tells the operator a column like "Email" or "First name"
+    // was not imported (dataSafety.piiNotice); this is what makes that true.
+    // Such a column used to be carried into metrics like any other, and from
+    // there into the store and every prompt that prints the week's metrics.
     Object.keys(obj).forEach(k => {
-      if (!["date","brand","source","notes",...numericKeys].includes(k) && obj[k]) {
+      if (!["date","brand","source","notes",...numericKeys].includes(k) && obj[k] && !classifyHeader(k)) {
         metrics[k] = obj[k];
       }
     });

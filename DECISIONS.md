@@ -4,6 +4,18 @@ Architecture decisions worth remembering. The bar for this file is a real tradeo
 
 ---
 
+## The data contract is about customers, and the people it does name are listed
+
+**Decision:** the contract in `docs/data-handling.md` changes from "it does not hold people" to "it does not hold customers or audiences", and the records that do name people — an initiative's owner, a creator name in an ad name, members' sign-in emails, whatever is typed into free text — are listed in the document rather than left for a reviewer to find. The same pass rewrote the storage, retention and subprocessor sections against the code, and fixed the code where it was the code that was wrong.
+
+**Why:** a claim-by-claim check of the document against the source found the broader sentence false in ways a prospect's reviewer would find in an afternoon. The weekly-metrics importer stored the personal columns its own dialog said it had dropped. `stripPersonalFields`, named as the connector chokepoint, had no caller. Debate runs keep a full portfolio snapshot server-side with no purge, while the document said there was no server-side copy. The original entry below rested on "both importers already read only the columns they recognise", and one of them did not. Narrowing the promise to what is enforced, and enforcing the parts that should be (the weekly importer, the connector endpoint), costs a slogan. Handing a prospect a security page that is wrong costs the deal and the next one.
+
+**What stays manual, and says so:** retention and deletion. Debate runs and stored images carry no workspace id, so deleting a client means finding them by date. The document gives that procedure as it is rather than promising a feature.
+
+**Forcing condition:** the first client contract, or the first security questionnaire. Either one needs workspace ids on debate runs and images, a purge, and a deletion action with a stated timeline, and those should be built then rather than now.
+
+---
+
 ## A product is read from its own page, by the server, and reviewed before it is kept
 
 **Decision.** A brand has products (`brand.products`, at most 12, two images

@@ -241,16 +241,18 @@ it. Those are trackers a human updates. **The pitch is never the Library.** The
 pitch is that the ledger reads the ad account.
 
 ### 5.4 Not a customer data store — and this is enforced, not promised
-No email address, phone number, person's name, postal address, customer or profile
-id, device or advertising id, IP address, or date of birth enters the workspace.
-Age, gender, country, city, region and placement are permitted as *cohorts on a
-breakdown row* under an explicit allowlist. Every importer identifies, drops and
-reports offending columns; the same guard is the chokepoint every future connector
-must pass **[shipped]**.
+No customer's email address, phone number, name, postal address, customer or
+profile id, device or advertising id, IP address, or date of birth enters the
+workspace. Age, gender, country, city, region and placement are permitted as
+*cohorts on a breakdown row* under an explicit allowlist. The performance and
+weekly-metrics importers drop and report offending columns, and the connector
+endpoint strips every synced row on the server **[shipped]**. The people the
+workspace does name — initiative owners, creators in ad names, members — are
+listed in `docs/data-handling.md`.
 
-This is the reason a security review has a one-sentence answer, the reason browser
+This is the reason a security review has a short answer, the reason browser
 storage was ever defensible, and the reason no AI prompt in the product carries
-personal data. A prospect who needs individual-level data in the tool is not a
+customer data. A prospect who needs individual-level data in the tool is not a
 customer for this architecture, and the correct answer is to say so rather than to
 widen the contract.
 

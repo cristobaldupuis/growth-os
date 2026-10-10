@@ -296,6 +296,10 @@ shipped, plus two that are decisions rather than code.
   already happened to read only recognised columns — this turns an accident of
   how they were written into a property with a test and a document a prospect
   can be handed. `src/services/dataSafety.js`, `docs/data-handling.md`.
+  *Corrected October 2026:* the weekly-metrics importer did not read only
+  recognised columns, and nothing called the connector chokepoint. Both are now
+  enforced, and the document was rewritten against the code — see DECISIONS.md,
+  "The data contract is about customers".
 - [x] **The peeking guard.** The Test Validity panel had a correct sample-size
   calculator and a correct significance test, and no idea how many times it had
   been asked — which is the single most common way an ad test produces a false

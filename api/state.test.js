@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DOC_KEYS, MAX_ROWS, toRow, fromRow, handleDocs, readOnlyRefuses, validBatch, handlePerfStage, handlePerfCommit, BATCH_MAX_AGE_MS } from "./state.js";
+import { DOC_KEYS, MAX_ROWS, toRow, fromRow, handleDocs, readOnlyRefuses, validBatch, handlePerfStage, handlePerfCommit, handlePerfSummary, BATCH_MAX_AGE_MS } from "./state.js";
 import { bearerToken, resolveWorkspace } from "./_auth.js";
 import { perfRowKey } from "../src/services/performance.js";
 
@@ -217,6 +217,26 @@ async function withPg(handler, fn) {
   }
   return { res, calls };
 }
+
+test("the performance summary accepts a real date range and passes it to the aggregate", async () => {
+  // The pattern was once written double-escaped, which matches a literal
+  // backslash and refused every real date with a 400.
+  const { res, calls } = await withPg(null, (res) => handlePerfSummary(
+    { body: { dateFrom: "2026-01-01", dateTo: "2026-01-31" } }, res, { id: WS }));
+  assert.equal(res.code, 200);
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].url, /\/rpc\/performance_summary$/);
+  assert.equal(calls[0].body.p_date_from, "2026-01-01");
+  assert.equal(calls[0].body.p_date_to, "2026-01-31");
+});
+
+test("the performance summary refuses a malformed or inverted range before querying", async () => {
+  for (const body of [{ dateFrom: "01/02/2026" }, { dateTo: "2026-1-5" }, { dateFrom: "2026-02-01", dateTo: "2026-01-01" }]) {
+    const { res, calls } = await withPg(null, (res) => handlePerfSummary({ body }, res, { id: WS }));
+    assert.equal(res.code, 400, JSON.stringify(body));
+    assert.equal(calls.length, 0);
+  }
+});
 
 test("a batch time must be the server's own shape, recent, and not in the future", () => {
   const now = Date.parse("2026-09-24T10:00:00.000Z");

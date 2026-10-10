@@ -398,12 +398,12 @@ async function handleSaveDoc(req, res, workspace, user) {
   res.status(200).json({ revision: Number(next) });
 }
 
-async function handlePerfSummary(req, res, workspace) {
+export async function handlePerfSummary(req, res, workspace) {
   const body = req.body || {};
   const channel = body.channel ? String(body.channel) : null;
   const dateFrom = body.dateFrom ? String(body.dateFrom) : null;
   const dateTo = body.dateTo ? String(body.dateTo) : null;
-  const datePattern = /^\\d{4}-\\d{2}-\\d{2}$/;
+  const datePattern = /^\d{4}-\d{2}-\d{2}$/;
   if (dateFrom && !datePattern.test(dateFrom)) {
     res.status(400).json({ error: "dateFrom must be YYYY-MM-DD." });
     return;

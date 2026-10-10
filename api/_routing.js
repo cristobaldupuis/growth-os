@@ -55,14 +55,29 @@ export const routingIsDurable = () => supabaseConfigured();
  * and neither can take the app down.
  */
 export async function readRouting() {
-  if (!supabaseConfigured()) return null;
+  const read = await readRoutingStrict();
+  if (read.ok) return read.routing;
+  // Deliberately soft — see the header. The defaults are a shipped
+  // configuration, so serving them is a degradation rather than a failure.
+  console.error("Could not read model routing; falling back to defaults:", read.message);
+  return null;
+}
+
+/**
+ * The stored routing for a caller that must not mistake a failed read for an
+ * empty store. Resolves to `{ ok: true, routing }` — `routing` null when nothing
+ * is stored or no store is configured — or `{ ok: false, message }`.
+ *
+ * The public read can fall back to defaults; a read-modify-write cannot. Merging
+ * a save over a read that failed writes back only the group being saved, which
+ * erases every other group's stored assignment and reports success.
+ */
+export async function readRoutingStrict() {
+  if (!supabaseConfigured()) return { ok: true, routing: null };
   try {
-    return await readConfig(ROUTING_KEY);
+    return { ok: true, routing: await readConfig(ROUTING_KEY) };
   } catch (err) {
-    // Deliberately soft — see the header. The defaults are a shipped
-    // configuration, so serving them is a degradation rather than a failure.
-    console.error("Could not read model routing; falling back to defaults:", err);
-    return null;
+    return { ok: false, message: String((err && err.message) || err) };
   }
 }
 

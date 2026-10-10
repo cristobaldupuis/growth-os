@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { gG, gGh, gGd, gCd, gTA } from "./styles.js";
-import { auditAccount, extractNames, auditToCSV } from "../services/accountAudit.js";
+import { auditAccount, extractNames, auditToCSV, suggestionText } from "../services/accountAudit.js";
 import { piiNotice } from "../services/dataSafety.js";
 import { SAMPLE_ACCOUNT_NAMES } from "../activeConfig.js";
 
@@ -22,6 +22,23 @@ import { SAMPLE_ACCOUNT_NAMES } from "../activeConfig.js";
 // work cost.
 
 const pct = (n) => `${(n * 100).toFixed(n >= 0.995 || n === 0 ? 0 : 1)}%`;
+const slotsLabel = (n) => `${n} slot${n === 1 ? "" : "s"}`;
+
+// The unstructured verdict, built from what was counted rather than asserted:
+// a minority that does follow a convention is named, and the hand-claim figure
+// is the retrofit count, which is "every name" only when it actually is.
+function unstructuredProse(audit) {
+  const { partial } = audit.delimiter;
+  const { distinct } = audit.corpus;
+  const n = audit.retrofit.count;
+  const minority = partial
+    ? ` The largest group that does follow one: ${partial.count.toLocaleString()} of ${distinct.toLocaleString()} names (${pct(partial.share)}) split on "${partial.delimiter}" into ${partial.slots} slots.`
+    : "";
+  const claims = n === distinct
+    ? "Every name currently running has to be claimed by hand"
+    : `${n.toLocaleString()} of the ${distinct.toLocaleString()} names currently running ${n === 1 ? "has" : "have"} to be claimed by hand`;
+  return `No delimiter splits most of these names consistently, so most of this account is free-text names and the taxonomy is installed rather than mapped.${minority} ${claims}, and the convention applies to new campaigns from here on.`;
+}
 
 export function AccountAuditPanel({ t, settings, showToast }) {
   const [text, setText] = useState("");
@@ -108,12 +125,12 @@ export function AccountAuditPanel({ t, settings, showToast }) {
             <div style={{ display: "flex", gap: 30, flexWrap: "wrap", marginBottom: 14 }}>
               <div><div style={label}>Names supplied</div><div style={num}>{audit.corpus.rows.toLocaleString()}</div></div>
               <div><div style={label}>Distinct</div><div style={num}>{audit.corpus.distinct.toLocaleString()}</div></div>
-              <div><div style={label}>Delimiter in use</div><div style={{ ...num, color: audit.delimiter.matchesSchema ? t.teal : t.warn }}>{audit.delimiter.unstructured ? "none" : audit.delimiter.using}</div></div>
-              <div><div style={label}>Dominant shape</div><div style={num}>{audit.dominant.slots || "—"} slots</div></div>
+              <div><div style={label}>Delimiter in use</div><div style={{ ...num, color: audit.delimiter.matchesSchema ? t.teal : t.warn }}>{audit.delimiter.using || "none"}</div></div>
+              <div><div style={label}>Dominant shape</div><div style={num}>{audit.dominant.slots ? slotsLabel(audit.dominant.slots) : "—"}</div></div>
             </div>
             <div style={{ ...prose, maxWidth: 660 }}>
               {audit.delimiter.unstructured
-                ? "No delimiter splits these names consistently. This account is using free-text names, which means the taxonomy is being installed from scratch rather than mapped — every name currently running has to be claimed by hand, and the convention starts applying to new campaigns only."
+                ? unstructuredProse(audit)
                 : audit.delimiter.matchesSchema
                   ? `The account uses "${audit.delimiter.using}", which is the workspace's delimiter. ${pct(audit.dominant.share)} of distinct names have ${audit.dominant.slots} slots — the higher that share, the closer this is to a mapping exercise rather than a redesign.`
                   : `The account uses "${audit.delimiter.using}" and the workspace schema uses "${audit.schema.delimiter}". Changing the workspace delimiter invalidates every name already built against it, so this is a decision rather than a setting.`}
@@ -124,12 +141,13 @@ export function AccountAuditPanel({ t, settings, showToast }) {
           <div style={gCd(t)}>
             <div style={head}>Shape</div>
             <div style={{ ...prose, marginBottom: 12, maxWidth: 660 }}>
-              One dominant row is a convention somebody has been following. Four rows of similar weight is
-              several conventions layered over time, and the implementation includes deciding which survives.
+              Names split on "{audit.delimiter.splitOn}". One dominant row is a convention somebody has been following.
+              Four rows of similar weight is several conventions layered over time, and the implementation includes
+              deciding which survives.
             </div>
             {audit.histogram.slice(0, 8).map(h => (
               <div key={h.slots} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 5 }}>
-                <div style={{ width: 74, fontSize: 11.5, fontFamily: t.sans, color: t.textSub, textAlign: "right" }}>{h.slots} slots</div>
+                <div style={{ width: 74, fontSize: 11.5, fontFamily: t.sans, color: t.textSub, textAlign: "right" }}>{slotsLabel(h.slots)}</div>
                 <div style={{ flex: 1, height: 15, background: t.surfaceAlt, borderRadius: 3, overflow: "hidden" }}>
                   <div style={{ width: `${h.share * 100}%`, height: "100%", background: t.gold, opacity: h === audit.dominant ? 1 : 0.45 }} />
                 </div>
@@ -163,7 +181,7 @@ export function AccountAuditPanel({ t, settings, showToast }) {
                         <td style={{ padding: "7px 8px", fontFamily: t.sans, color: t.textSub }}>{s.index + 1}</td>
                         <td style={{ padding: "7px 8px", fontFamily: t.sans, color: t.textSub }}>{s.distinct.toLocaleString()}</td>
                         <td style={{ padding: "7px 8px", color: s.freeText ? t.textMuted : t.text }}>
-                          {s.freeText ? "free text" : s.suggestions[0] ? `${s.suggestions[0].label} · ${pct(s.suggestions[0].coverage)}` : "no vocabulary match"}
+                          {s.freeText ? "free text" : s.suggestions[0] ? suggestionText(s.suggestions[0]) : "no vocabulary match"}
                         </td>
                         <td style={{ padding: "7px 8px", color: t.textMuted, fontFamily: t.sans, fontSize: 11 }}>
                           {s.top.slice(0, 5).map(v => v.value).join("  ")}

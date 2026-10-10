@@ -135,7 +135,15 @@ export async function readConfig(key) {
     `${restBase()}/app_config?key=eq.${encodeURIComponent(key)}&select=value`,
     { headers: authHeaders(), signal: AbortSignal.timeout(TIMEOUT_MS) },
   );
-  if (!res.ok) throw new Error(`supabase config read returned ${res.status}`);
+  if (!res.ok) {
+    // The body, as rpc() and writeConfig() keep it. A bare status left a
+    // production 403 undiagnosable: PostgREST names a missing grant
+    // ("permission denied for table app_config", code 42501) in the body, and
+    // an edge or WAF refusal returns a page that looks nothing like that, so
+    // one logged occurrence tells the two apart.
+    const detail = await res.text().catch(() => "");
+    throw new Error(`supabase config read returned ${res.status}${detail ? ": " + detail.slice(0, 200) : ""}`);
+  }
   const rows = await res.json();
   return Array.isArray(rows) && rows.length ? rows[0].value : null;
 }

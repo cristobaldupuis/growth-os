@@ -223,6 +223,17 @@ function RoutingPanel({ config, reload }) {
         </div>
       )}
 
+      {config.readError && (
+        <div style={{ ...panel, borderColor: c.warn, marginBottom: 14 }}>
+          <div style={{ color: c.warn, fontWeight: 700, fontSize: 12.5, marginBottom: 5 }}>Stored routing could not be read</div>
+          <div style={{ fontSize: 12, color: c.textSub, lineHeight: 1.6 }}>
+            The groups below show the defaults committed in <code>registry.js</code>, which is also what the app falls
+            back to whenever this read fails. Saving is refused until it works, because a save now would erase the
+            other groups' stored assignments. The store said: <code>{config.readError}</code>
+          </div>
+        </div>
+      )}
+
       {config.dropped?.length > 0 && (
         <div style={{ ...panel, borderColor: c.warn, marginBottom: 14 }}>
           <div style={{ color: c.warn, fontWeight: 700, fontSize: 12.5, marginBottom: 5 }}>Stale assignment ignored</div>

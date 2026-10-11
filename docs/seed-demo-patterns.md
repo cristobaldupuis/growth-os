@@ -265,8 +265,8 @@ What it produces, and why each number is worth pausing on:
 | Retrofit | **70 names, 100%** | These cannot be renamed without resetting the learning phase, so each is a mapping decision |
 
 The slot table is the part to slow down on. Two slots resolve cleanly (Geo 100%,
-Format 100%), two resolve to nothing — and **slot 3 reads as "Age · 80.8%" and
-that is wrong.** It matches because `Broad` happens to sit in the age
+Format 100%), two resolve to nothing — and **slot 3 reads as "Age (81%), on one
+value: Broad" and that is wrong.** It matches because `Broad` happens to sit in the age
 vocabulary; the slot is plainly an audience slot. That is not a bug to tune out
 of the sample. It is the clearest possible demonstration of what "reports
 evidence and refuses to propose a taxonomy" means in practice: the tool offers

@@ -96,8 +96,9 @@ export const authHeaders = () => ({
 
 // Bounded so a hung datastore cannot hold a serverless function open. Short
 // because every caller here is on a request path a person is waiting on, and
-// both callers have a defined behaviour for "could not reach it" — routing
-// serves the committed defaults, the limiter fails closed.
+// each has a defined behaviour for "could not reach it": the public routing
+// read serves the committed defaults, a routing save refuses, the limiter
+// fails closed.
 const TIMEOUT_MS = 4000;
 
 /**
@@ -123,19 +124,29 @@ export async function rpc(fn, args) {
 }
 
 /**
- * Read one `app_config` row's value, or null when the key is absent.
+ * Read one `app_config` row's value: null when the key is absent, and a throw
+ * when the read fails.
  *
- * Absent and unreachable are deliberately NOT distinguished in the return value:
- * both mean "no stored value", and the one caller treats them the same way by
- * merging over committed defaults. A caller that needs to tell them apart should
- * catch instead.
+ * The two must stay distinguishable. The public routing read may treat a
+ * failure like an absent row and serve the committed defaults (`readRouting`),
+ * but a read-modify-write may not: merging a save over a failed read writes
+ * back only the new value and erases the rest, so `readRoutingStrict` reports
+ * the failure and the admin save refuses.
  */
 export async function readConfig(key) {
   const res = await fetch(
     `${restBase()}/app_config?key=eq.${encodeURIComponent(key)}&select=value`,
     { headers: authHeaders(), signal: AbortSignal.timeout(TIMEOUT_MS) },
   );
-  if (!res.ok) throw new Error(`supabase config read returned ${res.status}`);
+  if (!res.ok) {
+    // The body, as rpc() and writeConfig() keep it. A bare status left a
+    // production 403 undiagnosable: PostgREST names a missing grant
+    // ("permission denied for table app_config", code 42501) in the body, and
+    // an edge or WAF refusal returns a page that looks nothing like that, so
+    // one logged occurrence tells the two apart.
+    const detail = await res.text().catch(() => "");
+    throw new Error(`supabase config read returned ${res.status}${detail ? ": " + detail.slice(0, 200) : ""}`);
+  }
   const rows = await res.json();
   return Array.isArray(rows) && rows.length ? rows[0].value : null;
 }

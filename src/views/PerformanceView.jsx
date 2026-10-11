@@ -169,8 +169,8 @@ export function PerformanceView({ t, items, settings, perfRows, onImport, onClea
           ))}
           {rows.length >= PERF_ROW_LIMIT && (
             <div style={{ fontSize: 11.5, color: t.warn, fontFamily: t.sans, flexBasis: "100%", lineHeight: 1.5 }}>
-              At the {PERF_ROW_LIMIT.toLocaleString()}-row browser storage ceiling. The oldest rows are dropped as new
-              ones import — narrow the export's date range, or wait for the Postgres fact table.
+              At the {PERF_ROW_LIMIT.toLocaleString()}-row storage ceiling. The oldest rows are dropped as new
+              ones import — narrow the export's date range.
             </div>
           )}
         </div>

@@ -168,12 +168,63 @@ export function inferDelimiter(names, preferred = "_") {
     CANDIDATE_DELIMITERS.indexOf(a.delimiter) - CANDIDATE_DELIMITERS.indexOf(b.delimiter)
   );
   const best = candidates[0];
+  // Under every candidate delimiter the most common shape is a name that does
+  // not split at all, so no delimiter gives the account a dominant shape. That
+  // is the finding, not a winner — and it says nothing about how many names are
+  // free text, which `split.unsplit` counts.
+  const unstructured = !best || best.consistency === 0;
+  const split = unstructured ? splitGroups(names, preferred) : null;
   return {
     candidates,
+    // The delimiter to compute with. When the account is unstructured this is
+    // the schema's own as a stand-in, and it must never be reported as found:
+    // `auditAccount` reports `using: null` in that case.
     chosen: best && best.consistency > 0 ? best.delimiter : preferred,
-    // No delimiter produced more than one slot in a majority of names. The
-    // account is using free-text names and the finding is that, not a winner.
-    unstructured: !best || best.consistency === 0,
+    unstructured,
+    // The largest group that does follow a convention, reported as evidence
+    // alongside "unstructured" rather than instead of it.
+    partial: split ? split.partial : null,
+    // Names no candidate delimiter splits: the account's actual free text.
+    unsplit: split ? split.unsplit : null,
+  };
+}
+
+/**
+ * For an account with no dominant shape: which convention the largest group of
+ * names follows, and how many names follow none.
+ *
+ * Each name is counted under the delimiter that splits it into the most slots,
+ * then names are grouped by (delimiter, slot count). Counting a name once, under
+ * its richest split, is what stops a character inside a value from out-voting
+ * the delimiter it sits inside: "…_Chocolate_35s-Raw_NA" splits in two on the
+ * hyphen and in eleven on the underscore, so it counts toward the underscore,
+ * and one dashed free-text name beside ten of them cannot make "-" the finding.
+ * Ties go to the schema's delimiter, then the candidate order.
+ */
+function splitGroups(names, preferred) {
+  const order = [preferred, ...CANDIDATE_DELIMITERS.filter(d => d !== preferred)];
+  const groups = new Map();
+  let unsplit = 0;
+  (names || []).forEach(n => {
+    let pick = null;
+    order.forEach(delimiter => {
+      const slots = String(n).split(delimiter).length;
+      if (slots >= MIN_SLOTS && (!pick || slots > pick.slots)) pick = { delimiter, slots };
+    });
+    if (!pick) { unsplit += 1; return; }
+    const key = `${pick.delimiter}\u0000${pick.slots}`;
+    const g = groups.get(key) || { ...pick, count: 0 };
+    g.count += 1;
+    groups.set(key, g);
+  });
+  const total = (names || []).length || 1;
+  const top = [...groups.values()].sort((a, b) =>
+    b.count - a.count ||
+    b.slots - a.slots ||
+    order.indexOf(a.delimiter) - order.indexOf(b.delimiter))[0];
+  return {
+    partial: top ? { delimiter: top.delimiter, slots: top.slots, count: top.count, share: top.count / total } : null,
+    unsplit: { count: unsplit, share: unsplit / total },
   };
 }
 
@@ -212,7 +263,11 @@ export function profileSlots(names, delimiter, slots, schema) {
         const vocab = new Set(d.vocab.map(normKey));
         const matched = distinct.filter(v => vocab.has(normKey(v.value)));
         const rowsMatched = matched.reduce((s, v) => s + v.count, 0);
-        return { key: d.key, label: d.label, coverage: rows.length ? rowsMatched / rows.length : 0 };
+        // Which values the match rests on, because 81% coverage from one value
+        // ("Broad" happens to be in the age list) is much thinner evidence than
+        // 81% from six, and the reader can only weigh it if they can see it.
+        return { key: d.key, label: d.label, coverage: rows.length ? rowsMatched / rows.length : 0,
+                 valueCount: matched.length, values: matched.slice(0, 3).map(v => v.value) };
       })
       .filter(s => s.coverage >= 0.34)
       .sort((a, b) => b.coverage - a.coverage)
@@ -306,10 +361,20 @@ export function auditAccount(rawNames, settings, options = {}) {
   const unique = distinct.map(d => d.name);
 
   const delimiter = inferDelimiter(unique, schema.delimiter);
-  const chosen = options.delimiter || delimiter.chosen;
-  const histogram = slotHistogram(unique, chosen);
+  // The delimiter the account uses, or null when no delimiter gives its names a
+  // dominant shape. Never the schema's own as a stand-in: an export that says
+  // "delimiter: _, matches schema: yes" about names containing no underscore is
+  // the guess this module exists to refuse, and the CSV is the part of the
+  // audit that is quoted a week later by somebody who was not in the meeting.
+  const using = options.delimiter || (delimiter.unstructured ? null : delimiter.chosen);
+  // What the shape histogram is split on. For an unstructured account that is
+  // the largest group's delimiter, so the histogram shows the structure that
+  // does exist; null when no name splits on anything, and then the stand-in is
+  // used to compute (every name is one slot under it) but never reported.
+  const splitOn = using || (delimiter.partial ? delimiter.partial.delimiter : null);
+  const histogram = slotHistogram(unique, splitOn || delimiter.chosen);
   const dominant = histogram[0] || { slots: 0, count: 0, share: 0 };
-  const slots = dominant.slots >= MIN_SLOTS ? profileSlots(unique, chosen, dominant.slots, schema) : [];
+  const slots = dominant.slots >= MIN_SLOTS ? profileSlots(unique, splitOn, dominant.slots, schema) : [];
   const fit = schemaFit(unique, schema);
   const best = fit[0] || null;
 
@@ -325,7 +390,7 @@ export function auditAccount(rawNames, settings, options = {}) {
 
   return {
     corpus: { rows: rows.length, distinct: unique.length, repeated: rows.length - unique.length },
-    delimiter: { ...delimiter, using: chosen, matchesSchema: chosen === schema.delimiter },
+    delimiter: { ...delimiter, using, splitOn, matchesSchema: using == null ? null : using === schema.delimiter },
     histogram, dominant, slots,
     fit, best,
     retrofit: { count: retrofit.length, share: unique.length ? retrofit.length / unique.length : 0, sample: retrofit.slice(0, 200) },
@@ -339,6 +404,16 @@ function parsesUnder(name, schema, template) {
   if (parts.length !== dims.length) return false;
   return dims.every((dim, i) =>
     normKey(parts[i]) === normKey(schema.placeholder || "NA") || !validateValue(dim, parts[i], schema.delimiter));
+}
+
+/**
+ * A slot suggestion as one line: "Age (81%)", with the value it rests on named
+ * when there is only one. Shared by the panel and the export so the two never
+ * describe the same evidence differently.
+ */
+export function suggestionText(s) {
+  const base = `${s.label} (${(s.coverage * 100).toFixed(0)}%)`;
+  return s.valueCount === 1 ? `${base}, on one value: ${s.values[0]}` : base;
 }
 
 /**
@@ -358,11 +433,20 @@ export function auditToCSV(audit) {
 
   push("corpus", "rows", audit.corpus.rows, "");
   push("corpus", "distinct names", audit.corpus.distinct, "");
-  push("delimiter", "inferred", audit.delimiter.using, audit.delimiter.unstructured ? "no consistent delimiter found" : "");
-  push("delimiter", "matches schema", audit.delimiter.matchesSchema ? "yes" : "no", "");
+  const d = audit.delimiter;
+  push("delimiter", "inferred", d.using || "none", d.unstructured ? "no delimiter gives these names a dominant shape" : "");
+  push("delimiter", "matches schema", d.matchesSchema == null ? "n/a" : d.matchesSchema ? "yes" : "no", "");
+  if (d.unstructured) {
+    push("delimiter", "names with no delimiter", d.unsplit.count, `${(d.unsplit.share * 100).toFixed(1)}% of distinct names`);
+    if (d.partial) {
+      push("delimiter", "largest split shape", `${d.partial.slots} slots on ${d.partial.delimiter}`,
+        `${d.partial.count} names (${(d.partial.share * 100).toFixed(1)}% of distinct names)`);
+    }
+  }
+  push("shape", "split on", d.splitOn || "none", "");
   audit.histogram.forEach(h => push("shape", `${h.slots} slots`, h.count, `${(h.share * 100).toFixed(1)}% of distinct names`));
   audit.slots.forEach(s => push("slot", `position ${s.index + 1}`, s.distinct,
-    s.freeText ? "free text" : (s.suggestions[0] ? `looks like ${s.suggestions[0].label} (${(s.suggestions[0].coverage * 100).toFixed(0)}%)` : "no vocabulary match")));
+    s.freeText ? "free text" : (s.suggestions[0] ? `looks like ${suggestionText(s.suggestions[0])}` : "no vocabulary match")));
   audit.slots.forEach(s => s.top.forEach(v => push("slot value", `position ${s.index + 1}`, v.value, v.count)));
   audit.fit.forEach(f => push("schema fit", `${f.channelLabel}/${f.levelLabel}`, `${(f.rate * 100).toFixed(1)}%`,
     `${f.parsed} parsed, ${f.failures.slots} wrong slot count, ${f.failures.vocab} unknown value, ${f.failures.illegal} illegal character`));

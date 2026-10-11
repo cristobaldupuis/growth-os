@@ -161,7 +161,6 @@ test("the row cap drops the oldest and says how many", () => {
   assert.equal(rows.length, PERF_ROW_LIMIT);
   assert.equal(dropped, 10);
 });
-
 // -- The initiative bridge -----------------------------------------------------
 
 test("untagged spend and a broken tag are counted separately", () => {

@@ -27,7 +27,7 @@
 // `gos:vid` buckets in _guard.js.
 
 import { guardEntry, guardRateLimit, clientIp } from "./_guard.js";
-import { readRouting, writeRouting, routingIsDurable } from "./_routing.js";
+import { readRoutingStrict, writeRouting, routingIsDurable } from "./_routing.js";
 import {
   adminConfigError, passwordMatches, sessionCookie, clearedCookie, hasValidSession,
 } from "./_session.js";
@@ -166,7 +166,9 @@ export default async function handler(req, res) {
       // The registry travels to the console rather than being duplicated there, so
       // the picker is built from the same catalogue the proxy allowlists against
       // and the two cannot drift.
-      const stored = await readRouting();
+      const read = await readRoutingStrict();
+      if (!read.ok) console.error("Could not read model routing for the console:", read.message);
+      const stored = read.ok ? read.routing : null;
       const { routing, dropped } = resolveRouting(stored);
       return res.status(200).json({
         catalogue: MODEL_CATALOGUE,
@@ -181,6 +183,11 @@ export default async function handler(req, res) {
         // has — the console should say that rather than silently showing a default.
         dropped,
         durable: routingIsDurable(),
+        // The store's own words when the read failed, so the console can say why
+        // it is showing defaults rather than implying nothing was ever assigned.
+        // Runtime logs on this plan last an hour; this is visible whenever the
+        // console is opened.
+        readError: read.ok ? null : read.message,
       });
     }
 
@@ -189,8 +196,18 @@ export default async function handler(req, res) {
       if (invalid) return res.status(400).json({ error: invalid });
 
       // Merge over what is stored rather than replacing it, so saving one group's
-      // card cannot blank the others.
-      const stored = (await readRouting()) || {};
+      // card cannot blank the others. That only holds if the read worked: a
+      // failed read merged as an empty store writes back this one group alone,
+      // erasing every other assignment and reporting success. So it is refused.
+      const read = await readRoutingStrict();
+      if (!read.ok) {
+        console.error("Refused a routing save because the stored routing could not be read:", read.message);
+        return res.status(503).json({
+          error: `The stored routing could not be read, so nothing was saved: saving now would erase the other groups' assignments. The store said: ${read.message}`,
+          durable: false,
+        });
+      }
+      const stored = read.routing || {};
       const merged = { ...stored, ...req.body.routing };
       const result = await writeRouting(merged);
       if (!result.ok) return res.status(503).json({ error: result.message, durable: false });

@@ -4,6 +4,18 @@ Architecture decisions worth remembering. The bar for this file is a real tradeo
 
 ---
 
+## The data contract is about customers, and the people it does name are listed
+
+**Decision:** the contract in `docs/data-handling.md` changes from "it does not hold people" to "it does not hold customers or audiences", and the records that do name people — an initiative's owner, a creator name in an ad name, members' sign-in emails, whatever is typed into free text — are listed in the document rather than left for a reviewer to find. The same pass rewrote the storage, retention and subprocessor sections against the code, and fixed the code where it was the code that was wrong.
+
+**Why:** a claim-by-claim check of the document against the source found the broader sentence false in ways a prospect's reviewer would find in an afternoon. The weekly-metrics importer stored the personal columns its own dialog said it had dropped. `stripPersonalFields`, named as the connector chokepoint, had no caller. Debate runs keep a full portfolio snapshot server-side with no purge, while the document said there was no server-side copy. The original entry below rested on "both importers already read only the columns they recognise", and one of them did not. Narrowing the promise to what is enforced, and enforcing the parts that should be (the weekly importer, the connector endpoint), costs a slogan. Handing a prospect a security page that is wrong costs the deal and the next one.
+
+**What stays manual, and says so:** retention and deletion. Debate runs and stored images carry no workspace id, so deleting a client means collecting their image keys and identifying their debate runs from the workspace's own records before the workspace row is deleted — a date range would catch other clients' on a shared deployment. The document gives that procedure as it is rather than promising a feature.
+
+**Forcing condition:** the first client contract, or the first security questionnaire. Either one needs workspace ids on debate runs and images, a purge, and a deletion action with a stated timeline, and those should be built then rather than now.
+
+---
+
 ## A product is read from its own page, by the server, and reviewed before it is kept
 
 **Decision.** A brand has products (`brand.products`, at most 12, two images
@@ -1388,7 +1400,7 @@ them. Until that exists, this defect is cheaper than its fix.
 
 **The agenda is authored; the model outputs are not seeded at all.** The same commit seeds six learning-agenda questions, and that is legitimate for a reason worth stating: an agenda question is operator judgement, which is why `seedInitiativeFromAgenda` derives an experiment from one deterministically rather than through a model. Fabricating a question is fabricating a person's opinion, which the demo announces. Fabricating a debate transcript, a creative brief or a Next Plays batch would be fabricating *the system's* output, which it cannot announce without undermining the thing being shown. So those surfaces stay empty until real runs are captured and stamped with the model and date that produced them.
 
-**The audit sample is a second, deliberately worse corpus.** The seeded ad account follows the convention because this tool built it. `SAMPLE_ACCOUNT_NAMES` is an account as found — a different delimiter, five slot shapes, 0% parse, 100% needing manual mapping. One detail is kept rather than fixed: the audit reads slot 3 as "Age · 80.8%" because `Broad` sits in that vocabulary, and the slot is plainly an audience slot. Leaving a confident wrong suggestion in the sample is the most direct demonstration available of why the audit reports coverage and refuses to propose a taxonomy — a tool that auto-assigned that slot would have been silently wrong in a client's first week.
+**The audit sample is a second, deliberately worse corpus.** The seeded ad account follows the convention because this tool built it. `SAMPLE_ACCOUNT_NAMES` is an account as found — a different delimiter, five slot shapes, 0% parse, 100% needing manual mapping. One detail is kept rather than fixed: the audit reads slot 3 as "Age (81%), on one value: Broad" because `Broad` sits in that vocabulary, and the slot is plainly an audience slot. Leaving a confident wrong suggestion in the sample is the most direct demonstration available of why the audit reports coverage and refuses to propose a taxonomy — a tool that auto-assigned that slot would have been silently wrong in a client's first week.
 
 **Forcing condition:** the first real client export going through this path. At that point the seeded account is a fixture competing with real data for the same view, and it should move behind the workspace-mode switch that already distinguishes demo from live — a live workspace should never seed it.
 

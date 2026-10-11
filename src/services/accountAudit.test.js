@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   extractNames, distinctNames, slotHistogram, inferDelimiter,
-  profileSlots, schemaFit, auditAccount, auditToCSV,
+  profileSlots, schemaFit, auditAccount, auditToCSV, suggestionText,
 } from "./accountAudit.js";
 import { DEFAULT_NAMING_SCHEMA } from "./naming.js";
 
@@ -86,7 +86,90 @@ test("the delimiter is inferred from consistency, not from frequency", () => {
 test("an account with no convention is called unstructured rather than given a winner", () => {
   const d = inferDelimiter(["Summer Sale final", "TEST campaign", "another one"], "_");
   assert.equal(d.unstructured, true);
-  assert.equal(d.chosen, "_", "falls back to the schema's own delimiter");
+  assert.equal(d.chosen, "_", "computes with the schema's own delimiter");
+  assert.equal(d.partial, null, "nothing splits, so there is no minority to report");
+});
+
+// Templated prose: the shape a real email account's names take. Invented
+// examples, never a client's.
+const PROSE = [
+  "Get Ready Lakeview", "Get Ready Hillcrest", "Get Ready Rivermont", "Get Ready Oakdale",
+  "Lakeview Game Day", "Hillcrest Game Day",
+  "3/10 Spring Sale", "3/17 Spring Sale", "3/24 Easter Gifts",
+  "Welcome Series", "Abandoned Checkout", "Browse Abandonment",
+];
+
+test("free-text names are never reported as using the schema's delimiter", () => {
+  const a = auditAccount(PROSE, S);
+  assert.equal(a.delimiter.unstructured, true);
+  assert.equal(a.delimiter.using, null, "no delimiter is in use, and none is named");
+  assert.equal(a.delimiter.matchesSchema, null, "there is nothing to match, so neither yes nor no");
+  assert.equal(a.delimiter.splitOn, null, "nothing splits, so nothing is named as the split");
+  assert.deepEqual(a.delimiter.unsplit, { count: PROSE.length, share: 1 });
+  const csv = auditToCSV(a);
+  assert.match(csv, /^delimiter,inferred,none,no delimiter gives these names a dominant shape$/m);
+  assert.match(csv, /^delimiter,matches schema,n\/a,$/m);
+  assert.match(csv, /^delimiter,names with no delimiter,12,100\.0% of distinct names$/m);
+  assert.match(csv, /^shape,split on,none,$/m);
+  assert.doesNotMatch(csv, /^delimiter,inferred,_/m);
+  assert.doesNotMatch(csv, /^delimiter,matches schema,yes/m);
+});
+
+test("free text is counted, not assumed to be the majority of an unstructured account", () => {
+  // Four free-text names and six underscore names in two shapes: one slot is
+  // the most common shape under every delimiter, so no delimiter dominates, but
+  // free text is 40% of the account, not "most" of it.
+  const a = auditAccount([
+    "Welcome Series", "Abandoned Checkout", "Browse Abandonment", "Spring Sale",
+    "holiday_2023_prospecting", "holiday_2023_retargeting", "holiday_2024_prospecting",
+    "bf_us_broad_video", "bf_ca_broad_video", "bf_uk_broad_static",
+  ], S);
+  assert.equal(a.delimiter.unstructured, true);
+  assert.deepEqual(a.delimiter.unsplit, { count: 4, share: 0.4 });
+  assert.match(auditToCSV(a), /^delimiter,names with no delimiter,4,40\.0% of distinct names$/m);
+});
+
+test("a hyphen inside values cannot out-vote the delimiter it sits inside", () => {
+  // Every compliant name splits in two on the hyphen in "35s-Raw" and in eleven
+  // on the underscore. One dashed free-text name used to tip the count to "-".
+  const compliant = Array.from({ length: 10 }, (_, i) =>
+    `Meta_Col_Asset${i}_R3_F_Fitness_Gym_Pastry_Chocolate_35s-Raw_NA`);
+  const a = auditAccount([...PROSE, ...compliant, "Summer Sale - final"], S);
+  assert.equal(a.delimiter.unstructured, true);
+  assert.deepEqual(
+    { delimiter: a.delimiter.partial.delimiter, slots: a.delimiter.partial.slots, count: a.delimiter.partial.count },
+    { delimiter: "_", slots: 11, count: 10 });
+  assert.equal(a.delimiter.splitOn, "_");
+  assert.ok(a.histogram.some(h => h.slots === 11 && h.count === 10));
+});
+
+test("a structured minority is reported alongside the unstructured verdict, not hidden by it", () => {
+  // Ten names follow the house convention; twelve are free text. The mode is one
+  // slot, so the account is unstructured, but 45% of it is not, and the schema
+  // fit below will parse exactly those ten.
+  const compliant = Array.from({ length: 10 }, (_, i) =>
+    `Meta_Col_Asset${i}_R3_F_Fitness_Gym_Pastry_Chocolate_35s-Raw_NA`);
+  const a = auditAccount([...PROSE, ...compliant], S);
+  assert.equal(a.delimiter.unstructured, true);
+  assert.equal(a.delimiter.using, null);
+  assert.deepEqual(
+    { delimiter: a.delimiter.partial.delimiter, slots: a.delimiter.partial.slots, count: a.delimiter.partial.count },
+    { delimiter: "_", slots: 11, count: 10 });
+  assert.equal(a.delimiter.splitOn, "_", "the histogram shows the structure that exists");
+  assert.ok(a.histogram.some(h => h.slots === 11 && h.count === 10));
+  assert.equal(a.best.parsed, 10);
+  assert.equal(a.retrofit.count, PROSE.length, "only the free-text names need claiming by hand");
+  assert.match(auditToCSV(a), /^delimiter,largest split shape,11 slots on _,10 names \(45\.5% of distinct names\)$/m);
+});
+
+test("a minority on another delimiter is split on that delimiter, not the schema's", () => {
+  const piped = ["Promo|US|Video", "Promo|CA|Video", "Promo|UK|Static"];
+  const a = auditAccount([...PROSE, ...piped], S);
+  assert.equal(a.delimiter.unstructured, true);
+  assert.equal(a.delimiter.partial.delimiter, "|");
+  assert.equal(a.delimiter.splitOn, "|");
+  assert.ok(a.histogram.some(h => h.slots === 3 && h.count === 3));
+  assert.match(auditToCSV(a), /^shape,split on,\|,$/m);
 });
 
 test("a tie goes to the schema's delimiter, because changing it invalidates every built name", () => {
@@ -120,6 +203,17 @@ test("a slot is matched to the dimension whose vocabulary covers it", () => {
   const slots = profileSlots(GOOD, "_", 11, DEFAULT_NAMING_SCHEMA);
   assert.equal(slots[0].suggestions[0].key, "channel");
   assert.equal(slots[0].suggestions[0].coverage, 1);
+});
+
+test("a suggestion says which values it rests on, and names a lone one", () => {
+  const slots = profileSlots(GOOD, "_", 11, DEFAULT_NAMING_SCHEMA);
+  const channel = slots[0].suggestions[0];
+  assert.equal(channel.valueCount, 1);
+  assert.deepEqual(channel.values, ["Meta"]);
+  assert.equal(suggestionText(channel), "Channel (100%), on one value: Meta");
+  const gender = slots[4].suggestions.find(s => s.key === "gender");
+  assert.equal(gender.valueCount, 2);
+  assert.doesNotMatch(suggestionText(gender), /one value/);
 });
 
 test("a high-cardinality slot is named as free text rather than forced into a vocabulary", () => {

@@ -411,6 +411,57 @@ test("saving one group does not blank the others", async () => {
   });
 });
 
+// Every app_config read from here on answers the way PostgREST does when the
+// secret key's role has no SELECT on the table. Writes still succeed, which is
+// the dangerous combination: a save would land, built on a read that did not.
+function failConfigReads() {
+  const inner = globalThis.fetch;
+  globalThis.fetch = async (url, opts = {}) => {
+    if (String(url).includes("/app_config") && (opts.method || "GET") === "GET") {
+      return {
+        ok: false, status: 403,
+        text: async () => '{"code":"42501","message":"permission denied for table app_config"}',
+      };
+    }
+    return inner(url, opts);
+  };
+}
+
+test("a save is refused, not merged over nothing, when the stored routing cannot be read", async () => {
+  await withStore(async (kv) => {
+    const cookie = await signIn();
+    await post({ action: "setRouting", routing: { capture: "claude-opus-5", analysis: "claude-opus-5" } }, cookie);
+    failConfigReads();
+
+    const save = await post({ action: "setRouting", routing: { creative: "claude-haiku-4-5" } }, cookie);
+    assert.equal(save.statusCode, 503);
+    assert.equal(save.body.durable, false);
+    assert.match(save.body.error, /permission denied for table app_config/, "the store's own reason reaches the operator");
+    assert.deepEqual(kv.routing, { capture: "claude-opus-5", analysis: "claude-opus-5" },
+      "the other groups' assignments are untouched");
+  });
+});
+
+test("the console is told why it is showing defaults when the read fails", async () => {
+  await withStore(async () => {
+    const cookie = await signIn();
+    await post({ action: "setRouting", routing: { capture: "claude-opus-5" } }, cookie);
+    failConfigReads();
+
+    const cfg = await post({ action: "getConfig" }, cookie);
+    assert.equal(cfg.statusCode, 200, "the console still opens");
+    assert.deepEqual(cfg.body.routing, DEFAULT_ROUTING);
+    assert.match(cfg.body.readError, /returned 403: .*42501/);
+  });
+});
+
+test("a healthy read reports no error", async () => {
+  await withStore(async () => {
+    const cfg = await post({ action: "getConfig" }, await signIn());
+    assert.equal(cfg.body.readError, null);
+  });
+});
+
 test("a stored assignment reaches the app through the public routing read", async () => {
   // The end of the chain: console save -> store -> /api/routing -> applyRouting.
   // If this link were broken the console would look like it worked and change nothing.

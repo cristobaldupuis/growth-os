@@ -3,10 +3,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  classifyHeader, scanHeaders, piiNotice, stripPersonalFields, isAllowedDimension,
+  classifyHeader, scanHeaders, piiNotice, stripPersonalFields, stripPersonalMetrics, isAllowedDimension,
   resolveWorkspaceMode, isLiveWorkspace, backupStatus, BACKUP_STALE_DAYS,
 } from "./dataSafety.js";
 import { parsePerformanceCSV } from "./performance.js";
+import { parseMetricsCSV } from "../constants.js";
 import { DEFAULT_NAMING_SCHEMA } from "./naming.js";
 
 // -- Classification ------------------------------------------------------------
@@ -39,6 +40,14 @@ test("aggregate dimensions that read like personal data are allowed through", ()
 
 test("ordinary metric columns are untouched", () => {
   ["Ad name", "Amount spent (USD)", "Purchases", "Impressions", "Reporting starts"]
+    .forEach(h => assert.equal(classifyHeader(h), null, `${h} should pass`));
+});
+
+test("a column naming a count, rate or amount is an aggregate, whatever else it mentions", () => {
+  // The weekly importer keeps custom columns, so a false positive here drops a
+  // real metric rather than costing a line in the summary.
+  ["email_revenue", "Email Signups", "email_open_rate", "mobile_sessions", "Mobile %",
+   "phone_calls", "ip_traffic", "user_id_count", "zip_code_count", "birthday_campaign_revenue"]
     .forEach(h => assert.equal(classifyHeader(h), null, `${h} should pass`));
 });
 
@@ -80,6 +89,44 @@ test("a performance export carrying personal columns imports without them", () =
   assert.equal(serialised.includes("example.com"), false);
   assert.equal(serialised.includes("Someone"), false);
   assert.equal(rows[0].metrics.spend, 100);
+});
+
+test("a weekly-metrics export carrying personal columns imports without them", () => {
+  // The weekly shape keeps unrecognised columns as custom metrics, which is how
+  // a personal one used to reach the store while the dialog said it had not.
+  const csv = [
+    "date,brand,source,revenue,Email,First name,IP Address,Customer ID,Phone,promo_code,email_revenue,mobile_sessions",
+    "2026-03-02,default,manual,1200,someone@example.com,Someone,203.0.113.7,cus_123,5551234567,SPRING,300,4100",
+  ].join("\n");
+  const { rows } = parseMetricsCSV(csv);
+  assert.equal(rows.length, 1);
+  const serialised = JSON.stringify(rows[0]);
+  for (const leaked of ["example.com", "Someone", "203.0.113.7", "cus_123", "5551234567"]) {
+    assert.equal(serialised.includes(leaked), false, leaked);
+  }
+  assert.equal(rows[0].metrics.revenue, 1200);
+  assert.equal(rows[0].metrics.promo_code, "SPRING", "a custom column that is not personal still comes through");
+  assert.equal(rows[0].metrics.email_revenue, "300", "an aggregate that mentions email is still an aggregate");
+  assert.equal(rows[0].metrics.mobile_sessions, "4100");
+  // And the dialog's notice names every column the parser left out — all five,
+  // not three and a count.
+  const notice = piiNotice(scanHeaders(csv.split("\n")[0].split(",")));
+  for (const header of ["Email", "First name", "IP Address", "Customer ID", "Phone"]) {
+    assert.match(notice, new RegExp(`"${header}"`), header);
+  }
+  assert.doesNotMatch(notice, /more/);
+  assert.doesNotMatch(notice, /email_revenue|mobile_sessions/);
+});
+
+test("weekly metrics restored from a backup lose personal keys on save", () => {
+  // A backup can carry rows the old importer stored with an Email column.
+  const restored = [
+    { date: "2026-03-02", brand: "default", source: "manual", metrics: { revenue: 1200, email: "someone@example.com", email_revenue: 300 } },
+    { date: "2026-03-09", brand: "default", source: "manual", metrics: { revenue: 900 } },
+  ];
+  const clean = stripPersonalMetrics(restored);
+  assert.deepEqual(clean[0].metrics, { revenue: 1200, email_revenue: 300 });
+  assert.equal(clean[1], restored[1], "a clean row is passed through untouched");
 });
 
 // -- Connector rows ------------------------------------------------------------
